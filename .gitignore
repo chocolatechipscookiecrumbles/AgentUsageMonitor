@@ -1,0 +1,32 @@
+# macOS Finder metadata
+.DS_Store
+
+# Swift Package Manager and Xcode build products
+CodexUsageMonitor/.build/
+CodexUsageMonitor/.swiftpm/
+CodexUsageMonitor/DerivedData/
+CodexUsageMonitor/**/*.xcuserdatad/
+CodexUsageMonitor/**/*.xcscmblueprint
+
+# Python caches and local environments
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Live probe output: can contain account usage and local machine metadata
+UsageProbe/Outputs/*
+!UsageProbe/Outputs/.gitkeep
+
+# Local credentials, quota caches, and environment overrides
+.env
+.env.*
+!.env.example
+**/auth.json
+**/last-known-good.json
+**/quota-history.json
+.codex-usage-probe/
+
+# Local logs
+*.log
