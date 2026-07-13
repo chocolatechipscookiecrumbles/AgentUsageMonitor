@@ -1169,7 +1169,7 @@ Current execution status (2026-07-13)
 * Do not begin another provider integration until the reliability gate records refresh outcomes, foreground-independent cadence, forecast behavior, and a Codex-adapter decision.
 * The Codex-first daily-driver roadmap is recorded in `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md`.
 * `feature/notification-settings` is merged with persisted category controls, operational reset/stale/failure warnings, and quiet hours; real reset-transition acceptance remains observational.
-* `feature/settings-foundation` is active. It adds General, Refresh, Codex Account, Data & Privacy, and Diagnostics tabs around the existing Notifications tab, using only real actions and privacy-safe read-only status.
+* `feature/settings-foundation` is active. It adds General, Refresh, Agents, Data & Privacy, and Diagnostics tabs around the existing Notifications tab, using only real actions and privacy-safe read-only status. Agents marks Codex as current while Claude Code and GitHub Copilot remain visibly planned and not connected.
 * All UI work must use a shared two-state quota presentation contract: confirmed/completed after a trusted live refresh, or cached/paused after an unsuccessful refresh while retaining and labeling the last confirmed record.
 * A later `feature/menu-bar-display` branch will make the menu-bar label configurable: current gauge, numeric lowest-remaining percentage, five-hour or weekly remaining, provider plus remaining, or icon-only. Numeric cached/paused values must carry a visible stale marker and never fall back to a misleading `0%`.
 

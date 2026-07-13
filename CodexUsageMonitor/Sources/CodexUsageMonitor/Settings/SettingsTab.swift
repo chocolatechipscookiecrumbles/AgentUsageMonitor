@@ -2,7 +2,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     case general
     case notifications
     case refresh
-    case codexAccount
+    case agents
     case dataPrivacy
     case diagnostics
 
@@ -13,7 +13,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .general: "General"
         case .notifications: "Notifications"
         case .refresh: "Refresh"
-        case .codexAccount: "Codex Account"
+        case .agents: "Agents"
         case .dataPrivacy: "Data & Privacy"
         case .diagnostics: "Diagnostics"
         }
@@ -24,7 +24,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .general: "gear"
         case .notifications: "bell"
         case .refresh: "arrow.clockwise"
-        case .codexAccount: "person.crop.circle"
+        case .agents: "person.3"
         case .dataPrivacy: "hand.raised"
         case .diagnostics: "stethoscope"
         }

@@ -27,9 +27,9 @@ struct SettingsView: View {
                 .tabItem { Label(SettingsTab.refresh.title, systemImage: SettingsTab.refresh.systemImage) }
                 .tag(SettingsTab.refresh)
 
-            CodexAccountSettingsView(status: viewModel.settingsStatus)
-                .tabItem { Label(SettingsTab.codexAccount.title, systemImage: SettingsTab.codexAccount.systemImage) }
-                .tag(SettingsTab.codexAccount)
+            AgentsSettingsView(status: viewModel.settingsStatus)
+                .tabItem { Label(SettingsTab.agents.title, systemImage: SettingsTab.agents.systemImage) }
+                .tag(SettingsTab.agents)
 
             DataPrivacySettingsView()
                 .tabItem { Label(SettingsTab.dataPrivacy.title, systemImage: SettingsTab.dataPrivacy.systemImage) }

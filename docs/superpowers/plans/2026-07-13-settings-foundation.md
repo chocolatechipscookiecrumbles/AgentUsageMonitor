@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `executing-plans` task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Do not create or run automated tests for this branch.
 
-**Goal:** Expand the existing macOS Settings window into a durable five-area foundation—General, Notifications, Refresh, Codex Account, Data & Privacy, and Diagnostics—without implementing later adaptive-refresh, sign-in, launch-at-login, export, or deletion behavior early.
+**Goal:** Expand the existing macOS Settings window into a durable six-tab foundation—General, Notifications, Refresh, Agents, Data & Privacy, and Diagnostics—without implementing later adaptive-refresh, sign-in, launch-at-login, export, or deletion behavior early.
 
 **Architecture:** Preserve the app's lightweight MVVM structure. `AppSettings` remains the only persisted-preference owner; `QuotaMonitor` owns refresh and diagnostic effects; `QuotaViewModel` publishes a provider-neutral `SettingsStatus`; small SwiftUI tab views render bindings, real actions, or explicitly read-only status. No Settings view reads `UserDefaults`, JSON files, provider RPCs, or raw errors directly.
 
@@ -15,7 +15,7 @@
 - Do not create or run automated tests; verify with fresh signed-app builds, read-only state inspection, and manual UI acceptance.
 - Keep `AppSettings` as the only module that reads and writes persisted preferences.
 - Every interactive control must change real current behavior; future controls remain absent until their implementation branch.
-- General, Refresh, Codex Account, Data & Privacy, and Diagnostics may show read-only status for deferred features.
+- General, Refresh, Agents, Data & Privacy, and Diagnostics may show read-only status for deferred features.
 - Keep notification thresholds fixed at 50%, 25%, 10%, and 5%.
 - Do not add export, delete, logout, account switching, adaptive refresh choices, or launch-at-login controls.
 - Preserve the user's 600-point Settings window width and native macOS `Form`, `Section`, `LabeledContent`, and tab presentation.
@@ -32,18 +32,18 @@
 
 **Interfaces:**
 - Consumes: `QuotaPresentation`, `RefreshState`, and `RefreshDiagnosticSummary`.
-- Produces: `SettingsTab`, `SettingsStatus.make(...)`, `CodexAccountStatus`, and `LocalDataInventory.stores` for later view tasks.
+- Produces: `SettingsTab`, `SettingsStatus.make(...)`, `CodexAgentStatus`, and `LocalDataInventory.stores` for later view tasks.
 
 - [x] **Step 1: Expand Settings tabs with stable labels and symbols**
 
-Replace `SettingsTab` with a `CaseIterable`, `Identifiable` enum whose order is General, Notifications, Refresh, Codex Account, Data & Privacy, Diagnostics:
+Replace `SettingsTab` with a `CaseIterable`, `Identifiable` enum whose order is General, Notifications, Refresh, Agents, Data & Privacy, Diagnostics:
 
 ```swift
 enum SettingsTab: String, CaseIterable, Identifiable {
     case general
     case notifications
     case refresh
-    case codexAccount
+    case agents
     case dataPrivacy
     case diagnostics
 
@@ -54,7 +54,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .general: "General"
         case .notifications: "Notifications"
         case .refresh: "Refresh"
-        case .codexAccount: "Codex Account"
+        case .agents: "Agents"
         case .dataPrivacy: "Data & Privacy"
         case .diagnostics: "Diagnostics"
         }
@@ -65,7 +65,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .general: "gear"
         case .notifications: "bell"
         case .refresh: "arrow.clockwise"
-        case .codexAccount: "person.crop.circle"
+        case .agents: "person.3"
         case .dataPrivacy: "hand.raised"
         case .diagnostics: "stethoscope"
         }
@@ -80,7 +80,7 @@ Create `SettingsStatus.swift` with:
 ```swift
 import Foundation
 
-enum CodexAccountStatus: Sendable {
+enum CodexAgentStatus: Sendable {
     case connected
     case cached
     case unavailable
@@ -97,7 +97,7 @@ enum CodexAccountStatus: Sendable {
 struct SettingsStatus: Sendable {
     let appVersion: String
     let buildNumber: String
-    let accountStatus: CodexAccountStatus
+    let codexStatus: CodexAgentStatus
     let planName: String?
     let confirmation: ConfirmationState
     let collectedAt: Date
@@ -110,20 +110,20 @@ struct SettingsStatus: Sendable {
         diagnostics: RefreshDiagnosticSummary,
         bundle: Bundle = .main
     ) -> SettingsStatus {
-        let accountStatus: CodexAccountStatus
+        let codexStatus: CodexAgentStatus
         if presentation.accountFingerprint != nil,
            presentation.confirmation == .confirmed || presentation.confirmation == .confirmedAfterRetry {
-            accountStatus = .connected
+            codexStatus = .connected
         } else if presentation.accountFingerprint != nil,
                   presentation.confirmation == .cachedLastKnownGood {
-            accountStatus = .cached
+            codexStatus = .cached
         } else {
-            accountStatus = .unavailable
+            codexStatus = .unavailable
         }
         return SettingsStatus(
             appVersion: bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Development",
             buildNumber: bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "Local",
-            accountStatus: accountStatus,
+            codexStatus: codexStatus,
             planName: presentation.planType?.capitalized,
             confirmation: presentation.confirmation,
             collectedAt: presentation.collectedAt,
@@ -261,7 +261,7 @@ Expected: `Build complete!`; do not inspect diagnostic values, only confirm no r
 - Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/GeneralSettingsView.swift`
 - Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/NotificationSettingsView.swift`
 - Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/RefreshSettingsView.swift`
-- Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/CodexAccountSettingsView.swift`
+- Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AgentsSettingsView.swift`
 - Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/DataPrivacySettingsView.swift`
 - Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/DiagnosticsSettingsView.swift`
 - Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/CodexUsageMonitorApp.swift`
@@ -298,9 +298,9 @@ Compose six tab views with `.tabItem { Label(tab.title, systemImage: tab.systemI
 
 Do not add interval choices; those belong to `feature/adaptive-refresh`.
 
-- [x] **Step 4: Add Codex Account and Data & Privacy read-only views**
+- [x] **Step 4: Add Agents and Data & Privacy read-only views**
 
-`CodexAccountSettingsView` shows only `CodexAccountStatus.displayName`, optional plan name, and confirmation. It must explicitly say sign-in controls arrive in the Codex Connection phase and must not display an email or fingerprint.
+`AgentsSettingsView` marks OpenAI Codex as the only current integration and shows its `CodexAgentStatus.displayName`, optional plan name, and confirmation. It also lists Claude Code and GitHub Copilot as planned and not connected. The view must explicitly say sign-in controls arrive in the Codex Connection phase and must not display an email or fingerprint.
 
 `DataPrivacySettingsView` shows the local directory, each `LocalDataStoreDescriptor`, owner-only permissions (`0700` directory, `0600` files), and excluded sensitive content. Do not add reveal, export, or delete buttons.
 
@@ -375,7 +375,7 @@ Do not replace the native Settings scene with a custom `NSWindow` controller.
 
 - [x] **Step 1: Document each tab and its current boundaries**
 
-State that Refresh, Codex Account, Data & Privacy, and Diagnostics are read-only except the real **Refresh now** action; adaptive scheduling, sign-in, export/delete, and launch at login remain later branches.
+State that Refresh, Agents, Data & Privacy, and Diagnostics are read-only except the real **Refresh now** action; Agents lists Codex as current and Claude Code/GitHub Copilot as planned, while adaptive scheduling, sign-in, export/delete, and launch at login remain later branches.
 
 - [x] **Step 2: Record privacy and retention presentation**
 

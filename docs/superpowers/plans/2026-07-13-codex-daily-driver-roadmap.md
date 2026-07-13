@@ -68,7 +68,7 @@ Acceptance: settings survive relaunch; notification authorization is requested o
 
 ### 2. `feature/settings-foundation` — active
 
-Add General, Refresh, Codex Account, Data & Privacy, and Diagnostics tabs to the existing Settings window. Show retention and privacy information without export/delete actions. Keep all settings behind one persisted settings module rather than reading `UserDefaults` throughout views.
+Add General, Refresh, Agents, Data & Privacy, and Diagnostics tabs to the existing Settings window. Agents lists Codex as the current integration and shows Claude Code and GitHub Copilot as planned, not connected providers. Show retention and privacy information without export/delete actions. Keep all settings behind one persisted settings module rather than reading `UserDefaults` throughout views.
 
 Acceptance: one Settings window is focused on repeated opens; `Command-,` works; every control changes real behavior or is read-only status.
 

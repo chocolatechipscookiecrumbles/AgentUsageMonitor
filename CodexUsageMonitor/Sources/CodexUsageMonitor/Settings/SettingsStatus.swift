@@ -1,6 +1,6 @@
 import Foundation
 
-enum CodexAccountStatus: Sendable {
+enum CodexAgentStatus: Sendable {
     case connected
     case cached
     case unavailable
@@ -17,7 +17,7 @@ enum CodexAccountStatus: Sendable {
 struct SettingsStatus: Sendable {
     let appVersion: String
     let buildNumber: String
-    let accountStatus: CodexAccountStatus
+    let codexStatus: CodexAgentStatus
     let planName: String?
     let confirmation: ConfirmationState
     let collectedAt: Date
@@ -38,21 +38,21 @@ struct SettingsStatus: Sendable {
         diagnostics: RefreshDiagnosticSummary,
         bundle: Bundle = .main
     ) -> SettingsStatus {
-        let accountStatus: CodexAccountStatus
+        let codexStatus: CodexAgentStatus
         if presentation.accountFingerprint != nil,
            presentation.confirmation == .confirmed || presentation.confirmation == .confirmedAfterRetry {
-            accountStatus = .connected
+            codexStatus = .connected
         } else if presentation.accountFingerprint != nil,
                   presentation.confirmation == .cachedLastKnownGood {
-            accountStatus = .cached
+            codexStatus = .cached
         } else {
-            accountStatus = .unavailable
+            codexStatus = .unavailable
         }
 
         return SettingsStatus(
             appVersion: bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Development",
             buildNumber: bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "Local",
-            accountStatus: accountStatus,
+            codexStatus: codexStatus,
             planName: presentation.planType?.capitalized,
             confirmation: presentation.confirmation,
             collectedAt: presentation.collectedAt,
