@@ -16,6 +16,8 @@ final class AppSettings: ObservableObject {
         static let quietHoursEndMinutes = "notification.quietHoursEndMinutes"
         static let allowCriticalDuringQuietHours = "notification.allowCriticalDuringQuietHours"
         static let refreshMode = "refresh.mode"
+        static let menuBarDisplayStyle = "menuBar.displayStyle"
+        static let quotaValueMode = "menuBar.valueMode"
     }
 
     private let defaults: UserDefaults
@@ -34,6 +36,8 @@ final class AppSettings: ObservableObject {
     @Published var quietHoursEndMinutes: Int { didSet { defaults.set(quietHoursEndMinutes, forKey: Key.quietHoursEndMinutes) } }
     @Published var allowCriticalDuringQuietHours: Bool { didSet { defaults.set(allowCriticalDuringQuietHours, forKey: Key.allowCriticalDuringQuietHours) } }
     @Published var refreshMode: RefreshMode { didSet { defaults.set(refreshMode.rawValue, forKey: Key.refreshMode) } }
+    @Published var menuBarDisplayStyle: MenuBarDisplayStyle { didSet { defaults.set(menuBarDisplayStyle.rawValue, forKey: Key.menuBarDisplayStyle) } }
+    @Published var quotaValueMode: QuotaValueMode { didSet { defaults.set(quotaValueMode.rawValue, forKey: Key.quotaValueMode) } }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -49,6 +53,8 @@ final class AppSettings: ObservableObject {
         quietHoursEndMinutes = Self.integer(for: Key.quietHoursEndMinutes, defaults: defaults, defaultValue: 7 * 60)
         allowCriticalDuringQuietHours = Self.value(for: Key.allowCriticalDuringQuietHours, defaults: defaults, defaultValue: true)
         refreshMode = defaults.string(forKey: Key.refreshMode).flatMap(RefreshMode.init(rawValue:)) ?? .twoMinutes
+        menuBarDisplayStyle = defaults.string(forKey: Key.menuBarDisplayStyle).flatMap(MenuBarDisplayStyle.init(rawValue:)) ?? .gaugeAndLowest
+        quotaValueMode = defaults.string(forKey: Key.quotaValueMode).flatMap(QuotaValueMode.init(rawValue:)) ?? .remaining
     }
 
     private static func value(for key: String, defaults: UserDefaults, defaultValue: Bool) -> Bool {

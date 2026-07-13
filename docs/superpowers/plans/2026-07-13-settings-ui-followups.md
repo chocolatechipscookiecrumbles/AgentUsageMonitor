@@ -21,7 +21,7 @@
 - Interpret “hotkeys” as app-local keyboard shortcuts, not system-wide global hotkeys. Initial scope is `Command-R` for **Refresh now**; standard macOS `Command-,` for Settings and `Command-Q` for Quit remain available and are not disabled by this preference.
 - The top Settings tab bar must remain full-width and unchanged. The Agents provider sidebar begins below it and divides only the lower Agents content region.
 - Preserve Codex, Claude Code, and GitHub Copilot as the visible provider list; Codex remains the only active integration.
-- Keep menu-bar display controls out of this branch. The later `feature/menu-bar-display` branch adds them to General after Dashboard, using the persisted Settings patterns established here.
+- Keep menu-bar display controls out of this branch. The independently stacked `feature/menu-bar-display` branch adds them to General without coupling them to the remaining Settings follow-ups.
 - Update `outline.md`, the daily-driver roadmap, `how-to.md`, and `UsageProbe/README.md` when implementation changes behavior.
 
 ---

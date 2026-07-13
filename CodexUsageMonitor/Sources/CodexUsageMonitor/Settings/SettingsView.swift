@@ -11,7 +11,11 @@ struct SettingsView: View {
 
     var body: some View {
         TabView(selection: $settings.selectedSettingsTab) {
-            GeneralSettingsView(status: viewModel.settingsStatus)
+            GeneralSettingsView(
+                settings: settings,
+                status: viewModel.settingsStatus,
+                displayState: viewModel.displayState
+            )
                 .tabItem { Label(SettingsTab.general.title, systemImage: SettingsTab.general.systemImage) }
                 .tag(SettingsTab.general)
 

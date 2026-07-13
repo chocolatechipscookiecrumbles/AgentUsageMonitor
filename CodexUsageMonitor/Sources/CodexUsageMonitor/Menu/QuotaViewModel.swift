@@ -78,13 +78,6 @@ final class QuotaViewModel: ObservableObject {
         }
     }
 
-    var menuBarTitle: String {
-        guard let remaining = [presentation.fiveHour?.remainingPercent, presentation.weekly?.remainingPercent].compactMap({ $0 }).min() else {
-            return "Codex"
-        }
-        return "Codex \(remaining)%"
-    }
-
     var settingsStatus: SettingsStatus {
         SettingsStatus.make(
             displayState: displayState,

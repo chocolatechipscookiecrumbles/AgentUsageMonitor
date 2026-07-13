@@ -86,23 +86,11 @@ Acceptance: neither path reads credentials; successful sign-in triggers a quota 
 
 Implementation status on 2026-07-13: the provider-neutral connection state, `account/read` detection, Codex-managed browser flow, visible Terminal CLI flow, explicit disconnected menu stage, and Agents Settings connection detail are implemented. The native menu renders exactly one of two top-level stages: connected quota controls, or connection guidance/actions; Settings and Quit remain the final shared commands. Compilation, confirmed live collection, signed-bundle launch, and isolated disconnected-process survival passed, and user-reported manual acceptance confirmed the disconnected menu plus successful browser/CLI transitions. The app does not log out the current account automatically to manufacture that state.
 
-### 5. `feature/settings-ui-followups`
+### 5. `feature/menu-bar-display` — implemented; manual UI acceptance pending (stacked on Codex Connection)
 
-Refine the existing Settings window before adding Dashboard. Replace the combined remaining-quota warning switch with separate 50%/25%/10%/5% choices that apply to both quota lanes. Turning off **Enable quota notifications** must grey every subordinate notification control without erasing choices. Expand General with working **Launch at login**, **System/Light/Dark** appearance, and app-local keyboard-shortcut enablement. Rebuild the Agents tab as a lower-content-only split so its provider sidebar begins below, and never takes space from, the unchanged full-width top Settings tab bar.
+Implement the dynamic General-controlled menu-bar display described below before returning to the remaining Settings and Dashboard sequence.
 
-Acceptance: threshold choices persist and filter delivery independently; the notification master switch gates and greys the checklist while permission recovery remains active; Launch at Login reflects real `SMAppService` state; appearance updates app-owned windows; disabling shortcuts removes the custom `Command-R` refresh binding but not standard Settings/Quit commands; and switching tabs never moves or narrows the top tab bar.
-
-Detailed plan: `docs/superpowers/plans/2026-07-13-settings-ui-followups.md`.
-
-### 6. `feature/dashboard`
-
-Add one separate Dashboard window using Swift Charts and a read-only analytics module. Include current five-hour/weekly percentages, reset countdowns, reset-separated usage charts, consumption per hour, forecast/confidence/observation count, sustainable pace, 15-minute/1-hour/24-hour changes, refresh outcome rates, data age, and inferred reset history. Exclude credit balance and earned reset credits.
-
-Acceptance: ranges are 24h/7d/30d/90d with 7d default; no account fingerprint is displayed; missing evidence produces an unavailable explanation rather than zero; repeated opens focus one window.
-
-Dashboard acceptance also requires rendering `QuotaDisplayState` directly: cached/paused data must remain visually distinguishable from the latest confirmed history and must show its last-successful timestamp.
-
-### 7. `feature/menu-bar-display`
+Detailed plan: `docs/superpowers/plans/2026-07-13-menu-bar-display.md`.
 
 Add a **Menu Bar** section to General with two independent preferences: **Appearance** chooses the label layout, and **Show** chooses whether every percentage represents quota **Remaining** or **Used**. Preserve the current gauge as the default appearance and add one dual-limit appearance that shows both quota lanes at once.
 
@@ -122,7 +110,7 @@ Behavior:
 
 - In General, label the layout picker **Appearance** with choices **Gauge** and **5-hour and weekly**.
 - Label the value-mode picker **Show** with choices **Remaining** and **Used**. Use an explicit two-choice picker rather than a switch whose off state is hidden. Default to **Remaining** for compatibility with the current display.
-- **Gauge:** retain the current gauge and lowest-available percentage. Interpret that percentage using the selected value mode.
+- **Gauge:** retain the current gauge and show the most-consumed available lane: minimum remaining in Remaining mode or maximum used in Used mode.
 - **5-hour and weekly:** render `5H: 64% | Week: 82%` in Remaining mode. In Used mode, render the complements, for example `5H: 36% | Week: 18%`.
 - Calculate used percentage as `100 - remaining`, clamp to 0...100, and use the same whole-percent rounding rule for both modes.
 - If one lane is unavailable, preserve the label structure and show `—` for only that lane, such as `5H: 64% | Week: —`. Never substitute `0%` for unavailable data.
@@ -133,6 +121,24 @@ Behavior:
 - Keep the initial scope to these two appearances. Later extensions may add lowest-only, single-lane, provider-and-remaining, icon-only, user-selected system icons, lane rotation, color/urgency accents where macOS permits them, and multi-provider lowest-remaining mode.
 
 Acceptance: the dual label shows both lanes in the requested format; switching Appearance or Show updates immediately; Remaining and Used are complementary; a missing lane never invents a value; cached/paused mode is visibly distinct; VoiceOver describes both lanes, value mode, and freshness; and the maximum-width label remains readable in light and dark appearances.
+
+Implementation status on 2026-07-13: persisted Appearance and Show preferences, provider-neutral label formatting, cached/paused marking, semantic accessibility text, reactive `MenuBarExtra` rendering, and the General live preview compile and produce a valid signed app. A newly launched signed instance survived its launch refresh without a new crash report. Visual switching, preference relaunch, and one full scheduled interval remain manual acceptance checks.
+
+### 6. `feature/settings-ui-followups`
+
+Refine the existing Settings window before adding Dashboard. Replace the combined remaining-quota warning switch with separate 50%/25%/10%/5% choices that apply to both quota lanes. Turning off **Enable quota notifications** must grey every subordinate notification control without erasing choices. Expand General with working **Launch at login**, **System/Light/Dark** appearance, and app-local keyboard-shortcut enablement. Rebuild the Agents tab as a lower-content-only split so its provider sidebar begins below, and never takes space from, the unchanged full-width top Settings tab bar.
+
+Acceptance: threshold choices persist and filter delivery independently; the notification master switch gates and greys the checklist while permission recovery remains active; Launch at Login reflects real `SMAppService` state; appearance updates app-owned windows; disabling shortcuts removes the custom `Command-R` refresh binding but not standard Settings/Quit commands; and switching tabs never moves or narrows the top tab bar.
+
+Detailed plan: `docs/superpowers/plans/2026-07-13-settings-ui-followups.md`.
+
+### 7. `feature/dashboard`
+
+Add one separate Dashboard window using Swift Charts and a read-only analytics module. Include current five-hour/weekly percentages, reset countdowns, reset-separated usage charts, consumption per hour, forecast/confidence/observation count, sustainable pace, 15-minute/1-hour/24-hour changes, refresh outcome rates, data age, and inferred reset history. Exclude credit balance and earned reset credits.
+
+Acceptance: ranges are 24h/7d/30d/90d with 7d default; no account fingerprint is displayed; missing evidence produces an unavailable explanation rather than zero; repeated opens focus one window.
+
+Dashboard acceptance also requires rendering `QuotaDisplayState` directly: cached/paused data must remain visually distinguishable from the latest confirmed history and must show its last-successful timestamp.
 
 ### 8. `feature/figma-ui-overhaul`
 
