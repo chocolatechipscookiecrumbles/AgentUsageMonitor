@@ -17,7 +17,7 @@
 - Every interactive control must change real current behavior; future controls remain absent until their implementation branch.
 - General, Refresh, Agents, Data & Privacy, and Diagnostics may show read-only status for deferred features.
 - Keep notification thresholds fixed at 50%, 25%, 10%, and 5%.
-- Do not add export, delete, logout, account switching, adaptive refresh choices, or launch-at-login controls.
+- Do not add export, delete, logout, account switching, adaptive refresh choices, Launch at Login, or appearance controls.
 - Preserve the user's 600-point Settings window width and native macOS `Form`, `Section`, `LabeledContent`, and tab presentation.
 - Update `outline.md`, `how-to.md`, `UsageProbe/README.md`, the daily-driver roadmap, and this plan whenever behavior or documented status changes.
 
@@ -262,6 +262,9 @@ Expected: `Build complete!`; do not inspect diagnostic values, only confirm no r
 - Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/NotificationSettingsView.swift`
 - Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/RefreshSettingsView.swift`
 - Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AgentsSettingsView.swift`
+- Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AgentProvider.swift`
+- Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/CodexAgentSettingsView.swift`
+- Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/PlannedAgentSettingsView.swift`
 - Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/DataPrivacySettingsView.swift`
 - Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/DiagnosticsSettingsView.swift`
 - Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/CodexUsageMonitorApp.swift`
@@ -300,7 +303,7 @@ Do not add interval choices; those belong to `feature/adaptive-refresh`.
 
 - [x] **Step 4: Add Agents and Data & Privacy read-only views**
 
-`AgentsSettingsView` marks OpenAI Codex as the only current integration and shows its `CodexAgentStatus.displayName`, optional plan name, and confirmation. It also lists Claude Code and GitHub Copilot as planned and not connected. The view must explicitly say sign-in controls arrive in the Codex Connection phase and must not display an email or fingerprint.
+`AgentsSettingsView` uses a `NavigationSplitView`: a left sidebar lists OpenAI Codex, Claude Code, and GitHub Copilot, while the detail column renders an agent-specific view. `CodexAgentSettingsView` shows `CodexAgentStatus.displayName`, optional plan name, and confirmation. `PlannedAgentSettingsView` identifies Claude Code and GitHub Copilot as planned and not connected. The views must explicitly say sign-in controls arrive in later phases and must not display an email or fingerprint.
 
 `DataPrivacySettingsView` shows the local directory, each `LocalDataStoreDescriptor`, owner-only permissions (`0700` directory, `0600` files), and excluded sensitive content. Do not add reveal, export, or delete buttons.
 
@@ -375,7 +378,15 @@ Do not replace the native Settings scene with a custom `NSWindow` controller.
 
 - [x] **Step 1: Document each tab and its current boundaries**
 
-State that Refresh, Agents, Data & Privacy, and Diagnostics are read-only except the real **Refresh now** action; Agents lists Codex as current and Claude Code/GitHub Copilot as planned, while adaptive scheduling, sign-in, export/delete, and launch at login remain later branches.
+State that Refresh, Agents, Data & Privacy, and Diagnostics are read-only except the real **Refresh now** action; Agents uses a provider sidebar with Codex current and Claude Code/GitHub Copilot planned, while adaptive scheduling, sign-in, export/delete, Launch at Login, and appearance remain later branches.
+
+### Follow-up correction: Agent navigation and deferred General controls
+
+- [x] Replace the flat Agents form with a left provider sidebar and in-tab detail pane.
+- [x] Give Codex a live detail view and Claude Code/GitHub Copilot planned-provider detail views.
+- [x] Keep Codex visibly identified as the only current integration.
+- [x] Record future General controls for Launch at Login and System/Light/Dark appearance without rendering nonfunctional controls.
+- [ ] Build and visually confirm sidebar selection, detail switching, and layout at the current 600×520 Settings size.
 
 - [x] **Step 2: Record privacy and retention presentation**
 

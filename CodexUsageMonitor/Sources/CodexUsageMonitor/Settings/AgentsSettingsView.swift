@@ -2,36 +2,44 @@ import SwiftUI
 
 struct AgentsSettingsView: View {
     let status: SettingsStatus
+    @State private var selectedAgent: AgentProvider? = .codex
 
     var body: some View {
-        Form {
-            Section("Current integration") {
-                LabeledContent("Agent", value: "OpenAI Codex")
-                LabeledContent("Status", value: status.codexStatus.displayName)
-                if let planName = status.planName {
-                    LabeledContent("Plan", value: planName)
+        NavigationSplitView {
+            List(AgentProvider.allCases, selection: $selectedAgent) { agent in
+                Label {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(agent.title)
+                        Text(agent.sidebarStatus)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } icon: {
+                    Image(systemName: agent.systemImage)
                 }
-                LabeledContent("Quota verification", value: status.confirmation.displayName)
-                Text("Codex is the only active agent integration in this build.")
-                    .foregroundStyle(.secondary)
+                .tag(agent)
             }
-
-            Section("Planned agents") {
-                LabeledContent("Claude Code", value: "Not connected")
-                LabeledContent("GitHub Copilot", value: "Not connected")
-                Text("Claude Code and GitHub Copilot are roadmap entries only. Their connection and usage features are not implemented yet.")
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("Privacy") {
-                Text("The Agents screen never displays an email address, account fingerprint, credential, or authentication token.")
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("Planned connection flow") {
-                Text("Browser sign-in and a visible Codex CLI login option arrive in the Codex Connection phase. Logout and account switching remain out of scope.")
-                    .foregroundStyle(.secondary)
+            .navigationTitle("Agents")
+            .navigationSplitViewColumnWidth(min: 160, ideal: 180, max: 210)
+        } detail: {
+            if let selectedAgent {
+                Group {
+                    switch selectedAgent {
+                    case .codex:
+                        CodexAgentSettingsView(status: status)
+                    case .claudeCode, .githubCopilot:
+                        PlannedAgentSettingsView(agent: selectedAgent)
+                    }
+                }
+                    .navigationTitle(selectedAgent.title)
+            } else {
+                ContentUnavailableView(
+                    "Select an agent",
+                    systemImage: "person.3",
+                    description: Text("Choose an agent from the sidebar to view its status.")
+                )
             }
         }
+        .navigationSplitViewStyle(.balanced)
     }
 }

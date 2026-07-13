@@ -68,7 +68,7 @@ Acceptance: settings survive relaunch; notification authorization is requested o
 
 ### 2. `feature/settings-foundation` — active
 
-Add General, Refresh, Agents, Data & Privacy, and Diagnostics tabs to the existing Settings window. Agents lists Codex as the current integration and shows Claude Code and GitHub Copilot as planned, not connected providers. Show retention and privacy information without export/delete actions. Keep all settings behind one persisted settings module rather than reading `UserDefaults` throughout views.
+Add General, Refresh, Agents, Data & Privacy, and Diagnostics tabs to the existing Settings window. Agents uses a left provider sidebar and an in-tab detail pane for each agent: Codex is the current integration, while Claude Code and GitHub Copilot are planned and not connected. Show retention and privacy information without export/delete actions. Keep all settings behind one persisted settings module rather than reading `UserDefaults` throughout views.
 
 Acceptance: one Settings window is focused on repeated opens; `Command-,` works; every control changes real behavior or is read-only status.
 
@@ -92,11 +92,11 @@ Acceptance: ranges are 24h/7d/30d/90d with 7d default; no account fingerprint is
 
 Dashboard acceptance also requires rendering `QuotaDisplayState` directly: cached/paused data must remain visually distinguishable from the latest confirmed history and must show its last-successful timestamp.
 
-### 6. `feature/launch-at-login`
+### 6. `feature/general-preferences`
 
-Add an opt-in General setting backed by `SMAppService.mainApp`. Default off, show actual registration state, and surface registration errors without changing the preference silently.
+Add an opt-in **Launch at Login** General setting backed by `SMAppService.mainApp`. Default off, show actual registration state, and surface registration errors without changing the preference silently. Add an **Appearance** picker with **System** (default), **Light**, and **Dark** choices, persisted through `AppSettings`; apply the selected scheme to app-owned windows without attempting to recolor native macOS menu-bar chrome.
 
-Acceptance: enabling registers the app, disabling unregisters it, and fresh installs remain off.
+Acceptance: enabling launch at login registers the app, disabling unregisters it, and fresh installs remain off. Appearance defaults to System, updates open app windows immediately, and persists after relaunch.
 
 ### 7. `feature/menu-bar-display`
 
