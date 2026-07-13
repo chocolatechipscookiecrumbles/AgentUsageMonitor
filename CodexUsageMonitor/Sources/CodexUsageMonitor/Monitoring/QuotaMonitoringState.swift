@@ -5,6 +5,7 @@ enum RefreshReason: String, Codable, Sendable {
     case scheduled
     case wake
     case manual
+    case authentication
 }
 
 enum RefreshState: Equatable, Sendable {

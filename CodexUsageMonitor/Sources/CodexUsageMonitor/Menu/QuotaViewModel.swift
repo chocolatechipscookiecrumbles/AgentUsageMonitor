@@ -16,10 +16,12 @@ final class QuotaViewModel: ObservableObject {
     @Published private(set) var nextRefreshAt: Date?
     @Published private(set) var effectiveRefreshInterval: TimeInterval?
     @Published private(set) var refreshScheduleReason: RefreshScheduleReason?
+    @Published private(set) var connectionState: AgentConnectionState = .checking
 
     let settings: AppSettings
     let countdownClock: RefreshCountdownClock
     private let monitor: QuotaMonitor
+    private let connectionController: CodexConnectionController
     private var subscriptions: Set<AnyCancellable> = []
 
     init() {
@@ -27,6 +29,10 @@ final class QuotaViewModel: ObservableObject {
         self.settings = settings
         let monitor = QuotaMonitor(settings: settings)
         self.monitor = monitor
+        let connectionController = CodexConnectionController {
+            monitor.refresh(reason: .authentication)
+        }
+        self.connectionController = connectionController
         displayState = monitor.displayState
         countdownClock = RefreshCountdownClock(
             lastRefreshAt: monitor.displayState.lastAttemptAt,
@@ -46,6 +52,7 @@ final class QuotaViewModel: ObservableObject {
         monitor.$refreshState.sink { [weak self] state in
             self?.refreshState = state
             if case .refreshing = state { self?.isRefreshing = true } else { self?.isRefreshing = false }
+            if case .failed = state { self?.connectionController.recheckConnection() }
             self?.updateCountdownClock()
         }.store(in: &subscriptions)
         monitor.$diagnosticSummary.sink { [weak self] summary in
@@ -62,6 +69,9 @@ final class QuotaViewModel: ObservableObject {
         }.store(in: &subscriptions)
         settings.$notificationAuthorizationState.removeDuplicates().sink { [weak self] state in
             self?.notificationAuthorizationState = state
+        }.store(in: &subscriptions)
+        connectionController.$state.removeDuplicates().sink { [weak self] state in
+            self?.connectionState = state
         }.store(in: &subscriptions)
         if !CommandLine.arguments.contains("--live-read-once") {
             start()
@@ -84,6 +94,7 @@ final class QuotaViewModel: ObservableObject {
     }
 
     func start() {
+        connectionController.start()
         monitor.start()
         Task { [weak self] in
             guard let self else { return }
@@ -93,6 +104,18 @@ final class QuotaViewModel: ObservableObject {
 
     func refresh() {
         monitor.refresh(reason: .manual)
+    }
+
+    func checkCodexConnection() {
+        connectionController.checkConnection()
+    }
+
+    func signInWithBrowser() {
+        connectionController.signInWithBrowser()
+    }
+
+    func signInWithCLI() {
+        connectionController.signInWithCLI()
     }
 
     func setAlertsEnabled(_ enabled: Bool) {

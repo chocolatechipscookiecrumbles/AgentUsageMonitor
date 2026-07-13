@@ -21,9 +21,9 @@ enum AgentProvider: String, CaseIterable, Identifiable {
         }
     }
 
-    var sidebarStatus: String {
+    func sidebarStatus(connectionState: AgentConnectionState) -> String {
         switch self {
-        case .codex: "Current integration"
+        case .codex: connectionState.displayName
         case .claudeCode, .githubCopilot: "Planned"
         }
     }

@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct AgentsSettingsView: View {
-    let status: SettingsStatus
+    @ObservedObject var viewModel: QuotaViewModel
     @State private var selectedAgent: AgentProvider? = .codex
 
     var body: some View {
@@ -10,7 +10,7 @@ struct AgentsSettingsView: View {
                 Label {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(agent.title)
-                        Text(agent.sidebarStatus)
+                        Text(agent.sidebarStatus(connectionState: viewModel.connectionState))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -26,7 +26,13 @@ struct AgentsSettingsView: View {
                 Group {
                     switch selectedAgent {
                     case .codex:
-                        CodexAgentSettingsView(status: status)
+                        CodexAgentSettingsView(
+                            status: viewModel.settingsStatus,
+                            connectionState: viewModel.connectionState,
+                            signInWithBrowser: viewModel.signInWithBrowser,
+                            signInWithCLI: viewModel.signInWithCLI,
+                            checkConnection: viewModel.checkCodexConnection
+                        )
                     case .claudeCode, .githubCopilot:
                         PlannedAgentSettingsView(agent: selectedAgent)
                     }

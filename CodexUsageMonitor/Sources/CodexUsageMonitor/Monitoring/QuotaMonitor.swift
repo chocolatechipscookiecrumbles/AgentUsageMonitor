@@ -21,6 +21,7 @@ final class QuotaMonitor: ObservableObject {
     private var wakeObserver: NSObjectProtocol?
     private var settingsSubscription: AnyCancellable?
     private var hasStarted = false
+    private var hasPendingAuthenticationRefresh = false
     private var consecutiveFailures = 0
     private var automaticBurstStartedAt: Date?
 
@@ -77,7 +78,12 @@ final class QuotaMonitor: ObservableObject {
     }
 
     func refresh(reason: RefreshReason) {
-        guard refreshTask == nil else { return }
+        guard refreshTask == nil else {
+            if reason == .authentication {
+                hasPendingAuthenticationRefresh = true
+            }
+            return
+        }
         invalidateRefreshTimer()
         let startedAt = Date()
         refreshState = .refreshing(reason: reason)
@@ -101,7 +107,12 @@ final class QuotaMonitor: ObservableObject {
                 : .failed(at: completedAt)
             await notifier?.evaluate(freshRecord)
             refreshTask = nil
-            scheduleNextRefresh(from: completedAt)
+            if hasPendingAuthenticationRefresh {
+                hasPendingAuthenticationRefresh = false
+                refresh(reason: .authentication)
+            } else {
+                scheduleNextRefresh(from: completedAt)
+            }
         }
     }
 

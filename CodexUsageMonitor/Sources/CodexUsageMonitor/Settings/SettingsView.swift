@@ -27,7 +27,7 @@ struct SettingsView: View {
                 .tabItem { Label(SettingsTab.refresh.title, systemImage: SettingsTab.refresh.systemImage) }
                 .tag(SettingsTab.refresh)
 
-            AgentsSettingsView(status: viewModel.settingsStatus)
+            AgentsSettingsView(viewModel: viewModel)
                 .tabItem { Label(SettingsTab.agents.title, systemImage: SettingsTab.agents.systemImage) }
                 .tag(SettingsTab.agents)
 

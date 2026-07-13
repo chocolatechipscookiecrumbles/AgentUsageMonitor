@@ -72,17 +72,19 @@ Add General, Refresh, Agents, Data & Privacy, and Diagnostics tabs to the existi
 
 Acceptance: one Settings window is focused on repeated opens; `Command-,` works; every control changes real behavior or is read-only status.
 
-### 3. `feature/adaptive-refresh` — active (stacked on Settings Foundation)
+### 3. `feature/adaptive-refresh` — implemented (stacked on Settings Foundation)
 
 Replace the fixed timer with a scheduling policy returning an effective interval and explanation. Fixed modes use 60/90/120/300/600 seconds. Automatic considers confirmed consumption slope, remaining percentage, reset proximity, forecast confidence, and recent failures. It may use 30 seconds for at most ten minutes and exits after the event or two failures. Add `nextRefreshAt`, effective-mode explanation, and the provider-neutral `QuotaDisplayState` to monitoring state; show a live countdown beside Last refresh and the two-state confirmed/completed or cached/paused status in the popover.
 
 Acceptance: manual refresh never waits behind scheduled work; only one collection runs; repeated failures fall back to five minutes; wake and launch always refresh. Confirmed-after-retry is confirmed/completed; cached, unconfirmed, and unavailable outcomes are cached/paused without replacing the last confirmed display record.
 
-### 4. `feature/codex-connection`
+### 4. `feature/codex-connection` — active (stacked on Adaptive Refresh)
 
 Add a Codex connection module that distinguishes missing CLI, unauthenticated, connected, signing in, and failed states. Primary “Sign in with browser” uses provider-generated app-server authentication URLs and completion events. Secondary CLI flow visibly opens Terminal with `codex login` ready for the user to run, then monitors `codex login status`. Omit logout and account switching.
 
 Acceptance: neither path reads credentials; successful sign-in triggers a quota refresh; missing Codex shows installation guidance; failures remain recoverable.
+
+Implementation status on 2026-07-13: the provider-neutral connection state, `account/read` detection, Codex-managed browser flow, visible Terminal CLI flow, explicit disconnected menu stage, and Agents Settings connection detail are implemented. The native menu renders exactly one of two top-level stages: connected quota controls, or connection guidance/actions; Settings and Quit remain the final shared commands. Compilation, confirmed live collection, signed-bundle launch, and isolated disconnected-process survival have passed. Visual disconnected-menu inspection and completing both sign-in paths from a deliberately disconnected account remain manual acceptance gates; the app does not log out the current account to manufacture that state.
 
 ### 5. `feature/dashboard`
 

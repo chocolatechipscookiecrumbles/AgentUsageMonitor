@@ -243,6 +243,15 @@ Do not display, copy, or synchronize the contents of ~/.codex/auth.json.
 
 Prefer invoking Codex as a subprocess and allowing Codex to manage its own credentials.
 
+Implemented native connection contract:
+
+* The menu has a dedicated connection stage when `account/read` does not confirm an account; cached quota content is not mixed into that stage.
+* The stage offers **Sign in with browser** and **Sign in with Codex CLI…**, followed by **Settings…** and **Quit Codex Usage Monitor** at the bottom.
+* Browser sign-in sends `account/login/start` with `type: chatgpt`, opens only the provider-created HTTPS URL, keeps the app-server session alive for the matching completion event, and confirms the account with a fresh `account/read`.
+* CLI sign-in visibly opens Terminal and executes the located `codex login`, while the app polls `codex login status` and confirms success with `account/read`.
+* Checking, missing CLI, disconnected, signing in, connected, and recoverable failure are provider-neutral UI states that future agent integrations can map to without exposing provider errors or credentials.
+* A confirmed sign-in triggers one quota refresh with the `authentication` refresh reason. Logout and account switching remain out of scope.
+
 Source priority
 
 Supported structured CLI quota output

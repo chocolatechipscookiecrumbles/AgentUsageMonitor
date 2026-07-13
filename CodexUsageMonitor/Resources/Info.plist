@@ -24,5 +24,7 @@
     <string>14.0</string>
     <key>LSUIElement</key>
     <true/>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Codex Usage Monitor opens Terminal only when you choose Codex CLI sign-in.</string>
 </dict>
 </plist>
