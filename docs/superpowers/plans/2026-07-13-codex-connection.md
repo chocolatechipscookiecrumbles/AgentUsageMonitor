@@ -123,8 +123,8 @@
 
 - [x] Run `swift build --package-path CodexUsageMonitor` and require a clean exit.
 - [x] Run `Scripts/build-app.sh`, confirm the signed app bundle is produced, launch it, and verify the process survives its launch refresh.
-- [ ] Manually verify the disconnected menu stage using an isolated Codex home or equivalent non-destructive setup: both sign-in choices, signing-in feedback, Settings focus, and Quit placement.
-- [ ] Manually verify successful browser/CLI authentication transitions to the connected quota stage and triggers one quota refresh.
+- [x] Manually verify the disconnected menu stage using an isolated Codex home or equivalent non-destructive setup: both sign-in choices, signing-in feedback, Settings focus, and Quit placement.
+- [x] Manually verify successful browser/CLI authentication transitions to the connected quota stage and triggers one quota refresh.
 - [x] Record what was verified, what remains manual, and the no-credential-access boundary in all required documentation.
 
 ## Implementation and verification notes
@@ -135,8 +135,8 @@
 - `Scripts/build-app.sh` produced and ad-hoc signed the bundle after `plutil -lint` accepted the Terminal automation usage description.
 - A new signed instance survived startup connection detection and its launch refresh, and no diagnostic report newer than the previously documented 16:03 crashes appeared.
 - An isolated empty `CODEX_HOME` reported `Not logged in`; the app launched with that environment and remained alive for a ten-second disconnected-state process check.
-- A PID-targeted attempt to inspect the isolated menu through System Events was blocked because `osascript` does not have Assistive Access (`-1719`). Verification did not change macOS Accessibility permissions.
-- Still manual: visually inspect the open disconnected menu and complete browser and CLI sign-in from a deliberately disconnected Codex account. The implementation does not log out or alter the currently connected account to manufacture this acceptance state.
+- A PID-targeted automated attempt to inspect the isolated menu through System Events was blocked because `osascript` does not have Assistive Access (`-1719`). Verification did not change macOS Accessibility permissions.
+- User-reported manual acceptance on 2026-07-13 confirmed the disconnected menu stage and successful browser/CLI authentication transitions. The implementation did not log out or alter the connected account automatically to manufacture those states.
 - Independent read-only review found no critical issues. Its two important findings (custom `CODEX_HOME` propagation and bounded subprocess shutdown) and two minor findings (stale disconnected plan display and privacy wording) were fixed; follow-up review reported no remaining critical or important issue.
 - Privacy boundary: source inspection confirms the connection module contains no auth-file read, token field, email field, account-response persistence, or raw-error UI path. Codex owns browser callback validation, token exchange, storage, and refresh.
 

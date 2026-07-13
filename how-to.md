@@ -198,7 +198,7 @@ Optional quiet hours use local wall-clock time and may cross midnight. Noncritic
 
 ### Current hardening checkpoint
 
-The quota-history foundation, reliability hardening, adaptive refresh, and Codex connection implementation compile successfully. The connection branch also passed a confirmed live one-shot collection, signed-bundle launch, and an isolated disconnected-process survival check. The disconnected menu and both sign-in paths still need visual/manual acceptance while Codex is deliberately signed out; the app will not sign out the current account for verification. Longer operational verification still includes leaving the menu-bar app running for more than five minutes, inspecting diagnostic field names and permissions, and completing the seven-calendar-day observation log before starting another provider or a UI overhaul.
+The quota-history foundation, reliability hardening, adaptive refresh, and Codex connection implementation compile successfully. The connection branch also passed a confirmed live one-shot collection, signed-bundle launch, and an isolated disconnected-process survival check. User-reported manual acceptance confirmed the disconnected menu and successful browser/CLI sign-in transitions; the app will not sign out the current account automatically for verification. Longer operational verification still includes leaving the menu-bar app running for more than five minutes, inspecting diagnostic field names and permissions, and completing the seven-calendar-day observation log before starting another provider or a UI overhaul.
 
 For a terminal-only live diagnostic of the native collector (it performs one read and exits):
 
