@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject private var viewModel: QuotaViewModel
     @ObservedObject private var settings: AppSettings
+    @StateObject private var launchAtLogin = LaunchAtLoginController()
 
     init(viewModel: QuotaViewModel) {
         self.viewModel = viewModel
@@ -13,6 +14,7 @@ struct SettingsView: View {
         TabView(selection: $settings.selectedSettingsTab) {
             GeneralSettingsView(
                 settings: settings,
+                launchAtLogin: launchAtLogin,
                 status: viewModel.settingsStatus,
                 displayState: viewModel.displayState
             )
@@ -44,5 +46,6 @@ struct SettingsView: View {
                 .tag(SettingsTab.diagnostics)
         }
         .frame(width: 600, height: 520)
+        .preferredColorScheme(settings.appearancePreference.colorScheme)
     }
 }

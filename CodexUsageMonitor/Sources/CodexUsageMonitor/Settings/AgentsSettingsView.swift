@@ -5,7 +5,7 @@ struct AgentsSettingsView: View {
     @State private var selectedAgent: AgentProvider? = .codex
 
     var body: some View {
-        NavigationSplitView {
+        HStack(spacing: 0) {
             List(AgentProvider.allCases, selection: $selectedAgent) { agent in
                 Label {
                     VStack(alignment: .leading, spacing: 2) {
@@ -19,11 +19,13 @@ struct AgentsSettingsView: View {
                 }
                 .tag(agent)
             }
-            .navigationTitle("Agents")
-            .navigationSplitViewColumnWidth(min: 160, ideal: 180, max: 210)
-        } detail: {
-            if let selectedAgent {
-                Group {
+            .listStyle(.sidebar)
+            .frame(width: 180)
+
+            Divider()
+
+            Group {
+                if let selectedAgent {
                     switch selectedAgent {
                     case .codex:
                         CodexAgentSettingsView(
@@ -36,16 +38,15 @@ struct AgentsSettingsView: View {
                     case .claudeCode, .githubCopilot:
                         PlannedAgentSettingsView(agent: selectedAgent)
                     }
+                } else {
+                    ContentUnavailableView(
+                        "Select an agent",
+                        systemImage: "person.3",
+                        description: Text("Choose an agent from the sidebar to view its status.")
+                    )
                 }
-                    .navigationTitle(selectedAgent.title)
-            } else {
-                ContentUnavailableView(
-                    "Select an agent",
-                    systemImage: "person.3",
-                    description: Text("Choose an agent from the sidebar to view its status.")
-                )
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .navigationSplitViewStyle(.balanced)
     }
 }

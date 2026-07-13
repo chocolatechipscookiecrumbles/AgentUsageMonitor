@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Implement on `feature/settings-ui-followups` after `feature/codex-connection` is merged and `main` is updated.
+- Implement on `feature/settings-ui-followups`, stacked on `feature/menu-bar-display` commit `cefd57e` so the working General menu-bar controls remain intact.
 - Do not add or run automated tests. Verify with compilation, a signed app build, preference relaunch checks, notification inspection, and manual Settings acceptance.
 - Keep the fixed remaining-quota thresholds at exactly 50%, 25%, 10%, and 5%; do not add arbitrary threshold entry.
 - Each threshold preference applies to both the five-hour and weekly quota lanes.
@@ -36,11 +36,11 @@
 - Produces: `RemainingQuotaThreshold`, `AppSettings.enabledQuotaThresholds`, and `AppSettings.isQuotaThresholdEnabled(_:)`.
 - Consumes: the legacy `notification.thresholdWarnings` preference for one-time compatibility.
 
-- [ ] Define `RemainingQuotaThreshold` as a `CaseIterable`, `Codable`, `Hashable`, `Identifiable`, `Sendable` enum with raw integer values `50`, `25`, `10`, and `5`, ordered from earliest to most critical.
-- [ ] Persist the enabled raw values under `notification.enabledQuotaThresholds`; fresh installs default to all four thresholds enabled.
-- [ ] When the new key is absent, migrate the legacy `notification.thresholdWarnings` value: legacy `false` becomes an empty set and legacy `true` or missing becomes all four thresholds.
-- [ ] Keep the old key read-only for migration and stop writing it after the new set has been saved.
-- [ ] Ensure toggling one threshold cannot mutate any other notification-category preference.
+- [x] Define `RemainingQuotaThreshold` as a `CaseIterable`, `Codable`, `Hashable`, `Identifiable`, `Sendable` enum with raw integer values `50`, `25`, `10`, and `5`, ordered from earliest to most critical.
+- [x] Persist the enabled raw values under `notification.enabledQuotaThresholds`; fresh installs default to all four thresholds enabled.
+- [x] When the new key is absent, migrate the legacy `notification.thresholdWarnings` value: legacy `false` becomes an empty set and legacy `true` or missing becomes all four thresholds.
+- [x] Keep the old key read-only for migration and stop writing it after the new set has been saved.
+- [x] Ensure toggling one threshold cannot mutate any other notification-category preference.
 
 ### Task 2: Replace the combined warning toggle and enforce visual hierarchy
 
@@ -51,13 +51,13 @@
 - Consumes: `AppSettings.alertsEnabled`, `enabledQuotaThresholds`, notification authorization state, and the existing category/quiet-hour preferences.
 - Produces: four threshold bindings and native disabled states for every subordinate notification control.
 
-- [ ] Keep **Enable quota notifications** as the master switch and remove the single **Remaining quota warnings** category switch.
-- [ ] Under a **Remaining quota** section, render four toggles with exact labels **50% remaining**, **25% remaining**, **10% remaining**, and **5% remaining**.
-- [ ] Add the concise description: “Applies to both the 5-hour and weekly limits.” Do not repeat the threshold values in a second sentence.
-- [ ] Disable and natively grey the threshold toggles, forecast/reset/stale/failure toggles, **Enable quiet hours**, both time pickers, and **Allow critical warnings** whenever the master switch is off.
-- [ ] Preserve the existing secondary quiet-hours rule: time pickers and **Allow critical warnings** also remain disabled when quiet hours themselves are off.
-- [ ] Do not reset subordinate values when the master switch changes. Re-enabling notifications restores the prior checklist selections.
-- [ ] Keep authorization text and **Open Notification Settings…** outside the disabled subtree so permission recovery always works.
+- [x] Keep **Enable quota notifications** as the master switch and remove the single **Remaining quota warnings** category switch.
+- [x] Under a **Remaining quota** section, render four toggles with exact labels **50% remaining**, **25% remaining**, **10% remaining**, and **5% remaining**.
+- [x] Add the concise description: “Applies to both the 5-hour and weekly limits.” Do not repeat the threshold values in a second sentence.
+- [x] Disable and natively grey the threshold toggles, forecast/reset/stale/failure toggles, **Enable quiet hours**, both time pickers, and **Allow critical warnings** whenever the master switch is off.
+- [x] Preserve the existing secondary quiet-hours rule: time pickers and **Allow critical warnings** also remain disabled when quiet hours themselves are off.
+- [x] Do not reset subordinate values when the master switch changes. Re-enabling notifications restores the prior checklist selections.
+- [x] Keep authorization text and **Open Notification Settings…** outside the disabled subtree so permission recovery always works.
 
 ### Task 3: Filter quota delivery by the selected thresholds
 
@@ -68,32 +68,34 @@
 - Consumes: `AppSettings.enabledQuotaThresholds` and trusted `QuotaPresentation` windows.
 - Produces: threshold-specific delivery for both five-hour and weekly lanes using the existing deduplication keys.
 
-- [ ] Replace the `thresholdWarningsEnabled` guard with iteration over enabled `RemainingQuotaThreshold` values.
-- [ ] Skip disabled thresholds without changing the existing reset-window deduplication key format for enabled thresholds.
-- [ ] Preserve trusted-data gating: cached, unconfirmed, or unavailable results never produce threshold warnings.
-- [ ] Preserve 5% as critical severity and 50%/25%/10% as warning severity.
-- [ ] Confirm disabling the master switch still prevents every notification category regardless of subordinate values.
+- [x] Replace the `thresholdWarningsEnabled` guard with iteration over enabled `RemainingQuotaThreshold` values.
+- [x] Skip disabled thresholds without changing the existing reset-window deduplication key format for enabled thresholds.
+- [x] Preserve trusted-data gating: cached, unconfirmed, or unavailable results never produce threshold warnings.
+- [x] Preserve 5% as critical severity and 50%/25%/10% as warning severity.
+- [x] Confirm disabling the master switch still prevents every notification category regardless of subordinate values.
 
 ### Task 4: Add working General preferences
 
 **Files:**
 - Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AppearancePreference.swift`
 - Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/LaunchAtLoginController.swift`
+- Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/RefreshNowButton.swift`
 - Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AppSettings.swift`
 - Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/GeneralSettingsView.swift`
 - Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsView.swift`
-- Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/CodexUsageMonitorApp.swift`
+- Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/RefreshSettingsView.swift`
+- Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/ConnectedQuotaMenuView.swift`
 
 **Interfaces:**
 - Produces: persisted `appearancePreference`, persisted `keyboardShortcutsEnabled`, actual launch-at-login status/action, and an app-window color-scheme mapping.
 - Consumes: `SMAppService.mainApp`, the existing `QuotaViewModel`, and app-owned scene roots.
 
-- [ ] Add **Launch at login** to General. Default off, reflect the actual `SMAppService.mainApp.status`, and show a concise inline failure without silently flipping the displayed choice.
-- [ ] Add an **Appearance** picker with **System**, **Light**, and **Dark**. Persist the selection and apply it immediately to the Settings window and later app-owned Dashboard window; leave native menu-bar presentation alone.
-- [ ] Add **Enable keyboard shortcuts**, default on, with the description “Allows app shortcuts such as ⌘R for Refresh now.”
-- [ ] When enabled, expose `Command-R` on every app-owned **Refresh now** command. When disabled, remove that custom shortcut while leaving the button action available.
-- [ ] Do not make `Command-,` or `Command-Q` conditional; they remain standard macOS behavior.
-- [ ] Keep application version/build and Codex-first scope as read-only General sections below the working preferences.
+- [x] Add **Launch at login** to General. Default off, reflect the actual `SMAppService.mainApp.status`, and show a concise inline failure without silently flipping the displayed choice.
+- [x] Add an **Appearance** picker with **System**, **Light**, and **Dark**. Persist the selection and apply it immediately to the Settings window and later app-owned Dashboard window; leave native menu-bar presentation alone.
+- [x] Add **Enable keyboard shortcuts**, default on, with the description “Allows app shortcuts such as ⌘R for Refresh now.”
+- [x] When enabled, expose `Command-R` on every app-owned **Refresh now** command. When disabled, remove that custom shortcut while leaving the button action available.
+- [x] Do not make `Command-,` or `Command-Q` conditional; they remain standard macOS behavior.
+- [x] Keep application version/build and Codex-first scope as read-only General sections below the working preferences.
 
 ### Task 5: Constrain the Agents sidebar to the lower content region
 
@@ -105,11 +107,11 @@
 - Consumes: the outer `TabView` selection and existing provider/detail views.
 - Produces: a content-only provider sidebar with stable top-tab geometry.
 
-- [ ] Keep `SettingsView` as the sole owner of the full-width top Settings tab bar; do not nest another toolbar or title bar around it.
-- [ ] Replace the Agents `NavigationSplitView` with an inner `HStack(spacing: 0)` or equivalent content-only split inside the Agents tab content.
-- [ ] Render the provider `List` in a compact fixed-width sidebar of approximately 180 points, followed by a divider and a detail region that fills the remaining lower width.
-- [ ] Remove `.navigationTitle` and navigation-split column behavior that can reserve or reshape space above the lower content region.
-- [ ] Preserve provider selection and each existing Codex/planned-provider detail view without changing connection behavior.
+- [x] Keep `SettingsView` as the sole owner of the full-width top Settings tab bar; do not nest another toolbar or title bar around it.
+- [x] Replace the Agents `NavigationSplitView` with an inner `HStack(spacing: 0)` or equivalent content-only split inside the Agents tab content.
+- [x] Render the provider `List` in a compact fixed-width sidebar of approximately 180 points, followed by a divider and a detail region that fills the remaining lower width.
+- [x] Remove `.navigationTitle` and navigation-split column behavior that can reserve or reshape space above the lower content region.
+- [x] Preserve provider selection and each existing Codex/planned-provider detail view without changing connection behavior.
 - [ ] Verify switching between General, Notifications, Refresh, Agents, Data & Privacy, and Diagnostics never shifts, narrows, or overlays the top tab bar.
 
 ### Task 6: Document and manually verify the Settings follow-up
@@ -125,14 +127,25 @@
 - Consumes: final behavior and manual acceptance evidence.
 - Produces: current user instructions and accurate roadmap status.
 
-- [ ] Run `swift build --package-path CodexUsageMonitor` and `Scripts/build-app.sh`; require a valid signed bundle.
+- [x] Run `swift build --package-path CodexUsageMonitor -Xswiftc -warnings-as-errors` and `zsh CodexUsageMonitor/Scripts/build-app.sh`; require a valid signed bundle.
 - [ ] Relaunch and verify all four threshold choices persist independently and control both quota lanes.
 - [ ] Verify turning the master notification switch off greys every subordinate notification control, retains its values, and leaves permission-recovery UI usable.
 - [ ] Verify Launch at Login against actual macOS registration state using the signed `.app`, not the raw SwiftPM executable.
 - [ ] Verify System/Light/Dark changes app-owned windows immediately and persists after relaunch.
 - [ ] Verify disabling keyboard shortcuts removes `Command-R` behavior without disabling **Refresh now**, Settings, or Quit.
 - [ ] Verify the Agents sidebar begins below the unchanged full-width tab bar and divides only the lower content region.
-- [ ] Record all behavior and any remaining manual limitations in the plan, `outline.md`, `how-to.md`, and `UsageProbe/README.md`.
+- [x] Record all behavior and any remaining manual limitations in the plan, `outline.md`, `how-to.md`, and `UsageProbe/README.md`.
+
+## Implementation and verification notes
+
+- The branch is stacked on `feature/menu-bar-display` commit `cefd57e`; its Menu Bar General controls remain present in the compiled result.
+- The legacy combined threshold key is read once for migration. The new raw-value set is written under `notification.enabledQuotaThresholds`, and notification delivery checks the selected set for confirmed live five-hour and weekly data.
+- `SMAppService.mainApp` owns Launch at Login state. The controller reports enabled, not registered, approval-required, and unavailable states; it links to Login Items when user action is required and does not store a duplicate Boolean preference.
+- System/Light/Dark and keyboard-shortcut preferences persist in `AppSettings`. Appearance is scoped to the Settings window; native menu-bar presentation remains system controlled. Both existing Refresh buttons use the same conditional `Command-R` component.
+- The Agents provider list is a 180-point inner sidebar below the unchanged outer Settings tabs, with existing provider detail views and connection actions preserved.
+- `swift build --package-path CodexUsageMonitor -Xswiftc -warnings-as-errors`, the ad-hoc signed app build, strict code-signature validation, and `plutil -lint` passed.
+- A temporary signed instance launched and remained alive through its launch refresh without a new crash report. It was launched alongside the user's existing instance so no running app was replaced.
+- Still manual: visually inspect all Settings tabs, exercise each threshold and master disabled state, verify preference persistence after relaunch, toggle Launch at Login from the signed app, verify all three appearances, and confirm `Command-R` enable/disable behavior.
 
 ## Self-review
 

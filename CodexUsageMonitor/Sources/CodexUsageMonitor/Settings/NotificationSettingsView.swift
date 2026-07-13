@@ -22,19 +22,30 @@ struct NotificationSettingsView: View {
                 }
             }
 
-            Section(footer: Color.clear.frame(height: 20)) {
-                Toggle("Remaining quota warnings", isOn: $settings.thresholdWarningsEnabled)
-                Text("Uses fixed thresholds at 50%, 25%, 10%, and 5% remaining.")
+            Section("Remaining Quota") {
+                ForEach(RemainingQuotaThreshold.allCases) { threshold in
+                    Toggle(threshold.title, isOn: thresholdBinding(threshold))
+                }
+                Text("Applies to both the 5-hour and weekly limits.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            }
+            .disabled(!settings.alertsEnabled)
+
+            Section {
                 Toggle("Forecasted exhaustion", isOn: $settings.forecastWarningsEnabled)
                 Toggle("Reset-credit expiration", isOn: $settings.resetCreditWarningsEnabled)
                 Toggle("Quota reset or reset failure", isOn: $settings.resetWarningsEnabled)
                 Toggle("Stale quota data", isOn: $settings.staleDataWarningsEnabled)
                 Toggle("Repeated refresh failures", isOn: $settings.refreshFailureWarningsEnabled)
+            } header: {
+                Text("Other Warnings")
+            } footer: {
+                Color.clear.frame(height: 20)
             }
+            .disabled(!settings.alertsEnabled)
 
-            Section {
+            Section("Quiet Hours") {
                 Toggle("Enable quiet hours", isOn: $settings.quietHoursEnabled)
 
                 LabeledContent("Start") {
@@ -56,7 +67,15 @@ struct NotificationSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            .disabled(!settings.alertsEnabled)
         }
+    }
+
+    private func thresholdBinding(_ threshold: RemainingQuotaThreshold) -> Binding<Bool> {
+        Binding(
+            get: { settings.isQuotaThresholdEnabled(threshold) },
+            set: { settings.setQuotaThreshold(threshold, enabled: $0) }
+        )
     }
 
     private func minuteBinding(_ minutes: Binding<Int>) -> Binding<Date> {

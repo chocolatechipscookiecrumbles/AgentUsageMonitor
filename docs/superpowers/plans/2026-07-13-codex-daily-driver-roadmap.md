@@ -124,13 +124,15 @@ Acceptance: the dual label shows both lanes in the requested format; switching A
 
 Implementation status on 2026-07-13: persisted Appearance and Show preferences, provider-neutral label formatting, cached/paused marking, semantic accessibility text, reactive `MenuBarExtra` rendering, and the General live preview compile and produce a valid signed app. A newly launched signed instance survived its launch refresh without a new crash report. Visual switching, preference relaunch, and one full scheduled interval remain manual acceptance checks.
 
-### 6. `feature/settings-ui-followups`
+### 6. `feature/settings-ui-followups` — implemented; manual UI acceptance pending (stacked on Menu Bar Display)
 
 Refine the existing Settings window before adding Dashboard. Replace the combined remaining-quota warning switch with separate 50%/25%/10%/5% choices that apply to both quota lanes. Turning off **Enable quota notifications** must grey every subordinate notification control without erasing choices. Expand General with working **Launch at login**, **System/Light/Dark** appearance, and app-local keyboard-shortcut enablement. Rebuild the Agents tab as a lower-content-only split so its provider sidebar begins below, and never takes space from, the unchanged full-width top Settings tab bar.
 
 Acceptance: threshold choices persist and filter delivery independently; the notification master switch gates and greys the checklist while permission recovery remains active; Launch at Login reflects real `SMAppService` state; appearance updates app-owned windows; disabling shortcuts removes the custom `Command-R` refresh binding but not standard Settings/Quit commands; and switching tabs never moves or narrows the top tab bar.
 
 Detailed plan: `docs/superpowers/plans/2026-07-13-settings-ui-followups.md`.
+
+Implementation status on 2026-07-13: typed per-threshold persistence and confirmed-live delivery filtering, master disabled-state hierarchy, real `SMAppService.mainApp` Launch at Login handling, persisted System/Light/Dark appearance, conditional app-local `Command-R`, and the lower-only Agents sidebar compile and produce a valid signed app. Strict signature and plist validation passed, and a temporary signed instance survived its launch refresh without a new crash report. Visual interaction, persistence relaunch, actual Login Items mutation, and complete tab-layout inspection remain manual acceptance checks.
 
 ### 7. `feature/dashboard`
 

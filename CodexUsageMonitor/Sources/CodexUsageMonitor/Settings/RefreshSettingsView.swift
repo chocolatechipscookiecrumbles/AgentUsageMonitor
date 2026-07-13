@@ -40,8 +40,7 @@ struct RefreshSettingsView: View {
                         Text(lastConfirmedAt.formatted(date: .abbreviated, time: .shortened))
                     }
                 }
-                Button(viewModel.isRefreshing ? "Refreshing…" : "Refresh now", action: viewModel.refresh)
-                    .disabled(viewModel.isRefreshing)
+                RefreshNowButton(viewModel: viewModel)
             }
         }
     }

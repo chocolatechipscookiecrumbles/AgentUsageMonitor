@@ -54,8 +54,7 @@ struct ConnectedQuotaMenuView: View {
                 .foregroundStyle(.orange)
             Button("Open Notification Settings…", action: viewModel.openNotificationSettings)
         }
-        Button(viewModel.isRefreshing ? "Refreshing…" : "Refresh now", action: viewModel.refresh)
-            .disabled(viewModel.isRefreshing)
+        RefreshNowButton(viewModel: viewModel)
     }
 
     private var statusColor: Color {
