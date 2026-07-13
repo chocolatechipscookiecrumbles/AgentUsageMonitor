@@ -8,6 +8,9 @@ CodexUsageMonitor/DerivedData/
 CodexUsageMonitor/**/*.xcuserdatad/
 CodexUsageMonitor/**/*.xcscmblueprint
 
+# Isolated feature worktrees
+.worktrees/
+
 # Python caches and local environments
 **/__pycache__/
 *.py[cod]
