@@ -1165,11 +1165,11 @@ Current execution status (2026-07-13)
 
 * The Codex capability probe, menu-bar MVP, and quota-history foundation are implemented.
 * Reliability-hardening Tasks 1–4 are implemented; compilation is verified without adding or running tests.
-* The active gate is the seven-calendar-day reliability observation in `docs/superpowers/plans/2026-07-13-codex-reliability-hardening.md`.
-* Do not begin another provider integration or UI overhaul until that gate records refresh outcomes, foreground-independent cadence, forecast behavior, and a Codex-adapter decision.
-* After the gate, choose exactly one next plan from the hardening decision table: Codex validation refinement, GitHub Copilot capability research, forecast refinement, or UI-overhaul design.
-* The Codex-first daily-driver roadmap is recorded in `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md`; notification settings are the first active feature branch.
-* `feature/notification-settings` now contains persisted category controls, operational reset/stale/failure warnings, and quiet hours; manual UI and real reset-transition acceptance remain open.
+* The seven-calendar-day reliability observation in `docs/superpowers/plans/2026-07-13-codex-reliability-hardening.md` remains required before release, but Codex-only feature work may proceed while it accumulates evidence.
+* Do not begin another provider integration until the reliability gate records refresh outcomes, foreground-independent cadence, forecast behavior, and a Codex-adapter decision.
+* The Codex-first daily-driver roadmap is recorded in `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md`.
+* `feature/notification-settings` is merged with persisted category controls, operational reset/stale/failure warnings, and quiet hours; real reset-transition acceptance remains observational.
+* `feature/settings-foundation` is active. It adds General, Refresh, Codex Account, Data & Privacy, and Diagnostics tabs around the existing Notifications tab, using only real actions and privacy-safe read-only status.
 * All UI work must use a shared two-state quota presentation contract: confirmed/completed after a trusted live refresh, or cached/paused after an unsuccessful refresh while retaining and labeling the last confirmed record.
 * A later `feature/menu-bar-display` branch will make the menu-bar label configurable: current gauge, numeric lowest-remaining percentage, five-hour or weekly remaining, provider plus remaining, or icon-only. Numeric cached/paused values must carry a visible stale marker and never fall back to a misleading `0%`.
 

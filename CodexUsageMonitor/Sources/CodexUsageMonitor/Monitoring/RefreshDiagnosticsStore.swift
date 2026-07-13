@@ -6,6 +6,16 @@ enum RefreshOutcome: String, Codable, Sendable {
     case cachedLastKnownGood = "cached-last-known-good"
     case unconfirmed
     case unavailable
+
+    var displayName: String {
+        switch self {
+        case .confirmed: "Confirmed"
+        case .confirmedAfterRetry: "Confirmed after retry"
+        case .cachedLastKnownGood: "Cached last-known-good"
+        case .unconfirmed: "Unconfirmed"
+        case .unavailable: "Unavailable"
+        }
+    }
 }
 
 struct RefreshDiagnostic: Codable, Sendable {
@@ -19,6 +29,8 @@ struct RefreshDiagnostic: Codable, Sendable {
 struct RefreshDiagnosticSummary: Sendable {
     let outcomes: [RefreshOutcome: Int]
     let failureKinds: [String: Int]
+
+    static let empty = RefreshDiagnosticSummary(outcomes: [:], failureKinds: [:])
 }
 
 private struct StoredRefreshDiagnostics: Codable {

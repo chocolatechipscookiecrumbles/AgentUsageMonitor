@@ -60,13 +60,13 @@ The existing seven-day hardening evidence is deferred. Before release, create `f
 
 ## Branch sequence
 
-### 1. `feature/notification-settings` — active
+### 1. `feature/notification-settings` — merged
 
 Deliver the separate Settings window shell and persisted warning controls. Existing 50/25/10/5 threshold, qualified forecast, and reset-credit-expiry notifications must respect their controls. Add monitor-driven reset-completed, reset-failed, stale-data, and repeated-refresh-failure events plus quiet hours with a critical-warning override.
 
 Acceptance: settings survive relaunch; notification authorization is requested only from an explicit user action; cached/unconfirmed data never drives forecast alerts; fixed thresholds remain unchanged.
 
-### 2. `feature/settings-foundation`
+### 2. `feature/settings-foundation` — active
 
 Add General, Refresh, Codex Account, Data & Privacy, and Diagnostics tabs to the existing Settings window. Show retention and privacy information without export/delete actions. Keep all settings behind one persisted settings module rather than reading `UserDefaults` throughout views.
 

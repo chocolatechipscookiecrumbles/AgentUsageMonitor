@@ -163,13 +163,17 @@ Every completed menu-bar refresh also appends a privacy-safe outcome to `~/Libra
 
 The monitor refreshes at launch, every five minutes while its process is running, after wake, and on **Refresh now**. Only one collection runs at a time; the manual button is disabled during an active refresh. Forecast alerts require confirmed live data, medium or high confidence, and projected exhaustion at least 15 minutes before reset.
 
-Open **Settings…** from the menu popover (or press `Command-,`) to configure notifications. The master switch requests macOS notification permission only when enabled. Separate switches control the existing fixed 50%, 25%, 10%, and 5% remaining-quota warnings, qualified forecast warnings, and earned reset-credit-expiration warnings. Each lane and threshold is deduplicated within its current reset window.
+Open **Settings…** from the menu popover (or press `Command-,`) to use the separate Settings window. Its General, Refresh, Codex Account, Data & Privacy, and Diagnostics tabs show current app, collection, connection, retention, and classified-outcome status; Notifications contains the working preferences. The Refresh tab also provides a real **Refresh now** action. Interval choices, Codex sign-in, launch at login, export, and deletion remain in later roadmap branches rather than appearing as nonfunctional controls.
+
+The notification master switch requests macOS notification permission only when enabled. Separate switches control the existing fixed 50%, 25%, 10%, and 5% remaining-quota warnings, qualified forecast warnings, and earned reset-credit-expiration warnings. Each lane and threshold is deduplicated within its current reset window.
 
 The local build script ad-hoc signs the completed bundle with the stable identifier `com.david.codex-usage-monitor` after installing its `Info.plist`. Always launch the `.app` produced by `Scripts/build-app.sh` when checking notification permission; running the raw SwiftPM executable does not provide the same macOS notification identity.
 
 macOS normally shows the notification permission prompt only once. If permission was denied, toggling alerts cannot display the prompt again. The app will show the denied state and **Open Notification Settings…**; enable **Codex Usage Monitor** in System Settings, then return to the app and enable quota notifications. The popover and Settings controls share the same app preference and macOS authorization status.
 
 The menu-bar content uses native menu presentation. **Refresh now**, **Settings…**, **Open Notification Settings…**, and **Quit Codex Usage Monitor** remain inline menu commands. When notifications are disabled, a concise standalone status row appears without overlapping **Last refresh** or later commands.
+
+Settings presents only privacy-safe status. It never displays the stored account fingerprint, email, credentials, prompts, raw provider responses, raw provider errors, or quota values inside Diagnostics. Data & Privacy lists the three local files, their owner-only permissions, and their existing replacement, 90-day/500-observation, or 30-day/1,000-outcome retention policies without export or deletion actions.
 
 The notification settings also control:
 

@@ -7,6 +7,8 @@ final class QuotaViewModel: ObservableObject {
     @Published private(set) var presentation = QuotaPresentation.unavailable("Codex quota unavailable. Refresh after signing in to Codex.")
     @Published private(set) var fiveHourForecast: QuotaForecast?
     @Published private(set) var weeklyForecast: QuotaForecast?
+    @Published private(set) var refreshState: RefreshState = .idle
+    @Published private(set) var diagnosticSummary: RefreshDiagnosticSummary = .empty
     @Published private(set) var isRefreshing = false
     @Published private(set) var alertsEnabled = false
     @Published private(set) var notificationAuthorizationState: NotificationAuthorizationState = .unknown
@@ -26,7 +28,11 @@ final class QuotaViewModel: ObservableObject {
             self?.weeklyForecast = record.weeklyForecast
         }.store(in: &subscriptions)
         monitor.$refreshState.sink { [weak self] state in
+            self?.refreshState = state
             if case .refreshing = state { self?.isRefreshing = true } else { self?.isRefreshing = false }
+        }.store(in: &subscriptions)
+        monitor.$diagnosticSummary.sink { [weak self] summary in
+            self?.diagnosticSummary = summary
         }.store(in: &subscriptions)
         settings.$alertsEnabled.removeDuplicates().sink { [weak self] enabled in
             self?.alertsEnabled = enabled
@@ -41,6 +47,14 @@ final class QuotaViewModel: ObservableObject {
             return "Codex"
         }
         return "Codex \(remaining)%"
+    }
+
+    var settingsStatus: SettingsStatus {
+        SettingsStatus.make(
+            presentation: presentation,
+            refreshState: refreshState,
+            diagnostics: diagnosticSummary
+        )
     }
 
     func start() {

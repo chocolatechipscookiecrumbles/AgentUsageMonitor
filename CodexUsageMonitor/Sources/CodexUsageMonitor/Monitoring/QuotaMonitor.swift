@@ -6,6 +6,7 @@ import Foundation
 final class QuotaMonitor: ObservableObject {
     @Published private(set) var record: QuotaRecord
     @Published private(set) var refreshState: RefreshState = .idle
+    @Published private(set) var diagnosticSummary: RefreshDiagnosticSummary
 
     private let repository: QuotaRepository
     private let diagnostics: RefreshDiagnosticsStore
@@ -25,6 +26,10 @@ final class QuotaMonitor: ObservableObject {
         self.settings = settings
         notifier = Bundle.main.bundleURL.pathExtension == "app" ? QuotaNotifier(settings: settings) : nil
         record = .withoutForecasts(.unavailable("Codex quota unavailable. Refresh after signing in to Codex."))
+        diagnosticSummary = diagnostics.diagnosticSummary(
+            from: Date().addingTimeInterval(-30 * 24 * 3_600),
+            through: .now
+        )
     }
 
     deinit {
@@ -61,6 +66,10 @@ final class QuotaMonitor: ObservableObject {
             record = freshRecord
             let completedAt = Date()
             diagnostics.append(Self.diagnostic(for: freshRecord.presentation, reason: reason, startedAt: startedAt, completedAt: completedAt))
+            diagnosticSummary = diagnostics.diagnosticSummary(
+                from: completedAt.addingTimeInterval(-30 * 24 * 3_600),
+                through: completedAt
+            )
             refreshState = freshRecord.presentation.confirmation == .unavailable ? .failed(at: completedAt) : .idle
             refreshTask = nil
             await notifier?.evaluate(freshRecord)

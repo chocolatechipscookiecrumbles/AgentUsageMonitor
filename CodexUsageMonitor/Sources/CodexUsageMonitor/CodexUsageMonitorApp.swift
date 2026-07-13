@@ -28,11 +28,7 @@ struct CodexUsageMonitorApp: App {
             Label(viewModel.menuBarTitle, systemImage: "gauge.with.dots.needle.33percent")
         }
         Settings {
-            SettingsView(
-                settings: viewModel.settings,
-                setAlertsEnabled: viewModel.setAlertsEnabled,
-                openNotificationSettings: viewModel.openNotificationSettings
-            )
+            SettingsView(viewModel: viewModel)
         }
     }
 }
