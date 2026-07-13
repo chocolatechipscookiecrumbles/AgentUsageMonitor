@@ -10,10 +10,16 @@ struct NextRefreshCountdownView: View {
             Text("Last refresh: \(lastRefreshName) · Refreshing…")
                 .font(.caption)
         } else if let nextRefreshAt {
-            TimelineView(.periodic(from: .now, by: 1)) { context in
-                Text(scheduledText(nextRefreshAt: nextRefreshAt, at: context.date))
-                    .font(.caption)
+            HStack(spacing: 0) {
+                Text("Last refresh: \(lastRefreshName) · Next: ")
+                Text(
+                    timerInterval: countdownInterval(endingAt: nextRefreshAt),
+                    pauseTime: nil,
+                    countsDown: true,
+                    showsHours: false
+                )
             }
+            .font(.caption)
         } else {
             Text("Last refresh: \(lastRefreshName) · Scheduling…")
                 .font(.caption)
@@ -24,8 +30,7 @@ struct NextRefreshCountdownView: View {
         lastRefreshAt.formatted(date: .omitted, time: .shortened)
     }
 
-    private func scheduledText(nextRefreshAt: Date, at date: Date) -> String {
-        let remaining = max(0, Int(ceil(nextRefreshAt.timeIntervalSince(date))))
-        return "Last refresh: \(lastRefreshName) · Next: \(remaining / 60):\(String(format: "%02d", remaining % 60))"
+    private func countdownInterval(endingAt endDate: Date) -> ClosedRange<Date> {
+        min(.now, endDate)...endDate
     }
 }

@@ -165,7 +165,7 @@ Replace the verification row with `Confirmed / completed` or `Cached / paused`. 
 
 - [x] **Step 3: Show a live next-refresh countdown beside refresh timing**
 
-Use `TimelineView(.periodic(from: .now, by: 1))` in a small read-only row. Render `Last refresh: <time> · Next: <countdown>` when scheduled, `Refreshing…` during collection, and `Scheduling…` only before the first decision. Clamp expired countdowns at zero; never show a negative duration.
+Use SwiftUI's timer-interval `Text` in a small read-only row so the value updates while the native menu remains open. Render `Last refresh: <time> · Next: <countdown>` when scheduled, `Refreshing…` during collection, and `Scheduling…` only before the first decision. The countdown must stop at zero rather than showing a negative duration.
 
 - [ ] **Step 4: Perform manual UI acceptance**
 
@@ -202,3 +202,9 @@ Run `git diff --check`, a fresh signed app build, and read-only `rg` checks for 
 - UI state inspection: menu and Settings consume `QuotaDisplayState`; neither derives freshness from `QuotaPresentation.confirmation`.
 - App launch: the freshly signed bundle opened successfully.
 - Automated Settings/menu inspection was blocked because macOS denied `osascript` keystrokes without Accessibility permission. Task 5 Step 4 remains a user-visible manual checkpoint; no automated tests were created or run.
+
+## Countdown rendering correction (2026-07-13)
+
+Manual observation found that the original `TimelineView(.periodic)` displayed the correct deadline but did not receive periodic invalidations while the native menu was tracking, so its text changed only after a refresh rebuilt the menu. `NextRefreshCountdownView` now uses SwiftUI's self-updating timer-interval `Text`, preserving native inline menu presentation while allowing the remaining time to tick inside the open menu.
+
+Verification: the signed bundle rebuilt successfully (`Build complete! (1.57s)`). The countdown interval clamps an overdue deadline to zero so a delayed timer or wake cannot construct an invalid date range. The user-visible open-menu ticking behavior remains the manual acceptance check.
