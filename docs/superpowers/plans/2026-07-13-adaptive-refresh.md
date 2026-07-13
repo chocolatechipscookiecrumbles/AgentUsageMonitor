@@ -165,7 +165,7 @@ Replace the verification row with `Confirmed / completed` or `Cached / paused`. 
 
 - [x] **Step 3: Show a live next-refresh countdown beside refresh timing**
 
-Use SwiftUI's timer-interval `Text` in a small read-only row so the value updates while the native menu remains open. Render `Last refresh: <time> · Next: <countdown>` when scheduled, `Refreshing…` during collection, and `Scheduling…` only before the first decision. The countdown must stop at zero rather than showing a negative duration.
+Use a small AppKit-backed read-only label whose coordinator updates the displayed string directly while the native menu remains open. Do not drive a native-menu countdown through `TimelineView`, timer-interval `Text`, or other periodic SwiftUI invalidation. Render `Last refresh: <time> · Next: <countdown>` when scheduled, `Refreshing…` during collection, and `Scheduling…` only before the first decision. The countdown must stop at zero rather than showing a negative duration.
 
 - [ ] **Step 4: Perform manual UI acceptance**
 
@@ -205,6 +205,8 @@ Run `git diff --check`, a fresh signed app build, and read-only `rg` checks for 
 
 ## Countdown rendering correction (2026-07-13)
 
-Manual observation found that the original `TimelineView(.periodic)` displayed the correct deadline but did not receive periodic invalidations while the native menu was tracking, so its text changed only after a refresh rebuilt the menu. `NextRefreshCountdownView` now uses SwiftUI's self-updating timer-interval `Text`, preserving native inline menu presentation while allowing the remaining time to tick inside the open menu.
+Manual observation found that the original `TimelineView(.periodic)` displayed the correct deadline but did not receive periodic invalidations while the native menu was tracking, so its text changed only after a refresh rebuilt the menu. Replacing it with timer-interval `Text` made the countdown tick, but refresh transitions then crashed in SwiftUI menu rendering.
 
-Verification: the signed bundle rebuilt successfully (`Build complete! (1.57s)`). The countdown interval clamps an overdue deadline to zero so a delayed timer or wake cannot construct an invalid date range. The user-visible open-menu ticking behavior remains the manual acceptance check.
+The macOS diagnostic reports at 16:03:28 and 16:03:46 show `EXC_BAD_ACCESS` after unbounded repetition of `MenuBehavior.menuNeedsUpdate`, `ViewRendererHost.render`, and `AttributeGraph.propagate_dirty` on the main thread. This is a stack overflow caused by periodic SwiftUI menu invalidation, not a quota collection or scheduling failure. `NextRefreshCountdownView` now uses an `NSViewRepresentable` coordinator with a main-run-loop timer that changes only `NSTextField.stringValue`; the one-second tick no longer publishes state or dirties the SwiftUI menu graph. The user-visible refresh/crash and open-menu ticking behavior remain the manual acceptance checks.
+
+Verification: the replacement compiled and the final signed app bundle built successfully (`Build complete! (0.13s)`). The coordinator invalidates its timer when the row is dismantled, while refreshing, or when the deadline has elapsed. A read-only process check also confirmed that the corrected app remained alive after its launch refresh.
