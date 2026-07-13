@@ -19,8 +19,10 @@ struct SettingsStatus: Sendable {
     let buildNumber: String
     let codexStatus: CodexAgentStatus
     let planName: String?
-    let confirmation: ConfirmationState
-    let collectedAt: Date
+    let displayMode: QuotaDisplayMode
+    let pauseReason: QuotaPauseReason?
+    let lastAttemptAt: Date
+    let lastConfirmedAt: Date?
     let refreshState: RefreshState
     let diagnostics: RefreshDiagnosticSummary
 
@@ -33,17 +35,18 @@ struct SettingsStatus: Sendable {
     }
 
     static func make(
-        presentation: QuotaPresentation,
+        displayState: QuotaDisplayState,
         refreshState: RefreshState,
         diagnostics: RefreshDiagnosticSummary,
         bundle: Bundle = .main
     ) -> SettingsStatus {
         let codexStatus: CodexAgentStatus
+        let presentation = displayState.displayedRecord?.presentation
+            ?? QuotaPresentation.unavailable("No confirmed quota result is available.")
         if presentation.accountFingerprint != nil,
-           presentation.confirmation == .confirmed || presentation.confirmation == .confirmedAfterRetry {
+           displayState.mode == .confirmedCompleted {
             codexStatus = .connected
-        } else if presentation.accountFingerprint != nil,
-                  presentation.confirmation == .cachedLastKnownGood {
+        } else if presentation.accountFingerprint != nil {
             codexStatus = .cached
         } else {
             codexStatus = .unavailable
@@ -54,8 +57,10 @@ struct SettingsStatus: Sendable {
             buildNumber: bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "Local",
             codexStatus: codexStatus,
             planName: presentation.planType?.capitalized,
-            confirmation: presentation.confirmation,
-            collectedAt: presentation.collectedAt,
+            displayMode: displayState.mode,
+            pauseReason: displayState.pauseReason,
+            lastAttemptAt: displayState.lastAttemptAt,
+            lastConfirmedAt: displayState.lastConfirmedAt,
             refreshState: refreshState,
             diagnostics: diagnostics
         )

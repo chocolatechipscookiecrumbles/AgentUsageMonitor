@@ -72,7 +72,7 @@ Add General, Refresh, Agents, Data & Privacy, and Diagnostics tabs to the existi
 
 Acceptance: one Settings window is focused on repeated opens; `Command-,` works; every control changes real behavior or is read-only status.
 
-### 3. `feature/adaptive-refresh`
+### 3. `feature/adaptive-refresh` — active (stacked on Settings Foundation)
 
 Replace the fixed timer with a scheduling policy returning an effective interval and explanation. Fixed modes use 60/90/120/300/600 seconds. Automatic considers confirmed consumption slope, remaining percentage, reset proximity, forecast confidence, and recent failures. It may use 30 seconds for at most ten minutes and exits after the event or two failures. Add `nextRefreshAt`, effective-mode explanation, and the provider-neutral `QuotaDisplayState` to monitoring state; show a live countdown beside Last refresh and the two-state confirmed/completed or cached/paused status in the popover.
 

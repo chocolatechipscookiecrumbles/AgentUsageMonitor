@@ -5,6 +5,7 @@ import Foundation
 @MainActor
 final class QuotaViewModel: ObservableObject {
     @Published private(set) var presentation = QuotaPresentation.unavailable("Codex quota unavailable. Refresh after signing in to Codex.")
+    @Published private(set) var displayState: QuotaDisplayState
     @Published private(set) var fiveHourForecast: QuotaForecast?
     @Published private(set) var weeklyForecast: QuotaForecast?
     @Published private(set) var refreshState: RefreshState = .idle
@@ -12,6 +13,9 @@ final class QuotaViewModel: ObservableObject {
     @Published private(set) var isRefreshing = false
     @Published private(set) var alertsEnabled = false
     @Published private(set) var notificationAuthorizationState: NotificationAuthorizationState = .unknown
+    @Published private(set) var nextRefreshAt: Date?
+    @Published private(set) var effectiveRefreshInterval: TimeInterval?
+    @Published private(set) var refreshScheduleReason: RefreshScheduleReason?
 
     let settings: AppSettings
     private let monitor: QuotaMonitor
@@ -21,11 +25,15 @@ final class QuotaViewModel: ObservableObject {
         let settings = AppSettings()
         self.settings = settings
         monitor = QuotaMonitor(settings: settings)
+        displayState = monitor.displayState
         alertsEnabled = settings.alertsEnabled
-        monitor.$record.sink { [weak self] record in
-            self?.presentation = record.presentation
-            self?.fiveHourForecast = record.fiveHourForecast
-            self?.weeklyForecast = record.weeklyForecast
+        monitor.$displayState.sink { [weak self] state in
+            self?.displayState = state
+            let displayedRecord = state.displayedRecord
+            self?.presentation = displayedRecord?.presentation
+                ?? QuotaPresentation.unavailable("No confirmed Codex quota result is available yet.")
+            self?.fiveHourForecast = displayedRecord?.fiveHourForecast
+            self?.weeklyForecast = displayedRecord?.weeklyForecast
         }.store(in: &subscriptions)
         monitor.$refreshState.sink { [weak self] state in
             self?.refreshState = state
@@ -34,12 +42,18 @@ final class QuotaViewModel: ObservableObject {
         monitor.$diagnosticSummary.sink { [weak self] summary in
             self?.diagnosticSummary = summary
         }.store(in: &subscriptions)
+        monitor.$nextRefreshAt.sink { [weak self] in self?.nextRefreshAt = $0 }.store(in: &subscriptions)
+        monitor.$effectiveRefreshInterval.sink { [weak self] in self?.effectiveRefreshInterval = $0 }.store(in: &subscriptions)
+        monitor.$refreshScheduleReason.sink { [weak self] in self?.refreshScheduleReason = $0 }.store(in: &subscriptions)
         settings.$alertsEnabled.removeDuplicates().sink { [weak self] enabled in
             self?.alertsEnabled = enabled
         }.store(in: &subscriptions)
         settings.$notificationAuthorizationState.removeDuplicates().sink { [weak self] state in
             self?.notificationAuthorizationState = state
         }.store(in: &subscriptions)
+        if !CommandLine.arguments.contains("--live-read-once") {
+            start()
+        }
     }
 
     var menuBarTitle: String {
@@ -51,7 +65,7 @@ final class QuotaViewModel: ObservableObject {
 
     var settingsStatus: SettingsStatus {
         SettingsStatus.make(
-            presentation: presentation,
+            displayState: displayState,
             refreshState: refreshState,
             diagnostics: diagnosticSummary
         )

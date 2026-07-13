@@ -639,7 +639,7 @@ Support:
 * Manual refresh
 * Refresh when the menu opens
 * Refresh when the app becomes active
-* Scheduled background refresh
+* Scheduled foreground refresh while the menu-bar process is running
 * Refresh after local log changes
 * Refresh near a reset
 * Refresh after authentication changes
@@ -651,28 +651,26 @@ Support:
 Options:
 
 * 1 minute
+* 1 minute 30 seconds
 * 2 minutes
 * 5 minutes
 * 10 minutes
-* 15 minutes
-* 30 minutes
-* Manual only
 * Adaptive
 
-Recommended default: adaptive.
+Current default: 2 minutes.
 
 10.3 Adaptive refresh policy
 
-Normal state                     every 5 minutes
-Menu opened                      if data is older than 60 seconds
-Below 25% remaining              every 2 minutes
-Below 10% remaining              every 1 minute
-Within 15 minutes of reset       every 1 minute
-After expected reset             immediate refresh
-Rate-limited                     exponential backoff
+Steady usage                     every 5 minutes
+At or below 50% remaining        every 2 minutes
+At or below 25% remaining        every 90 seconds
+At or below 10% remaining        every 1 minute
+Imminent threshold/exhaustion    every 30 seconds, at most 10 minutes
+Within 10 minutes of reset       every 30 seconds, at most 10 minutes
+Repeated refresh failures        every 5 minutes
 Computer asleep                  no refresh
 Offline                          use cache
-Network restored                 refresh
+Launch or wake                   immediate refresh
 
 10.4 Refresh limits and safety
 
@@ -1170,6 +1168,7 @@ Current execution status (2026-07-13)
 * The Codex-first daily-driver roadmap is recorded in `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md`.
 * `feature/notification-settings` is merged with persisted category controls, operational reset/stale/failure warnings, and quiet hours; real reset-transition acceptance remains observational.
 * `feature/settings-foundation` is active. It adds General, Refresh, Agents, Data & Privacy, and Diagnostics tabs around the existing Notifications tab, using only real actions and privacy-safe read-only status. Agents uses a left provider sidebar with an in-tab detail pane for each agent; Codex is current while Claude Code and GitHub Copilot remain visibly planned and not connected.
+* `feature/adaptive-refresh` is active as a stacked branch on `feature/settings-foundation`. It replaces the repeating five-minute timer with persisted fixed/automatic modes, a one-shot scheduler, a next-refresh countdown, and monitor-owned confirmed/completed or cached/paused display state.
 * A later `feature/general-preferences` branch will add working General controls for Launch at Login plus System, Light, and Dark appearance. These controls must not appear before their behavior exists.
 * All UI work must use a shared two-state quota presentation contract: confirmed/completed after a trusted live refresh, or cached/paused after an unsuccessful refresh while retaining and labeling the last confirmed record.
 * A later `feature/menu-bar-display` branch will make the menu-bar label configurable: current gauge, numeric lowest-remaining percentage, five-hour or weekly remaining, provider plus remaining, or icon-only. Numeric cached/paused values must carry a visible stale marker and never fall back to a misleading `0%`.

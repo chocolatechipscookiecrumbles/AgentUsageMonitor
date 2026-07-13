@@ -15,6 +15,7 @@ final class AppSettings: ObservableObject {
         static let quietHoursStartMinutes = "notification.quietHoursStartMinutes"
         static let quietHoursEndMinutes = "notification.quietHoursEndMinutes"
         static let allowCriticalDuringQuietHours = "notification.allowCriticalDuringQuietHours"
+        static let refreshMode = "refresh.mode"
     }
 
     private let defaults: UserDefaults
@@ -32,6 +33,7 @@ final class AppSettings: ObservableObject {
     @Published var quietHoursStartMinutes: Int { didSet { defaults.set(quietHoursStartMinutes, forKey: Key.quietHoursStartMinutes) } }
     @Published var quietHoursEndMinutes: Int { didSet { defaults.set(quietHoursEndMinutes, forKey: Key.quietHoursEndMinutes) } }
     @Published var allowCriticalDuringQuietHours: Bool { didSet { defaults.set(allowCriticalDuringQuietHours, forKey: Key.allowCriticalDuringQuietHours) } }
+    @Published var refreshMode: RefreshMode { didSet { defaults.set(refreshMode.rawValue, forKey: Key.refreshMode) } }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -46,6 +48,7 @@ final class AppSettings: ObservableObject {
         quietHoursStartMinutes = Self.integer(for: Key.quietHoursStartMinutes, defaults: defaults, defaultValue: 22 * 60)
         quietHoursEndMinutes = Self.integer(for: Key.quietHoursEndMinutes, defaults: defaults, defaultValue: 7 * 60)
         allowCriticalDuringQuietHours = Self.value(for: Key.allowCriticalDuringQuietHours, defaults: defaults, defaultValue: true)
+        refreshMode = defaults.string(forKey: Key.refreshMode).flatMap(RefreshMode.init(rawValue:)) ?? .twoMinutes
     }
 
     private static func value(for key: String, defaults: UserDefaults, defaultValue: Bool) -> Bool {

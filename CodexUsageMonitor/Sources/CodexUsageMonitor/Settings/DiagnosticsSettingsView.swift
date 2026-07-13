@@ -14,9 +14,14 @@ struct DiagnosticsSettingsView: View {
     var body: some View {
         Form {
             Section("Latest refresh") {
-                LabeledContent("Verification", value: status.confirmation.displayName)
-                LabeledContent("Collected") {
-                    Text(status.collectedAt.formatted(date: .abbreviated, time: .shortened))
+                LabeledContent("Status", value: status.displayMode.displayName)
+                LabeledContent("Last attempt") {
+                    Text(status.lastAttemptAt.formatted(date: .abbreviated, time: .shortened))
+                }
+                if let lastConfirmedAt = status.lastConfirmedAt {
+                    LabeledContent("Last confirmed") {
+                        Text(lastConfirmedAt.formatted(date: .abbreviated, time: .shortened))
+                    }
                 }
                 LabeledContent("Activity", value: status.refreshActivity)
             }

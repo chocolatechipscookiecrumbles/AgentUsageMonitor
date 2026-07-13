@@ -35,14 +35,22 @@ struct QuotaMenuView: View {
                 forecast: viewModel.weeklyForecast
             )
             Divider()
-            Text("Verification: \(viewModel.presentation.confirmation.displayName)")
+            Text("Status: \(viewModel.displayState.mode.displayName)")
                 .foregroundStyle(statusColor)
-            if let detail = viewModel.presentation.detail {
-                Text(detail)
+            if let pauseReason = viewModel.displayState.pauseReason {
+                Text(pauseReason.displayName)
                     .font(.caption)
             }
-            Text("Last refresh: \(viewModel.presentation.collectedAt.formatted(date: .omitted, time: .shortened))")
-                .font(.caption)
+            if viewModel.displayState.mode == .cachedPaused,
+               let lastConfirmedAt = viewModel.displayState.lastConfirmedAt {
+                Text("Last successful refresh: \(lastConfirmedAt.formatted(date: .omitted, time: .shortened))")
+                    .font(.caption)
+            }
+            NextRefreshCountdownView(
+                lastRefreshAt: viewModel.displayState.lastAttemptAt,
+                nextRefreshAt: viewModel.nextRefreshAt,
+                isRefreshing: viewModel.isRefreshing
+            )
             Toggle("Quota alerts", isOn: Binding(
                 get: { viewModel.alertsEnabled },
                 set: { viewModel.setAlertsEnabled($0) }
@@ -59,7 +67,6 @@ struct QuotaMenuView: View {
             Button("Settings…", action: openNotificationSettings)
             Button("Quit Codex Usage Monitor") { NSApplication.shared.terminate(nil) }
         }
-        .onAppear { viewModel.start() }
     }
 
     private func openNotificationSettings() {
@@ -69,10 +76,9 @@ struct QuotaMenuView: View {
     }
 
     private var statusColor: Color {
-        switch viewModel.presentation.confirmation {
-        case .confirmed, .confirmedAfterRetry: .primary
-        case .cachedLastKnownGood, .unconfirmed: .orange
-        case .unavailable: .secondary
+        switch viewModel.displayState.mode {
+        case .confirmedCompleted: .primary
+        case .cachedPaused: .orange
         }
     }
 }

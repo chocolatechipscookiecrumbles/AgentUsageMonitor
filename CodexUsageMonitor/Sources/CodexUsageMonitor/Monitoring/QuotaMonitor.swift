@@ -5,8 +5,12 @@ import Foundation
 @MainActor
 final class QuotaMonitor: ObservableObject {
     @Published private(set) var record: QuotaRecord
+    @Published private(set) var displayState: QuotaDisplayState
     @Published private(set) var refreshState: RefreshState = .idle
     @Published private(set) var diagnosticSummary: RefreshDiagnosticSummary
+    @Published private(set) var nextRefreshAt: Date?
+    @Published private(set) var effectiveRefreshInterval: TimeInterval?
+    @Published private(set) var refreshScheduleReason: RefreshScheduleReason?
 
     private let repository: QuotaRepository
     private let diagnostics: RefreshDiagnosticsStore
@@ -15,6 +19,10 @@ final class QuotaMonitor: ObservableObject {
     private var refreshTask: Task<Void, Never>?
     private var refreshTimer: Timer?
     private var wakeObserver: NSObjectProtocol?
+    private var settingsSubscription: AnyCancellable?
+    private var hasStarted = false
+    private var consecutiveFailures = 0
+    private var automaticBurstStartedAt: Date?
 
     init(
         repository: QuotaRepository = QuotaRepository(),
@@ -25,7 +33,15 @@ final class QuotaMonitor: ObservableObject {
         self.diagnostics = diagnostics
         self.settings = settings
         notifier = Bundle.main.bundleURL.pathExtension == "app" ? QuotaNotifier(settings: settings) : nil
-        record = .withoutForecasts(.unavailable("Codex quota unavailable. Refresh after signing in to Codex."))
+        let initialRecord = QuotaRecord.withoutForecasts(.unavailable("Codex quota unavailable. Refresh after signing in to Codex."))
+        record = initialRecord
+        displayState = QuotaDisplayState(
+            mode: .cachedPaused,
+            displayedRecord: nil,
+            lastAttemptAt: initialRecord.presentation.collectedAt,
+            lastConfirmedAt: nil,
+            pauseReason: .unavailable
+        )
         diagnosticSummary = diagnostics.diagnosticSummary(
             from: Date().addingTimeInterval(-30 * 24 * 3_600),
             through: .now
@@ -36,16 +52,21 @@ final class QuotaMonitor: ObservableObject {
         refreshTask?.cancel()
         MainActor.assumeIsolated {
             refreshTimer?.invalidate()
+            settingsSubscription?.cancel()
             if let wakeObserver { NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver) }
         }
     }
 
     func start() {
-        guard refreshTimer == nil else { return }
+        guard !hasStarted else { return }
+        hasStarted = true
+        settingsSubscription = settings.$refreshMode
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] _ in
+                self?.refreshModeChanged()
+            }
         refresh(reason: .launch)
-        refreshTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.refresh(reason: .scheduled) }
-        }
         wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification,
             object: nil,
@@ -57,23 +78,105 @@ final class QuotaMonitor: ObservableObject {
 
     func refresh(reason: RefreshReason) {
         guard refreshTask == nil else { return }
+        invalidateRefreshTimer()
         let startedAt = Date()
         refreshState = .refreshing(reason: reason)
         refreshTask = Task { [weak self] in
             guard let self else { return }
             let freshRecord = await repository.refresh()
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled else {
+                refreshTask = nil
+                return
+            }
             record = freshRecord
             let completedAt = Date()
+            updateDisplayState(with: freshRecord, completedAt: completedAt)
             diagnostics.append(Self.diagnostic(for: freshRecord.presentation, reason: reason, startedAt: startedAt, completedAt: completedAt))
             diagnosticSummary = diagnostics.diagnosticSummary(
                 from: completedAt.addingTimeInterval(-30 * 24 * 3_600),
                 through: completedAt
             )
-            refreshState = freshRecord.presentation.confirmation == .unavailable ? .failed(at: completedAt) : .idle
-            refreshTask = nil
+            refreshState = freshRecord.presentation.confirmation == .confirmed || freshRecord.presentation.confirmation == .confirmedAfterRetry
+                ? .idle
+                : .failed(at: completedAt)
             await notifier?.evaluate(freshRecord)
+            refreshTask = nil
+            scheduleNextRefresh(from: completedAt)
         }
+    }
+
+    private func updateDisplayState(with freshRecord: QuotaRecord, completedAt: Date) {
+        switch freshRecord.presentation.confirmation {
+        case .confirmed, .confirmedAfterRetry:
+            consecutiveFailures = 0
+            displayState = QuotaDisplayState(
+                mode: .confirmedCompleted,
+                displayedRecord: freshRecord,
+                lastAttemptAt: completedAt,
+                lastConfirmedAt: freshRecord.presentation.collectedAt,
+                pauseReason: nil
+            )
+        case .cachedLastKnownGood:
+            consecutiveFailures += 1
+            displayState = QuotaDisplayState(
+                mode: .cachedPaused,
+                displayedRecord: displayState.displayedRecord ?? freshRecord,
+                lastAttemptAt: completedAt,
+                lastConfirmedAt: displayState.lastConfirmedAt ?? freshRecord.presentation.collectedAt,
+                pauseReason: consecutiveFailures >= 2 ? .repeatedFailures : .cachedLastKnownGood
+            )
+        case .unconfirmed, .unavailable:
+            consecutiveFailures += 1
+            displayState = QuotaDisplayState(
+                mode: .cachedPaused,
+                displayedRecord: displayState.displayedRecord,
+                lastAttemptAt: completedAt,
+                lastConfirmedAt: displayState.lastConfirmedAt,
+                pauseReason: consecutiveFailures >= 2
+                    ? .repeatedFailures
+                    : (freshRecord.presentation.confirmation == .unconfirmed ? .unconfirmed : .unavailable)
+            )
+        }
+    }
+
+    private func scheduleNextRefresh(from date: Date) {
+        let decision = AdaptiveRefreshPolicy.decision(
+            mode: settings.refreshMode,
+            record: displayState.displayedRecord,
+            consecutiveFailures: consecutiveFailures,
+            burstStartedAt: automaticBurstStartedAt,
+            now: date
+        )
+        if decision.isAutomaticBurst {
+            automaticBurstStartedAt = automaticBurstStartedAt ?? date
+        } else if !decision.isBurstConditionActive {
+            automaticBurstStartedAt = nil
+        }
+        effectiveRefreshInterval = decision.interval
+        refreshScheduleReason = decision.reason
+        nextRefreshAt = date.addingTimeInterval(decision.interval)
+        let timer = Timer(timeInterval: decision.interval, repeats: false) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.refreshTimer = nil
+                self?.nextRefreshAt = nil
+                self?.refresh(reason: .scheduled)
+            }
+        }
+        refreshTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func refreshModeChanged() {
+        automaticBurstStartedAt = nil
+        invalidateRefreshTimer()
+        guard refreshTask == nil else { return }
+        scheduleNextRefresh(from: .now)
+    }
+
+    private func invalidateRefreshTimer() {
+        refreshTimer?.invalidate()
+        refreshTimer = nil
+        nextRefreshAt = nil
     }
 
     func refreshNotificationAuthorization() async -> NotificationAuthorizationState {

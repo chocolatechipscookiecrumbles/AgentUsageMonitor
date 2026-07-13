@@ -11,7 +11,7 @@ struct CodexAgentSettingsView: View {
                 if let planName = status.planName {
                     LabeledContent("Plan", value: planName)
                 }
-                LabeledContent("Quota verification", value: status.confirmation.displayName)
+                LabeledContent("Quota status", value: status.displayMode.displayName)
                 Text("Codex is the only active agent integration in this build.")
                     .foregroundStyle(.secondary)
             }
