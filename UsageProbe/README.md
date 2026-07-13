@@ -61,3 +61,5 @@ The menu-bar companion uses native inline menu commands for refresh, Settings, n
 Native notification controls also cover confirmed resets, reset failures verified by two post-reset reads, data older than 15 minutes, and three or more consecutive refresh failures. Optional local-time quiet hours defer noncritical delivery; users may allow critical 5%-remaining and reset-failure warnings through. No notification stores raw provider errors or changes the probe's read-only safety boundary.
 
 The native app reports macOS notification authorization separately from its alert preference. When system permission is denied, it links to Notification Settings because macOS does not repeat the original permission prompt. Both the popover and separate Settings window observe the same state.
+
+A separate future `feature/figma-ui-overhaul` branch is reserved for adapting approved Figma designs to the native Settings and Dashboard windows after their behavior stabilizes. That frontend-only work must preserve native menu commands and must not alter the Python probe, quota collection, scheduling, authentication, notification policy, or storage schemas.

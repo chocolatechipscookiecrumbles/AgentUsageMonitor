@@ -175,6 +175,8 @@ The menu-bar content uses native menu presentation. **Refresh now**, **Settingsâ
 
 Settings presents only privacy-safe status. It never displays the stored account fingerprint, email, credentials, prompts, raw provider responses, raw provider errors, or quota values inside Diagnostics. Data & Privacy lists the three local files, their owner-only permissions, and their existing replacement, 90-day/500-observation, or 30-day/1,000-outcome retention policies without export or deletion actions.
 
+The current interface uses native SwiftUI. A separate future `feature/figma-ui-overhaul` branch will adapt approved Figma designs for app-owned Settings and Dashboard windows after their functional interfaces stabilize. It will not replace the menu's native inline commands or change data collection behavior without a separate decision.
+
 The notification settings also control:
 
 - confirmed quota-reset notifications;

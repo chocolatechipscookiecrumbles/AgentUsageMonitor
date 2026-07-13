@@ -127,7 +127,15 @@ Behavior:
 
 Acceptance: the numeric label changes after a confirmed refresh; switching styles updates immediately; five-hour/weekly modes handle a missing lane without inventing a value; cached/paused mode is visibly distinct; VoiceOver describes provider, lane, percentage, and freshness; the menu-bar label remains readable in light and dark appearances.
 
-### 8. `release/codex-daily-driver`
+### 8. `feature/figma-ui-overhaul`
+
+Run a frontend-only Figma-to-SwiftUI overhaul after the functional Settings, Dashboard, General preferences, and menu-bar display branches have stable interfaces. Entry requires an approved Figma `/design/` URL with specific screen nodes or an explicit Figma Desktop selection. Use Figma MCP design context, screenshots, variables, asset inventory, and Code Connect mappings; perform an element-by-element adaptation audit before changing existing SwiftUI.
+
+Scope the overhaul to app-owned windows and reusable presentation components. Settings and Dashboard may adopt the Figma layout, tokens, typography, and exported assets while continuing to consume the existing provider-neutral state and action interfaces. Keep the menu-bar extra in native menu presentation unless a separate decision explicitly approves window style; a Figma mockup must not silently turn inline menu commands into panel buttons.
+
+Acceptance: every implemented screen has a recorded Figma node and source screenshot; light and dark appearances, Dynamic Type, VoiceOver labels, confirmed/completed, cached/paused, unavailable, loading, and error states are represented; no view reads provider services or persistence directly; all existing working controls retain behavior; exported assets are validated and documented; manual side-by-side visual review is recorded. This branch must not change quota collection, scheduling, authentication, notification policy, or storage schemas.
+
+### 9. `release/codex-daily-driver`
 
 Reconcile all branch plans and docs, finish the seven-day reliability gate, build the app bundle, and run the complete manual acceptance checklist. Record deferred work: export/delete, logout/account switching, arbitrary thresholds, widgets, CloudKit/Watch, signing/notarization/updater, Claude, and Copilot.
 

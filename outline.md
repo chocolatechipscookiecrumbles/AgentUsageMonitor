@@ -1173,6 +1173,7 @@ Current execution status (2026-07-13)
 * A later `feature/general-preferences` branch will add working General controls for Launch at Login plus System, Light, and Dark appearance. These controls must not appear before their behavior exists.
 * All UI work must use a shared two-state quota presentation contract: confirmed/completed after a trusted live refresh, or cached/paused after an unsuccessful refresh while retaining and labeling the last confirmed record.
 * A later `feature/menu-bar-display` branch will make the menu-bar label configurable: current gauge, numeric lowest-remaining percentage, five-hour or weekly remaining, provider plus remaining, or icon-only. Numeric cached/paused values must carry a visible stale marker and never fall back to a misleading `0%`.
+* A separate frontend-only `feature/figma-ui-overhaul` branch is planned after the functional UI branches stabilize. It will import approved Figma nodes into Settings and Dashboard using Figma MCP, preserve native menu semantics, and leave collection, scheduling, authentication, notification, and storage behavior unchanged.
 
 Phase 0 — Provider capability research
 
