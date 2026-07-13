@@ -4,7 +4,9 @@
 
 **Implementation status (2026-07-12):** The first native MVP is implemented as a Swift package plus local app-bundle script, rather than a hand-authored `.xcodeproj`. It compiles with Xcode 26.3 and produced a confirmed live snapshot matching the Python reference. The user must still run the one-time `sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer` command to make Xcode 26.3 the system default.
 
-**Functional follow-on (2026-07-13):** [Quota History Foundation](<USER_HOME>/Desktop/agent%20usage/docs/superpowers/plans/2026-07-13-quota-history-foundation.md) is implemented. `QuotaRepository` now shields application state from Codex collection/storage details, retains bounded confirmed history, and calculates future-UI forecasts without changing the menu source.
+**Functional follow-on (2026-07-13):** [Quota History Foundation](<USER_HOME>/Desktop/agent%20usage/docs/superpowers/plans/2026-07-13-quota-history-foundation.md) is implemented. `QuotaRepository` now shields application state from Codex collection/storage details, retains bounded confirmed history, and supplies forecasts to the existing quota rows.
+
+**Next decision-gated phase:** [Codex Reliability Hardening](<USER_HOME>/Desktop/agent%20usage/docs/superpowers/plans/2026-07-13-codex-reliability-hardening.md) is planned, not yet implemented. It addresses refresh cadence, sanitized diagnostics, conservative forecast confidence, and a one-week evidence review before any provider expansion or UI overhaul.
 
 **Goal:** Build a native macOS menu-bar application that shows the currently confirmed Codex plan, credit balance, earned reset-credit expiries, five-hour quota, weekly quota, reset times, freshness, and confirmation state.
 
@@ -125,7 +127,7 @@ Use Swift for the app. The required product surfaces—`MenuBarExtra`, launch at
 
 - [x] Add a five-minute active-app refresh timer and refresh after wake or a manual action.
 - [x] Request notification permission only after the user enables alerts in the menu.
-- [x] Add 25%, 10%, and 5% remaining alerts per window, deduplicated by reset timestamp and threshold.
+- [x] Add 50%, 25%, 10%, and 5% remaining alerts per window, deduplicated by reset timestamp and threshold.
 - [x] Add earned-reset-credit-expiry alerts at 24 hours and one hour, deduplicated by expiry timestamp.
 - [x] Never send an alert from `unconfirmed` or `unavailable` data.
 - [ ] Leave background polling, widgets, CloudKit, Watch support, and other providers out of this MVP.

@@ -51,11 +51,12 @@ enum CodexProtocol {
         guard let limitID = rateLimits["limitId"] as? String, limitID == "codex" else {
             throw CodexProtocolError.missingCodexLimit
         }
-        guard let fiveHour = window(from: rateLimits["primary"]),
-              let weekly = window(from: rateLimits["secondary"])
-        else {
+        let primary = window(from: rateLimits["primary"])
+        let secondary = window(from: rateLimits["secondary"])
+        guard let weekly = weeklyWindow(primary: primary, secondary: secondary) else {
             throw CodexProtocolError.missingWindows
         }
+        let fiveHour = shortTermWindow(primary: primary, secondary: secondary)
 
         let credits = rateLimits["credits"] as? [String: Any]
         let resetCredits = limitResult["rateLimitResetCredits"] as? [String: Any]
@@ -88,6 +89,18 @@ enum CodexProtocol {
             resetAt: unixDate(values["resetsAt"]),
             durationMinutes: integer(from: values["windowDurationMins"])
         )
+    }
+
+    private static func weeklyWindow(primary: QuotaWindow?, secondary: QuotaWindow?) -> QuotaWindow? {
+        if primary?.durationMinutes == 10_080 { return primary }
+        if secondary?.durationMinutes == 10_080 { return secondary }
+        return secondary
+    }
+
+    private static func shortTermWindow(primary: QuotaWindow?, secondary: QuotaWindow?) -> QuotaWindow? {
+        if primary?.durationMinutes == 10_080 { return secondary }
+        if secondary?.durationMinutes == 10_080 { return primary }
+        return primary
     }
 
     private static func unixDate(_ value: Any?) -> Date? {

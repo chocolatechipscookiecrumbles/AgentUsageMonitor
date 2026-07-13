@@ -4,13 +4,13 @@
 
 **Goal:** Make confirmed Codex quota data durable and future-UI-ready by exposing it through one repository and retaining a bounded, sanitized history with deterministic exhaustion forecasts.
 
-**Architecture:** `QuotaRepository` is the only quota-refresh module known to application state. It owns the existing read-only Codex collector, records only trusted snapshots in `QuotaHistoryStore`, and returns a `QuotaRecord` containing the unchanged current presentation plus history-derived forecasts. The existing SwiftUI view remains a consumer of its current presentation and receives no layout, copy, or behavior changes.
+**Architecture:** `QuotaRepository` is the only quota-refresh module known to application state. It owns the existing read-only Codex collector, records only trusted snapshots in `QuotaHistoryStore`, and returns a `QuotaRecord` containing the current presentation plus history-derived forecasts. The existing SwiftUI quota rows consume those forecasts without learning collection or storage details.
 
 **Tech Stack:** Swift 6.2, Foundation, existing `CodexUsageMonitor` Swift package; no dependencies.
 
 ## Global Constraints
 
-- Do not modify `Menu/QuotaMenuView.swift` or `CodexUsageMonitorApp.swift`.
+- Do not modify `CodexUsageMonitorApp.swift`; keep forecast rendering within the existing quota rows.
 - Do not send prompts, spend reset credits, read `auth.json`, or add an OAuth implementation.
 - Persist only a one-way account fingerprint and normalized confirmed quota fields; never persist email, token, prompt, or raw RPC data.
 - Append history only for `confirmed` and `confirmed-after-retry` results.
@@ -91,7 +91,7 @@ actor QuotaRepository {
 - [x] Keep the collector’s confirmation/cache policy unchanged.
 - [x] Persist only a new trusted history entry; derive the two forecasts from entries matching the current identity and reset window.
 - [x] Change `QuotaViewModel` to depend on `QuotaRepository`, assign `record.presentation` exactly as it assigned the collector result, and continue notifying with that same presentation.
-- [x] Do not add any history or forecast rendering to the menu.
+- [x] Pass repository forecasts through `QuotaViewModel` and render a compact projected-exhaustion line in the existing matching quota row only when a forecast is valid.
 
 ### Task 4: Verify and document the invisible functional foundation
 
@@ -103,7 +103,7 @@ actor QuotaRepository {
 - [x] Compile the Swift package with Xcode 26.3.
 - [x] Run `./.build/debug/CodexUsageMonitor --live-read-once` and confirm a trusted snapshot returns without a prompt or reset-credit action.
 - [x] Inspect only file presence, mode, and JSON field names for `quota-history.json`; its file mode is `0600` and its schema excludes tokens, email, prompts, and raw RPC data.
-- [x] Document the new local history path, 90-day/500-entry retention, privacy boundary, and that forecasts are stored for future UI rather than currently displayed.
+- [x] Document the new local history path, 90-day/500-entry retention, privacy boundary, and forecast display conditions.
 
 ## Self-review
 
@@ -111,3 +111,7 @@ actor QuotaRepository {
 - Future-UI leverage: a new UI can call one `QuotaRepository.refresh()` interface and later consume `QuotaRecord` forecasts without learning Codex app-server or persistence details.
 - Safety: provider data remains read-only and all durable data excludes secrets and raw account identity.
 - Validation: only compiler and live read-only verification are used, per user direction.
+
+## Superseded details
+
+The foundation was implemented and verified before the reliability-hardening phase. The later `2026-07-13-codex-reliability-hardening.md` plan now owns the evolved forecast contract: forecasts require three observations over at least 15 minutes, use median adjacent positive slopes, and include confidence and observation count. Current operating documentation in `how-to.md` and `UsageProbe/README.md` reflects the stricter behavior.

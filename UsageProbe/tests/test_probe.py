@@ -24,8 +24,9 @@ class FakeRunner:
                 0,
                 '\n'.join((
                     '{"id":1,"result":{}}',
-                    '{"id":2,"result":{"rateLimits":{"primary":{"usedPercent":22}}}}',
-                    '{"id":3,"result":{"summary":{"lifetimeTokens":321}}}',
+                    '{"id":2,"result":{"account":{}}}',
+                    '{"id":3,"result":{"rateLimits":{"primary":{"usedPercent":22}}}}',
+                    '{"id":4,"result":{"summary":{"lifetimeTokens":321}}}',
                 )),
                 "",
             )

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lesson 1 — Find, edit, and preview the UI</title>
+  <link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<main>
+  <p class="eyebrow">Lesson 1 · 15 minutes</p>
+  <h1>Find, edit, and preview the UI</h1>
+  <p class="lede">Your first win: make one reversible Settings-window layout change, rebuild the real app, and explain why the same edit would be risky in the native menu.</p>
+
+  <h2>1. Use the three-layer mental model</h2>
+  <table>
+    <thead><tr><th>Layer</th><th>Question</th><th>This project</th></tr></thead>
+    <tbody>
+      <tr><td>Scene</td><td>Where does the UI appear?</td><td><code>MenuBarExtra</code> and <code>Settings</code> in <code>CodexUsageMonitorApp.swift</code></td></tr>
+      <tr><td>View</td><td>What does it look like?</td><td><code>QuotaMenuView</code> and <code>SettingsView</code></td></tr>
+      <tr><td>State/action</td><td>What data drives it, and what happens on interaction?</td><td><code>QuotaViewModel</code>, <code>AppSettings</code>, bindings, and button actions</td></tr>
+    </tbody>
+  </table>
+  <p>For a visual-only change, begin in the <strong>View</strong> layer. Do not start in the model because a label, spacing, or color change should not alter persistence or notification logic.</p>
+
+  <h2>2. Recognize declarative SwiftUI</h2>
+  <pre><code>Section("Warnings") {
+    Toggle("Remaining quota warnings",
+           isOn: $settings.thresholdWarningsEnabled)
+    Text("Uses fixed thresholds…")
+        .font(.caption)
+        .foregroundStyle(.secondary)
+}</code></pre>
+  <p>This describes a section containing a control and supporting text. The dollar sign passes a two-way <em>binding</em>: changing the toggle changes the setting, and changing the setting updates the toggle. The chained modifiers affect appearance.</p>
+
+  <h2>3. Know the menu boundary</h2>
+  <p>The current menu uses native menu presentation. Its root <code>Group</code> supplies rows such as <code>Text</code>, <code>Toggle</code>, <code>Button</code>, and <code>Divider</code>. In this context, a <code>Button</code> becomes an inline menu command.</p>
+  <div class="warning">
+    A root <code>VStack</code> plus <code>.menuBarExtraStyle(.window)</code> is not merely spacing. It intentionally changes the presentation into a custom panel, which is why the commands previously looked like large buttons.
+  </div>
+
+  <h2>4. Make your first reversible edit</h2>
+  <div class="exercise">
+    <ol>
+      <li>Open <code>Settings/SettingsView.swift</code>.</li>
+      <li>Find <code>.frame(width: 540, height: 520)</code>.</li>
+      <li>Change only the width from <code>540</code> to <code>600</code>.</li>
+      <li>Build and relaunch using the commands below.</li>
+      <li>Open <strong>Settings…</strong>, compare the result, then choose whether to keep or restore <code>540</code>.</li>
+    </ol>
+  </div>
+  <pre><code>cd "<USER_HOME>/Desktop/agent usage/CodexUsageMonitor"
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer bash Scripts/build-app.sh
+pkill -x CodexUsageMonitor
+open .build/CodexUsageMonitor.app</code></pre>
+  <p>Before changing anything else, inspect exactly what you changed:</p>
+  <pre><code>git diff -- Sources/CodexUsageMonitor/Settings/SettingsView.swift</code></pre>
+
+  <h2>5. Retrieval check</h2>
+  <p>Answer these before opening the solution:</p>
+  <ol>
+    <li>Which file owns the menu-bar symbol?</li>
+    <li>Which file owns the Settings window width?</li>
+    <li>Why should you not add <code>.menuBarExtraStyle(.window)</code> just to get more spacing?</li>
+  </ol>
+  <details>
+    <summary>Show answers</summary>
+    <ol>
+      <li><code>CodexUsageMonitorApp.swift</code>.</li>
+      <li><code>Settings/SettingsView.swift</code>.</li>
+      <li>Because it changes the native menu into a custom panel; it is a presentation decision, not a spacing-only modifier.</li>
+    </ol>
+  </details>
+
+  <h2>What to try next</h2>
+  <p>After the width experiment, pick one visual-only edit: change a section label, adjust the Settings padding, or change the menu-bar SF Symbol. Make one change, rebuild, inspect the diff, and take a screenshot. Send me the diff or screenshot and I’ll review your reasoning rather than taking the keyboard away from you.</p>
+
+  <h2>Primary source</h2>
+  <p>Read Apple’s <a href="https://developer.apple.com/documentation/swiftui/menubarextra">MenuBarExtra documentation</a>, especially the distinction between the default menu and window style. Keep the <a href="../reference/codex-monitor-ui-map.html">UI map</a> open as your quick reference.</p>
+
+  <footer>Questions are part of the lesson. Ask about any syntax, modifier, binding, file boundary, or visual result that feels unclear.</footer>
+</main>
+</body>
+</html>

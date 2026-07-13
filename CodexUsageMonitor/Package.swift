@@ -9,5 +9,9 @@ let package = Package(
     ],
     targets: [
         .executableTarget(name: "CodexUsageMonitor"),
+        .testTarget(
+            name: "CodexUsageMonitorTests",
+            dependencies: ["CodexUsageMonitor"]
+        ),
     ]
 )

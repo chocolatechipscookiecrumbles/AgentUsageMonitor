@@ -19,8 +19,9 @@ class RecordingRunner:
             stdout="\n".join(
                 (
                     '{"id":1,"result":{}}',
-                    '{"id":2,"result":{"rateLimits":{"primary":{"usedPercent":7}}}}',
-                    '{"id":3,"result":{"summary":{"lifetimeTokens":99}}}',
+                    '{"id":2,"result":{"account":{}}}',
+                    '{"id":3,"result":{"rateLimits":{"primary":{"usedPercent":7}}}}',
+                    '{"id":4,"result":{"summary":{"lifetimeTokens":99}}}',
                 )
             ),
             stderr="",
@@ -41,7 +42,7 @@ class AppServerClientTests(unittest.TestCase):
         requests = [json.loads(line) for line in stdin.splitlines()]
         self.assertEqual(
             [request["method"] for request in requests],
-            ["initialize", "account/rateLimits/read", "account/usage/read"],
+            ["initialize", "initialized", "account/read", "account/rateLimits/read", "account/usage/read"],
         )
         self.assertTrue(requests[0]["params"]["capabilities"]["experimentalApi"])
         self.assertEqual(timeout, 15.0)
