@@ -50,4 +50,14 @@ open .build/CodexUsageMonitor.app
 
 This prototype is verified through compilation and live, read-only Codex responses at the user's direction. No generated test cases were added or run for this work.
 
-The native app additionally retains a bounded sanitized history at `~/Library/Application Support/CodexUsageMonitor/quota-history.json`: maximum 500 confirmed observations and 90 days. It stores only provider/lane identifiers, a one-way account fingerprint, normalized quota windows, and collection times. The Python probe does not read or write that app history.
+The native app additionally retains a bounded sanitized history at `~/Library/Application Support/CodexUsageMonitor/quota-history.json`: maximum 500 confirmed observations and 90 days. It stores only provider/lane identifiers, a one-way account fingerprint, normalized quota windows, and collection times. A forecast requires at least three confirmed observations spanning 15 minutes in one reset window and a consistently positive median-adjacent slope; valid forecasts include low, medium, or high confidence.
+
+Menu-bar refresh outcomes are stored separately at `~/Library/Application Support/CodexUsageMonitor/refresh-diagnostics.json`, with a 30-day/1,000-entry limit and owner-only permissions. Diagnostics contain only timestamps, launch/scheduled/wake/manual reason, classified outcome, and an optional stable failure kind. They never contain raw provider errors or account quota values. The Python probe does not read or write either native-app store.
+
+The native companion has a separate macOS Settings window for notification permission and category controls. Remaining-quota thresholds stay fixed at 50%, 25%, 10%, and 5% for both the five-hour and weekly lanes; forecast and reset-credit-expiration warnings can be disabled independently. These preferences affect only the native app and do not change the Python probe.
+
+The menu-bar companion uses native inline menu commands for refresh, Settings, notification permission recovery, and quit. A disabled-notification status is shown as its own concise row so it does not overlap refresh metadata or actions.
+
+Native notification controls also cover confirmed resets, reset failures verified by two post-reset reads, data older than 15 minutes, and three or more consecutive refresh failures. Optional local-time quiet hours defer noncritical delivery; users may allow critical 5%-remaining and reset-failure warnings through. No notification stores raw provider errors or changes the probe's read-only safety boundary.
+
+The native app reports macOS notification authorization separately from its alert preference. When system permission is denied, it links to Notification Settings because macOS does not repeat the original permission prompt. Both the popover and separate Settings window observe the same state.

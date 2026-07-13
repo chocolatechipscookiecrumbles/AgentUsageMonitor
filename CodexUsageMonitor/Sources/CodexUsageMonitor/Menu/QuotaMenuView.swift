@@ -1,6 +1,8 @@
+import AppKit
 import SwiftUI
 
 struct QuotaMenuView: View {
+    @Environment(\.openSettings) private var openSettings
     @ObservedObject var viewModel: QuotaViewModel
 
     var body: some View {
@@ -20,26 +22,50 @@ struct QuotaMenuView: View {
                 Text("Reset credit expires: \(expiry.formatted(date: .abbreviated, time: .shortened))")
             }
             Divider()
-            QuotaWindowRow(title: "5-hour limit", window: viewModel.presentation.fiveHour)
-            QuotaWindowRow(title: "Weekly limit", window: viewModel.presentation.weekly)
+            QuotaWindowRow(
+                title: "5-hour limit",
+                window: viewModel.presentation.fiveHour,
+                unavailableText: viewModel.presentation.weekly == nil ? "unavailable" : "not currently active",
+                forecast: viewModel.fiveHourForecast
+            )
+            QuotaWindowRow(
+                title: "Weekly limit",
+                window: viewModel.presentation.weekly,
+                unavailableText: "unavailable",
+                forecast: viewModel.weeklyForecast
+            )
             Divider()
             Text("Verification: \(viewModel.presentation.confirmation.displayName)")
                 .foregroundStyle(statusColor)
-            if let detail = viewModel.presentation.detail { Text(detail).font(.caption) }
+            if let detail = viewModel.presentation.detail {
+                Text(detail)
+                    .font(.caption)
+            }
             Text("Last refresh: \(viewModel.presentation.collectedAt.formatted(date: .omitted, time: .shortened))")
                 .font(.caption)
             Toggle("Quota alerts", isOn: Binding(
                 get: { viewModel.alertsEnabled },
                 set: { viewModel.setAlertsEnabled($0) }
             ))
-            Button(viewModel.isRefreshing ? "Refreshing…" : "Refresh now") { viewModel.refresh() }
+            if viewModel.notificationAuthorizationState == .denied {
+                Text("Notifications disabled in System Settings")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                Button("Open Notification Settings…", action: viewModel.openNotificationSettings)
+            }
+            Button(viewModel.isRefreshing ? "Refreshing…" : "Refresh now", action: viewModel.refresh)
                 .disabled(viewModel.isRefreshing)
             Divider()
+            Button("Settings…", action: openNotificationSettings)
             Button("Quit Codex Usage Monitor") { NSApplication.shared.terminate(nil) }
         }
-        .padding(10)
-        .frame(minWidth: 340, alignment: .leading)
         .onAppear { viewModel.start() }
+    }
+
+    private func openNotificationSettings() {
+        viewModel.settings.selectedSettingsTab = .notifications
+        NSApp.activate(ignoringOtherApps: true)
+        openSettings()
     }
 
     private var statusColor: Color {
@@ -54,6 +80,8 @@ struct QuotaMenuView: View {
 private struct QuotaWindowRow: View {
     let title: String
     let window: QuotaWindow?
+    let unavailableText: String
+    let forecast: QuotaForecast?
 
     var body: some View {
         if let window {
@@ -62,9 +90,13 @@ private struct QuotaWindowRow: View {
                 if let resetAt = window.resetAt {
                     Text("Resets: \(resetAt.formatted(date: .abbreviated, time: .shortened))").font(.caption)
                 }
+                if let forecast {
+                    Text("Projected exhaustion: \(forecast.projectedExhaustionAt.formatted(date: .abbreviated, time: .shortened)) · \(forecast.confidence.rawValue) confidence")
+                        .font(.caption)
+                }
             }
         } else {
-            Text("\(title): unavailable")
+            Text("\(title): \(unavailableText)")
         }
     }
 }

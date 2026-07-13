@@ -72,7 +72,7 @@ struct CodexQuotaSample: Sendable {
     let hasCredits: Bool?
     let availableResetCredits: Int?
     let resetCreditExpiryDates: [Date]
-    let fiveHour: QuotaWindow
+    let fiveHour: QuotaWindow?
     let weekly: QuotaWindow
     let collectedAt: Date
 

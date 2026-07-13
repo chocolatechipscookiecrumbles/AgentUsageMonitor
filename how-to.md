@@ -157,7 +157,32 @@ The gauge icon appears in the menu bar with the lowest remaining quota percentag
 
 The app performs the same three read-only `codex app-server` samples as the probe. It keeps a sanitized last-known-good result in `~/Library/Application Support/CodexUsageMonitor/last-known-good.json`, owner-readable only. That file contains a hashed account identity and normalized quota fields only—never a token, email address, prompt, or raw provider response.
 
-Confirmed live results are also appended to `~/Library/Application Support/CodexUsageMonitor/quota-history.json`. The app retains at most 500 observations from the last 90 days, with the same owner-only permissions and privacy boundary. It uses that history to calculate deterministic exhaustion forecasts only within the same reset window; forecasts are stored behind the app’s quota repository for a later UI overhaul and are not currently shown in the menu.
+Confirmed live results are also appended to `~/Library/Application Support/CodexUsageMonitor/quota-history.json`. The app retains at most 500 observations from the last 90 days, with the same owner-only permissions and privacy boundary. It calculates a forecast only from at least three confirmed readings spanning 15 minutes in the same reset window, with a consistently positive trend. The rate is the median of adjacent slopes. A valid row shows **Projected exhaustion** plus low, medium, or high confidence; projections at or after reset are hidden.
+
+Every completed menu-bar refresh also appends a privacy-safe outcome to `~/Library/Application Support/CodexUsageMonitor/refresh-diagnostics.json`. It retains at most 1,000 entries from 30 days and stores timestamps, refresh reason, classified outcome, and an optional stable failure kind—never raw provider errors, account quota values, email, credentials, prompts, or RPC messages. Both the Application Support directory and files use owner-only permissions (`0700` and `0600`).
+
+The monitor refreshes at launch, every five minutes while its process is running, after wake, and on **Refresh now**. Only one collection runs at a time; the manual button is disabled during an active refresh. Forecast alerts require confirmed live data, medium or high confidence, and projected exhaustion at least 15 minutes before reset.
+
+Open **Settings…** from the menu popover (or press `Command-,`) to configure notifications. The master switch requests macOS notification permission only when enabled. Separate switches control the existing fixed 50%, 25%, 10%, and 5% remaining-quota warnings, qualified forecast warnings, and earned reset-credit-expiration warnings. Each lane and threshold is deduplicated within its current reset window.
+
+The local build script ad-hoc signs the completed bundle with the stable identifier `com.david.codex-usage-monitor` after installing its `Info.plist`. Always launch the `.app` produced by `Scripts/build-app.sh` when checking notification permission; running the raw SwiftPM executable does not provide the same macOS notification identity.
+
+macOS normally shows the notification permission prompt only once. If permission was denied, toggling alerts cannot display the prompt again. The app will show the denied state and **Open Notification Settings…**; enable **Codex Usage Monitor** in System Settings, then return to the app and enable quota notifications. The popover and Settings controls share the same app preference and macOS authorization status.
+
+The menu-bar content uses native menu presentation. **Refresh now**, **Settings…**, **Open Notification Settings…**, and **Quit Codex Usage Monitor** remain inline menu commands. When notifications are disabled, a concise standalone status row appears without overlapping **Last refresh** or later commands.
+
+The notification settings also control:
+
+- confirmed quota-reset notifications;
+- critical reset-failure warnings after two confirmed reads still show the prior window;
+- stale-data warnings once the displayed snapshot is at least 15 minutes old;
+- repeated-refresh warnings after three consecutive reads fail to produce confirmed live data.
+
+Optional quiet hours use local wall-clock time and may cross midnight. Noncritical notifications are held in memory and delivered after quiet hours when the app next evaluates quota. The **Allow critical warnings** option permits only 5%-remaining and verified reset-failure warnings during quiet hours. Quiet-hour changes are calculated with the current calendar and time zone, including daylight-saving transitions.
+
+### Current hardening checkpoint
+
+The quota-history foundation and the implementation portions of reliability hardening Tasks 1–4 compile successfully. The remaining verification is operational: leave the menu-bar app running for more than five minutes to confirm foreground-independent refresh, inspect the diagnostic file's field names and permissions, and complete the seven-calendar-day observation log before starting another provider or a UI overhaul.
 
 For a terminal-only live diagnostic of the native collector (it performs one read and exits):
 

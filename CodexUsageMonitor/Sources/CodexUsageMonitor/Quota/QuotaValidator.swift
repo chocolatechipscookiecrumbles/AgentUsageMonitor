@@ -2,10 +2,11 @@ import Foundation
 
 enum QuotaValidator {
     static func isTransientEmpty(_ sample: CodexQuotaSample) -> Bool {
-        guard sample.fiveHour.usedPercent <= 5,
+        guard let fiveHour = sample.fiveHour,
+              fiveHour.usedPercent <= 5,
               sample.weekly.usedPercent <= 5,
-              let resetAt = sample.fiveHour.resetAt,
-              let duration = sample.fiveHour.durationMinutes
+              let resetAt = fiveHour.resetAt,
+              let duration = fiveHour.durationMinutes
         else { return false }
         let expectedReset = sample.collectedAt.addingTimeInterval(TimeInterval(duration * 60))
         return abs(resetAt.timeIntervalSince(expectedReset)) <= 90
@@ -26,7 +27,8 @@ enum QuotaValidator {
             presentation.limitID == "codex" && sample.limitID == "codex"
     }
 
-    private static func windowsMatch(_ first: QuotaWindow, _ second: QuotaWindow) -> Bool {
+    private static func windowsMatch(_ first: QuotaWindow?, _ second: QuotaWindow?) -> Bool {
+        guard let first, let second else { return first == nil && second == nil }
         guard abs(first.usedPercent - second.usedPercent) <= 5 else { return false }
         switch (first.resetAt, second.resetAt) {
         case let (.some(left), .some(right)):

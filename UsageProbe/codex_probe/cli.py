@@ -52,8 +52,15 @@ def _summary(report: dict[str, object]) -> str:
         for expiry in expiry_dates:
             if isinstance(expiry, int):
                 lines.append(f"  Reset credit expires: {_reset_text(expiry)}")
-    lines.extend(_window_summary("5-hour limit", rate_limits.get("primary")))
-    lines.extend(_window_summary("Weekly limit", rate_limits.get("secondary")))
+    primary = rate_limits.get("primary")
+    secondary = rate_limits.get("secondary")
+    weekly = _weekly_window(primary, secondary)
+    short_term = _short_term_window(primary, secondary, weekly)
+    if short_term is None and weekly is not None:
+        lines.append("5-hour limit: not currently active")
+    else:
+        lines.extend(_window_summary("5-hour limit", short_term))
+    lines.extend(_window_summary("Weekly limit", weekly))
     capability_detail = next(
         (item.get("detail") for item in report.get("capabilities", []) if isinstance(item, dict) and item.get("id") == "account-rate-limits"),
         None,
@@ -71,6 +78,27 @@ def _window_summary(label: str, window: object) -> list[str]:
     reset = window.get("resetsAt")
     reset_text = _reset_text(reset) if isinstance(reset, int) else "unknown"
     return [f"{label}: {used}% used · {remaining}% remaining", f"  Resets: {reset_text}"]
+
+
+def _weekly_window(primary: object, secondary: object) -> object:
+    for window in (primary, secondary):
+        if _duration_minutes(window) == 7 * 24 * 60:
+            return window
+    return secondary
+
+
+def _short_term_window(primary: object, secondary: object, weekly: object) -> object:
+    for window in (primary, secondary):
+        if window is not weekly:
+            return window
+    return None
+
+
+def _duration_minutes(window: object) -> int | None:
+    if not isinstance(window, dict):
+        return None
+    duration = window.get("windowDurationMinutes")
+    return duration if isinstance(duration, int) and not isinstance(duration, bool) else None
 
 
 def _reset_text(timestamp: int) -> str:

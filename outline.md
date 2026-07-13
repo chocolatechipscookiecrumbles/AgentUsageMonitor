@@ -1106,7 +1106,7 @@ Automatically show whichever provider has the least remaining capacity.
 
 Warning state
 
-At 25%, 10%, and 5%, the complication may display an alert symbol or urgency state, while respecting Apple’s complication design constraints.
+At 50%, 25%, 10%, and 5%, the complication may display an alert symbol or urgency state, while respecting Apple’s complication design constraints.
 
 ⸻
 
@@ -1160,6 +1160,18 @@ enum UsageCause: Codable {
 ⸻
 
 18. Development phases
+
+Current execution status (2026-07-13)
+
+* The Codex capability probe, menu-bar MVP, and quota-history foundation are implemented.
+* Reliability-hardening Tasks 1–4 are implemented; compilation is verified without adding or running tests.
+* The active gate is the seven-calendar-day reliability observation in `docs/superpowers/plans/2026-07-13-codex-reliability-hardening.md`.
+* Do not begin another provider integration or UI overhaul until that gate records refresh outcomes, foreground-independent cadence, forecast behavior, and a Codex-adapter decision.
+* After the gate, choose exactly one next plan from the hardening decision table: Codex validation refinement, GitHub Copilot capability research, forecast refinement, or UI-overhaul design.
+* The Codex-first daily-driver roadmap is recorded in `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md`; notification settings are the first active feature branch.
+* `feature/notification-settings` now contains persisted category controls, operational reset/stale/failure warnings, and quiet hours; manual UI and real reset-transition acceptance remain open.
+* All UI work must use a shared two-state quota presentation contract: confirmed/completed after a trusted live refresh, or cached/paused after an unsuccessful refresh while retaining and labeling the last confirmed record.
+* A later `feature/menu-bar-display` branch will make the menu-bar label configurable: current gauge, numeric lowest-remaining percentage, five-hour or weekly remaining, provider plus remaining, or icon-only. Numeric cached/paused values must carry a visible stale marker and never fall back to a misleading `0%`.
 
 Phase 0 — Provider capability research
 
@@ -1231,7 +1243,7 @@ Build:
 * Scheduled refresh
 * Source and confidence labels
 * Stale-data states
-* 25%, 10%, and 5% notifications for provider-reported values
+* 50%, 25%, 10%, and 5% notifications for provider-reported values
 * Reset notifications for verified reset timestamps
 * JSON and CSV export
 * Diagnostics screen

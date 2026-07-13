@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Codex Usage Monitor UI Map</title>
+  <link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<main>
+  <p class="eyebrow">Quick reference</p>
+  <h1>Codex Usage Monitor UI map</h1>
+  <p class="lede">Start with the thing you can see, then open the owning file. Avoid changing state code until the visual-only edit is understood.</p>
+
+  <table>
+    <thead><tr><th>Visible surface</th><th>Owning file</th><th>Safe first edits</th></tr></thead>
+    <tbody>
+      <tr><td>Menu-bar icon and number</td><td><code>CodexUsageMonitorApp.swift</code></td><td>SF Symbol name and label composition</td></tr>
+      <tr><td>Opened menu rows</td><td><code>Menu/QuotaMenuView.swift</code></td><td>Text, order, dividers, font and foreground style</td></tr>
+      <tr><td>Settings window</td><td><code>Settings/SettingsView.swift</code></td><td>Sections, labels, padding, window frame and help text</td></tr>
+      <tr><td>Persisted setting values</td><td><code>Settings/AppSettings.swift</code></td><td>Not visual-only; edit when adding or changing behavior</td></tr>
+      <tr><td>Displayed quota state</td><td><code>Menu/QuotaViewModel.swift</code></td><td>Not visual-only; edit when changing derived UI state</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Native menu versus window</h2>
+  <div class="card">
+    <p><strong>Native menu:</strong> keep the root as a sequence of menu-compatible rows in <code>Group</code>. A SwiftUI <code>Button</code> renders as an inline command here.</p>
+    <p><strong>Settings window:</strong> ordinary layout containers such as <code>Form</code>, <code>Section</code>, <code>TabView</code>, padding, and frames are appropriate.</p>
+  </div>
+  <div class="warning">
+    Adding <code>.menuBarExtraStyle(.window)</code> intentionally changes the menu into a custom panel. Do this only when you want panel controls rather than native inline menu commands.
+  </div>
+
+  <h2>Modifier reading rule</h2>
+  <pre><code>Text("Last refresh")     // create a view
+    .font(.caption)      // transform that view
+    .foregroundStyle(.secondary)</code></pre>
+  <p>Read SwiftUI top to bottom: create a view, then apply each modifier to the result above it. Indentation tells you which view receives the modifier.</p>
+
+  <h2>Build and inspect</h2>
+  <pre><code>cd "<USER_HOME>/Desktop/agent usage/CodexUsageMonitor"
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer bash Scripts/build-app.sh
+pkill -x CodexUsageMonitor
+open .build/CodexUsageMonitor.app</code></pre>
+  <p class="muted">If <code>pkill</code> says no process was found, continue with <code>open</code>.</p>
+</main>
+</body>
+</html>
