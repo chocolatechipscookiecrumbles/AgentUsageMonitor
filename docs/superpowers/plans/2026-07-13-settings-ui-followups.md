@@ -142,10 +142,25 @@
 - The legacy combined threshold key is read once for migration. The new raw-value set is written under `notification.enabledQuotaThresholds`, and notification delivery checks the selected set for confirmed live five-hour and weekly data.
 - `SMAppService.mainApp` owns Launch at Login state. The controller reports enabled, not registered, approval-required, and unavailable states; it links to Login Items when user action is required and does not store a duplicate Boolean preference.
 - System/Light/Dark and keyboard-shortcut preferences persist in `AppSettings`. Appearance is scoped to the Settings window; native menu-bar presentation remains system controlled. Both existing Refresh buttons use the same conditional `Command-R` component.
-- The Agents provider list is a 180-point inner sidebar below the unchanged outer Settings tabs, with existing provider detail views and connection actions preserved.
+- The Agents provider list is a 190-point inner sidebar below the unchanged outer Settings tabs, with existing provider detail views and connection actions preserved.
 - `swift build --package-path CodexUsageMonitor -Xswiftc -warnings-as-errors`, the ad-hoc signed app build, strict code-signature validation, and `plutil -lint` passed.
 - A temporary signed instance launched and remained alive through its launch refresh without a new crash report. It was launched alongside the user's existing instance so no running app was replaced.
 - Still manual: visually inspect all Settings tabs, exercise each threshold and master disabled state, verify preference persistence after relaunch, toggle Launch at Login from the signed app, verify all three appearances, and confirm `Command-R` enable/disable behavior.
+
+## July 14 visual audit follow-up
+
+- [x] Reproduce the General, Notifications, and Refresh clipping and readability failures from screenshots of the signed app.
+- [x] Replace the fragile macOS `Form` label-column behavior with one shared native SwiftUI Settings layout using consistent page margins, section spacing, and a fixed 148-point label column.
+- [x] Bound picker widths so controls remain readable instead of stretching across the full window.
+- [x] Promote notification permission and explanatory copy from caption-sized text to wrapping callout text.
+- [x] Remove transparent section-footer spacer hacks and use explicit section spacing.
+- [x] Make every preference page scroll vertically so longer content remains reachable without colliding with the window edge.
+- [x] Apply the shared layout to General, Notifications, Refresh, Agents detail panes, Data & Privacy, and Diagnostics while preserving the native theme and the full-width top tab bar.
+- [x] Increase the Settings content frame from 600 × 520 to 680 × 560 points for clearer tab labels and wrapped content.
+- [x] Visually inspect the rebuilt signed app in dark appearance and confirm that the reported left-edge clipping is absent from General, Notifications, and Refresh.
+- [x] Visually inspect Agents, Data & Privacy, and Diagnostics for consistent lower-pane/sidebar boundaries, label alignment, and readable wrapping.
+- [x] Record the root causes and repository-wide prevention rules in `AGENTS.md` so later Settings work reuses the shared layout and requires signed-app visual acceptance.
+- [ ] Manually inspect the same pages in Light appearance; all colors remain adaptive system styles, but the automated visual pass used the current dark system appearance.
 
 ## Self-review
 

@@ -4,23 +4,20 @@ struct PlannedAgentSettingsView: View {
     let agent: AgentProvider
 
     var body: some View {
-        Form {
-            Section("Integration status") {
-                LabeledContent("Agent", value: agent.title)
-                LabeledContent("Status", value: "Planned")
-                LabeledContent("Connection", value: "Not connected")
+        SettingsPage {
+            SettingsSection("Integration status") {
+                SettingsLabeledRow("Agent") { Text(agent.title) }
+                SettingsLabeledRow("Status") { Text("Planned") }
+                SettingsLabeledRow("Connection") { Text("Not connected") }
             }
 
-            Section("Availability") {
-                Text("This agent is listed for roadmap visibility only. Connection, quota, and usage features are not implemented.")
-                    .foregroundStyle(.secondary)
-                Text("OpenAI Codex remains the only active integration in this build.")
-                    .foregroundStyle(.secondary)
+            SettingsSection("Availability") {
+                SettingsDescription("This agent is listed for roadmap visibility only. Connection, quota, and usage features are not implemented.")
+                SettingsDescription("OpenAI Codex remains the only active integration in this build.")
             }
 
-            Section("Privacy") {
-                Text("No account or usage data is collected for this agent.")
-                    .foregroundStyle(.secondary)
+            SettingsSection("Privacy") {
+                SettingsDescription("No account or usage data is collected for this agent.")
             }
         }
     }

@@ -8,19 +8,18 @@ struct CodexAgentSettingsView: View {
     let checkConnection: () -> Void
 
     var body: some View {
-        Form {
-            Section("Current integration") {
-                LabeledContent("Agent", value: AgentProvider.codex.title)
-                LabeledContent("Status", value: connectionState.displayName)
+        SettingsPage {
+            SettingsSection("Current integration") {
+                SettingsLabeledRow("Agent") { Text(AgentProvider.codex.title) }
+                SettingsLabeledRow("Status") { Text(connectionState.displayName) }
                 if let planName {
-                    LabeledContent("Plan", value: planName)
+                    SettingsLabeledRow("Plan") { Text(planName) }
                 }
-                LabeledContent("Quota status", value: status.displayMode.displayName)
-                Text("Codex is the only active agent integration in this build.")
-                    .foregroundStyle(.secondary)
+                SettingsLabeledRow("Quota status") { Text(status.displayMode.displayName) }
+                SettingsDescription("Codex is the only active agent integration in this build.")
             }
 
-            Section("Connection") {
+            SettingsSection("Connection") {
                 connectionGuidance
                 if showsSignInActions {
                     Button("Sign in with browser", action: signInWithBrowser)
@@ -33,9 +32,8 @@ struct CodexAgentSettingsView: View {
                 }
             }
 
-            Section("Privacy") {
-                Text("Codex owns sign-in and credential storage. This app never displays an email address, account fingerprint, credential, or authentication token.")
-                    .foregroundStyle(.secondary)
+            SettingsSection("Privacy") {
+                SettingsDescription("Codex owns sign-in and credential storage. This app never displays an email address, account fingerprint, credential, or authentication token.")
             }
         }
     }
@@ -49,26 +47,22 @@ struct CodexAgentSettingsView: View {
     private var connectionGuidance: some View {
         switch connectionState {
         case .checking:
-            Text("Checking the Codex connection…")
-                .foregroundStyle(.secondary)
+            SettingsDescription("Checking the Codex connection…")
         case .missingCLI:
-            Text("Install the Codex CLI, then check again. Both sign-in options use the official Codex executable.")
-                .foregroundStyle(.secondary)
+            SettingsDescription("Install the Codex CLI, then check again. Both sign-in options use the official Codex executable.")
         case .disconnected:
-            Text("Connect Codex to show current five-hour and weekly usage.")
-                .foregroundStyle(.secondary)
+            SettingsDescription("Connect Codex to show current five-hour and weekly usage.")
         case .signingIn(.browser):
-            Text("Finish signing in in your browser.")
-                .foregroundStyle(.secondary)
+            SettingsDescription("Finish signing in in your browser.")
         case .signingIn(.cli):
-            Text("Finish signing in in the Terminal window.")
-                .foregroundStyle(.secondary)
+            SettingsDescription("Finish signing in in the Terminal window.")
         case .connected:
-            Text("Codex is connected. Logout and account switching are not included in this phase.")
-                .foregroundStyle(.secondary)
+            SettingsDescription("Codex is connected. Logout and account switching are not included in this phase.")
         case .failed(let failure):
             Text(failure.displayMessage)
+                .font(.callout)
                 .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

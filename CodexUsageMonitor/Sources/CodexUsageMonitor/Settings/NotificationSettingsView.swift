@@ -6,56 +6,54 @@ struct NotificationSettingsView: View {
     let openNotificationSettings: () -> Void
 
     var body: some View {
-        Form {
-            Section(footer: Color.clear.frame(height: 20)) {
+        SettingsPage {
+            SettingsSection("Notifications") {
                 Toggle("Enable quota notifications", isOn: Binding(
                     get: { settings.alertsEnabled },
                     set: { enabled in setAlertsEnabled(enabled) }
                 ))
                 if let message = settings.notificationAuthorizationState.statusMessage {
                     Text(message)
-                        .font(.caption)
+                        .font(.callout)
                         .foregroundStyle(settings.notificationAuthorizationState == .denied ? .orange : .secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.leading, 26)
                 }
                 if settings.notificationAuthorizationState == .denied {
                     Button("Open Notification Settings…", action: openNotificationSettings)
+                        .padding(.leading, 26)
                 }
             }
 
-            Section("Remaining Quota") {
+            SettingsSection("Remaining Quota") {
                 ForEach(RemainingQuotaThreshold.allCases) { threshold in
                     Toggle(threshold.title, isOn: thresholdBinding(threshold))
                 }
-                Text("Applies to both the 5-hour and weekly limits.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                SettingsDescription("Applies to both the 5-hour and weekly limits.")
+                    .padding(.leading, 26)
             }
             .disabled(!settings.alertsEnabled)
 
-            Section {
+            SettingsSection("Other Warnings") {
                 Toggle("Forecasted exhaustion", isOn: $settings.forecastWarningsEnabled)
                 Toggle("Reset-credit expiration", isOn: $settings.resetCreditWarningsEnabled)
                 Toggle("Quota reset or reset failure", isOn: $settings.resetWarningsEnabled)
                 Toggle("Stale quota data", isOn: $settings.staleDataWarningsEnabled)
                 Toggle("Repeated refresh failures", isOn: $settings.refreshFailureWarningsEnabled)
-            } header: {
-                Text("Other Warnings")
-            } footer: {
-                Color.clear.frame(height: 20)
             }
             .disabled(!settings.alertsEnabled)
 
-            Section("Quiet Hours") {
+            SettingsSection("Quiet Hours") {
                 Toggle("Enable quiet hours", isOn: $settings.quietHoursEnabled)
 
-                LabeledContent("Start") {
-                    DatePicker("", selection: minuteBinding($settings.quietHoursStartMinutes), displayedComponents: .hourAndMinute)
+                SettingsLabeledRow("Start") {
+                    DatePicker("Start", selection: minuteBinding($settings.quietHoursStartMinutes), displayedComponents: .hourAndMinute)
                         .labelsHidden()
                 }
                 .disabled(!settings.quietHoursEnabled)
 
-                LabeledContent("End") {
-                    DatePicker("", selection: minuteBinding($settings.quietHoursEndMinutes), displayedComponents: .hourAndMinute)
+                SettingsLabeledRow("End") {
+                    DatePicker("End", selection: minuteBinding($settings.quietHoursEndMinutes), displayedComponents: .hourAndMinute)
                         .labelsHidden()
                 }
                 .disabled(!settings.quietHoursEnabled)
@@ -63,9 +61,8 @@ struct NotificationSettingsView: View {
                 Toggle("Allow critical warnings", isOn: $settings.allowCriticalDuringQuietHours)
                     .disabled(!settings.quietHoursEnabled)
 
-                Text("Critical warnings are 5% remaining and a reset that failed verification.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                SettingsDescription("Critical warnings are 5% remaining and a reset that failed verification.")
+                    .padding(.leading, 26)
             }
             .disabled(!settings.alertsEnabled)
         }

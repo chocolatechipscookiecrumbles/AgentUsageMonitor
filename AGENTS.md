@@ -1,0 +1,48 @@
+# Repository Agent Instructions
+
+These instructions apply to the entire repository. More specific instructions in a nested `AGENTS.md` override them for that subtree.
+
+## Documentation discipline
+
+- Update the relevant implementation plan whenever behavior, scope, verification evidence, or a known limitation changes.
+- Update `UsageProbe/README.md` and `how-to.md` when a native-app change affects user-visible behavior or operating instructions.
+- Preserve existing user changes and keep unrelated edits out of the current task.
+
+## macOS Settings UI guardrails
+
+The July 14 Settings audit found that macOS SwiftUI `Form` and `LabeledContent` can calculate an implicit label column that extends outside the visible content area. In this app it clipped the leading text in General and Refresh, stretched pickers across the window, crowded Notifications against the bottom edge, and made caption-sized status text hard to read.
+
+When editing `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings`:
+
+- Build preference pages with the shared `SettingsPage`, `SettingsSection`, `SettingsLabeledRow`, and `SettingsDescription` components in `SettingsLayout.swift`.
+- Do not reintroduce a top-level `Form` or rely on its implicit macOS label-column alignment without a documented reason and signed-app visual evidence that it does not clip at the default window size.
+- Keep label widths and value-column offsets in `SettingsLayoutMetrics`; do not duplicate alignment constants in individual pages.
+- Keep long pages vertically scrollable. Content must remain reachable at the default 680 × 560-point Settings content size.
+- Bound wide controls such as pop-up pickers instead of allowing them to consume every available horizontal point.
+- Let explanatory and status text wrap vertically. Use adaptive system foreground styles and at least callout-sized text for information a user needs to understand or recover from a state.
+- Use explicit stack spacing. Do not create section gaps with transparent footer views such as `Color.clear.frame(height:)`.
+- Keep the top Settings `TabView` owned by `SettingsView`. Provider navigation belongs inside the lower Agents content region and must not resize, cover, or shift the top tab bar.
+- Preserve native SwiftUI controls and system colors unless a separately approved visual-design task explicitly changes the theme.
+
+## Required visual acceptance for Settings changes
+
+- Compile and build the signed `.app` with `CodexUsageMonitor/Scripts/build-app.sh`; the raw SwiftPM executable is not sufficient for final macOS UI or permission checks.
+- Inspect the actual Settings window at its default size. Source review alone is not visual verification.
+- Open every affected tab and check for leading-label clipping, truncated descriptions, controls extending past the trailing edge, content hidden at the bottom, inconsistent section spacing, and movement of the top tab bar.
+- Exercise relevant conditional states, including disabled notification controls, missing permission or connection guidance, absent quota values, and long status strings.
+- Check both Light and Dark appearance when colors or contrast change. If one appearance cannot be inspected, state that limitation in the implementation plan and handoff instead of claiming complete visual coverage.
+- Capture or otherwise directly inspect the original failing page after the fix. Do not infer that a shared-layout change fixed every tab without opening those tabs.
+- Do not leave temporary audit app instances running or terminate an app process that was already owned by the user.
+
+## Regression warning signs
+
+Stop and perform a visual audit if a Settings change introduces any of the following:
+
+- a new top-level `Form` in a preference page;
+- a new `LabeledContent` outside `SettingsLabeledRow`;
+- a hard-coded alignment padding that duplicates `SettingsLayoutMetrics`;
+- caption-sized permission, failure, recovery, or scheduling text;
+- transparent spacer content;
+- an unbounded picker or long single-line description;
+- a Settings frame reduction without checking all six top tabs and the longest page;
+- a completion claim based only on compilation or source inspection.

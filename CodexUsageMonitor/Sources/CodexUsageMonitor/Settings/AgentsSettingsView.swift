@@ -20,7 +20,7 @@ struct AgentsSettingsView: View {
                 .tag(agent)
             }
             .listStyle(.sidebar)
-            .frame(width: 180)
+            .frame(width: 190)
 
             Divider()
 

@@ -45,7 +45,7 @@ struct SettingsView: View {
                 .tabItem { Label(SettingsTab.diagnostics.title, systemImage: SettingsTab.diagnostics.systemImage) }
                 .tag(SettingsTab.diagnostics)
         }
-        .frame(width: 600, height: 520)
+        .frame(width: 680, height: 560)
         .preferredColorScheme(settings.appearancePreference.colorScheme)
     }
 }
