@@ -30,6 +30,7 @@ struct RefreshSettingsView: View {
                 SettingsLabeledRow("Activity") { Text(viewModel.settingsStatus.refreshActivity) }
                 SettingsDescription("The monitor refreshes at launch, after wake, on schedule, and when requested manually.")
                 SettingsDescription("Automatic may temporarily refresh every 30 seconds near a warning threshold, qualified exhaustion, or quota reset. Fixed choices never use 30 seconds.")
+                SettingsDescription("After three unsuccessful refreshes, every mode temporarily retries every 10 minutes until an update is confirmed.")
             }
 
             SettingsSection("Latest collection") {

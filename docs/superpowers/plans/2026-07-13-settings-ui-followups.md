@@ -48,14 +48,13 @@
 - Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/NotificationSettingsView.swift`
 
 **Interfaces:**
-- Consumes: `AppSettings.alertsEnabled`, `enabledQuotaThresholds`, notification authorization state, and the existing category/quiet-hour preferences.
+- Consumes: `AppSettings.alertsEnabled`, `enabledQuotaThresholds`, notification authorization state, and the existing category preferences.
 - Produces: four threshold bindings and native disabled states for every subordinate notification control.
 
 - [x] Keep **Enable quota notifications** as the master switch and remove the single **Remaining quota warnings** category switch.
 - [x] Under a **Remaining quota** section, render four toggles with exact labels **50% remaining**, **25% remaining**, **10% remaining**, and **5% remaining**.
 - [x] Add the concise description: “Applies to both the 5-hour and weekly limits.” Do not repeat the threshold values in a second sentence.
-- [x] Disable and natively grey the threshold toggles, forecast/reset/stale/failure toggles, **Enable quiet hours**, both time pickers, and **Allow critical warnings** whenever the master switch is off.
-- [x] Preserve the existing secondary quiet-hours rule: time pickers and **Allow critical warnings** also remain disabled when quiet hours themselves are off.
+- [x] Disable and natively grey the threshold and forecast/reset/stale/failure toggles whenever the master switch is off.
 - [x] Do not reset subordinate values when the master switch changes. Re-enabling notifications restores the prior checklist selections.
 - [x] Keep authorization text and **Open Notification Settings…** outside the disabled subtree so permission recovery always works.
 
@@ -161,6 +160,13 @@
 - [x] Visually inspect Agents, Data & Privacy, and Diagnostics for consistent lower-pane/sidebar boundaries, label alignment, and readable wrapping.
 - [x] Record the root causes and repository-wide prevention rules in `AGENTS.md` so later Settings work reuses the shared layout and requires signed-app visual acceptance.
 - [ ] Manually inspect the same pages in Light appearance; all colors remain adaptive system styles, but the automated visual pass used the current dark system appearance.
+
+## July 14 notification simplification follow-up
+
+- [x] Remove app-owned quiet-hours controls from the Notifications page.
+- [x] Remove the matching persistence and deferred-delivery behavior so no hidden legacy preference can suppress notifications.
+- [x] Keep macOS authorization recovery and all remaining warning-category controls intact.
+- [x] Document macOS Focus and notification settings as the supported scheduled-silencing mechanism.
 
 ## Self-review
 

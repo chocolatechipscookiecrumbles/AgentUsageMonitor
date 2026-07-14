@@ -12,10 +12,6 @@ final class AppSettings: ObservableObject {
         static let resetWarnings = "notification.resetWarnings"
         static let staleDataWarnings = "notification.staleDataWarnings"
         static let refreshFailureWarnings = "notification.refreshFailureWarnings"
-        static let quietHoursEnabled = "notification.quietHoursEnabled"
-        static let quietHoursStartMinutes = "notification.quietHoursStartMinutes"
-        static let quietHoursEndMinutes = "notification.quietHoursEndMinutes"
-        static let allowCriticalDuringQuietHours = "notification.allowCriticalDuringQuietHours"
         static let refreshMode = "refresh.mode"
         static let menuBarDisplayStyle = "menuBar.displayStyle"
         static let quotaValueMode = "menuBar.valueMode"
@@ -41,10 +37,6 @@ final class AppSettings: ObservableObject {
     @Published var resetWarningsEnabled: Bool { didSet { defaults.set(resetWarningsEnabled, forKey: Key.resetWarnings) } }
     @Published var staleDataWarningsEnabled: Bool { didSet { defaults.set(staleDataWarningsEnabled, forKey: Key.staleDataWarnings) } }
     @Published var refreshFailureWarningsEnabled: Bool { didSet { defaults.set(refreshFailureWarningsEnabled, forKey: Key.refreshFailureWarnings) } }
-    @Published var quietHoursEnabled: Bool { didSet { defaults.set(quietHoursEnabled, forKey: Key.quietHoursEnabled) } }
-    @Published var quietHoursStartMinutes: Int { didSet { defaults.set(quietHoursStartMinutes, forKey: Key.quietHoursStartMinutes) } }
-    @Published var quietHoursEndMinutes: Int { didSet { defaults.set(quietHoursEndMinutes, forKey: Key.quietHoursEndMinutes) } }
-    @Published var allowCriticalDuringQuietHours: Bool { didSet { defaults.set(allowCriticalDuringQuietHours, forKey: Key.allowCriticalDuringQuietHours) } }
     @Published var refreshMode: RefreshMode { didSet { defaults.set(refreshMode.rawValue, forKey: Key.refreshMode) } }
     @Published var menuBarDisplayStyle: MenuBarDisplayStyle { didSet { defaults.set(menuBarDisplayStyle.rawValue, forKey: Key.menuBarDisplayStyle) } }
     @Published var quotaValueMode: QuotaValueMode { didSet { defaults.set(quotaValueMode.rawValue, forKey: Key.quotaValueMode) } }
@@ -60,10 +52,6 @@ final class AppSettings: ObservableObject {
         resetWarningsEnabled = Self.value(for: Key.resetWarnings, defaults: defaults, defaultValue: true)
         staleDataWarningsEnabled = Self.value(for: Key.staleDataWarnings, defaults: defaults, defaultValue: true)
         refreshFailureWarningsEnabled = Self.value(for: Key.refreshFailureWarnings, defaults: defaults, defaultValue: true)
-        quietHoursEnabled = defaults.bool(forKey: Key.quietHoursEnabled)
-        quietHoursStartMinutes = Self.integer(for: Key.quietHoursStartMinutes, defaults: defaults, defaultValue: 22 * 60)
-        quietHoursEndMinutes = Self.integer(for: Key.quietHoursEndMinutes, defaults: defaults, defaultValue: 7 * 60)
-        allowCriticalDuringQuietHours = Self.value(for: Key.allowCriticalDuringQuietHours, defaults: defaults, defaultValue: true)
         refreshMode = defaults.string(forKey: Key.refreshMode).flatMap(RefreshMode.init(rawValue:)) ?? .twoMinutes
         menuBarDisplayStyle = defaults.string(forKey: Key.menuBarDisplayStyle).flatMap(MenuBarDisplayStyle.init(rawValue:)) ?? .gaugeAndLowest
         quotaValueMode = defaults.string(forKey: Key.quotaValueMode).flatMap(QuotaValueMode.init(rawValue:)) ?? .remaining
@@ -79,10 +67,6 @@ final class AppSettings: ObservableObject {
 
     private static func value(for key: String, defaults: UserDefaults, defaultValue: Bool) -> Bool {
         defaults.object(forKey: key) == nil ? defaultValue : defaults.bool(forKey: key)
-    }
-
-    private static func integer(for key: String, defaults: UserDefaults, defaultValue: Int) -> Int {
-        defaults.object(forKey: key) == nil ? defaultValue : defaults.integer(forKey: key)
     }
 
     private static func quotaThresholds(defaults: UserDefaults) -> Set<RemainingQuotaThreshold> {

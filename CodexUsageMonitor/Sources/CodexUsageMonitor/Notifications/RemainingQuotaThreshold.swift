@@ -8,5 +8,4 @@ enum RemainingQuotaThreshold: Int, Codable, CaseIterable, Hashable, Identifiable
 
     var id: Int { rawValue }
     var title: String { "\(rawValue)% remaining" }
-    var isCritical: Bool { self == .five }
 }

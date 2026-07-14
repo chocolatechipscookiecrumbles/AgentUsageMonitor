@@ -42,6 +42,7 @@ enum RefreshScheduleReason: Equatable, Sendable {
     case qualifiedExhaustion
     case resetVerification
     case failureBackoff
+    case interruptionBackoff
 
     var displayName: String {
         switch self {
@@ -53,6 +54,7 @@ enum RefreshScheduleReason: Equatable, Sendable {
         case .qualifiedExhaustion: "Automatic: qualified exhaustion approaching"
         case .resetVerification: "Automatic: quota reset approaching"
         case .failureBackoff: "Automatic: backed off to five minutes after refresh failures"
+        case .interruptionBackoff: "Updates paused: retrying every 10 minutes"
         }
     }
 }
@@ -72,16 +74,26 @@ enum AdaptiveRefreshPolicy {
     static func decision(
         mode: RefreshMode,
         record: QuotaRecord?,
-        consecutiveFailures: Int,
+        interruptionState: RefreshInterruptionState,
         burstStartedAt: Date?,
         now: Date = .now
     ) -> RefreshScheduleDecision {
+        if case .backedOff = interruptionState {
+            return RefreshScheduleDecision(
+                interval: 600,
+                reason: .interruptionBackoff,
+                isAutomaticBurst: false,
+                isBurstConditionActive: false
+            )
+        }
+
         if let interval = mode.fixedInterval {
             return RefreshScheduleDecision(interval: interval, reason: .fixed(mode), isAutomaticBurst: false, isBurstConditionActive: false)
         }
 
         let trigger = burstTrigger(for: record, now: now)
-        if consecutiveFailures >= 2 {
+        let failureCount = interruptionState.episode?.failureCount ?? 0
+        if failureCount >= 2 {
             return RefreshScheduleDecision(interval: 300, reason: .failureBackoff, isAutomaticBurst: false, isBurstConditionActive: trigger != nil)
         }
 
@@ -90,7 +102,7 @@ enum AdaptiveRefreshPolicy {
             return RefreshScheduleDecision(interval: burstInterval, reason: trigger, isAutomaticBurst: true, isBurstConditionActive: true)
         }
 
-        if consecutiveFailures == 1 {
+        if failureCount == 1 {
             return RefreshScheduleDecision(interval: 300, reason: .failureBackoff, isAutomaticBurst: false, isBurstConditionActive: trigger != nil)
         }
 

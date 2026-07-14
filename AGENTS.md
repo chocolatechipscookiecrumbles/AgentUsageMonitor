@@ -46,3 +46,24 @@ Stop and perform a visual audit if a Settings change introduces any of the follo
 - an unbounded picker or long single-line description;
 - a Settings frame reduction without checking all six top tabs and the longest page;
 - a completion claim based only on compilation or source inspection.
+
+## Notification episode guardrails
+
+The July 14 interruption audit found that keeping one consecutive-failure counter in the monitor and another in notification policy caused scheduling and delivery to drift. The notification counter also generated a new key for every group of three failures, so one continuing outage could repeatedly alert the user.
+
+When changing refresh-failure, stale-data, connection, or recovery notifications:
+
+- Keep episode state in one owner. `QuotaMonitor` owns refresh-interruption counts, transitions, persistence, and scheduling; notification policy consumes its typed state and must not introduce a parallel failure counter.
+- Model one continuing problem as one durable episode with a stable identifier. Do not derive a new delivery key from an increasing failure count, retry number, elapsed-time bucket, or app launch.
+- Define the recovery boundary explicitly. A confirmed result ends the interruption episode and restores the user-selected cadence; another failed retry does neither.
+- Treat authentication/setup failures separately from operational interruptions. Missing Codex CLI and signed-out states use the connection UI and must not consume or trigger the disconnection-style alert.
+- Suppress overlapping operational alerts for the same cause. While a refresh interruption is active, do not also emit recurring stale-data notifications for that same lack of confirmed updates.
+- Keep notification permission, the app master switch, the category switch, transition eligibility, persisted delivery deduplication, and retry scheduling as separate gates. Trace all six before claiming a notification control or policy works.
+- Use cautious copy for inferred causes. A failed provider refresh may mean the user is disconnected, but it does not prove that the internet is unavailable.
+- Verify restraint, not only first delivery: observe failures one and two, the third-failure alert, additional ten-minute retries, relaunch during the same episode, manual retry, and confirmed recovery.
+
+## GUI audit command safety
+
+- Do not attach LLDB to an already running app merely to open or focus a Settings window; debugger attachment can wait indefinitely and is not visual acceptance evidence.
+- Open the signed app through normal UI paths. If macOS Accessibility or foreground-control permissions prevent automated navigation, stop the audit command promptly, record the limitation in the active plan, and leave the remaining visual check for manual acceptance.
+- Track every temporary audit process before launch and close only the instance started by the audit. Never terminate a pre-existing user-owned app process.

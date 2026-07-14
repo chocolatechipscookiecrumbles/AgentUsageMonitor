@@ -676,7 +676,8 @@ At or below 25% remaining        every 90 seconds
 At or below 10% remaining        every 1 minute
 Imminent threshold/exhaustion    every 30 seconds, at most 10 minutes
 Within 10 minutes of reset       every 30 seconds, at most 10 minutes
-Repeated refresh failures        every 5 minutes
+First two refresh failures       current Automatic backoff: every 5 minutes; fixed modes unchanged
+Third refresh failure onward     one alert on the third failure, then retry every 10 minutes
 Computer asleep                  no refresh
 Offline                          use cache
 Launch or wake                   immediate refresh
@@ -1175,7 +1176,7 @@ Current execution status (2026-07-13)
 * The seven-calendar-day reliability observation in `docs/superpowers/plans/2026-07-13-codex-reliability-hardening.md` remains required before release, but Codex-only feature work may proceed while it accumulates evidence.
 * Do not begin another provider integration until the reliability gate records refresh outcomes, foreground-independent cadence, forecast behavior, and a Codex-adapter decision.
 * The Codex-first daily-driver roadmap is recorded in `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md`.
-* `feature/notification-settings` is merged with persisted category controls, operational reset/stale/failure warnings, and quiet hours; real reset-transition acceptance remains observational.
+* `feature/notification-settings` is merged with persisted category controls and operational reset/stale/failure warnings; the app-owned quiet-hours feature was retired in favor of macOS Focus and notification scheduling.
 * `feature/settings-foundation` is active. It adds General, Refresh, Agents, Data & Privacy, and Diagnostics tabs around the existing Notifications tab, using only real actions and privacy-safe read-only status. Agents uses a left provider sidebar with an in-tab detail pane for each agent; Codex is current while Claude Code and GitHub Copilot remain visibly planned and not connected.
 * `feature/adaptive-refresh` is active as a stacked branch on `feature/settings-foundation`. It replaces the repeating five-minute timer with persisted fixed/automatic modes, a one-shot scheduler, a next-refresh countdown, and monitor-owned confirmed/completed or cached/paused display state.
 * `feature/settings-ui-followups` is implemented with manual UI acceptance pending as a stacked branch on `feature/menu-bar-display`. It replaces the combined quota-threshold switch with independent 50%, 25%, 10%, and 5% choices for both five-hour and weekly lanes. Turning off the notification master switch greys all subordinate controls without erasing their selections, while authorization recovery remains usable.
