@@ -31,8 +31,34 @@ enum CodexProtocol {
 
     static func initializedNotification() -> [String: Any] { ["method": "initialized", "params": [:]] }
     static func accountRequest() -> [String: Any] { ["id": 2, "method": "account/read", "params": ["refreshToken": false]] }
+    static func browserLoginRequest() -> [String: Any] { ["id": 5, "method": "account/login/start", "params": ["type": "chatgpt"]] }
     static func rateLimitsRequest() -> [String: Any] { ["id": 3, "method": "account/rateLimits/read"] }
     static func usageRequest() -> [String: Any] { ["id": 4, "method": "account/usage/read"] }
+
+    static func parseAccountSummary(response: [String: Any]) throws -> AgentAccountSummary? {
+        guard response["error"] == nil,
+              let result = response["result"] as? [String: Any]
+        else {
+            throw CodexProtocolError.invalidResponse("account status was rejected")
+        }
+        guard let account = result["account"] as? [String: Any] else { return nil }
+        return AgentAccountSummary(planType: account["planType"] as? String)
+    }
+
+    static func parseBrowserLogin(response: [String: Any]) throws -> (loginID: String, authURL: URL) {
+        guard response["error"] == nil,
+              let result = response["result"] as? [String: Any],
+              result["type"] as? String == "chatgpt",
+              let loginID = result["loginId"] as? String,
+              !loginID.isEmpty,
+              let rawURL = result["authUrl"] as? String,
+              let authURL = URL(string: rawURL),
+              authURL.scheme == "https"
+        else {
+            throw CodexProtocolError.invalidResponse("browser sign-in did not return a valid provider URL")
+        }
+        return (loginID, authURL)
+    }
 
     static func parseSample(responses: [Int: [String: Any]], collectedAt: Date) throws -> CodexQuotaSample {
         guard let accountResult = result(for: 2, in: responses),

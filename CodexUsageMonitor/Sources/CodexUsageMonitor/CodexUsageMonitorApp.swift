@@ -4,7 +4,7 @@ import Darwin
 @main
 @MainActor
 struct CodexUsageMonitorApp: App {
-    @State private var viewModel = QuotaViewModel()
+    @StateObject private var viewModel = QuotaViewModel()
 
     init() {
         guard CommandLine.arguments.contains("--live-read-once") else { return }
@@ -25,14 +25,10 @@ struct CodexUsageMonitorApp: App {
         MenuBarExtra {
             QuotaMenuView(viewModel: viewModel)
         } label: {
-            Label(viewModel.menuBarTitle, systemImage: "gauge.with.dots.needle.33percent")
+            MenuBarStatusLabel(viewModel: viewModel)
         }
         Settings {
-            SettingsView(
-                settings: viewModel.settings,
-                setAlertsEnabled: viewModel.setAlertsEnabled,
-                openNotificationSettings: viewModel.openNotificationSettings
-            )
+            SettingsView(viewModel: viewModel)
         }
     }
 }

@@ -153,7 +153,17 @@ bash Scripts/build-app.sh
 open .build/CodexUsageMonitor.app
 ```
 
-The gauge icon appears in the menu bar with the lowest remaining quota percentage. Open it to see the plan, credits, earned reset-credit expiries, five-hour and weekly usage/reset times, the confirmation state, and **Refresh now**. Quit it from the menu.
+By default, the gauge icon appears in the menu bar with the most-consumed quota lane shown as its remaining percentage. In **Settings… > General > Menu Bar**, set **Appearance** to **5-hour and weekly** for a live label such as `5H: 64% | Week: 82%`. Set **Show** to **Used** to display the complementary used percentages instead; **Remaining** is the default. Missing lanes display `—`, and cached/paused values retain a pause marker. When Codex is connected, open the menu to see the plan, credits, earned reset-credit expiries, five-hour and weekly usage/reset times, the confirmation state, and **Refresh now**. Quit it from the menu.
+
+When the app cannot confirm a Codex account, the same menu shows a dedicated connection stage instead of quota controls:
+
+- **Sign in with browser** asks `codex app-server` for the official provider URL, opens it in the default browser, and waits for Codex to confirm completion.
+- **Sign in with Codex CLI…** opens Terminal and runs the located `codex login` command visibly. If the app was launched with a custom `CODEX_HOME`, the Terminal command preserves that same home. The app watches `codex login status` and confirms the result through `account/read`.
+- **Settings…** and **Quit Codex Usage Monitor** remain at the bottom.
+
+Both options require the Codex CLI. The first time you choose the CLI option, macOS may ask whether Codex Usage Monitor may control Terminal; this permission is used only to open the visible `codex login` session. If Codex is not found, install or update it and select **Check again** in Settings > Agents > OpenAI Codex. The monitor never asks for a password, reads `~/.codex/auth.json`, or stores tokens. A successful sign-in immediately triggers a fresh quota collection.
+
+If Codex is signed out elsewhere while the monitor remains open, the next unavailable quota refresh rechecks `account/read` and moves the menu to the disconnected stage without requiring an app relaunch.
 
 The app performs the same three read-only `codex app-server` samples as the probe. It keeps a sanitized last-known-good result in `~/Library/Application Support/CodexUsageMonitor/last-known-good.json`, owner-readable only. That file contains a hashed account identity and normalized quota fields only—never a token, email address, prompt, or raw provider response.
 
@@ -161,15 +171,23 @@ Confirmed live results are also appended to `~/Library/Application Support/Codex
 
 Every completed menu-bar refresh also appends a privacy-safe outcome to `~/Library/Application Support/CodexUsageMonitor/refresh-diagnostics.json`. It retains at most 1,000 entries from 30 days and stores timestamps, refresh reason, classified outcome, and an optional stable failure kind—never raw provider errors, account quota values, email, credentials, prompts, or RPC messages. Both the Application Support directory and files use owner-only permissions (`0700` and `0600`).
 
-The monitor refreshes at launch, every five minutes while its process is running, after wake, and on **Refresh now**. Only one collection runs at a time; the manual button is disabled during an active refresh. Forecast alerts require confirmed live data, medium or high confidence, and projected exhaustion at least 15 minutes before reset.
+The monitor refreshes at launch, after wake, on **Refresh now**, and at the selected foreground interval while its process is running. The Refresh tab offers Automatic, 1 minute, 1 minute 30 seconds, 2 minutes (the default), 5 minutes, and 10 minutes. Automatic considers confirmed usage rate, remaining quota, reset proximity, forecast confidence, and recent failures. Only Automatic may temporarily use 30 seconds near a warning threshold, qualified exhaustion, or reset verification; that burst ends after ten minutes, after its trigger passes, or after two unsuccessful live reads. Repeated failures back off to five minutes. Only one collection runs at a time, and the manual button is disabled during an active refresh.
 
-Open **Settings…** from the menu popover (or press `Command-,`) to configure notifications. The master switch requests macOS notification permission only when enabled. Separate switches control the existing fixed 50%, 25%, 10%, and 5% remaining-quota warnings, qualified forecast warnings, and earned reset-credit-expiration warnings. Each lane and threshold is deduplicated within its current reset window.
+Open **Settings…** from the menu popover (or press `Command-,`) to use the separate Settings window. General contains working **Launch at login**, **System/Light/Dark** app appearance, **Enable keyboard shortcuts**, and menu-bar Appearance/Show controls with a live preview. Launch at Login reflects the real macOS Login Items state and links to System Settings when approval is required. Disabling keyboard shortcuts removes the app-local `Command-R` binding while leaving both **Refresh now** buttons and the standard Settings/Quit commands available. Changing appearance or menu-bar controls updates the app-owned Settings window or menu label immediately. Quota values update after each launch, wake, authentication, manual, or scheduled refresh; the maximum scheduled delay follows the frequency selected in Refresh (60, 90, 120, 300, or 600 seconds, while Automatic may temporarily use 30 seconds). Agents uses an inner sidebar for OpenAI Codex, Claude Code, and GitHub Copilot that begins below the unchanged top Settings tabs and divides only the lower content area. Codex is the only active integration and its pane shows the same connection state and sign-in actions as the menu; Claude Code and GitHub Copilot are planned and not connected. Refresh contains the working frequency picker, effective-policy explanation, timestamps, and **Refresh now**. Export and deletion remain later roadmap work.
+
+Preference pages keep the native macOS theme but use consistent page margins and aligned label/value rows. Longer pages scroll vertically; if the bottom of Notifications, Data & Privacy, or another tab is not visible, scroll inside the page rather than resizing the window. Helper text wraps instead of running beneath controls or past the window edge.
+
+The notification master switch requests macOS notification permission only when enabled. Separate 50%, 25%, 10%, and 5% remaining toggles apply to both the five-hour and weekly lanes; qualified forecast and earned reset-credit-expiration warnings remain independently selectable. Turning the master switch off greys the subordinate warning and quiet-hours controls without erasing their selections, while authorization status and **Open Notification Settings…** remain usable. Each lane and threshold is deduplicated within its current reset window.
 
 The local build script ad-hoc signs the completed bundle with the stable identifier `com.david.codex-usage-monitor` after installing its `Info.plist`. Always launch the `.app` produced by `Scripts/build-app.sh` when checking notification permission; running the raw SwiftPM executable does not provide the same macOS notification identity.
 
 macOS normally shows the notification permission prompt only once. If permission was denied, toggling alerts cannot display the prompt again. The app will show the denied state and **Open Notification Settings…**; enable **Codex Usage Monitor** in System Settings, then return to the app and enable quota notifications. The popover and Settings controls share the same app preference and macOS authorization status.
 
-The menu-bar content uses native menu presentation. **Refresh now**, **Settings…**, **Open Notification Settings…**, and **Quit Codex Usage Monitor** remain inline menu commands. When notifications are disabled, a concise standalone status row appears without overlapping **Last refresh** or later commands.
+The menu-bar content uses native menu presentation. **Refresh now**, **Settings…**, **Open Notification Settings…**, and **Quit Codex Usage Monitor** remain inline menu commands. Its refresh row shows the last attempt beside a live next-refresh countdown that continues ticking while the menu is open. **Confirmed / completed** means the latest attempt returned trusted live data. **Cached / paused** means it did not: the app retains and labels the last confirmed result when one exists, shows the last successful and attempted times, and never presents an unconfirmed result as current. When notifications are disabled, a concise standalone status row appears without overlapping refresh metadata or later commands.
+
+Settings presents only privacy-safe status. It never displays the stored account fingerprint, email, credentials, prompts, raw provider responses, raw provider errors, or quota values inside Diagnostics. Data & Privacy lists the three local files, their owner-only permissions, and their existing replacement, 90-day/500-observation, or 30-day/1,000-outcome retention policies without export or deletion actions.
+
+The current interface uses native SwiftUI. A separate future `feature/figma-ui-overhaul` branch will adapt approved Figma designs for app-owned Settings and Dashboard windows after their functional interfaces stabilize. It will not replace the menu's native inline commands or change data collection behavior without a separate decision.
 
 The notification settings also control:
 
@@ -182,7 +200,7 @@ Optional quiet hours use local wall-clock time and may cross midnight. Noncritic
 
 ### Current hardening checkpoint
 
-The quota-history foundation and the implementation portions of reliability hardening Tasks 1–4 compile successfully. The remaining verification is operational: leave the menu-bar app running for more than five minutes to confirm foreground-independent refresh, inspect the diagnostic file's field names and permissions, and complete the seven-calendar-day observation log before starting another provider or a UI overhaul.
+The quota-history foundation, reliability hardening, adaptive refresh, and Codex connection implementation compile successfully. The connection branch also passed a confirmed live one-shot collection, signed-bundle launch, and an isolated disconnected-process survival check. User-reported manual acceptance confirmed the disconnected menu and successful browser/CLI sign-in transitions; the app will not sign out the current account automatically for verification. Longer operational verification still includes leaving the menu-bar app running for more than five minutes, inspecting diagnostic field names and permissions, and completing the seven-calendar-day observation log before starting another provider or a UI overhaul.
 
 For a terminal-only live diagnostic of the native collector (it performs one read and exits):
 
@@ -197,7 +215,7 @@ Run `bash Scripts/build-app.sh` first. The one-shot command is for troubleshooti
 
 The URLs indicate that SessionWatcher is probably initiating or reusing the Codex-managed login flow. It is not necessarily collecting your OpenAI password itself.
 
-For our eventual application, the safest implementation is:
+The native application now uses this flow:
 
 ```text
 Our app

@@ -243,6 +243,15 @@ Do not display, copy, or synchronize the contents of ~/.codex/auth.json.
 
 Prefer invoking Codex as a subprocess and allowing Codex to manage its own credentials.
 
+Implemented native connection contract:
+
+* The menu has a dedicated connection stage when `account/read` does not confirm an account; cached quota content is not mixed into that stage.
+* The stage offers **Sign in with browser** and **Sign in with Codex CLI…**, followed by **Settings…** and **Quit Codex Usage Monitor** at the bottom.
+* Browser sign-in sends `account/login/start` with `type: chatgpt`, opens only the provider-created HTTPS URL, keeps the app-server session alive for the matching completion event, and confirms the account with a fresh `account/read`.
+* CLI sign-in visibly opens Terminal and executes the located `codex login`, while the app polls `codex login status` and confirms success with `account/read`.
+* Checking, missing CLI, disconnected, signing in, connected, and recoverable failure are provider-neutral UI states that future agent integrations can map to without exposing provider errors or credentials.
+* A confirmed sign-in triggers one quota refresh with the `authentication` refresh reason. Logout and account switching remain out of scope.
+
 Source priority
 
 Supported structured CLI quota output
@@ -639,7 +648,7 @@ Support:
 * Manual refresh
 * Refresh when the menu opens
 * Refresh when the app becomes active
-* Scheduled background refresh
+* Scheduled foreground refresh while the menu-bar process is running
 * Refresh after local log changes
 * Refresh near a reset
 * Refresh after authentication changes
@@ -651,28 +660,26 @@ Support:
 Options:
 
 * 1 minute
+* 1 minute 30 seconds
 * 2 minutes
 * 5 minutes
 * 10 minutes
-* 15 minutes
-* 30 minutes
-* Manual only
 * Adaptive
 
-Recommended default: adaptive.
+Current default: 2 minutes.
 
 10.3 Adaptive refresh policy
 
-Normal state                     every 5 minutes
-Menu opened                      if data is older than 60 seconds
-Below 25% remaining              every 2 minutes
-Below 10% remaining              every 1 minute
-Within 15 minutes of reset       every 1 minute
-After expected reset             immediate refresh
-Rate-limited                     exponential backoff
+Steady usage                     every 5 minutes
+At or below 50% remaining        every 2 minutes
+At or below 25% remaining        every 90 seconds
+At or below 10% remaining        every 1 minute
+Imminent threshold/exhaustion    every 30 seconds, at most 10 minutes
+Within 10 minutes of reset       every 30 seconds, at most 10 minutes
+Repeated refresh failures        every 5 minutes
 Computer asleep                  no refresh
 Offline                          use cache
-Network restored                 refresh
+Launch or wake                   immediate refresh
 
 10.4 Refresh limits and safety
 
@@ -1165,13 +1172,18 @@ Current execution status (2026-07-13)
 
 * The Codex capability probe, menu-bar MVP, and quota-history foundation are implemented.
 * Reliability-hardening Tasks 1–4 are implemented; compilation is verified without adding or running tests.
-* The active gate is the seven-calendar-day reliability observation in `docs/superpowers/plans/2026-07-13-codex-reliability-hardening.md`.
-* Do not begin another provider integration or UI overhaul until that gate records refresh outcomes, foreground-independent cadence, forecast behavior, and a Codex-adapter decision.
-* After the gate, choose exactly one next plan from the hardening decision table: Codex validation refinement, GitHub Copilot capability research, forecast refinement, or UI-overhaul design.
-* The Codex-first daily-driver roadmap is recorded in `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md`; notification settings are the first active feature branch.
-* `feature/notification-settings` now contains persisted category controls, operational reset/stale/failure warnings, and quiet hours; manual UI and real reset-transition acceptance remain open.
+* The seven-calendar-day reliability observation in `docs/superpowers/plans/2026-07-13-codex-reliability-hardening.md` remains required before release, but Codex-only feature work may proceed while it accumulates evidence.
+* Do not begin another provider integration until the reliability gate records refresh outcomes, foreground-independent cadence, forecast behavior, and a Codex-adapter decision.
+* The Codex-first daily-driver roadmap is recorded in `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md`.
+* `feature/notification-settings` is merged with persisted category controls, operational reset/stale/failure warnings, and quiet hours; real reset-transition acceptance remains observational.
+* `feature/settings-foundation` is active. It adds General, Refresh, Agents, Data & Privacy, and Diagnostics tabs around the existing Notifications tab, using only real actions and privacy-safe read-only status. Agents uses a left provider sidebar with an in-tab detail pane for each agent; Codex is current while Claude Code and GitHub Copilot remain visibly planned and not connected.
+* `feature/adaptive-refresh` is active as a stacked branch on `feature/settings-foundation`. It replaces the repeating five-minute timer with persisted fixed/automatic modes, a one-shot scheduler, a next-refresh countdown, and monitor-owned confirmed/completed or cached/paused display state.
+* `feature/settings-ui-followups` is implemented with manual UI acceptance pending as a stacked branch on `feature/menu-bar-display`. It replaces the combined quota-threshold switch with independent 50%, 25%, 10%, and 5% choices for both five-hour and weekly lanes. Turning off the notification master switch greys all subordinate controls without erasing their selections, while authorization recovery remains usable.
+* The same Settings follow-up branch adds working General controls for Launch at Login, System/Light/Dark appearance, and app-local keyboard-shortcut enablement. Initial custom shortcut scope is Command-R for Refresh; standard Command-, and Command-Q remain available.
+* The Agents tab keeps the full-width top Settings tab bar unchanged. Its provider list appears in an inner 180-point sidebar that begins below the tab bar and divides only the lower Agents content region. Compilation, signed-bundle validation, and launch survival passed; visual interaction and persistence checks remain manual.
 * All UI work must use a shared two-state quota presentation contract: confirmed/completed after a trusted live refresh, or cached/paused after an unsuccessful refresh while retaining and labeling the last confirmed record.
-* A later `feature/menu-bar-display` branch will make the menu-bar label configurable: current gauge, numeric lowest-remaining percentage, five-hour or weekly remaining, provider plus remaining, or icon-only. Numeric cached/paused values must carry a visible stale marker and never fall back to a misleading `0%`.
+* `feature/menu-bar-display` is implemented with manual UI acceptance pending as a stacked branch on `feature/codex-connection`. It adds a Menu Bar section to General: **Appearance** switches between the current gauge and a dual-limit label formatted as `5H: 64% | Week: 82%`; **Show** switches all percentages between Remaining and Used, with Remaining as the default. The label observes the existing configured refresh schedule rather than starting another timer. Missing lanes display `—`, and cached/paused values retain a visible pause marker instead of falling back to a misleading `0%`. Compilation, signed-bundle validation, and new-instance process survival passed; visual switching, preference relaunch, and a scheduled interval remain manual checks. Other compact styles remain later extensions.
+* A separate frontend-only `feature/figma-ui-overhaul` branch is planned after the functional UI branches stabilize. It will import approved Figma nodes into Settings and Dashboard using Figma MCP, preserve native menu semantics, and leave collection, scheduling, authentication, notification, and storage behavior unchanged.
 
 Phase 0 — Provider capability research
 

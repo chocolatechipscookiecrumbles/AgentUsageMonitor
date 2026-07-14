@@ -60,31 +60,81 @@ The existing seven-day hardening evidence is deferred. Before release, create `f
 
 ## Branch sequence
 
-### 1. `feature/notification-settings` — active
+### 1. `feature/notification-settings` — merged
 
 Deliver the separate Settings window shell and persisted warning controls. Existing 50/25/10/5 threshold, qualified forecast, and reset-credit-expiry notifications must respect their controls. Add monitor-driven reset-completed, reset-failed, stale-data, and repeated-refresh-failure events plus quiet hours with a critical-warning override.
 
 Acceptance: settings survive relaunch; notification authorization is requested only from an explicit user action; cached/unconfirmed data never drives forecast alerts; fixed thresholds remain unchanged.
 
-### 2. `feature/settings-foundation`
+### 2. `feature/settings-foundation` — active
 
-Add General, Refresh, Codex Account, Data & Privacy, and Diagnostics tabs to the existing Settings window. Show retention and privacy information without export/delete actions. Keep all settings behind one persisted settings module rather than reading `UserDefaults` throughout views.
+Add General, Refresh, Agents, Data & Privacy, and Diagnostics tabs to the existing Settings window. Agents uses a left provider sidebar and an in-tab detail pane for each agent: Codex is the current integration, while Claude Code and GitHub Copilot are planned and not connected. Show retention and privacy information without export/delete actions. Keep all settings behind one persisted settings module rather than reading `UserDefaults` throughout views.
 
 Acceptance: one Settings window is focused on repeated opens; `Command-,` works; every control changes real behavior or is read-only status.
 
-### 3. `feature/adaptive-refresh`
+### 3. `feature/adaptive-refresh` — implemented (stacked on Settings Foundation)
 
 Replace the fixed timer with a scheduling policy returning an effective interval and explanation. Fixed modes use 60/90/120/300/600 seconds. Automatic considers confirmed consumption slope, remaining percentage, reset proximity, forecast confidence, and recent failures. It may use 30 seconds for at most ten minutes and exits after the event or two failures. Add `nextRefreshAt`, effective-mode explanation, and the provider-neutral `QuotaDisplayState` to monitoring state; show a live countdown beside Last refresh and the two-state confirmed/completed or cached/paused status in the popover.
 
 Acceptance: manual refresh never waits behind scheduled work; only one collection runs; repeated failures fall back to five minutes; wake and launch always refresh. Confirmed-after-retry is confirmed/completed; cached, unconfirmed, and unavailable outcomes are cached/paused without replacing the last confirmed display record.
 
-### 4. `feature/codex-connection`
+### 4. `feature/codex-connection` — active (stacked on Adaptive Refresh)
 
 Add a Codex connection module that distinguishes missing CLI, unauthenticated, connected, signing in, and failed states. Primary “Sign in with browser” uses provider-generated app-server authentication URLs and completion events. Secondary CLI flow visibly opens Terminal with `codex login` ready for the user to run, then monitors `codex login status`. Omit logout and account switching.
 
 Acceptance: neither path reads credentials; successful sign-in triggers a quota refresh; missing Codex shows installation guidance; failures remain recoverable.
 
-### 5. `feature/dashboard`
+Implementation status on 2026-07-13: the provider-neutral connection state, `account/read` detection, Codex-managed browser flow, visible Terminal CLI flow, explicit disconnected menu stage, and Agents Settings connection detail are implemented. The native menu renders exactly one of two top-level stages: connected quota controls, or connection guidance/actions; Settings and Quit remain the final shared commands. Compilation, confirmed live collection, signed-bundle launch, and isolated disconnected-process survival passed, and user-reported manual acceptance confirmed the disconnected menu plus successful browser/CLI transitions. The app does not log out the current account automatically to manufacture that state.
+
+### 5. `feature/menu-bar-display` — implemented; manual UI acceptance pending (stacked on Codex Connection)
+
+Implement the dynamic General-controlled menu-bar display described below before returning to the remaining Settings and Dashboard sequence.
+
+Detailed plan: `docs/superpowers/plans/2026-07-13-menu-bar-display.md`.
+
+Add a **Menu Bar** section to General with two independent preferences: **Appearance** chooses the label layout, and **Show** chooses whether every percentage represents quota **Remaining** or **Used**. Preserve the current gauge as the default appearance and add one dual-limit appearance that shows both quota lanes at once.
+
+```swift
+enum MenuBarDisplayStyle: String, Codable, CaseIterable, Sendable {
+    case gaugeAndLowest = "gauge-and-lowest"
+    case fiveHourAndWeekly = "five-hour-and-weekly"
+}
+
+enum QuotaValueMode: String, Codable, CaseIterable, Sendable {
+    case remaining
+    case used
+}
+```
+
+Behavior:
+
+- In General, label the layout picker **Appearance** with choices **Gauge** and **5-hour and weekly**.
+- Label the value-mode picker **Show** with choices **Remaining** and **Used**. Use an explicit two-choice picker rather than a switch whose off state is hidden. Default to **Remaining** for compatibility with the current display.
+- **Gauge:** retain the current gauge and show the most-consumed available lane: minimum remaining in Remaining mode or maximum used in Used mode.
+- **5-hour and weekly:** render `5H: 64% | Week: 82%` in Remaining mode. In Used mode, render the complements, for example `5H: 36% | Week: 18%`.
+- Calculate used percentage as `100 - remaining`, clamp to 0...100, and use the same whole-percent rounding rule for both modes.
+- If one lane is unavailable, preserve the label structure and show `—` for only that lane, such as `5H: 64% | Week: —`. Never substitute `0%` for unavailable data.
+- Update immediately after every accepted display-state transition and whenever the preference changes; do not wait for the popover to open.
+- Consume `QuotaDisplayState`. In cached/paused mode, retain the last confirmed values but add a compact pause/stale marker and accessibility description. When no confirmed value exists, display `—` for both lanes.
+- Give the dual label a semantic accessibility value such as “5-hour limit, 64 percent remaining; weekly limit, 82 percent remaining” instead of reading the visual separator aloud.
+- Provide a live preview for both appearances and both value modes in General. Use native SwiftUI text, monospaced digits, and SF Symbols for menu-bar legibility; verify the maximum `5H: 100% | Week: 100%` label does not clip in light or dark appearance.
+- Keep the initial scope to these two appearances. Later extensions may add lowest-only, single-lane, provider-and-remaining, icon-only, user-selected system icons, lane rotation, color/urgency accents where macOS permits them, and multi-provider lowest-remaining mode.
+
+Acceptance: the dual label shows both lanes in the requested format; switching Appearance or Show updates immediately; Remaining and Used are complementary; a missing lane never invents a value; cached/paused mode is visibly distinct; VoiceOver describes both lanes, value mode, and freshness; and the maximum-width label remains readable in light and dark appearances.
+
+Implementation status on 2026-07-13: persisted Appearance and Show preferences, provider-neutral label formatting, cached/paused marking, semantic accessibility text, reactive `MenuBarExtra` rendering, and the General live preview compile and produce a valid signed app. A newly launched signed instance survived its launch refresh without a new crash report. Visual switching, preference relaunch, and one full scheduled interval remain manual acceptance checks.
+
+### 6. `feature/settings-ui-followups` — implemented; manual UI acceptance pending (stacked on Menu Bar Display)
+
+Refine the existing Settings window before adding Dashboard. Replace the combined remaining-quota warning switch with separate 50%/25%/10%/5% choices that apply to both quota lanes. Turning off **Enable quota notifications** must grey every subordinate notification control without erasing choices. Expand General with working **Launch at login**, **System/Light/Dark** appearance, and app-local keyboard-shortcut enablement. Rebuild the Agents tab as a lower-content-only split so its provider sidebar begins below, and never takes space from, the unchanged full-width top Settings tab bar.
+
+Acceptance: threshold choices persist and filter delivery independently; the notification master switch gates and greys the checklist while permission recovery remains active; Launch at Login reflects real `SMAppService` state; appearance updates app-owned windows; disabling shortcuts removes the custom `Command-R` refresh binding but not standard Settings/Quit commands; and switching tabs never moves or narrows the top tab bar.
+
+Detailed plan: `docs/superpowers/plans/2026-07-13-settings-ui-followups.md`.
+
+Implementation status on 2026-07-13: typed per-threshold persistence and confirmed-live delivery filtering, master disabled-state hierarchy, real `SMAppService.mainApp` Launch at Login handling, persisted System/Light/Dark appearance, conditional app-local `Command-R`, and the lower-only Agents sidebar compile and produce a valid signed app. Strict signature and plist validation passed, and a temporary signed instance survived its launch refresh without a new crash report. Visual interaction, persistence relaunch, actual Login Items mutation, and complete tab-layout inspection remain manual acceptance checks.
+
+### 7. `feature/dashboard`
 
 Add one separate Dashboard window using Swift Charts and a read-only analytics module. Include current five-hour/weekly percentages, reset countdowns, reset-separated usage charts, consumption per hour, forecast/confidence/observation count, sustainable pace, 15-minute/1-hour/24-hour changes, refresh outcome rates, data age, and inferred reset history. Exclude credit balance and earned reset credits.
 
@@ -92,42 +142,15 @@ Acceptance: ranges are 24h/7d/30d/90d with 7d default; no account fingerprint is
 
 Dashboard acceptance also requires rendering `QuotaDisplayState` directly: cached/paused data must remain visually distinguishable from the latest confirmed history and must show its last-successful timestamp.
 
-### 6. `feature/launch-at-login`
+### 8. `feature/figma-ui-overhaul`
 
-Add an opt-in General setting backed by `SMAppService.mainApp`. Default off, show actual registration state, and surface registration errors without changing the preference silently.
+Run a frontend-only Figma-to-SwiftUI overhaul after the functional Settings, Dashboard, General preferences, and menu-bar display branches have stable interfaces. Entry requires an approved Figma `/design/` URL with specific screen nodes or an explicit Figma Desktop selection. Use Figma MCP design context, screenshots, variables, asset inventory, and Code Connect mappings; perform an element-by-element adaptation audit before changing existing SwiftUI.
 
-Acceptance: enabling registers the app, disabling unregisters it, and fresh installs remain off.
+Scope the overhaul to app-owned windows and reusable presentation components. Settings and Dashboard may adopt the Figma layout, tokens, typography, and exported assets while continuing to consume the existing provider-neutral state and action interfaces. Keep the menu-bar extra in native menu presentation unless a separate decision explicitly approves window style; a Figma mockup must not silently turn inline menu commands into panel buttons.
 
-### 7. `feature/menu-bar-display`
+Acceptance: every implemented screen has a recorded Figma node and source screenshot; light and dark appearances, Dynamic Type, VoiceOver labels, confirmed/completed, cached/paused, unavailable, loading, and error states are represented; no view reads provider services or persistence directly; all existing working controls retain behavior; exported assets are validated and documented; manual side-by-side visual review is recorded. This branch must not change quota collection, scheduling, authentication, notification policy, or storage schemas.
 
-Add a General setting for the compact menu-bar label. Preserve the existing gauge as one option, but allow the user to replace it with a live numeric remaining-usage label or another compact provider-neutral style.
-
-```swift
-enum MenuBarDisplayStyle: String, Codable, CaseIterable, Sendable {
-    case gaugeAndLowestRemaining = "gauge-and-lowest-remaining"
-    case lowestRemainingPercent = "lowest-remaining-percent"
-    case fiveHourRemaining = "five-hour-remaining"
-    case weeklyRemaining = "weekly-remaining"
-    case providerAndRemaining = "provider-and-remaining"
-    case iconOnly = "icon-only"
-}
-```
-
-Behavior:
-
-- **Gauge and lowest remaining:** retain the current gauge plus the lowest available remaining percentage.
-- **Lowest remaining percentage:** show a compact live value such as `64%`, without the speedometer.
-- **Five-hour remaining / weekly remaining:** pin the label to one chosen quota lane.
-- **Provider and remaining:** show compact provider context such as `C 64%`; the provider abbreviation comes from normalized presentation metadata rather than a Codex-specific view condition.
-- **Icon only:** show the selected system icon without percentage text.
-- Update immediately after every accepted display-state transition and whenever the preference changes; do not wait for the popover to open.
-- Consume `QuotaDisplayState`. In cached/paused mode, retain the last confirmed percentage but add a compact pause/stale marker and accessibility label. When no confirmed value exists, display `—` rather than `0%`.
-- Provide a small preview for every style in Settings. Use native SwiftUI text and SF Symbols for menu-bar legibility; defer imported/custom artwork until signing, asset, light/dark appearance, and template-image behavior are proven.
-- Keep the initial scope to the styles above. Later extensions may add user-selected system icons, used-versus-remaining display, lane rotation, color/urgency accents where macOS permits them, and multi-provider lowest-remaining mode.
-
-Acceptance: the numeric label changes after a confirmed refresh; switching styles updates immediately; five-hour/weekly modes handle a missing lane without inventing a value; cached/paused mode is visibly distinct; VoiceOver describes provider, lane, percentage, and freshness; the menu-bar label remains readable in light and dark appearances.
-
-### 8. `release/codex-daily-driver`
+### 9. `release/codex-daily-driver`
 
 Reconcile all branch plans and docs, finish the seven-day reliability gate, build the app bundle, and run the complete manual acceptance checklist. Record deferred work: export/delete, logout/account switching, arbitrary thresholds, widgets, CloudKit/Watch, signing/notarization/updater, Claude, and Copilot.
 

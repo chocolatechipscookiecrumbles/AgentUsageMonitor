@@ -56,67 +56,118 @@ final class CodexAppServerSession {
     }
 
     func collectSample(codexExecutable: URL) throws -> CodexQuotaSample {
-        let process = Process()
-        let input = Pipe()
-        let output = Pipe()
-        let error = Pipe()
-        process.executableURL = codexExecutable
-        process.arguments = ["app-server", "--listen", "stdio://"]
-        process.standardInput = input
-        process.standardOutput = output
-        process.standardError = error
+        let connection = CodexAppServerProcess(codexExecutable: codexExecutable)
+        defer { connection.stop() }
+        try connection.startInitialized(timeout: timeout)
+        try connection.send(CodexProtocol.accountRequest())
+        try connection.send(CodexProtocol.rateLimitsRequest())
+        try connection.send(CodexProtocol.usageRequest())
+        try connection.waitForResponses([2, 3, 4], timeout: timeout)
 
-        let collector = ResponseCollector()
-        output.fileHandleForReading.readabilityHandler = { handle in
-            collector.append(handle.availableData)
-        }
-        defer {
-            output.fileHandleForReading.readabilityHandler = nil
-            input.fileHandleForWriting.closeFile()
-            if process.isRunning { process.terminate() }
-            process.waitUntilExit()
-        }
-
-        try process.run()
-        try send(CodexProtocol.initializeRequest(), to: input.fileHandleForWriting)
-        try waitFor([1], in: collector)
-
-        try send(CodexProtocol.initializedNotification(), to: input.fileHandleForWriting)
-        try send(CodexProtocol.accountRequest(), to: input.fileHandleForWriting)
-        try send(CodexProtocol.rateLimitsRequest(), to: input.fileHandleForWriting)
-        try send(CodexProtocol.usageRequest(), to: input.fileHandleForWriting)
-        try waitFor([2, 3, 4], in: collector)
-
-        let responses = collector.responses
+        let responses = connection.responses
         for id in [1, 2, 3, 4] where responses[id]?["error"] != nil {
             throw CodexAppServerError.requestFailed(id)
         }
         return try CodexProtocol.parseSample(responses: responses, collectedAt: .now)
     }
+}
 
-    private func send(_ request: [String: Any], to handle: FileHandle) throws {
-        let data = try JSONSerialization.data(withJSONObject: request, options: [])
-        handle.write(data)
-        handle.write(Data([0x0A]))
+final class CodexAppServerProcess {
+    private let process = Process()
+    private let input = Pipe()
+    private let output = Pipe()
+    private let collector = CodexMessageCollector()
+    private var hasStarted = false
+    private var hasStopped = false
+
+    init(codexExecutable: URL) {
+        process.executableURL = codexExecutable
+        process.arguments = ["app-server", "--listen", "stdio://"]
+        process.standardInput = input
+        process.standardOutput = output
+        process.standardError = FileHandle.nullDevice
     }
 
-    private func waitFor(_ identifiers: Set<Int>, in collector: ResponseCollector) throws {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if identifiers.allSatisfy({ collector.responses[$0] != nil }) { return }
+    var responses: [Int: [String: Any]] { collector.responses }
+
+    func startInitialized(timeout: TimeInterval) throws {
+        output.fileHandleForReading.readabilityHandler = { [collector] handle in
+            collector.append(handle.availableData)
+        }
+        try process.run()
+        hasStarted = true
+        try send(CodexProtocol.initializeRequest())
+        try waitForResponses([1], timeout: timeout)
+        guard responses[1]?["error"] == nil else {
+            throw CodexAppServerError.requestFailed(1)
+        }
+        try send(CodexProtocol.initializedNotification())
+    }
+
+    func send(_ request: [String: Any]) throws {
+        let data = try JSONSerialization.data(withJSONObject: request, options: [])
+        input.fileHandleForWriting.write(data)
+        input.fileHandleForWriting.write(Data([0x0A]))
+    }
+
+    func waitForResponses(_ identifiers: Set<Int>, timeout: TimeInterval) throws {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(timeout))
+        while clock.now < deadline {
+            try Task.checkCancellation()
+            if identifiers.allSatisfy({ responses[$0] != nil }) { return }
+            guard process.isRunning else {
+                throw CodexAppServerError.processFailed("the process exited before responding")
+            }
             Thread.sleep(forTimeInterval: 0.01)
         }
         throw CodexAppServerError.timedOut
     }
+
+    func waitForLoginCompletion(loginID: String, timeout: TimeInterval) async throws -> [String: Any] {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(timeout))
+        while clock.now < deadline {
+            try Task.checkCancellation()
+            if let message = collector.loginCompletion(loginID: loginID) { return message }
+            guard process.isRunning else {
+                throw CodexAppServerError.processFailed("the process exited before sign-in completed")
+            }
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        throw CodexAppServerError.timedOut
+    }
+
+    func stop() {
+        guard !hasStopped else { return }
+        hasStopped = true
+        output.fileHandleForReading.readabilityHandler = nil
+        try? input.fileHandleForWriting.close()
+        try? output.fileHandleForReading.close()
+        guard hasStarted else { return }
+        CodexProcessLifecycle.stop(process)
+    }
 }
 
-private final class ResponseCollector: @unchecked Sendable {
+private final class CodexMessageCollector: @unchecked Sendable {
     private let lock = NSLock()
     private var buffered = Data()
     private var storedResponses: [Int: [String: Any]] = [:]
+    private var storedNotifications: [[String: Any]] = []
 
     var responses: [Int: [String: Any]] {
         lock.withLock { storedResponses }
+    }
+
+    func loginCompletion(loginID: String) -> [String: Any]? {
+        lock.withLock {
+            storedNotifications.first { message in
+                guard message["method"] as? String == "account/login/completed",
+                      let params = message["params"] as? [String: Any]
+                else { return false }
+                return params["loginId"] as? String == loginID
+            }
+        }
     }
 
     func append(_ data: Data) {
@@ -126,10 +177,12 @@ private final class ResponseCollector: @unchecked Sendable {
             while let newline = buffered.firstIndex(of: 0x0A) {
                 let line = buffered.prefix(upTo: newline)
                 buffered.removeSubrange(...newline)
-                guard let message = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
-                      let id = message["id"] as? Int
-                else { continue }
-                storedResponses[id] = message
+                guard let message = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else { continue }
+                if let id = message["id"] as? Int {
+                    storedResponses[id] = message
+                } else if message["method"] is String {
+                    storedNotifications.append(message)
+                }
             }
         }
     }

@@ -52,7 +52,7 @@ final class QuotaNotifier {
             await deliver(event)
         }
         guard presentation.confirmation.isTrusted else { return }
-        if settings.thresholdWarningsEnabled {
+        if presentation.confirmation == .confirmed || presentation.confirmation == .confirmedAfterRetry {
             await quotaAlerts(for: presentation.fiveHour, name: "5-hour")
             await quotaAlerts(for: presentation.weekly, name: "Weekly")
         }
@@ -85,12 +85,13 @@ final class QuotaNotifier {
 
     private func quotaAlerts(for window: QuotaWindow?, name: String) async {
         guard let window, let resetAt = window.resetAt else { return }
-        for threshold in [50, 25, 10, 5] where window.remainingPercent <= threshold {
+        for threshold in RemainingQuotaThreshold.allCases
+            where settings.isQuotaThresholdEnabled(threshold) && window.remainingPercent <= threshold.rawValue {
             await deliverOnce(
-                key: "quota-\(name)-\(resetAt.timeIntervalSince1970)-\(threshold)",
+                key: "quota-\(name)-\(resetAt.timeIntervalSince1970)-\(threshold.rawValue)",
                 title: "Codex \(name) limit is low",
                 body: "\(window.remainingPercent)% remains before the current limit resets.",
-                severity: threshold == 5 ? .critical : .warning
+                severity: threshold.isCritical ? .critical : .warning
             )
         }
     }
