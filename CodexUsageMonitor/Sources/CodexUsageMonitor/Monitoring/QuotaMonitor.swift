@@ -11,9 +11,11 @@ final class QuotaMonitor: ObservableObject {
     @Published private(set) var nextRefreshAt: Date?
     @Published private(set) var effectiveRefreshInterval: TimeInterval?
     @Published private(set) var refreshScheduleReason: RefreshScheduleReason?
+    @Published private(set) var interruptionState: RefreshInterruptionState
 
     private let repository: QuotaRepository
     private let diagnostics: RefreshDiagnosticsStore
+    private let interruptionStore: RefreshInterruptionStore
     private let settings: AppSettings
     private let notifier: QuotaNotifier?
     private var refreshTask: Task<Void, Never>?
@@ -22,17 +24,19 @@ final class QuotaMonitor: ObservableObject {
     private var settingsSubscription: AnyCancellable?
     private var hasStarted = false
     private var hasPendingAuthenticationRefresh = false
-    private var consecutiveFailures = 0
     private var automaticBurstStartedAt: Date?
 
     init(
         repository: QuotaRepository = QuotaRepository(),
         diagnostics: RefreshDiagnosticsStore = RefreshDiagnosticsStore(),
+        interruptionStore: RefreshInterruptionStore = RefreshInterruptionStore(),
         settings: AppSettings
     ) {
         self.repository = repository
         self.diagnostics = diagnostics
+        self.interruptionStore = interruptionStore
         self.settings = settings
+        interruptionState = interruptionStore.load()
         notifier = Bundle.main.bundleURL.pathExtension == "app" ? QuotaNotifier(settings: settings) : nil
         let initialRecord = QuotaRecord.withoutForecasts(.unavailable("Codex quota unavailable. Refresh after signing in to Codex."))
         record = initialRecord
@@ -96,8 +100,18 @@ final class QuotaMonitor: ObservableObject {
             }
             record = freshRecord
             let completedAt = Date()
-            updateDisplayState(with: freshRecord, completedAt: completedAt)
-            diagnostics.append(Self.diagnostic(for: freshRecord.presentation, reason: reason, startedAt: startedAt, completedAt: completedAt))
+            let diagnostic = Self.diagnostic(
+                for: freshRecord.presentation,
+                reason: reason,
+                startedAt: startedAt,
+                completedAt: completedAt
+            )
+            let interruptionTransition = updateDisplayState(
+                with: freshRecord,
+                completedAt: completedAt,
+                failureKind: diagnostic.failureKind
+            )
+            diagnostics.append(diagnostic)
             diagnosticSummary = diagnostics.diagnosticSummary(
                 from: completedAt.addingTimeInterval(-30 * 24 * 3_600),
                 through: completedAt
@@ -105,7 +119,11 @@ final class QuotaMonitor: ObservableObject {
             refreshState = freshRecord.presentation.confirmation == .confirmed || freshRecord.presentation.confirmation == .confirmedAfterRetry
                 ? .idle
                 : .failed(at: completedAt)
-            await notifier?.evaluate(freshRecord)
+            await notifier?.evaluate(
+                freshRecord,
+                interruptionState: interruptionState,
+                interruptionTransition: interruptionTransition
+            )
             refreshTask = nil
             if hasPendingAuthenticationRefresh {
                 hasPendingAuthenticationRefresh = false
@@ -116,10 +134,19 @@ final class QuotaMonitor: ObservableObject {
         }
     }
 
-    private func updateDisplayState(with freshRecord: QuotaRecord, completedAt: Date) {
+    private func updateDisplayState(
+        with freshRecord: QuotaRecord,
+        completedAt: Date,
+        failureKind: String?
+    ) -> RefreshInterruptionTransition {
+        let transition = updateInterruptionState(
+            presentation: freshRecord.presentation,
+            completedAt: completedAt,
+            failureKind: failureKind
+        )
+        let failureCount = interruptionState.episode?.failureCount ?? 0
         switch freshRecord.presentation.confirmation {
         case .confirmed, .confirmedAfterRetry:
-            consecutiveFailures = 0
             displayState = QuotaDisplayState(
                 mode: .confirmedCompleted,
                 displayedRecord: freshRecord,
@@ -128,25 +155,71 @@ final class QuotaMonitor: ObservableObject {
                 pauseReason: nil
             )
         case .cachedLastKnownGood:
-            consecutiveFailures += 1
             displayState = QuotaDisplayState(
                 mode: .cachedPaused,
                 displayedRecord: displayState.displayedRecord ?? freshRecord,
                 lastAttemptAt: completedAt,
                 lastConfirmedAt: displayState.lastConfirmedAt ?? freshRecord.presentation.collectedAt,
-                pauseReason: consecutiveFailures >= 2 ? .repeatedFailures : .cachedLastKnownGood
+                pauseReason: failureCount >= 2 ? .repeatedFailures : .cachedLastKnownGood
             )
         case .unconfirmed, .unavailable:
-            consecutiveFailures += 1
             displayState = QuotaDisplayState(
                 mode: .cachedPaused,
                 displayedRecord: displayState.displayedRecord,
                 lastAttemptAt: completedAt,
                 lastConfirmedAt: displayState.lastConfirmedAt,
-                pauseReason: consecutiveFailures >= 2
+                pauseReason: failureCount >= 2
                     ? .repeatedFailures
                     : (freshRecord.presentation.confirmation == .unconfirmed ? .unconfirmed : .unavailable)
             )
+        }
+        return transition
+    }
+
+    private func updateInterruptionState(
+        presentation: QuotaPresentation,
+        completedAt: Date,
+        failureKind: String?
+    ) -> RefreshInterruptionTransition {
+        let confirmation = presentation.confirmation
+        if confirmation == .confirmed || confirmation == .confirmedAfterRetry {
+            guard let episode = interruptionState.episode else { return .none }
+            interruptionState = .healthy
+            interruptionStore.save(.healthy)
+            return .recovered(episode)
+        }
+
+        if failureKind == "codex-not-found" || failureKind == "not-authenticated" {
+            interruptionState = .healthy
+            interruptionStore.save(.healthy)
+            return .none
+        }
+
+        switch interruptionState {
+        case .healthy:
+            let episode = RefreshInterruptionEpisode.start(
+                firstFailureAt: completedAt,
+                lastConfirmedAt: displayState.lastConfirmedAt
+                    ?? (confirmation == .cachedLastKnownGood ? presentation.collectedAt : nil)
+            )
+            interruptionState = .observing(episode)
+            interruptionStore.save(interruptionState)
+            return .none
+        case .observing(var episode):
+            episode.failureCount += 1
+            if episode.failureCount >= 3 {
+                interruptionState = .backedOff(episode)
+                interruptionStore.save(interruptionState)
+                return .alertEligible(episode)
+            }
+            interruptionState = .observing(episode)
+            interruptionStore.save(interruptionState)
+            return .none
+        case .backedOff(var episode):
+            episode.failureCount += 1
+            interruptionState = .backedOff(episode)
+            interruptionStore.save(interruptionState)
+            return .none
         }
     }
 
@@ -154,7 +227,7 @@ final class QuotaMonitor: ObservableObject {
         let decision = AdaptiveRefreshPolicy.decision(
             mode: settings.refreshMode,
             record: displayState.displayedRecord,
-            consecutiveFailures: consecutiveFailures,
+            interruptionState: interruptionState,
             burstStartedAt: automaticBurstStartedAt,
             now: date
         )

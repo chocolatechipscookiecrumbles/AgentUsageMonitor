@@ -62,7 +62,7 @@ The existing seven-day hardening evidence is deferred. Before release, create `f
 
 ### 1. `feature/notification-settings` — merged
 
-Deliver the separate Settings window shell and persisted warning controls. Existing 50/25/10/5 threshold, qualified forecast, and reset-credit-expiry notifications must respect their controls. Add monitor-driven reset-completed, reset-failed, stale-data, and repeated-refresh-failure events plus quiet hours with a critical-warning override.
+Deliver the separate Settings window shell and persisted warning controls. Existing 50/25/10/5 threshold, qualified forecast, and reset-credit-expiry notifications must respect their controls. Add monitor-driven reset-completed, reset-failed, stale-data, and extended-interruption events. The originally implemented quiet-hours override was retired on 2026-07-14 in favor of macOS Focus and notification settings. The interruption follow-up sends one cautious notice on the third consecutive unsuccessful refresh, suppresses overlapping stale-data notices, and persists the episode identity across relaunches.
 
 Acceptance: settings survive relaunch; notification authorization is requested only from an explicit user action; cached/unconfirmed data never drives forecast alerts; fixed thresholds remain unchanged.
 
@@ -76,7 +76,7 @@ Acceptance: one Settings window is focused on repeated opens; `Command-,` works;
 
 Replace the fixed timer with a scheduling policy returning an effective interval and explanation. Fixed modes use 60/90/120/300/600 seconds. Automatic considers confirmed consumption slope, remaining percentage, reset proximity, forecast confidence, and recent failures. It may use 30 seconds for at most ten minutes and exits after the event or two failures. Add `nextRefreshAt`, effective-mode explanation, and the provider-neutral `QuotaDisplayState` to monitoring state; show a live countdown beside Last refresh and the two-state confirmed/completed or cached/paused status in the popover.
 
-Acceptance: manual refresh never waits behind scheduled work; only one collection runs; repeated failures fall back to five minutes; wake and launch always refresh. Confirmed-after-retry is confirmed/completed; cached, unconfirmed, and unavailable outcomes are cached/paused without replacing the last confirmed display record.
+Acceptance: manual refresh never waits behind scheduled work; only one collection runs; the first two failures keep the existing fixed cadence (Automatic may fall back to five minutes), while the third starts a temporary ten-minute retry cadence in every mode; wake and launch always refresh. Confirmed-after-retry is confirmed/completed; cached, unconfirmed, and unavailable outcomes are cached/paused without replacing the last confirmed display record.
 
 ### 4. `feature/codex-connection` — active (stacked on Adaptive Refresh)
 

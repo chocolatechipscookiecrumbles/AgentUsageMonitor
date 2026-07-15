@@ -1,55 +1,47 @@
 import Foundation
 
-enum NotificationSeverity: Sendable {
-    case informational
-    case warning
-    case critical
-}
-
 struct NotificationEvent: Sendable {
     let key: String
     let title: String
     let body: String
-    let severity: NotificationSeverity
 }
 
 @MainActor
 final class NotificationPolicy {
     private var previousConfirmed: QuotaPresentation?
-    private var consecutiveFailures = 0
     private var overdueResetObservations: [String: Int] = [:]
 
-    func evaluate(_ record: QuotaRecord, now: Date = .now) -> [NotificationEvent] {
+    func evaluate(
+        _ record: QuotaRecord,
+        interruptionState: RefreshInterruptionState,
+        interruptionTransition: RefreshInterruptionTransition,
+        now: Date = .now
+    ) -> [NotificationEvent] {
         let presentation = record.presentation
         var events: [NotificationEvent] = []
 
         if presentation.confirmation == .confirmed || presentation.confirmation == .confirmedAfterRetry {
-            consecutiveFailures = 0
             if let previousConfirmed {
                 events += resetEvents(previous: previousConfirmed, current: presentation, now: now)
             }
             previousConfirmed = presentation
-        } else {
-            consecutiveFailures += 1
         }
 
-        if consecutiveFailures >= 3 {
+        if case .alertEligible(let episode) = interruptionTransition {
             events.append(NotificationEvent(
-                key: "refresh-failures-\(consecutiveFailures / 3)",
-                title: "Codex quota refresh is failing",
-                body: "The monitor has not obtained a confirmed live quota result in \(consecutiveFailures) consecutive refreshes.",
-                severity: .warning
+                key: "refresh-interruption-\(episode.id)",
+                title: "Codex usage updates are paused",
+                body: "Three refresh attempts could not confirm an update. You may be disconnected. The monitor will retry every 10 minutes and resume the normal schedule automatically."
             ))
         }
 
         let age = now.timeIntervalSince(presentation.collectedAt)
-        if age >= 15 * 60 {
+        if !interruptionState.isActive, age >= 15 * 60 {
             let bucket = Int(age / (15 * 60))
             events.append(NotificationEvent(
                 key: "stale-data-\(Int(presentation.collectedAt.timeIntervalSince1970))-\(bucket)",
                 title: "Codex quota data is stale",
-                body: "The latest trusted quota snapshot is more than \(bucket * 15) minutes old.",
-                severity: .warning
+                body: "The latest trusted quota snapshot is more than \(bucket * 15) minutes old."
             ))
         }
 
@@ -73,8 +65,7 @@ final class NotificationPolicy {
             return NotificationEvent(
                 key: "reset-complete-\(resetKey)",
                 title: "Codex \(lane) quota reset",
-                body: "The provider has confirmed that the \(lane) quota window replenished.",
-                severity: .informational
+                body: "The provider has confirmed that the \(lane) quota window replenished."
             )
         }
 
@@ -88,21 +79,7 @@ final class NotificationPolicy {
         return NotificationEvent(
             key: "reset-failed-\(resetKey)",
             title: "Codex \(lane) quota did not reset",
-            body: "Two confirmed reads after the scheduled reset still report the previous quota window.",
-            severity: .critical
+            body: "Two confirmed reads after the scheduled reset still report the previous quota window."
         )
-    }
-}
-
-extension AppSettings {
-    func isWithinQuietHours(at date: Date = .now, calendar: Calendar = .current) -> Bool {
-        guard quietHoursEnabled else { return false }
-        let components = calendar.dateComponents([.hour, .minute], from: date)
-        let minute = (components.hour ?? 0) * 60 + (components.minute ?? 0)
-        if quietHoursStartMinutes == quietHoursEndMinutes { return true }
-        if quietHoursStartMinutes < quietHoursEndMinutes {
-            return minute >= quietHoursStartMinutes && minute < quietHoursEndMinutes
-        }
-        return minute >= quietHoursStartMinutes || minute < quietHoursEndMinutes
     }
 }

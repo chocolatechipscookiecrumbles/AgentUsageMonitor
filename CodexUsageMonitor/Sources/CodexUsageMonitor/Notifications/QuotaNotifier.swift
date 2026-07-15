@@ -7,7 +7,6 @@ final class QuotaNotifier {
     private let defaults = UserDefaults.standard
     private let settings: AppSettings
     private let policy = NotificationPolicy()
-    private var deferredEvents: [String: NotificationEvent] = [:]
 
     init(settings: AppSettings) { self.settings = settings }
 
@@ -44,11 +43,18 @@ final class QuotaNotifier {
         }
     }
 
-    func evaluate(_ record: QuotaRecord) async {
+    func evaluate(
+        _ record: QuotaRecord,
+        interruptionState: RefreshInterruptionState,
+        interruptionTransition: RefreshInterruptionTransition
+    ) async {
         let presentation = record.presentation
         guard alertsEnabled else { return }
-        await flushDeferredEvents()
-        for event in policy.evaluate(record) where isEnabled(event) {
+        for event in policy.evaluate(
+            record,
+            interruptionState: interruptionState,
+            interruptionTransition: interruptionTransition
+        ) where isEnabled(event) {
             await deliver(event)
         }
         guard presentation.confirmation.isTrusted else { return }
@@ -78,8 +84,7 @@ final class QuotaNotifier {
         await deliverOnce(
             key: "forecast-codex-\(limitID ?? "unknown")-\(lane)-\(forecast.resetAt.timeIntervalSince1970)-\(bucket)",
             title: "Codex usage may exhaust before reset",
-            body: "The \(lane) limit is projected to run out before its current reset.",
-            severity: .warning
+            body: "The \(lane) limit is projected to run out before its current reset."
         )
     }
 
@@ -90,8 +95,7 @@ final class QuotaNotifier {
             await deliverOnce(
                 key: "quota-\(name)-\(resetAt.timeIntervalSince1970)-\(threshold.rawValue)",
                 title: "Codex \(name) limit is low",
-                body: "\(window.remainingPercent)% remains before the current limit resets.",
-                severity: threshold.isCritical ? .critical : .warning
+                body: "\(window.remainingPercent)% remains before the current limit resets."
             )
         }
     }
@@ -99,28 +103,16 @@ final class QuotaNotifier {
     private func isEnabled(_ event: NotificationEvent) -> Bool {
         if event.key.hasPrefix("reset-") { return settings.resetWarningsEnabled }
         if event.key.hasPrefix("stale-data-") { return settings.staleDataWarningsEnabled }
-        if event.key.hasPrefix("refresh-failures-") { return settings.refreshFailureWarningsEnabled }
+        if event.key.hasPrefix("refresh-interruption-") { return settings.refreshFailureWarningsEnabled }
         return true
     }
 
     private func deliver(_ event: NotificationEvent) async {
-        await deliverOnce(key: event.key, title: event.title, body: event.body, severity: event.severity)
+        await deliverOnce(key: event.key, title: event.title, body: event.body)
     }
 
-    private func flushDeferredEvents() async {
-        guard !settings.isWithinQuietHours() else { return }
-        let events = deferredEvents.values
-        deferredEvents.removeAll()
-        for event in events { await deliver(event) }
-    }
-
-    private func deliverOnce(key: String, title: String, body: String, severity: NotificationSeverity = .warning) async {
+    private func deliverOnce(key: String, title: String, body: String) async {
         guard !defaults.bool(forKey: key) else { return }
-        let event = NotificationEvent(key: key, title: title, body: body, severity: severity)
-        if settings.isWithinQuietHours(), !(severity == .critical && settings.allowCriticalDuringQuietHours) {
-            deferredEvents[key] = event
-            return
-        }
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body

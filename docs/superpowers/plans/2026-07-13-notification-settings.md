@@ -57,10 +57,12 @@
 - [x] Detect confirmed reset completion by a plausible reset-timestamp transition plus replenished quota.
 - [x] Detect reset failure only after the scheduled reset and a confirming retry.
 - [x] Warn when confirmed data becomes stale and when consecutive refresh failures reach the policy threshold.
-- [x] Persist separate enable switches for reset, stale-data, and repeated-failure warnings.
+- [x] Persist separate enable switches for reset, stale-data, and extended-interruption warnings.
 - [ ] Verify decision paths through read-only observation and documented manual acceptance; do not manufacture quota changes.
 
 ### Task 4: Add quiet hours
+
+> Retired on 2026-07-14. The app-owned schedule, persisted controls, and deferred-delivery queue were removed. Time-based silencing is delegated to macOS Focus and notification settings.
 
 **Files:**
 - Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Notifications/NotificationPolicy.swift`
@@ -71,6 +73,23 @@
 - [x] Treat 5%-remaining and reset-failed warnings as critical; defer other warnings during quiet hours.
 - [x] Handle ranges crossing midnight and daylight-saving changes using Calendar rather than fixed epoch arithmetic.
 - [ ] Verify both same-day and overnight quiet-hour configurations manually.
+
+### July 14 scope correction: remove quiet hours
+
+- [x] Remove **Enable quiet hours**, start/end time pickers, and **Allow critical warnings** from Notifications settings.
+- [x] Remove the four quiet-hours `UserDefaults` properties so an old hidden selection cannot continue suppressing delivery.
+- [x] Remove calendar-window evaluation and the in-memory deferred-event queue; enabled alerts are now handed directly to macOS.
+- [x] Keep threshold, forecast, reset-credit, reset, stale-data, and refresh-failure category controls during the quiet-hours removal.
+- [x] Direct users to macOS Focus or notification settings for scheduled silencing.
+- [x] Record the separate outage-episode proposal in `docs/superpowers/plans/2026-07-14-disconnection-notification-backoff.md` rather than coupling it to quiet hours.
+
+### July 14 follow-up: one extended-interruption episode
+
+- [x] Replace the notification policy's repeating three-failure buckets with one monitor-owned interruption episode.
+- [x] Alert once when the third consecutive refresh fails, using cautious copy that says the user may be disconnected without asserting a cause.
+- [x] Persist the episode across relaunches and reuse one delivery key until a confirmed refresh ends it.
+- [x] Temporarily override every refresh mode with a ten-minute retry cadence while the episode is backed off, then restore the selected schedule after recovery.
+- [x] Suppress stale-data notifications during the same episode and exclude missing-CLI or signed-out states from interruption alerts.
 
 ### Defect correction: notification authorization controls
 

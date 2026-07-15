@@ -39,29 +39,8 @@ struct NotificationSettingsView: View {
                 Toggle("Reset-credit expiration", isOn: $settings.resetCreditWarningsEnabled)
                 Toggle("Quota reset or reset failure", isOn: $settings.resetWarningsEnabled)
                 Toggle("Stale quota data", isOn: $settings.staleDataWarningsEnabled)
-                Toggle("Repeated refresh failures", isOn: $settings.refreshFailureWarningsEnabled)
-            }
-            .disabled(!settings.alertsEnabled)
-
-            SettingsSection("Quiet Hours") {
-                Toggle("Enable quiet hours", isOn: $settings.quietHoursEnabled)
-
-                SettingsLabeledRow("Start") {
-                    DatePicker("Start", selection: minuteBinding($settings.quietHoursStartMinutes), displayedComponents: .hourAndMinute)
-                        .labelsHidden()
-                }
-                .disabled(!settings.quietHoursEnabled)
-
-                SettingsLabeledRow("End") {
-                    DatePicker("End", selection: minuteBinding($settings.quietHoursEndMinutes), displayedComponents: .hourAndMinute)
-                        .labelsHidden()
-                }
-                .disabled(!settings.quietHoursEnabled)
-
-                Toggle("Allow critical warnings", isOn: $settings.allowCriticalDuringQuietHours)
-                    .disabled(!settings.quietHoursEnabled)
-
-                SettingsDescription("Critical warnings are 5% remaining and a reset that failed verification.")
+                Toggle("Extended update interruptions", isOn: $settings.refreshFailureWarningsEnabled)
+                SettingsDescription("Alerts once after three unsuccessful refreshes, then retries every 10 minutes.")
                     .padding(.leading, 26)
             }
             .disabled(!settings.alertsEnabled)
@@ -72,23 +51,6 @@ struct NotificationSettingsView: View {
         Binding(
             get: { settings.isQuotaThresholdEnabled(threshold) },
             set: { settings.setQuotaThreshold(threshold, enabled: $0) }
-        )
-    }
-
-    private func minuteBinding(_ minutes: Binding<Int>) -> Binding<Date> {
-        Binding(
-            get: {
-                Calendar.current.date(
-                    bySettingHour: minutes.wrappedValue / 60,
-                    minute: minutes.wrappedValue % 60,
-                    second: 0,
-                    of: .now
-                ) ?? .now
-            },
-            set: { date in
-                let components = Calendar.current.dateComponents([.hour, .minute], from: date)
-                minutes.wrappedValue = (components.hour ?? 0) * 60 + (components.minute ?? 0)
-            }
         )
     }
 }
