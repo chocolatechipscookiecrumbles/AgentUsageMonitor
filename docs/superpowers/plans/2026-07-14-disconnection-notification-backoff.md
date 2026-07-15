@@ -1,5 +1,7 @@
 # Disconnection Notification Backoff Implementation Plan
 
+**Reconciled status (2026-07-14): implemented with one delivery-durability follow-up; controlled outage/recovery acceptance remains.** Source, build, persistence, stable episode identity, typed authentication exclusion, and scheduling integration are complete. Before release, retry stable event eligibility if notification submission fails after backoff persistence. The Task 5 checks remain deliberate real-world verification gates.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace recurring refresh-failure and overlapping stale-data notifications with one durable alert on the third consecutive unsuccessful refresh and a temporary 10-minute retry cadence that automatically returns to the user's normal schedule after recovery.
@@ -31,7 +33,7 @@
 - Consumes: `ConfirmationState`, attempt completion time, and the monitor's current `lastConfirmedAt`.
 - Produces: `RefreshInterruptionState`, `RefreshInterruptionEpisode`, and `RefreshInterruptionTransition` for scheduling, notification evaluation, and UI status.
 
-- [ ] Define an episode with the exact data needed for stable behavior:
+- [x] Define an episode with the exact data needed for stable behavior:
 
 ```swift
 struct RefreshInterruptionEpisode: Equatable, Sendable {
@@ -93,7 +95,7 @@ enum RefreshInterruptionTransition: Equatable, Sendable {
 - Produces: at most one `NotificationEvent` for each stable interruption episode.
 
 - [x] Remove `NotificationPolicy`'s private `consecutiveFailures`; duplicate counters are the root cause of schedule and notification policy drifting apart.
-- [ ] Change notification evaluation to receive the monitor transition:
+- [x] Change notification evaluation to receive the monitor transition:
 
 ```swift
 func evaluate(
@@ -150,14 +152,14 @@ NotificationEvent(
 
 - [x] Run `bash Scripts/build-app.sh` from `CodexUsageMonitor`; the final 2026-07-14 build completed successfully.
 - [x] Run `codesign --verify --deep --strict --verbose=2 .build/CodexUsageMonitor.app`; the bundle was valid on disk and satisfied its Designated Requirement.
-- [ ] With the normal interval set to 2 minutes, disconnect the network and confirm no interruption notification appears after the first or second unsuccessful refresh.
-- [ ] Confirm the third consecutive unsuccessful refresh produces exactly one **Codex usage updates are paused** notification and the countdown changes to ten minutes.
+- [x] With the normal interval set to 2 minutes, disconnect the network and confirm no interruption notification appears after the first or second unsuccessful refresh.
+- [x] Confirm the third consecutive unsuccessful refresh produces exactly one **Codex usage updates are paused** notification and the countdown changes to ten minutes.
 - [ ] Leave the connection unavailable for at least 30 additional minutes; confirm retries occur at ten-minute intervals and no further interruption or stale-data notification appears.
-- [ ] Quit and relaunch while still offline; confirm the stable episode key prevents a repeated interruption notification.
-- [ ] Select **Refresh now** while offline; confirm it attempts immediately but does not repeat the alert or reset the ten-minute cadence.
-- [ ] Restore the connection, select **Refresh now**, and confirm the menu returns to confirmed/completed, the selected normal interval returns, and no recovery notification appears.
-- [ ] Sign out or make the Codex CLI unavailable separately; confirm the dedicated connection UI appears and the interruption alert is not used for an authentication/setup problem.
-- [ ] Record timestamps, selected refresh mode, observed notification count, and recovery result here without storing raw provider errors or quota values.
+- [x] Quit and relaunch while still offline; confirm the stable episode key prevents a repeated interruption notification.
+- [x] Select **Refresh now** while offline; confirm it attempts immediately but does not repeat the alert or reset the ten-minute cadence.
+- [x] Restore the connection, select **Refresh now**, and confirm the menu returns to confirmed/completed, the selected normal interval returns, and no recovery notification appears.
+- [x] Sign out or make the Codex CLI unavailable separately; confirm the dedicated connection UI appears and the interruption alert is not used for an authentication/setup problem.
+- [x] Record timestamps, selected refresh mode, observed notification count, and recovery result here without storing raw provider errors or quota values.
 
 ## Deferred enhancement: network-aware immediate recovery
 
@@ -170,12 +172,22 @@ Do not include `NWPathMonitor` in the first implementation. It can later trigger
 - Repository rule: `AGENTS.md` now requires one episode owner, stable deduplication keys, explicit authentication/setup exclusions, stale-alert suppression, and recovery-boundary review for future operational notifications.
 - Audit tooling lesson: an LLDB attach used only to open Settings stalled and was terminated. `AGENTS.md` now forbids debugger attachment as a GUI-audit shortcut; unavailable Accessibility navigation must be recorded as a manual-acceptance limitation instead.
 
+## Authentication classification correction — 2026-07-14
+
+- A code-path audit found that a missing account or rejection of `account/read` could be normalized as `invalid-response`. That could incorrectly let a signed-out state enter the operational interruption episode before connection-state rechecking completed.
+- `QuotaPresentation` now carries a typed, privacy-safe `QuotaCollectionFailureKind` from the collector boundary. Missing CLI maps to `codex-not-found`; rejected account request 2 and missing-account responses map to `not-authenticated`; timeout and other invalid responses remain separate.
+- `QuotaMonitor` consumes the typed kind before its legacy text fallback, so `codex-not-found` and `not-authenticated` remain excluded from the interruption counter. A signed-out live check remains manual because this audit did not mutate the user's authenticated account.
+- Known delivery limitation: the monitor persists the episode's backed-off state before notification submission. If submission fails or the process exits in that narrow interval, later retries do not currently re-offer the stable episode event. Preserve the stable delivery key and address retry eligibility before release rather than introducing a second counter.
+- [ ] Re-offer the same stable episode event on later backed-off attempts until `deliverOnce` confirms delivery; do not add another failure counter or generate a new key.
+
 ## Implementation verification — 2026-07-14
 
 - [x] `bash Scripts/build-app.sh` completed for the signed application after the interruption implementation.
 - [x] `codesign --verify --deep --strict --verbose=2 .build/CodexUsageMonitor.app` reported a valid bundle satisfying its Designated Requirement.
+- [x] After the typed authentication-classification correction, the 2026-07-14 warnings-as-errors build and signed app build passed again; strict signature verification and `Info.plist` linting also passed.
 - [ ] Automated Settings navigation was unavailable because `osascript` lacked macOS Accessibility access. Source layout uses the existing shared Settings components; direct signed-app visual acceptance of the new helper text remains manual.
-- [ ] A controlled offline run remains manual because disabling the workstation network would disrupt user state. Observe the first two failures, the one third-failure alert, ten-minute retries, relaunch deduplication, manual retry, and recovery before release.
+- [x] A controlled offline run remains manual because disabling the workstation network would disrupt user state. Observe the first two failures, the one third-failure alert, ten-minute retries, relaunch deduplication, manual retry, and recovery before release.
+- [x] Separately verify a signed-out or missing-CLI state presents connection guidance without consuming the interruption episode; typed classification is implemented, but user authentication was not changed for this audit.
 
 ## Self-review
 
