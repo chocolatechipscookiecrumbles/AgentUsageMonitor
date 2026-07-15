@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Neighboring Usage Monitor Playbook</title>
+  <link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<main>
+  <p class="eyebrow">Architecture and workflow reference</p>
+  <h1>Learn from neighboring monitors without becoming one</h1>
+  <p class="lede">Borrow evidence, seams, and verification habits. Keep the product promise, data ownership, and user experience recognizably yours.</p>
+
+  <h2>The recommendation</h2>
+  <div class="card">
+    <p><strong>Keep the existing quota path intact.</strong> It asks the installed Codex CLI app-server for account and rate-limit data, validates repeated samples, and retains last-known-good results.</p>
+    <p><strong>Add local session analytics as a separate domain only if it serves a clear user job.</strong> Start with a Codex-only “session pulse” such as last activity, today’s tokens, and active-session count. Do not pour token history into <code>QuotaPresentation</code>.</p>
+    <p><strong>Use Tokscale, ccusage, and CodexBar as triangulated references and comparison oracles first.</strong> A runtime dependency should be a later, explicit product and maintenance decision.</p>
+  </div>
+
+  <h2>What each project can teach you</h2>
+  <table>
+    <thead><tr><th>Project</th><th>Primary job</th><th>Data approach</th><th>Best lesson for this app</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>This project</td>
+        <td>Native Codex quota/status companion</td>
+        <td>Codex app-server RPC, repeated samples, typed outcomes, last-known-good state</td>
+        <td>Trust, restraint, native macOS behavior, and explicit recovery states</td>
+      </tr>
+      <tr>
+        <td><a href="https://github.com/Javis603/token-monitor">Token Monitor</a></td>
+        <td>Broad desktop token/cost dashboard with optional device sync</td>
+        <td>Tokscale subprocess scans, watched source directories, provider limit probes, normalized device records</td>
+        <td>Separate collection from aggregation; make performance and wire contracts explicit</td>
+      </tr>
+      <tr>
+        <td><a href="https://github.com/steipete/CodexBar">CodexBar</a></td>
+        <td>Native multi-provider menu-bar control surface</td>
+        <td>Provider strategies, Codex RPC/OAuth/web fallbacks, separate local JSONL cost scanner</td>
+        <td>Native packaging, provider isolation, bounded probes, fixtures, and macOS verification</td>
+      </tr>
+      <tr>
+        <td><a href="https://github.com/junhoyeo/tokscale">Tokscale</a></td>
+        <td>Cross-agent token/cost CLI and TUI</td>
+        <td>Provider-specific local scanners with JSON export and pricing</td>
+        <td>Coverage map, source discovery, output-oracle experiments, and parser edge cases</td>
+      </tr>
+      <tr>
+        <td><a href="https://github.com/ccusage/ccusage">ccusage</a></td>
+        <td>Fast local usage reporting by day, month, and session</td>
+        <td>Rust adapters separating paths, parsing, loading, reports, and shared aggregation</td>
+        <td>A mature adapter seam and fixture-backed parser discipline</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Two different data products</h2>
+  <pre><code>Existing quota path
+Codex CLI app-server
+  → account/read + account/rateLimits/read
+  → repeated samples
+  → validation / cached fallback
+  → QuotaPresentation
+  → monitor, menu, Settings, notifications
+
+Possible local usage path
+Known Codex session directories
+  → discovery
+  → record parser
+  → dedupe + normalization
+  → LocalUsageSnapshot
+  → bounded history / session pulse UI</code></pre>
+  <p>A file watcher should only say “something may have changed.” It must not own parsing, aggregation, scheduling, or UI state. The parser should produce a deterministic snapshot whether invoked by launch, a periodic refresh, a manual action, or a watched-file event.</p>
+
+  <h2>How Token Monitor differs today</h2>
+  <p>Token Monitor’s documented collector invokes Tokscale for today, month, and all-time scans on full ticks. Watched changes trigger a cheaper today-only scan and derive longer periods from a full-scan anchor. It watches known client paths with polling and debouncing, deliberately excludes self-generated cache paths to avoid refresh loops, and reads detailed session content on demand rather than syncing it.</p>
+  <p>Your app currently has no session watcher or local token parser. Its refresh schedule is about provider quota freshness and reliability. Treating these as one subsystem would couple file churn, pricing rules, and quota notifications for no user benefit.</p>
+
+  <h2>Integration choices</h2>
+  <table>
+    <thead><tr><th>Choice</th><th>Advantages</th><th>Costs and risks</th><th>Use when</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Spawn Tokscale</td>
+        <td>Fastest broad coverage; JSON output; active upstream</td>
+        <td>Bundling, signing, subprocess lifetime, schema drift, updates, transitive licenses, performance</td>
+        <td>Broad multi-agent analytics is the product and dependency ownership is intentional</td>
+      </tr>
+      <tr>
+        <td>Spawn ccusage</td>
+        <td>Mature Codex reports and adapter behavior</td>
+        <td>Large external CLI contract; packaging and version management; a poor fit for a focused native companion</td>
+        <td>An explicit external-tool integration is acceptable to users</td>
+      </tr>
+      <tr>
+        <td>Native Swift Codex adapter</td>
+        <td>Small bundle, native types, precise privacy boundary, full control of UX and caching</td>
+        <td>You own format drift, pricing, fixtures, performance, and migration</td>
+        <td>The first feature is narrow and Codex-specific</td>
+      </tr>
+      <tr>
+        <td>Remain quota-only</td>
+        <td>Strongest focus and lowest privacy/maintenance cost</td>
+        <td>No token/cost/session feature</td>
+        <td>The user job is “avoid hitting a limit,” not “analyze my coding history”</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="exercise">
+    <strong>Recommended first experiment:</strong> a read-only Codex session capability probe that emits a sanitized <code>LocalUsageSnapshot</code>. Compare its totals against Tokscale and ccusage on the same fixture or local sample. Do not add production UI until discrepancies and privacy fields are understood.
+  </div>
+
+  <h2>How to stay distinctive</h2>
+  <p>Distinctiveness is a set of product decisions, not a different color palette.</p>
+  <table>
+    <thead><tr><th>Decision</th><th>A distinctive answer for this app</th></tr></thead>
+    <tbody>
+      <tr><td>Primary user job</td><td>Know whether Codex work can continue safely without opening a dashboard</td></tr>
+      <tr><td>Trust promise</td><td>Show confirmed, cached, unconfirmed, and unavailable states honestly</td></tr>
+      <tr><td>Platform promise</td><td>Native macOS menu, Settings, notifications, accessibility, and low background cost</td></tr>
+      <tr><td>Data promise</td><td>Read only what the feature needs; keep detailed session content local; never invent missing values</td></tr>
+      <tr><td>Deliberate omissions</td><td>No multi-device hub, public leaderboard, social layer, or dozens of providers until demanded</td></tr>
+      <tr><td>Possible signature feature</td><td>A small session pulse tied to quota pace and freshness, not another all-purpose token dashboard</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Reference, dependency, or copied code?</h2>
+  <table>
+    <thead><tr><th>Relationship</th><th>What you may do</th><th>What to record</th></tr></thead>
+    <tbody>
+      <tr><td>Research</td><td>Study concepts, file formats, failure cases, and public behavior</td><td>Source links in the research note or ADR</td></tr>
+      <tr><td>Comparison oracle</td><td>Run another tool against the same sanitized fixture and compare outputs</td><td>Version, command, fixture hash, and discrepancies</td></tr>
+      <tr><td>Runtime dependency</td><td>Invoke or bundle the tool under its license and documented interface</td><td>Version policy, license notices, update path, failure UX, and security review</td></tr>
+      <tr><td>Adapted source</td><td>Port or modify MIT-licensed code while preserving required notices</td><td>Original file/commit, copyright notice, license, and local changes</td></tr>
+    </tbody>
+  </table>
+  <div class="warning">
+    Token Monitor, CodexBar, Tokscale, and ccusage publish MIT licenses, but that is not permission to copy names, icons, screenshots, or product identity without checking their separate status. Review transitive dependencies and current licenses before distribution. This is an engineering checklist, not legal advice.
+  </div>
+
+  <h2>A stronger agent-assisted development loop</h2>
+  <p>This section now has a detailed, repository-specific companion: <a href="../docs/development/evidence-rich-pull-requests.md">Evidence-Rich Pull Requests</a>. It explains the full path from problem framing through a Draft or Ready PR, including branch isolation, root-cause evidence, regression proof, signed-app acceptance, review follow-up, and rollback. Agents should use the repo-local <code>preparing-evidence-rich-prs</code> skill for the compact execution workflow.</p>
+  <ol>
+    <li><strong>Frame:</strong> write the user problem and one observable outcome. Do not begin with “copy feature X.”</li>
+    <li><strong>Gather evidence:</strong> reproduce current behavior, inspect local ownership, and read two independent implementations.</li>
+    <li><strong>Generate options:</strong> include “do nothing,” a narrow native solution, and an integration. State privacy and maintenance costs.</li>
+    <li><strong>Decide:</strong> write a small ADR for architecture or data-boundary choices. Record rejected options.</li>
+    <li><strong>Probe:</strong> answer unknown protocol or file-shape questions in <code>UsageProbe</code> before production code.</li>
+    <li><strong>Plan a tracer bullet:</strong> source → typed contract → one presentation → acceptance. Avoid broad infrastructure first.</li>
+    <li><strong>Implement in reviewable increments:</strong> keep contracts and compatibility surfaces explicit; update the plan as evidence changes.</li>
+    <li><strong>Verify proportionally:</strong> parser fixtures and focused checks where allowed, then the signed app and manual macOS acceptance for UI behavior.</li>
+    <li><strong>Review the evidence:</strong> explain root cause, measurements, commands, screenshots, limitations, and remaining manual checks.</li>
+    <li><strong>Reflect:</strong> record one non-obvious lesson only after you can explain or apply it.</li>
+  </ol>
+
+  <h2>What to take from their agent setup</h2>
+  <ul>
+    <li><strong>One canonical entry point:</strong> Token Monitor’s <code>CLAUDE.md</code> imports <code>AGENTS.md</code> so agents share guidance.</li>
+    <li><strong>Contracts over tours:</strong> document non-obvious invariants, compatibility surfaces, and failure traps rather than paraphrasing the file tree.</li>
+    <li><strong>Commands as policy:</strong> one verification command reduces handoff ambiguity; Token Monitor uses <code>npm run verify</code>.</li>
+    <li><strong>Evidence-rich changes:</strong> PR #144 states the symptom, root cause, before/after timing, tests, and remaining work.</li>
+    <li><strong>Scoped instructions:</strong> ccusage routes specialized work to repo-local skills and nearest-package <code>AGENTS.md</code> files.</li>
+    <li><strong>Sign-off boundaries:</strong> CodexBar’s short vision distinguishes routine fixes from auth, privacy, dependency, and architecture changes.</li>
+  </ul>
+  <p>Your root <code>AGENTS.md</code> already has excellent, evidence-based Settings, notification, and native-menu guardrails. The next optimization is not more root text. When a new subsystem arrives, move its durable instructions near the owning subtree or into a task-specific repo skill, leaving the root for always-on rules and routing.</p>
+
+  <h2>Suggested feature order</h2>
+  <ol>
+    <li>Finish the current Codex quota reliability and manual-acceptance gates.</li>
+    <li>Survey Codex session record shapes and privacy-sensitive fields in <code>UsageProbe</code>.</li>
+    <li>Define <code>LocalUsageSnapshot</code> independently from quota state.</li>
+    <li>Prototype a Codex-only session pulse with bounded scanning and explicit unavailable/stale states.</li>
+    <li>Add pricing only after model resolution, provenance, cache invalidation, and disagreement behavior are specified.</li>
+    <li>Deepen a provider adapter seam only when a second real provider is approved.</li>
+    <li>Consider sync or broad dashboard work only when it becomes a product goal, not because a neighbor has it.</li>
+  </ol>
+
+  <h2>Feature evidence card</h2>
+  <pre><code>User job:
+Observable outcome:
+Source of truth:
+Owner and typed contract:
+What we borrow:
+What remains distinctive:
+Privacy boundary:
+Fresh, stale, missing, and failed behavior:
+Verification evidence:
+License/provenance notes:
+Deferred work:</code></pre>
+
+  <h2>Primary sources</h2>
+  <ul>
+    <li><a href="https://github.com/Javis603/token-monitor/blob/main/AGENTS.md">Token Monitor agent and collector contracts</a></li>
+    <li><a href="https://github.com/Javis603/token-monitor/pull/144">Token Monitor measured performance fix</a></li>
+    <li><a href="https://github.com/steipete/CodexBar/blob/main/docs/codex.md">CodexBar Codex data-source boundaries</a></li>
+    <li><a href="https://github.com/ccusage/ccusage/blob/main/rust/crates/ccusage/src/adapter/README.md">ccusage adapter architecture</a></li>
+    <li><a href="https://github.com/junhoyeo/tokscale">Tokscale data sources and JSON CLI</a></li>
+  </ul>
+</main>
+</body>
+</html>

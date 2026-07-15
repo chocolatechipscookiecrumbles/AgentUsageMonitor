@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lesson 2 — Learn from a neighbor without cloning</title>
+  <link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+<main>
+  <p class="eyebrow">Lesson 2 · 20 minutes</p>
+  <h1>Learn from a neighbor without cloning</h1>
+  <p class="lede">Your win: turn one attractive feature from another repository into a small, distinctive, evidence-backed feature proposal for this app.</p>
+
+  <h2>1. Name the user job first</h2>
+  <p>“Token Monitor has session details” is an observation, not a requirement. A requirement begins with what your user should be able to decide or do.</p>
+  <div class="card">
+    <p><strong>Weak:</strong> Add session watching like Token Monitor.</p>
+    <p><strong>Stronger:</strong> Let a Codex user see whether recent work is consuming quota unusually quickly without opening a full analytics dashboard.</p>
+  </div>
+
+  <h2>2. Separate the source from the product</h2>
+  <table>
+    <thead><tr><th>Question</th><th>Example answer</th></tr></thead>
+    <tbody>
+      <tr><td>What is the source?</td><td>Local Codex JSONL session records</td></tr>
+      <tr><td>What is the parser output?</td><td>A sanitized <code>LocalUsageSnapshot</code></td></tr>
+      <tr><td>What is the product feature?</td><td>A small session pulse tied to recent quota pace</td></tr>
+      <tr><td>What is deliberately omitted?</td><td>Prompt text, public sync, leaderboard, and broad provider coverage</td></tr>
+    </tbody>
+  </table>
+  <p>This keeps implementation details replaceable. Tokscale might be the first comparison oracle and a native Swift parser the eventual production owner; the visible feature does not need to know.</p>
+
+  <h2>3. Classify what you are borrowing</h2>
+  <ol>
+    <li><strong>Idea:</strong> session usage can update after a local transcript changes.</li>
+    <li><strong>Contract:</strong> source-specific parsing produces normalized tokens, model, session, and time fields.</li>
+    <li><strong>Implementation:</strong> specific discovery, parsing, cache, or watcher code.</li>
+    <li><strong>Identity:</strong> name, icons, screenshots, layout, and brand.</li>
+  </ol>
+  <p>Ideas and contracts are the best learning material. Implementation requires provenance and license care. Identity is where accidental cloning usually happens.</p>
+
+  <h2>4. Fill one feature evidence card</h2>
+  <div class="exercise">
+    <p>Copy the questions below into your reply and answer each in one sentence. Do not open source code until you can answer the first two.</p>
+  </div>
+  <pre><code>User job:
+Observable outcome:
+Source of truth:
+Owner and typed contract:
+What I would borrow:
+What would make it ours:
+Privacy boundary:
+Failure behavior:
+Verification:
+Deferred work:</code></pre>
+
+  <h2>5. Test the proposal against three alternatives</h2>
+  <table>
+    <thead><tr><th>Alternative</th><th>Question to answer</th></tr></thead>
+    <tbody>
+      <tr><td>Do nothing</td><td>Is the existing quota view already enough for the user job?</td></tr>
+      <tr><td>Use an external CLI</td><td>Does broad coverage justify bundling and maintaining another process?</td></tr>
+      <tr><td>Write a narrow native adapter</td><td>Can the first useful slice stay small enough that format maintenance is honest?</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Retrieval check</h2>
+  <details>
+    <summary>Why should local token usage not be added to QuotaPresentation?</summary>
+    <p>Quota state and local log analytics have different sources, freshness rules, failure modes, privacy boundaries, and consumers. Combining them would make both harder to reason about and test.</p>
+  </details>
+  <details>
+    <summary>What should a file watcher own?</summary>
+    <p>Only an invalidation signal: something may have changed. Discovery, parsing, aggregation, scheduling, and UI state belong elsewhere.</p>
+  </details>
+  <details>
+    <summary>When is another project a comparison oracle?</summary>
+    <p>When you run both implementations on the same sanitized input and use their agreement or disagreement as evidence without making the other project a production dependency.</p>
+  </details>
+
+  <h2>Primary source</h2>
+  <p>Read <a href="https://github.com/steipete/CodexBar/blob/main/docs/codex.md">CodexBar’s Codex provider notes</a>. Notice how quota RPC, OAuth, web extras, diagnostics, and local cost scanning remain separate paths. Then keep the <a href="../reference/neighboring-usage-monitor-playbook.html">neighboring monitor playbook</a> as your architecture and workflow reference.</p>
+
+  <footer>Reply with your feature evidence card. I’ll challenge the boundaries and help turn it into a small implementation plan; questions and disagreements are part of the lesson.</footer>
+</main>
+</body>
+</html>
