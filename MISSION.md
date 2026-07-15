@@ -1,21 +1,24 @@
-# Mission: Edit the Codex Usage Monitor UI independently
+# Mission: Build a distinctive, reliable Codex Usage Monitor
 
 ## Why
-Build enough practical SwiftUI fluency to change the Codex Usage Monitor's menu-bar interface and separate Settings window directly, while preserving its working state, notification behavior, and native macOS conventions.
+Become a stronger macOS developer by studying successful neighboring projects, adapting verified ideas without cloning their product, and using a disciplined agent-assisted workflow to extend the real Codex Usage Monitor safely.
 
 ## Success looks like
-- Identify the source file responsible for any visible menu-bar or Settings element.
-- Make copy, spacing, control, section, icon, and window-layout changes without accidentally changing application behavior.
-- Build, relaunch, visually inspect, and revise a UI change independently.
-- Recognize when a change affects native menu semantics, persisted settings, or documentation.
+- Explain the difference between quota polling, local session-log analysis, file watching, aggregation, and presentation.
+- Decide whether an outside implementation should be used as research, a comparison oracle, a runtime dependency, or attributed source code.
+- Design and deliver a small vertical feature slice that reinforces this app's own product promise.
+- Move deliberately from problem evidence through options, decision, plan, implementation, verification, and reflection.
+- Continue making native SwiftUI changes without accidentally changing persistence, notification behavior, privacy, or menu semantics.
 
 ## Constraints
-- Learn through small edits in the actual repository.
-- Keep the current native inline menu presentation unless a panel-style redesign is intentional.
-- Do not add or run automated test cases for the current project work.
-- Document user-visible behavior changes in the README, how-to, and relevant plan.
+- Learn through small, reversible work in the actual repository.
+- Keep the app Codex-first, native to macOS, and conservative about credentials and local data.
+- Keep the current preference not to add or run automated tests unless it is explicitly revisited; use probes, fixtures, compilation, and signed-app inspection in the meantime.
+- Preserve the native inline menu unless a panel-style redesign is intentional.
+- Document user-visible behavior changes in the README, how-to, and relevant implementation plan.
 
 ## Out of scope
-- Rewriting the quota collector or notification engine.
-- Learning every Swift or SwiftUI feature before making useful UI changes.
-- Implementing the future dashboard design in the first lesson.
+- Copying another app's branding, visual identity, or full feature set.
+- Adding Tokscale, ccusage, CodexBar, or another runtime dependency before a focused integration decision.
+- Expanding to many providers before the Codex reliability gates and one provider seam are understood.
+- Learning every Swift, SwiftUI, or architecture concept before shipping useful work.

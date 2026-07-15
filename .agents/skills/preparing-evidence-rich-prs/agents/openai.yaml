@@ -1,0 +1,4 @@
+interface:
+  display_name: "Evidence-Rich PRs"
+  short_description: "Prepare reviewable PRs with defensible evidence"
+  default_prompt: "Use $preparing-evidence-rich-prs to prepare a focused pull request for this repository."
