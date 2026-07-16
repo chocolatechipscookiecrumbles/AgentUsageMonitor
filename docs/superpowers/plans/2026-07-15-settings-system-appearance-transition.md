@@ -1,314 +1,149 @@
 # Settings System Appearance Transition Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` (recommended) or `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Use `executing-plans` to implement this plan task by task. Keep unchecked acceptance items open until they are directly observed.
 
-**Goal:** Make the live Settings window transition completely between System, Light, and Dark without mixed AppKit/SwiftUI regions, reopening the window, or changing native menu appearance.
+**Status (2026-07-16):** The reported Light → System/System-Dark regression is fixed. Signed-app acceptance now covers both macOS Light and Dark hosts, live OS appearance changes, the reciprocal native-menu boundary, and all six destinations in explicit Light. Manufactured conditional states remain manual.
 
-**Architecture:** Replace the Settings root's optional `preferredColorScheme` preference with one Settings-window-scoped AppKit appearance bridge. Explicit Light/Dark set `NSWindow.appearance` to Aqua/Dark Aqua; System clears the window override so its title bar and hosted SwiftUI hierarchy inherit the current and future macOS appearance together. Keep `AppSettings` as the persisted choice owner and keep native `MenuBarExtra` system-controlled.
+**Goal:** Make the live Settings window transition completely between System, Light, and Dark without mixed AppKit/SwiftUI regions, reopening the window, resetting session state, or changing native menu appearance.
 
-**Tech Stack:** Swift 6.2, SwiftUI, AppKit, Combine-backed `AppSettings`, XCTest, macOS 14+; signed-app visual acceptance at the 780 × 520 Settings size.
+**Verified architecture:** `AppSettings` remains the persisted choice owner. `SettingsView` is the only presentation owner and always supplies a concrete `preferredColorScheme`. Explicit Light/Dark map directly; System maps to a live observation of `NSApplication.effectiveAppearance`. System therefore remains a persisted semantic choice while its presentation continues following later macOS changes. The preference is scoped to the Settings presentation, and the native `MenuBarExtra` remains system-controlled.
 
-## Global Constraints
+**Why this differs from the original plan:** A bridge inside the SwiftUI Settings scene could not reliably own its containing `NSWindow`. Signed-app tracing showed the scene cleared the window override after the bridge applied it while a private presentation host retained the stale explicit appearance. Clearing the window did not clear that host, which recreated the mixed window. A delayed bridge write made explicit Light mixed and was also rejected. The accepted implementation does not mutate `NSWindow.appearance` or `NSApplication.appearance`.
 
-- Preserve **System**, **Light**, and **Dark**, with System as the default and existing persistence key `general.appearance` unchanged.
-- Scope the override to the Settings `NSWindow`; do not set `NSApplication.appearance` or force native menu-bar chrome.
-- System must assign `nil` to `NSWindow.appearance` so an already-open Settings window follows subsequent macOS appearance changes.
-- Remove `.preferredColorScheme(settings.appearancePreference.colorScheme)` from `SettingsView`; do not retain two competing appearance owners.
-- Preserve the global Navigation Sidebar, selected destination, search state, scroll state, Context Rail visibility, focus, window dimensions, controls, and semantic colors.
-- Do not patch individual backgrounds, cards, borders, or text colors to conceal the mixed state.
-- Build the signed app and visually inspect every affected region; source inspection and isolated harnesses are diagnostic evidence only.
+**Tech stack:** Swift 6.2, SwiftUI, AppKit KVO, Combine-backed `AppSettings`, XCTest, macOS 14+, and signed-app visual acceptance at the default 780 × 548 window frame observed by Accessibility.
 
----
+## Global constraints
 
-### Task 1: Preserve the root-cause evidence and acceptance boundary
-
-**Files:**
-- Modify: `docs/superpowers/plans/2026-07-15-settings-system-appearance-transition.md`
-- Inspect: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AppearancePreference.swift`
-- Inspect: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsView.swift`
-- Inspect: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsLayout.swift`
-
-**Interfaces:**
-- Consumes: `AppSettings.appearancePreference`, SwiftUI `preferredColorScheme`, `NSWindow.appearance`, and the user-supplied mixed-appearance screenshot.
-- Produces: a recorded causal chain and transition matrix that later tasks must satisfy.
-
-- [x] **Step 1: Reproduce the existing propagation failure**
-
-The temporary AppKit hosting harness set the application host to Dark, rendered a root with `.preferredColorScheme(.light)`, changed the same modifier to `nil`, and recorded the inner `@Environment(\.colorScheme)`. Three consecutive runs produced:
-
-```text
-RED: SwiftUI content did not fully transition from Light to System Dark
-initial: light
-after System: light
-sequence: dark -> light
-```
-
-This is red-capable for the reported symptom: the host is Dark but the live SwiftUI subtree remains Light after selecting System.
-
-- [x] **Step 2: Falsify individual-color and persistence hypotheses**
-
-The failure occurs in a minimal `Text` plus semantic `windowBackgroundColor` without `AppSettings`, Figma cards, sidebar code, or `UserDefaults`. Conditional removal of the preference modifier also remained Light. Therefore hard-coded surfaces, delayed persistence, and the three-column layout are not the root cause.
-
-- [x] **Step 3: Confirm the scoped ownership alternative**
-
-A second harness applied `.aqua` to one `NSWindow`, then cleared `window.appearance` while macOS was Dark. Three consecutive runs produced:
-
-```text
-GREEN: Settings-window Light transitioned to System Dark
-initial: light
-after System: dark
-sequence: light -> dark
-```
-
-Application-wide ownership also transitioned correctly but is rejected because it would violate the native-menu system-appearance boundary.
-
-- [ ] **Step 4: Record the implementation acceptance matrix before editing Swift**
-
-Record expected effective appearance for Light → System under System Dark, Dark → System under System Light, both explicit round trips, macOS Light/Dark changes while System is selected, Settings reopen, and app relaunch. For each row, record Settings title bar, Navigation Sidebar, Settings Page, cards, controls, dividers, Context Rail, and native menu expectations.
+- Preserve **System**, **Light**, and **Dark**, with System as the default and the `general.appearance` persistence key unchanged.
+- Keep one presentation owner. Do not combine an AppKit window bridge with SwiftUI `preferredColorScheme`.
+- Never transition the Settings presentation from an explicit color scheme to `nil`; that is the stale-host failure boundary reproduced in the signed Settings scene.
+- System is not a one-time snapshot. Observe the application's effective appearance and update the open Settings presentation whenever it changes.
+- Read `NSApplication.effectiveAppearance`, but do not assign `NSApplication.appearance`; native menu presentation must remain system-controlled.
+- Preserve destination, search text, page scroll, Context Rail state, keyboard focus, window identity, controls, and semantic colors.
+- Do not use `.id(...)`, window recreation, delayed competing writes, or individual background/color patches to hide propagation failures.
+- Build and inspect the signed `.app`; compilation and isolated hosting harnesses are supporting evidence only.
 
 ---
 
-### Task 2: Define the Settings-window appearance mapping and bridge
+## Task 1: Preserve the diagnosis and acceptance boundary
+
+### Evidence
+
+- [x] A minimal host reproduced that changing a live SwiftUI presentation from `.preferredColorScheme(.light)` to `nil` can leave its subtree Light under a Dark host.
+- [x] The failure reproduced without `AppSettings`, persistence, Figma surfaces, or the three-column layout, ruling those out as root causes.
+- [x] A plain `NSWindow` harness showed that clearing `window.appearance` inherits the host correctly, but the signed SwiftUI `Settings` scene falsified that harness as a complete model of the app.
+- [x] An isolated signed process reproduced the original failure with the first bridge implementation.
+- [x] Temporary signed-app tracing recorded this sequence:
+  - the bridge applied Aqua to the Settings window;
+  - the SwiftUI Settings scene later cleared the window to inherited Dark;
+  - a private presentation host remained Aqua;
+  - choosing System left the window and root hosting view Dark while that presentation host remained Aqua.
+- [x] Deferring the bridge write was tested separately and rejected because explicit Light itself became mixed.
+
+### Acceptance matrix
+
+| Transition or lifecycle event | Settings presentation | Native menu |
+| --- | --- | --- |
+| Light → System while macOS is Dark | Existing window and all regions become Dark together. | Remains Dark/system-controlled. |
+| Dark → System while macOS is Light | Existing window and all regions become Light together. | Remains Light/system-controlled. |
+| System → Light → System under macOS Dark | Dark → Light → Dark without resetting session state. | Remains Dark. |
+| System → Dark → System under macOS Light | Light → Dark → Light without resetting session state. | Remains Light. |
+| macOS appearance changes while System is selected | Open Settings follows the new effective appearance. | Follows macOS independently. |
+| Reopen/relaunch with explicit Light or Dark | Persisted explicit choice is presented uniformly. | Continues following macOS. |
+| Reopen/relaunch with System | Persisted choice remains System and resolves from the current host. | Follows macOS. |
+
+---
+
+## Task 2: Implement a live Settings presentation owner
 
 **Files:**
+
 - Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AppearancePreference.swift`
-- Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsWindowAppearanceBridge.swift`
-- Create: `CodexUsageMonitor/Tests/CodexUsageMonitorTests/SettingsWindowAppearanceBridgeTests.swift`
-
-**Interfaces:**
-- Consumes: `AppearancePreference` and the `NSWindow` containing Settings.
-- Produces: `AppearancePreference.windowAppearance`, `SettingsWindowAppearanceController.apply(_:to:)`, and `SettingsWindowAppearanceBridge`.
-
-- [ ] **Step 1: Write the failing window-transition tests**
-
-Create main-actor XCTest coverage that temporarily sets `NSApplication.shared.appearance` to a known host appearance and restores it with `defer`. The key regression case must apply Light to one `NSWindow`, then apply System and assert both that the explicit window override is cleared and that `effectiveAppearance` inherits Dark:
-
-```swift
-@MainActor
-final class SettingsWindowAppearanceBridgeTests: XCTestCase {
-    func test_lightToSystemClearsOverrideAndInheritsDarkHost() {
-        let application = NSApplication.shared
-        let originalAppearance = application.appearance
-        application.appearance = NSAppearance(named: .darkAqua)
-        defer { application.appearance = originalAppearance }
-
-        let window = NSWindow()
-        SettingsWindowAppearanceController.apply(.light, to: window)
-        XCTAssertEqual(window.appearance?.name, .aqua)
-
-        SettingsWindowAppearanceController.apply(.system, to: window)
-        XCTAssertNil(window.appearance)
-        XCTAssertEqual(
-            window.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]),
-            .darkAqua
-        )
-    }
-}
-```
-
-Add the symmetric Dark → System/Light-host case and direct Light/Dark mapping cases.
-
-- [ ] **Step 2: Run the focused test red**
-
-Run:
-
-```bash
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-path CodexUsageMonitor --filter SettingsWindowAppearanceBridgeTests
-```
-
-Expected before implementation: compilation fails because `SettingsWindowAppearanceController` and `windowAppearance` do not exist.
-
-- [ ] **Step 3: Replace the SwiftUI color-scheme mapping with an AppKit window mapping**
-
-In `AppearancePreference.swift`, remove `colorScheme` and provide:
-
-```swift
-var windowAppearance: NSAppearance? {
-    switch self {
-    case .system: nil
-    case .light: NSAppearance(named: .aqua)
-    case .dark: NSAppearance(named: .darkAqua)
-    }
-}
-```
-
-Import AppKit instead of SwiftUI in that file.
-
-- [ ] **Step 4: Implement one window-scoped owner**
-
-Create an `NSViewRepresentable` whose anchor stores the latest preference, applies it when attached to a window, and reapplies it when the preference changes:
-
-```swift
-import AppKit
-import SwiftUI
-
-@MainActor
-enum SettingsWindowAppearanceController {
-    static func apply(_ preference: AppearancePreference, to window: NSWindow?) {
-        window?.appearance = preference.windowAppearance
-    }
-}
-
-struct SettingsWindowAppearanceBridge: NSViewRepresentable {
-    let preference: AppearancePreference
-
-    func makeNSView(context: Context) -> SettingsWindowAppearanceAnchor {
-        SettingsWindowAppearanceAnchor(preference: preference)
-    }
-
-    func updateNSView(_ nsView: SettingsWindowAppearanceAnchor, context: Context) {
-        nsView.preference = preference
-    }
-}
-
-@MainActor
-final class SettingsWindowAppearanceAnchor: NSView {
-    var preference: AppearancePreference {
-        didSet { applyAppearance() }
-    }
-
-    init(preference: AppearancePreference) {
-        self.preference = preference
-        super.init(frame: .zero)
-    }
-
-    @available(*, unavailable)
-    required init?(coder: NSCoder) { nil }
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        applyAppearance()
-    }
-
-    private func applyAppearance() {
-        SettingsWindowAppearanceController.apply(preference, to: window)
-    }
-}
-```
-
-The anchor must not dispatch delayed competing writes or retain the window after detachment.
-
-- [ ] **Step 5: Run the focused tests green**
-
-Run the same filtered test command. Expected: all Settings-window appearance mapping and inheritance tests pass.
-
----
-
-### Task 3: Install the bridge without rebuilding Settings state
-
-**Files:**
 - Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsView.swift`
+- Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SystemAppearanceObserver.swift`
+- Create: `CodexUsageMonitor/Tests/CodexUsageMonitorTests/SettingsAppearancePresentationTests.swift`
 
-**Interfaces:**
-- Consumes: `settings.appearancePreference` and `SettingsWindowAppearanceBridge`.
-- Produces: one live Settings window whose AppKit chrome and SwiftUI content share the same effective appearance.
-
-- [ ] **Step 1: Attach the bridge to the existing root**
-
-Remove:
-
-```swift
-.preferredColorScheme(settings.appearancePreference.colorScheme)
-```
-
-Attach the zero-layout bridge without changing the HStack identity:
-
-```swift
-.background {
-    SettingsWindowAppearanceBridge(preference: settings.appearancePreference)
-        .frame(width: 0, height: 0)
-}
-```
-
-Do not add `.id(settings.appearancePreference)`, replace the Settings scene, or reset view-local state.
-
-- [ ] **Step 2: Compile with warnings as errors**
-
-Run:
-
-```bash
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift build --package-path CodexUsageMonitor -Xswiftc -warnings-as-errors
-```
-
-Expected: `Build complete!` with no warning about actor isolation, unavailable initializers, or unused appearance ownership.
-
-- [ ] **Step 3: Verify ownership by source inspection**
-
-Run:
-
-```bash
-rg -n 'preferredColorScheme|NSApplication\.shared\.appearance|NSApp\.appearance|SettingsWindowAppearanceBridge' CodexUsageMonitor/Sources/CodexUsageMonitor
-```
-
-Expected: the Settings bridge is the only application code applying the preference; no app-wide appearance assignment exists, and `SettingsView` no longer uses `preferredColorScheme`.
+- [x] Write focused tests before implementation for System resolving to the current host scheme, explicit choices ignoring the host scheme, and a live observer responding to host changes.
+- [x] Run the focused test red. Compilation failed because `presentationColorScheme(system:)` and `SystemAppearanceObserver` did not exist.
+- [x] Map `AppearancePreference.system` to the observer's current `ColorScheme`; map explicit Light/Dark directly.
+- [x] Observe `NSApplication.effectiveAppearance` through KVO and publish only the derived Light/Dark scheme on the main actor.
+- [x] Attach the concrete scheme once at the `SettingsView` presentation boundary without changing the HStack identity.
+- [x] Remove the failed `SettingsWindowAppearanceBridge` implementation and its now-misleading window-only tests.
+- [x] Run the focused tests green: 3 tests, 0 failures.
+- [x] Run the full suite with `-Xswiftc -warnings-as-errors`: 5 tests, 0 failures and no compiler warnings.
 
 ---
 
-### Task 4: Perform comprehensive signed-app visual acceptance
+## Task 3: Perform signed-app visual acceptance
 
-**Files:**
-- Modify: `docs/superpowers/plans/2026-07-15-settings-system-appearance-transition.md`
+### Isolated audit setup
 
-**Interfaces:**
-- Consumes: the signed app, Task 1 matrix, and the current 780 × 520 Settings shell.
-- Produces: direct visual evidence for complete transitions and preserved interaction state.
+- [x] Confirm no pre-existing `CodexUsageMonitor` process is running.
+- [x] Build the signed bundle with `bash CodexUsageMonitor/Scripts/build-app.sh`.
+- [x] Launch and track an audit-owned executable process, confirm its Settings window through Accessibility, and close only that process after restoring System.
 
-- [ ] **Step 1: Build and launch only an audit-owned signed instance**
+### Directly observed on 2026-07-16 under macOS Dark
 
-Run `zsh CodexUsageMonitor/Scripts/build-app.sh`, verify the bundle with `codesign --verify --deep --strict`, and open Settings through a normal app UI path. Track the audit PID and do not terminate any pre-existing user-owned process.
+- [x] Reproduce the original Light → System transition in the same open signed Settings window. After a two-second settle, title bar, Navigation Sidebar, page, cards, controls, dividers, and Context Rail were uniformly Dark.
+- [x] Exercise System → Light → System without recreating Settings.
+- [x] Preserve the selected General destination, a non-empty search query, a scrolled page, hidden Context Rail, and text-field focus through that round trip. The query still filtered the sidebar after the transition, confirming it was not reset.
+- [x] Open all six destinations in System Dark with the Context Rail hidden and again with it visible. No mixed fills, stale dividers, clipped leading labels, trailing overflow, or inaccessible bottom content was observed in the captured default-size window.
+- [x] Force Settings Light and open the native menu. Settings stayed Light while the menu stayed Dark/system-controlled.
+- [x] Verify explicit Light survives Settings close/reopen.
+- [x] Restore System, relaunch the app, and verify the picker still says System and Settings resolves Dark from the current host.
+- [x] Restore System before closing each audit process; confirm no monitor process remains.
 
-- [ ] **Step 2: Reproduce the original transition under System Dark**
+### User-observed on 2026-07-16 under macOS Light and live OS switching
 
-Set Settings to Light, keep the window open, then choose System while macOS is Dark. Confirm in the same frame that title bar, sidebar, page background, section cards, controls, dividers, and Context Rail all become Dark without a mixed intermediate state persisting or requiring reopen.
+- [x] Under macOS Light, inspect Dark → System and System → Dark → System in the same live Settings window.
+- [x] Change macOS Light ↔ Dark through the normal System Settings control while Settings remains open and System is selected; confirm Settings follows each change and restore the original OS preference.
+- [x] Under macOS Light, force Settings Dark and confirm the native menu remains Light/system-controlled.
+- [x] Repeat the all-six-destination pass in explicit Light on the final build.
 
-- [ ] **Step 3: Exercise the symmetric and live-system transitions**
+### Remaining manual acceptance
 
-Under System Light, verify Dark → System becomes fully Light. With System selected and Settings open, change macOS between Light and Dark through the user's normal System Settings control and confirm the entire window follows each change. Restore the user's original macOS appearance afterward.
+- [ ] Exercise manufactured conditional states: disabled notification controls, missing permission/connection guidance, absent quota values, and long status strings.
 
-- [ ] **Step 4: Inspect every destination and preview state**
-
-Open General, Notifications, Refresh, Agents, Data & Privacy, and Diagnostics in Light, Dark, and System. Repeat with the Context Rail visible and hidden. Check semantic card fills, title/description contrast, picker and toggle rendering, selection backgrounds, status badges, long text, clipping, and scrolling.
-
-- [ ] **Step 5: Prove transition continuity**
-
-Before changing appearance, enter a sidebar search, select a non-General destination, scroll its page, set the Context Rail state, and focus a control. Confirm those session states remain intact after every transition.
-
-- [ ] **Step 6: Confirm the native-menu boundary**
-
-With macOS Dark, force Settings Light and open the native menu. The Settings window should remain Light while the menu remains Dark/system-controlled. Repeat the inverse under macOS Light with Settings forced Dark.
-
-- [ ] **Step 7: Verify reopen and relaunch behavior**
-
-Confirm explicit Light/Dark persists across Settings reopen and app relaunch. Confirm System persists as System and follows the macOS appearance present at each reopen/relaunch rather than persisting a resolved Light/Dark snapshot.
+This remaining unchecked row limits conditional-state coverage but does not block review of the scoped appearance-transition fix.
 
 ---
 
-### Task 5: Reconcile documentation and verification evidence
+## Task 4: Reconcile documentation and final verification
 
 **Files:**
-- Modify: `docs/superpowers/plans/2026-07-13-settings-ui-followups.md`
-- Modify: `docs/superpowers/plans/2026-07-14-figma-settings-global-sidebar.md`
-- Modify: `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md`
+
+- Modify: `AGENTS.md`
 - Modify: `UsageProbe/README.md`
 - Modify: `how-to.md`
 - Modify: `outline.md`
+- Modify: `docs/superpowers/plans/2026-07-13-settings-ui-followups.md`
+- Modify: `docs/superpowers/plans/2026-07-14-figma-settings-global-sidebar.md`
+- Modify: `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md`
 
-**Interfaces:**
-- Consumes: accepted implementation behavior and Task 4 signed-app evidence.
-- Produces: accurate current behavior, regression history, and any remaining visual limitations.
+- [x] Replace the obsolete window-bridge guidance and known-regression text with the verified presentation-owner model.
+- [x] Keep the System-Light and manufactured-state acceptance gaps explicit in developer-facing plans.
+- [x] Run `git diff --check`, the focused tests, the warning-clean full suite, the signed-app build, and strict signature verification.
+- [x] Review the final diff for unrelated changes and prepare an evidence-rich PR handoff.
 
-- [ ] **Step 1: Replace the known-limitation language only after acceptance**
+### Final verification evidence
 
-Record the Settings-window ownership model, all directly observed transitions, appearances, destinations, preview states, persistence results, and native-menu boundary. Do not claim a System-Light or System-Dark path that was not actually inspected.
-
-- [ ] **Step 2: Run final integrity checks**
-
-Run `git diff --check`, the focused test, warnings-as-errors build, signed-app build, and strict codesign verification. Record exact outputs and any manual limitations in this plan before committing.
+- **Run:** `swift test --filter SettingsAppearancePresentationTests` — 3 tests passed, 0 failures.
+- **Run:** `swift test -Xswiftc -warnings-as-errors` — 5 tests passed, 0 failures, no compiler warnings.
+- **Run:** `bash CodexUsageMonitor/Scripts/build-app.sh` — signed app rebuilt successfully after the final concurrency refinement.
+- **Run:** `codesign --verify --deep --strict --verbose=2 CodexUsageMonitor/.build/CodexUsageMonitor.app` — valid on disk and satisfies its designated requirement.
+- **Run:** `plutil -lint CodexUsageMonitor/.build/CodexUsageMonitor.app/Contents/Info.plist` — OK.
+- **Run:** `git diff --check` — no whitespace errors.
+- **Observed:** the final rebuilt signed app repeated Light → System under macOS Dark in the same 780 × 548 window and remained uniformly Dark after a two-second settle.
+- **Observed:** System was restored and the audit-owned process was closed; `pgrep -fl CodexUsageMonitor` returned no process.
+- **Observed by user:** Dark → System and System → Dark → System passed under macOS Light in the same live Settings window.
+- **Observed by user:** the open System-selected Settings window followed live macOS Light ↔ Dark changes, and the original OS appearance was restored.
+- **Observed by user:** with macOS Light and Settings forced Dark, the native menu remained Light/system-controlled.
+- **Observed by user:** all six destinations passed in explicit Light on the final signed build.
 
 ## Self-review
 
-- Root cause: the plan fixes the stale presentation-level preference rather than recoloring individual Figma surfaces.
-- Scope: only the Settings `NSWindow` receives an override; native menu presentation remains system-controlled.
-- State continuity: no view identity or window recreation workaround is allowed.
-- Visual coverage: the original transition, its symmetric case, live macOS changes, all six destinations, both Context Rail states, persistence, and menu-boundary behavior are explicit acceptance gates.
-- Evidence quality: the red/green harness proves the ownership boundary, while only the signed app can close visual acceptance.
+- The implementation fixes the stale presentation owner rather than recoloring surfaces.
+- `NSApplication.appearance` is never mutated, and the native menu boundary is directly verified under System Dark.
+- No `.id`, Settings recreation, or delayed timing workaround is used.
+- Automated coverage verifies mapping and live observation; signed-app evidence verifies the original failure path and the full Settings hierarchy.
+- The appearance transition matrix is accepted across macOS Light and Dark; manufactured conditional states remain explicitly unchecked rather than inferred.

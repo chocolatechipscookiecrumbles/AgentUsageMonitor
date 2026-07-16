@@ -41,9 +41,9 @@ The July 15 appearance audit found that changing a live Settings root from `.pre
 
 When changing System/Light/Dark behavior:
 
-- Treat appearance as a Settings-window concern. Apply or clear `NSWindow.appearance` for the Settings window; do not set `NSApplication.appearance`, because native `MenuBarExtra` presentation must remain system-controlled.
-- **System** means the Settings window has no explicit appearance override (`window.appearance = nil`). Do not resolve System once to the current Light/Dark value, because the open window must continue following later macOS appearance changes.
-- Do not use optional `.preferredColorScheme` at the Settings presentation boundary as the sole runtime owner, and do not use `.id(...)` or window recreation to hide propagation bugs. Appearance changes must preserve the selected destination, search query, scroll position, preview visibility, and control focus.
+- Treat appearance as a Settings-presentation concern. Keep `SettingsView` as the one owner and always supply a concrete `preferredColorScheme`; do not also mutate `NSWindow.appearance` from inside that SwiftUI hierarchy.
+- **System** remains a distinct persisted preference, but its presentation resolves from a live observation of `NSApplication.effectiveAppearance`. Do not resolve it only once, because the open Settings window must continue following later macOS appearance changes.
+- Read the application's effective appearance, but do not assign `NSApplication.appearance`; native `MenuBarExtra` presentation must remain system-controlled. Do not use `.id(...)`, delayed window writes, or window recreation to hide propagation bugs. Appearance changes must preserve the selected destination, search query, scroll position, preview visibility, and control focus.
 - Keep one owner for the entire Settings window so title bar, Navigation Sidebar, Settings Page, cards, controls, dividers, and Context Rail resolve through the same effective appearance. Do not patch individual Light-looking surfaces with hard-coded colors.
 - Preserve semantic system colors. A mixed transition is an ownership/propagation failure, not justification for replacing `windowBackgroundColor`, `controlBackgroundColor`, or semantic foreground styles.
 
@@ -70,6 +70,7 @@ Stop and perform a visual audit if a Settings change introduces any of the follo
 - a completion claim based only on compilation or source inspection.
 - a System appearance implementation that changes only SwiftUI content or only AppKit window chrome;
 - a Light/Dark fix that sets application-wide appearance and unintentionally recolors the native menu;
+- an appearance bridge inside the SwiftUI Settings hierarchy that competes with its containing scene for `NSWindow.appearance`;
 - an appearance transition that requires closing/reopening Settings or resets its session state.
 
 ## Notification episode guardrails
