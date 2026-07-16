@@ -1,6 +1,6 @@
 # Figma Settings Global Sidebar Implementation Plan
 
-**Status (2026-07-15): implementation and signed Light acceptance complete; a Light → System/System-Dark mixed-appearance regression is diagnosed and planned in `2026-07-15-settings-system-appearance-transition.md`.** Manufactured conditional states and complete post-fix appearance acceptance remain manual.
+**Status (2026-07-16): implementation, signed Light acceptance, and the reported Light → System/System-Dark regression fix are complete.** Reciprocal System-Light, live OS switching, explicit-Light all-destination, and manufactured conditional-state acceptance remain manual in `2026-07-15-settings-system-appearance-transition.md`.
 
 **Documented follow-up:** Fixed-region geometry, indexed setting search, switch styling, scoped warning controls, provider notification identity, agent Disconnect, and the Agents selector/context redesign are planned—but not implemented—in `2026-07-14-settings-provider-followups.md`.
 
@@ -95,9 +95,11 @@
 - The audit used temporary PID 79651 and closed only that process. Pre-existing user-owned PID 77731 remained running.
 - Dark appearance was not switched because appearance is persisted and shared with the user's pre-existing app instance. Disabled notification controls, missing permission/connection guidance, absent quota values, and other manufactured conditional states were not forced because doing so would mutate user state. These remain targeted manual acceptance items; no Dark or conditional-state coverage is claimed here.
 
-### July 15 System appearance regression
+### July 15–16 System appearance regression
 
-The user supplied a signed-app screenshot showing a mixed window after selecting **System** from explicit **Light** while macOS was Dark: AppKit chrome/outlines darkened, but the Settings Page and card bodies remained Light. A deterministic minimal host reproduced the cause in three runs: changing `.preferredColorScheme(.light)` to `nil` left the SwiftUI environment Light. Conditional removal of the modifier also failed. Clearing a Settings-window `NSWindow.appearance` override transitioned Light to inherited System Dark in three runs. No Swift fix is implemented yet; the scoped implementation and full visual matrix are in `2026-07-15-settings-system-appearance-transition.md`.
+The user supplied a signed-app screenshot showing a mixed window after selecting **System** from explicit **Light** while macOS was Dark: AppKit chrome/outlines darkened, but the Settings Page and card bodies remained Light. A deterministic minimal host reproduced the stale optional `preferredColorScheme` boundary. A proposed inner `NSWindow.appearance` bridge passed the plain-window harness but failed in the signed SwiftUI Settings scene; tracing showed that the scene and bridge competed for the window while a private presentation host retained Aqua. The accepted fix keeps SwiftUI as the single Settings presentation owner and resolves System from a live observation of `NSApplication.effectiveAppearance` without assigning application-wide appearance.
+
+An isolated signed-app audit directly verified Light → System under macOS Dark, System → Light → System, state continuity, all six destinations with the Context Rail visible and hidden in System Dark, Settings reopen/relaunch persistence, and the native menu remaining Dark while Settings was forced Light. Reciprocal System-Light and manufactured-state rows remain manual in `2026-07-15-settings-system-appearance-transition.md`.
 
 ## Self-review
 

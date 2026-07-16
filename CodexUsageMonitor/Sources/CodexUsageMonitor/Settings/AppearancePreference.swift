@@ -15,9 +15,9 @@ enum AppearancePreference: String, Codable, CaseIterable, Identifiable, Sendable
         }
     }
 
-    var colorScheme: ColorScheme? {
+    func presentationColorScheme(system: ColorScheme) -> ColorScheme {
         switch self {
-        case .system: nil
+        case .system: system
         case .light: .light
         case .dark: .dark
         }

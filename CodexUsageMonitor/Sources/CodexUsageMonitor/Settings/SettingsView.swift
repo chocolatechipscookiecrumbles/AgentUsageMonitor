@@ -5,6 +5,7 @@ struct SettingsView: View {
     @ObservedObject private var viewModel: QuotaViewModel
     @ObservedObject private var settings: AppSettings
     @StateObject private var launchAtLogin = LaunchAtLoginController()
+    @StateObject private var systemAppearance = SystemAppearanceObserver()
     @State private var isPreviewVisible = true
 
     init(viewModel: QuotaViewModel) {
@@ -48,6 +49,10 @@ struct SettingsView: View {
         }
         .frame(width: SettingsLayoutMetrics.windowWidth, height: SettingsLayoutMetrics.windowHeight)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: isPreviewVisible)
-        .preferredColorScheme(settings.appearancePreference.colorScheme)
+        .preferredColorScheme(
+            settings.appearancePreference.presentationColorScheme(
+                system: systemAppearance.colorScheme
+            )
+        )
     }
 }
