@@ -1,6 +1,6 @@
 # Codex Daily-Driver Roadmap
 
-> **For agentic workers:** Implement one branch at a time with `executing-plans`. Do not generate or run automated tests; use compilation, read-only live collection, schema inspection, and manual UI acceptance. Update `outline.md`, `how-to.md`, `UsageProbe/README.md`, and the active plan whenever behavior changes.
+> **For agentic workers:** Implement one branch at a time with `executing-plans`. Add focused automated coverage for deterministic seams and use compilation, read-only live collection, schema inspection, signed-app inspection, and manual UI acceptance in proportion to the claim. Update `outline.md`, `how-to.md`, `UsageProbe/README.md`, and the active plan whenever behavior changes.
 
 **Goal:** Turn the proven Codex quota monitor into a dependable daily-driver with configurable warnings, adaptive refresh, safe account connection, separate Settings and Dashboard windows, and launch at login before adding another provider.
 
@@ -41,7 +41,7 @@ The two user-facing modes are:
 
 **Tech Stack:** Swift 6.2, SwiftUI, AppKit, Charts, ServiceManagement, UserNotifications, Foundation JSON persistence, Codex app-server/CLI; no third-party dependencies or proprietary backend.
 
-## Authoritative plan status — reconciled 2026-07-14
+## Authoritative plan status — reconciled 2026-07-16
 
 | Plan | Current state | Remaining gate |
 | --- | --- | --- |
@@ -51,20 +51,22 @@ The two user-facing modes are:
 | Reliability hardening | Implementation complete; observation active | Natural forecast/failure evidence and seven corrected calendar days |
 | Notification settings | Implemented | Permission/persistence/natural-event manual acceptance |
 | Settings foundation and follow-ups | Implemented; superseded visually by Figma Settings port | Conditional states, shortcuts; Launch at Login skipped |
-| Adaptive refresh | Implemented with an open-menu presentation regression | Execute `2026-07-14-native-menu-refresh-row.md`: restore truthful refresh transitions without reviving stale menu hit-testing; Settings mode switching and natural cached/paused acceptance |
+| Adaptive refresh | Implemented with an open-menu presentation regression | Execute the pending [native menu refresh-row plan](2026-07-14-native-menu-refresh-row.md): restore truthful refresh transitions without reviving stale menu hit-testing; Settings mode switching and natural cached/paused acceptance |
 | Codex connection | Implemented and user-accepted | No account mutation required |
 | Menu-bar display and placement | Implemented | Immediate preview, missing/cached lane, width, and VoiceOver checks |
 | Interruption backoff | Implemented with one delivery-durability follow-up | Retry the same stable event after failed submission, then controlled outage/recovery and signed-out/missing-CLI acceptance |
-| Dashboard | Deferred by user | Resume only on explicit direction |
+| Dashboard | Deferred by user; partial historical checklist retained | Resume the recovered [Dashboard plan](2026-07-14-dashboard.md) only on explicit direction and after revalidating it against current `main` |
 | Figma Settings global sidebar | Implemented; signed Light/Dark appearance-transition acceptance complete | Inspect remaining manufactured conditional states in `2026-07-15-settings-system-appearance-transition.md` |
-| Settings and multi-agent follow-ups | Planned; documentation only | Implement the scoped plan after explicit direction and applicable provider capability work |
-| Other Figma surfaces | Deferred | Menu popover, widgets, Watch, and Dashboard require separate user direction |
+| Settings and multi-agent follow-ups | Planned; documentation only | Split and revalidate the recovered [Settings and multi-agent follow-ups plan](2026-07-14-settings-provider-followups.md) after explicit direction and applicable provider capability work |
+| Settings section sidebars | Implemented historical stage; superseded by the global sidebar | Retain the recovered [section-sidebars plan](2026-07-14-settings-section-sidebars.md) as provenance; do not resume its old geometry without re-scoping |
+| Compact Settings and menu placement | Implemented historical stage; visually superseded | Retain the recovered [compact Settings/menu-placement plan](2026-07-14-compact-settings-menu-placement.md) as provenance; the separate native refresh-row regression remains active above |
+| Other Figma surfaces | Deferred | Menu popover, widgets, and Watch require separate user direction |
 
 ## Global constraints
 
 - Codex first. Defer Claude and GitHub Copilot until the Codex daily-driver release passes acceptance.
 - Do not read `auth.json`, store tokens, accept passwords, replay callback URLs, send prompts, or consume reset credits.
-- Do not create or run automated tests for these branches.
+- Add the smallest deterministic automated regression coverage permitted by the current repository rules; keep signed macOS UI and permission checks as separate manual evidence.
 - Keep fixed remaining-quota thresholds at 50%, 25%, 10%, and 5%.
 - Manual refresh choices are 1 minute, 1 minute 30 seconds, 2 minutes (default), 5 minutes, and 10 minutes.
 - Automatic refresh may use 30 seconds only around an imminent threshold, qualified exhaustion, or reset verification.
@@ -85,7 +87,7 @@ Deliver the separate Settings window shell and persisted warning controls. Exist
 
 Acceptance: settings survive relaunch; notification authorization is requested only from an explicit user action; cached/unconfirmed data never drives forecast alerts; fixed thresholds remain unchanged.
 
-### 2. `feature/settings-foundation` — active
+### 2. `feature/settings-foundation` — implemented; superseded visually by later Settings work
 
 Add General, Refresh, Agents, Data & Privacy, and Diagnostics tabs to the existing Settings window. Agents uses a left provider sidebar and an in-tab detail pane for each agent: Codex is the current integration, while Claude Code and GitHub Copilot are planned and not connected. Show retention and privacy information without export/delete actions. Keep all settings behind one persisted settings module rather than reading `UserDefaults` throughout views.
 
@@ -97,7 +99,7 @@ Replace the fixed timer with a scheduling policy returning an effective interval
 
 Acceptance: manual refresh never waits behind scheduled work; only one collection runs; the first two failures keep the existing fixed cadence (Automatic may fall back to five minutes), while the third starts a temporary ten-minute retry cadence in every mode; wake and launch always refresh. Confirmed-after-retry is confirmed/completed; cached, unconfirmed, and unavailable outcomes are cached/paused without replacing the last confirmed display record.
 
-### 4. `feature/codex-connection` — active (stacked on Adaptive Refresh)
+### 4. `feature/codex-connection` — implemented and user-accepted (stacked on Adaptive Refresh)
 
 Add a Codex connection module that distinguishes missing CLI, unauthenticated, connected, signing in, and failed states. Primary “Sign in with browser” uses provider-generated app-server authentication URLs and completion events. Secondary CLI flow visibly opens Terminal with `codex login` ready for the user to run, then monitors `codex login status`. Omit logout and account switching.
 
