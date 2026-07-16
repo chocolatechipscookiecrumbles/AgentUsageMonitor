@@ -11,7 +11,7 @@ struct RefreshSettingsView: View {
 
     var body: some View {
         SettingsPage {
-            SettingsSection("Current policy") {
+            SettingsSection("Current Policy") {
                 SettingsLabeledRow("Refresh frequency") {
                     Picker("Refresh frequency", selection: $settings.refreshMode) {
                         ForEach(RefreshMode.allCases) { mode in
@@ -19,7 +19,7 @@ struct RefreshSettingsView: View {
                         }
                     }
                     .labelsHidden()
-                    .frame(maxWidth: 320)
+                    .frame(width: SettingsLayoutMetrics.controlWidth)
                 }
                 if let reason = viewModel.refreshScheduleReason {
                     SettingsLabeledRow("Effective policy") { Text(reason.displayName) }
@@ -33,7 +33,7 @@ struct RefreshSettingsView: View {
                 SettingsDescription("After three unsuccessful refreshes, every mode temporarily retries every 10 minutes until an update is confirmed.")
             }
 
-            SettingsSection("Latest collection") {
+            SettingsSection("Latest Collection") {
                 SettingsLabeledRow("Status") { Text(viewModel.displayState.mode.displayName) }
                 SettingsLabeledRow("Last attempt") {
                     Text(viewModel.displayState.lastAttemptAt.formatted(date: .abbreviated, time: .shortened))
@@ -44,7 +44,7 @@ struct RefreshSettingsView: View {
                     }
                 }
                 RefreshNowButton(viewModel: viewModel)
-                    .padding(.leading, SettingsLayoutMetrics.valueColumnInset)
+                    .settingsValueColumnAligned()
             }
         }
     }

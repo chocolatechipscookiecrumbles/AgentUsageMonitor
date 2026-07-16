@@ -1,9 +1,11 @@
 import SwiftUI
 
 struct SettingsView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject private var viewModel: QuotaViewModel
     @ObservedObject private var settings: AppSettings
     @StateObject private var launchAtLogin = LaunchAtLoginController()
+    @State private var isPreviewVisible = true
 
     init(viewModel: QuotaViewModel) {
         self.viewModel = viewModel
@@ -11,41 +13,41 @@ struct SettingsView: View {
     }
 
     var body: some View {
-        TabView(selection: $settings.selectedSettingsTab) {
-            GeneralSettingsView(
-                settings: settings,
-                launchAtLogin: launchAtLogin,
-                status: viewModel.settingsStatus,
-                displayState: viewModel.displayState
-            )
-                .tabItem { Label(SettingsTab.general.title, systemImage: SettingsTab.general.systemImage) }
-                .tag(SettingsTab.general)
+        HStack(spacing: 0) {
+            SettingsNavigationSidebar(selection: $settings.selectedSettingsTab)
 
-            NotificationSettingsView(
-                settings: settings,
-                setAlertsEnabled: viewModel.setAlertsEnabled,
-                openNotificationSettings: viewModel.openNotificationSettings
-            )
-            .tabItem { Label(SettingsTab.notifications.title, systemImage: SettingsTab.notifications.systemImage) }
-            .tag(SettingsTab.notifications)
+            Divider()
 
-            RefreshSettingsView(viewModel: viewModel)
-                .tabItem { Label(SettingsTab.refresh.title, systemImage: SettingsTab.refresh.systemImage) }
-                .tag(SettingsTab.refresh)
+            VStack(spacing: 0) {
+                SettingsPageHeader(
+                    title: settings.selectedSettingsTab.title,
+                    isPreviewVisible: $isPreviewVisible
+                )
 
-            AgentsSettingsView(viewModel: viewModel)
-                .tabItem { Label(SettingsTab.agents.title, systemImage: SettingsTab.agents.systemImage) }
-                .tag(SettingsTab.agents)
+                Divider()
 
-            DataPrivacySettingsView()
-                .tabItem { Label(SettingsTab.dataPrivacy.title, systemImage: SettingsTab.dataPrivacy.systemImage) }
-                .tag(SettingsTab.dataPrivacy)
+                SettingsDetailView(
+                    selection: settings.selectedSettingsTab,
+                    viewModel: viewModel,
+                    launchAtLogin: launchAtLogin
+                )
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            DiagnosticsSettingsView(status: viewModel.settingsStatus)
-                .tabItem { Label(SettingsTab.diagnostics.title, systemImage: SettingsTab.diagnostics.systemImage) }
-                .tag(SettingsTab.diagnostics)
+            if isPreviewVisible {
+                Divider()
+
+                SettingsContextPanel {
+                    SettingsPreviewView(
+                        selection: settings.selectedSettingsTab,
+                        viewModel: viewModel
+                    )
+                }
+                .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
         }
-        .frame(width: 680, height: 560)
+        .frame(width: SettingsLayoutMetrics.windowWidth, height: SettingsLayoutMetrics.windowHeight)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: isPreviewVisible)
         .preferredColorScheme(settings.appearancePreference.colorScheme)
     }
 }
