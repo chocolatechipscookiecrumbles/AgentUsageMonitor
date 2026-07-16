@@ -41,6 +41,25 @@ The two user-facing modes are:
 
 **Tech Stack:** Swift 6.2, SwiftUI, AppKit, Charts, ServiceManagement, UserNotifications, Foundation JSON persistence, Codex app-server/CLI; no third-party dependencies or proprietary backend.
 
+## Authoritative plan status — reconciled 2026-07-14
+
+| Plan | Current state | Remaining gate |
+| --- | --- | --- |
+| Capability probe | Complete historical research | None |
+| Menu-bar MVP | Complete; superseded by follow-ons | None |
+| Quota history foundation | Complete; superseded by reliability contract | None |
+| Reliability hardening | Implementation complete; observation active | Natural forecast/failure evidence and seven corrected calendar days |
+| Notification settings | Implemented | Permission/persistence/natural-event manual acceptance |
+| Settings foundation and follow-ups | Implemented; superseded visually by Figma Settings port | Conditional states, shortcuts; Launch at Login skipped |
+| Adaptive refresh | Implemented with an open-menu presentation regression | Execute `2026-07-14-native-menu-refresh-row.md`: restore truthful refresh transitions without reviving stale menu hit-testing; Settings mode switching and natural cached/paused acceptance |
+| Codex connection | Implemented and user-accepted | No account mutation required |
+| Menu-bar display and placement | Implemented | Immediate preview, missing/cached lane, width, and VoiceOver checks |
+| Interruption backoff | Implemented with one delivery-durability follow-up | Retry the same stable event after failed submission, then controlled outage/recovery and signed-out/missing-CLI acceptance |
+| Dashboard | Deferred by user | Resume only on explicit direction |
+| Figma Settings global sidebar | Implemented; signed Light acceptance complete; System transition regression diagnosed | Execute `2026-07-15-settings-system-appearance-transition.md`, then inspect remaining manufactured conditional states |
+| Settings and multi-agent follow-ups | Planned; documentation only | Implement the scoped plan after explicit direction and applicable provider capability work |
+| Other Figma surfaces | Deferred | Menu popover, widgets, Watch, and Dashboard require separate user direction |
+
 ## Global constraints
 
 - Codex first. Defer Claude and GitHub Copilot until the Codex daily-driver release passes acceptance.

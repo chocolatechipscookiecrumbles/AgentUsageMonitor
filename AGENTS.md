@@ -35,6 +35,27 @@ When editing `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings`:
 - Capture or otherwise directly inspect the original failing page after the fix. Do not infer that a shared-layout change fixed every tab without opening those tabs.
 - Do not leave temporary audit app instances running or terminate an app process that was already owned by the user.
 
+## Settings appearance-transition guardrails
+
+The July 15 appearance audit found that changing a live Settings root from `.preferredColorScheme(.light)` to `.preferredColorScheme(nil)` does not reliably clear SwiftUI's presentation-level override. The picker persists **System** and AppKit chrome follows Dark, while the hosted SwiftUI content can remain Light, producing a mixed window with dark outlines/title bar and light page/card bodies.
+
+When changing System/Light/Dark behavior:
+
+- Treat appearance as a Settings-window concern. Apply or clear `NSWindow.appearance` for the Settings window; do not set `NSApplication.appearance`, because native `MenuBarExtra` presentation must remain system-controlled.
+- **System** means the Settings window has no explicit appearance override (`window.appearance = nil`). Do not resolve System once to the current Light/Dark value, because the open window must continue following later macOS appearance changes.
+- Do not use optional `.preferredColorScheme` at the Settings presentation boundary as the sole runtime owner, and do not use `.id(...)` or window recreation to hide propagation bugs. Appearance changes must preserve the selected destination, search query, scroll position, preview visibility, and control focus.
+- Keep one owner for the entire Settings window so title bar, Navigation Sidebar, Settings Page, cards, controls, dividers, and Context Rail resolve through the same effective appearance. Do not patch individual Light-looking surfaces with hard-coded colors.
+- Preserve semantic system colors. A mixed transition is an ownership/propagation failure, not justification for replacing `windowBackgroundColor`, `controlBackgroundColor`, or semantic foreground styles.
+
+Before claiming an appearance fix complete:
+
+- Reproduce the original **Light → System while macOS is Dark** transition in the signed app and directly inspect the same live Settings window after the change.
+- Exercise Light → System under System Dark, Dark → System under System Light, System → Light → System, System → Dark → System, and a macOS appearance change while the Settings window remains open.
+- Inspect all six Settings destinations with the Context Rail visible and hidden. Confirm there is no mixed title-bar/content state, stale card fill, incorrect divider contrast, or region that updates only after reopening.
+- Confirm destination selection, search text, scroll position, preview state, and keyboard focus survive each appearance transition.
+- Open the native menu before and after forcing Settings Light/Dark and confirm it still follows macOS rather than the Settings preference.
+- Build and inspect the signed `.app`. An isolated `NSHostingView` harness can prove the propagation mechanism but is not final visual evidence.
+
 ## Regression warning signs
 
 Stop and perform a visual audit if a Settings change introduces any of the following:
@@ -47,6 +68,9 @@ Stop and perform a visual audit if a Settings change introduces any of the follo
 - an unbounded picker or long single-line description;
 - a Settings frame reduction without checking all six top tabs and the longest page;
 - a completion claim based only on compilation or source inspection.
+- a System appearance implementation that changes only SwiftUI content or only AppKit window chrome;
+- a Light/Dark fix that sets application-wide appearance and unintentionally recolors the native menu;
+- an appearance transition that requires closing/reopening Settings or resets its session state.
 
 ## Notification episode guardrails
 
