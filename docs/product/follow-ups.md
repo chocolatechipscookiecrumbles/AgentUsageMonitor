@@ -1,0 +1,6 @@
+the app should detect network changes, and help diagnose the reason for failure of refresh
+upload network status change, it should prompt a refresh right a way instead of having users to manually trigger it
+there is a bug where the reset text is overlayed on the quota alerts button in the popover menu
+when the web signin or cli fails, the disconnected but mid connection page doesn't have a fallback, it gets stuck there and focues the user to quit and relaunch to redo the connection, fix that and have either a timed or detection fallback to automatically return to the initial disconnected screen
+the theme color switch bug is still present, switching from dark to system still shows the past bug where the divider outlines are a different color then the actual shade it is suppose to represent
+the general settings page context rail menu bar previous should remove the "Current label" text and have the actual menubar icon take up the entire give space, then remove the preview under the settings section "menu bar"'s preview part. Also remove the current scope section as well from the general part. 
