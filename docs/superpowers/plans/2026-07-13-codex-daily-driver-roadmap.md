@@ -56,7 +56,7 @@ The two user-facing modes are:
 | Menu-bar display and placement | Implemented | Immediate preview, missing/cached lane, width, and VoiceOver checks |
 | Interruption backoff | Implemented with one delivery-durability follow-up | Retry the same stable event after failed submission, then controlled outage/recovery and signed-out/missing-CLI acceptance |
 | Dashboard | Deferred by user | Resume only on explicit direction |
-| Figma Settings global sidebar | Implemented; signed Light and System-Dark transition acceptance complete | Finish the reciprocal System-Light and manufactured conditional-state checks in `2026-07-15-settings-system-appearance-transition.md` |
+| Figma Settings global sidebar | Implemented; signed Light/Dark appearance-transition acceptance complete | Inspect remaining manufactured conditional states in `2026-07-15-settings-system-appearance-transition.md` |
 | Settings and multi-agent follow-ups | Planned; documentation only | Implement the scoped plan after explicit direction and applicable provider capability work |
 | Other Figma surfaces | Deferred | Menu popover, widgets, Watch, and Dashboard require separate user direction |
 

@@ -145,7 +145,8 @@
 - `swift build --package-path CodexUsageMonitor -Xswiftc -warnings-as-errors`, the ad-hoc signed app build, strict code-signature validation, and `plutil -lint` passed.
 - A temporary signed instance launched and remained alive through its launch refresh without a new crash report. It was launched alongside the user's existing instance so no running app was replaced.
 - The reported Light → System/System-Dark mixed-appearance regression is fixed and directly accepted in the isolated signed app. Search, destination, scroll, Context Rail, and focus state survived; all six destinations were inspected in System Dark with the rail visible and hidden; explicit Light survived Settings reopen; System survived app relaunch; and the native menu stayed Dark while Settings was forced Light.
-- Still manual/open: exercise each threshold and master disabled state, toggle Launch at Login from the signed app, confirm `Command-R` enable/disable behavior, and complete the reciprocal System-Light, live macOS appearance-change, explicit-Light all-destination, and manufactured conditional-state rows in `2026-07-15-settings-system-appearance-transition.md`.
+- The reciprocal System-Light transitions, live macOS appearance changes, native-menu boundary under macOS Light, and all-six-destination explicit-Light pass were subsequently completed by the user on the final signed build.
+- Still manual/open: exercise each threshold and master disabled state, toggle Launch at Login from the signed app, confirm `Command-R` enable/disable behavior, and complete the manufactured conditional-state row in `2026-07-15-settings-system-appearance-transition.md`.
 
 ## July 14 visual audit follow-up
 

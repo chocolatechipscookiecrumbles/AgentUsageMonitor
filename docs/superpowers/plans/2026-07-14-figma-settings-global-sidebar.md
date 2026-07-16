@@ -1,6 +1,6 @@
 # Figma Settings Global Sidebar Implementation Plan
 
-**Status (2026-07-16): implementation, signed Light acceptance, and the reported Light → System/System-Dark regression fix are complete.** Reciprocal System-Light, live OS switching, explicit-Light all-destination, and manufactured conditional-state acceptance remain manual in `2026-07-15-settings-system-appearance-transition.md`.
+**Status (2026-07-16): implementation and signed Light/Dark appearance-transition acceptance are complete.** Manufactured conditional-state acceptance remains manual in `2026-07-15-settings-system-appearance-transition.md`.
 
 **Documented follow-up:** Fixed-region geometry, indexed setting search, switch styling, scoped warning controls, provider notification identity, agent Disconnect, and the Agents selector/context redesign are planned—but not implemented—in `2026-07-14-settings-provider-followups.md`.
 
@@ -99,7 +99,7 @@
 
 The user supplied a signed-app screenshot showing a mixed window after selecting **System** from explicit **Light** while macOS was Dark: AppKit chrome/outlines darkened, but the Settings Page and card bodies remained Light. A deterministic minimal host reproduced the stale optional `preferredColorScheme` boundary. A proposed inner `NSWindow.appearance` bridge passed the plain-window harness but failed in the signed SwiftUI Settings scene; tracing showed that the scene and bridge competed for the window while a private presentation host retained Aqua. The accepted fix keeps SwiftUI as the single Settings presentation owner and resolves System from a live observation of `NSApplication.effectiveAppearance` without assigning application-wide appearance.
 
-An isolated signed-app audit directly verified Light → System under macOS Dark, System → Light → System, state continuity, all six destinations with the Context Rail visible and hidden in System Dark, Settings reopen/relaunch persistence, and the native menu remaining Dark while Settings was forced Light. Reciprocal System-Light and manufactured-state rows remain manual in `2026-07-15-settings-system-appearance-transition.md`.
+An isolated signed-app audit directly verified Light → System under macOS Dark, System → Light → System, state continuity, all six destinations with the Context Rail visible and hidden in System Dark, Settings reopen/relaunch persistence, and the native menu remaining Dark while Settings was forced Light. The user subsequently completed the reciprocal System-Light transitions, live macOS Light ↔ Dark switching, the reciprocal native-menu boundary, and all six destinations in explicit Light on the final signed build. Manufactured conditional states remain manual in `2026-07-15-settings-system-appearance-transition.md`.
 
 ## Self-review
 

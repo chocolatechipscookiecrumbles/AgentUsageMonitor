@@ -2,7 +2,7 @@
 
 > **For agentic workers:** Use `executing-plans` to implement this plan task by task. Keep unchecked acceptance items open until they are directly observed.
 
-**Status (2026-07-16):** The reported Light → System/System-Dark regression is fixed and accepted in an isolated signed app. The reciprocal System-Light visual paths remain manual because the audit host stayed in macOS Dark.
+**Status (2026-07-16):** The reported Light → System/System-Dark regression is fixed. Signed-app acceptance now covers both macOS Light and Dark hosts, live OS appearance changes, the reciprocal native-menu boundary, and all six destinations in explicit Light. Manufactured conditional states remain manual.
 
 **Goal:** Make the live Settings window transition completely between System, Light, and Dark without mixed AppKit/SwiftUI regions, reopening the window, resetting session state, or changing native menu appearance.
 
@@ -93,15 +93,18 @@
 - [x] Restore System, relaunch the app, and verify the picker still says System and Settings resolves Dark from the current host.
 - [x] Restore System before closing each audit process; confirm no monitor process remains.
 
+### User-observed on 2026-07-16 under macOS Light and live OS switching
+
+- [x] Under macOS Light, inspect Dark → System and System → Dark → System in the same live Settings window.
+- [x] Change macOS Light ↔ Dark through the normal System Settings control while Settings remains open and System is selected; confirm Settings follows each change and restore the original OS preference.
+- [x] Under macOS Light, force Settings Dark and confirm the native menu remains Light/system-controlled.
+- [x] Repeat the all-six-destination pass in explicit Light on the final build.
+
 ### Remaining manual acceptance
 
-- [ ] Under macOS Light, inspect Dark → System and System → Dark → System in the same live Settings window.
-- [ ] Change macOS Light ↔ Dark through the user's normal System Settings control while Settings remains open and System is selected; restore the user's original OS preference afterward.
-- [ ] Under macOS Light, force Settings Dark and confirm the native menu remains Light/system-controlled.
-- [ ] Repeat the all-six-destination pass in explicit Light on the final build. Earlier global-sidebar work has signed Light evidence, but this fix's isolated audit inspected General in Light and all six destinations in System Dark.
 - [ ] Exercise manufactured conditional states: disabled notification controls, missing permission/connection guidance, absent quota values, and long status strings.
 
-These unchecked rows limit the breadth of visual acceptance; they do not invalidate the directly reproduced and fixed System-Dark regression.
+This remaining unchecked row limits conditional-state coverage but does not block review of the scoped appearance-transition fix.
 
 ---
 
@@ -132,6 +135,10 @@ These unchecked rows limit the breadth of visual acceptance; they do not invalid
 - **Run:** `git diff --check` — no whitespace errors.
 - **Observed:** the final rebuilt signed app repeated Light → System under macOS Dark in the same 780 × 548 window and remained uniformly Dark after a two-second settle.
 - **Observed:** System was restored and the audit-owned process was closed; `pgrep -fl CodexUsageMonitor` returned no process.
+- **Observed by user:** Dark → System and System → Dark → System passed under macOS Light in the same live Settings window.
+- **Observed by user:** the open System-selected Settings window followed live macOS Light ↔ Dark changes, and the original OS appearance was restored.
+- **Observed by user:** with macOS Light and Settings forced Dark, the native menu remained Light/system-controlled.
+- **Observed by user:** all six destinations passed in explicit Light on the final signed build.
 
 ## Self-review
 
@@ -139,4 +146,4 @@ These unchecked rows limit the breadth of visual acceptance; they do not invalid
 - `NSApplication.appearance` is never mutated, and the native menu boundary is directly verified under System Dark.
 - No `.id`, Settings recreation, or delayed timing workaround is used.
 - Automated coverage verifies mapping and live observation; signed-app evidence verifies the original failure path and the full Settings hierarchy.
-- Unobserved System-Light and manufactured-state paths remain unchecked rather than being inferred.
+- The appearance transition matrix is accepted across macOS Light and Dark; manufactured conditional states remain explicitly unchecked rather than inferred.
