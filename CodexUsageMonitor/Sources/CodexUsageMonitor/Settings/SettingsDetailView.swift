@@ -1,0 +1,33 @@
+import SwiftUI
+
+struct SettingsDetailView: View {
+    let selection: SettingsTab
+    @ObservedObject var viewModel: QuotaViewModel
+    @ObservedObject var launchAtLogin: LaunchAtLoginController
+
+    var body: some View {
+        switch selection {
+        case .general:
+            GeneralSettingsView(
+                settings: viewModel.settings,
+                launchAtLogin: launchAtLogin,
+                status: viewModel.settingsStatus,
+                displayState: viewModel.displayState
+            )
+        case .notifications:
+            NotificationSettingsView(
+                settings: viewModel.settings,
+                setAlertsEnabled: viewModel.setAlertsEnabled,
+                openNotificationSettings: viewModel.openNotificationSettings
+            )
+        case .refresh:
+            RefreshSettingsView(viewModel: viewModel)
+        case .agents:
+            AgentsSettingsView(viewModel: viewModel)
+        case .dataPrivacy:
+            DataPrivacySettingsView()
+        case .diagnostics:
+            DiagnosticsSettingsView(status: viewModel.settingsStatus)
+        }
+    }
+}

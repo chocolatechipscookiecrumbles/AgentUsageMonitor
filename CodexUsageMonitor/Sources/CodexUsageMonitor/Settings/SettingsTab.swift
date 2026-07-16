@@ -1,3 +1,5 @@
+import SwiftUI
+
 enum SettingsTab: String, CaseIterable, Identifiable {
     case general
     case notifications
@@ -21,12 +23,23 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 
     var systemImage: String {
         switch self {
-        case .general: "gear"
-        case .notifications: "bell"
+        case .general: "square.grid.2x2.fill"
+        case .notifications: "bell.fill"
         case .refresh: "arrow.clockwise"
-        case .agents: "person.3"
-        case .dataPrivacy: "hand.raised"
-        case .diagnostics: "stethoscope"
+        case .agents: "person.2.fill"
+        case .dataPrivacy: "lock.fill"
+        case .diagnostics: "waveform.path.ecg"
+        }
+    }
+
+    var navigationTint: Color {
+        switch self {
+        case .general: .gray
+        case .notifications: .red
+        case .refresh: .green
+        case .agents: .blue
+        case .dataPrivacy: .indigo
+        case .diagnostics: .orange
         }
     }
 }

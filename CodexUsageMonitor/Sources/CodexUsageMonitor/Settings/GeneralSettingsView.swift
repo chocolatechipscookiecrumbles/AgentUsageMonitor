@@ -30,7 +30,7 @@ struct GeneralSettingsView: View {
                         }
                     }
                     .labelsHidden()
-                    .frame(maxWidth: 320)
+                    .frame(width: SettingsLayoutMetrics.controlWidth)
                 }
             }
 
@@ -48,7 +48,7 @@ struct GeneralSettingsView: View {
                         }
                     }
                     .labelsHidden()
-                    .frame(maxWidth: 320)
+                    .frame(width: SettingsLayoutMetrics.controlWidth)
                 }
 
                 SettingsLabeledRow("Show") {
@@ -58,7 +58,7 @@ struct GeneralSettingsView: View {
                         }
                     }
                     .labelsHidden()
-                    .frame(maxWidth: 320)
+                    .frame(width: SettingsLayoutMetrics.controlWidth)
                 }
 
                 SettingsLabeledRow("Preview") {
@@ -72,7 +72,7 @@ struct GeneralSettingsView: View {
                 }
 
                 SettingsDescription("Updates after each quota refresh using the frequency selected in Refresh.")
-                    .padding(.leading, SettingsLayoutMetrics.valueColumnInset)
+                    .settingsValueColumnAligned()
             }
 
             SettingsSection("Application") {
@@ -81,7 +81,7 @@ struct GeneralSettingsView: View {
                 SettingsLabeledRow("Build") { Text(status.buildNumber) }
             }
 
-            SettingsSection("Current scope") {
+            SettingsSection("Current Scope") {
                 SettingsLabeledRow("Provider") { Text("OpenAI Codex") }
                 SettingsDescription("The daily-driver roadmap remains Codex-first. Additional providers are not active in this build.")
             }
