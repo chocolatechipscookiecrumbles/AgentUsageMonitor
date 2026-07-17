@@ -65,6 +65,8 @@ Acceptance
 
 ## 2. Automatic recovery from interrupted sign-in flow
 
+**Status:** **Deferred.** The observed cancelled-Browser-to-external-CLI-login gap now has a dedicated [interrupted sign-in recovery plan](../superpowers/plans/2026-07-17-interrupted-signin-recovery.md). No source change has started; resume only on explicit direction.
+
 Problem
 
 If Browser Sign-In or CLI Sign-In fails during the intermediate connection state, the UI can become stuck on an in-progress/disconnected screen.
