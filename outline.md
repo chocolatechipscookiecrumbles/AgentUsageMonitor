@@ -251,6 +251,7 @@ Implemented native connection contract:
 * CLI sign-in visibly opens Terminal and executes the located `codex login`, while the app polls `codex login status` and confirms success with `account/read`.
 * Checking, missing CLI, disconnected, signing in, connected, and recoverable failure are provider-neutral UI states that future agent integrations can map to without exposing provider errors or credentials.
 * A confirmed sign-in triggers one quota refresh with the `authentication` refresh reason. Logout and account switching remain out of scope.
+* While the published state is disconnected, an independently completed `codex login` is reconciled by a read-only `account/read` immediately on app activation and at most every 30 seconds. It does not read credential files or create another quota scheduler; isolated acceptance observed both paths, while exact refresh-count/coalescing and negative-path checks remain documented limitations.
 
 Source priority
 

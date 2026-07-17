@@ -314,7 +314,7 @@ git commit -m "Detect external Codex logins while disconnected"
 - Consumes: the signed `.app`, a temporary isolated `CODEX_HOME`, the user's own explicit Codex login action, and the controller's 30-second/activation triggers.
 - Produces: dated evidence for the external-login boundary without reading credentials or disturbing a pre-existing app process.
 
-- [ ] **Step 1: Build and validate the signed application.**
+- [x] **Step 1: Build and validate the signed application.**
 
 Run:
 
@@ -334,7 +334,7 @@ Expected: the app builds, signature verification succeeds, and `Info.plist` repo
 - `plutil -lint CodexUsageMonitor/.build/CodexUsageMonitor.app/Contents/Info.plist` reported `OK`.
 - The isolated external-login checks remain pending the user's explicit `codex login` action; no credentials, account files, or user-owned app process have been touched.
 
-- [ ] **Step 2: Prepare, but do not destroy, an isolated Codex home.**
+- [x] **Step 2: Prepare, but do not destroy, an isolated Codex home.**
 
 Run only from a dedicated audit shell:
 
@@ -356,7 +356,7 @@ Repeat with a fresh isolated disconnected session. Complete the independent `cod
 
 With the same isolated home, confirm a failed status read remains retryable through the existing sign-in actions and **Check again** without a stuck `.checking` or `.signingIn` state. Confirm the existing in-app Browser and CLI paths, custom `CODEX_HOME` propagation, external-logout detection after an unavailable quota refresh, sleep/wake refresh behavior, and app teardown still work. Record any state that cannot be safely manufactured as **Not run** rather than inferring coverage.
 
-- [ ] **Step 6: Record exact evidence and commit it.**
+- [x] **Step 6: Record exact evidence and commit it.**
 
 Record command outcomes, the documented 30-second bound, observed refresh count, menu-state results, process ownership/cleanup, and all unrun states in this plan. Do not record tokens, email, raw provider responses, raw errors, or the isolated-home contents.
 
@@ -364,6 +364,14 @@ Record command outcomes, the documented 30-second bound, observed refresh count,
 git add docs/superpowers/plans/2026-07-17-external-codex-login-detection.md
 git commit -m "Record external login detection acceptance"
 ```
+
+### Task 3 acceptance evidence (2026-07-17)
+
+- Signed build, signature, and `Info.plist` verification passed before manual acceptance.
+- Interval route: with a fresh isolated `CODEX_HOME`, the user completed `codex login` independently without selecting an in-app sign-in action or activating the monitor. The monitor changed from disconnected to connected after roughly five seconds. That satisfies the 30-second bound; the time remaining to the next watcher tick was not observed.
+- Activation route: with a separate fresh isolated `CODEX_HOME`, the user completed independent `codex login`, then activated the monitor before the next interval. The monitor connected promptly after roughly two to three seconds.
+- The two temporary audit instances were app-owned processes, not a user-owned app process. Their isolated homes have not been removed because cleanup has not yet been accepted.
+- **Not run:** Diagnostics confirmation of exactly one `.authentication` refresh; repeated activation/menu-event coalescing while a status check is in flight; failed-read retryability; Browser/CLI regression, custom-home propagation beyond these independent-login paths; external logout, sleep/wake, controller teardown, and audit cleanup. No claim is made for those states.
 
 ## Task 4: Synchronize product and operating documentation
 
@@ -381,11 +389,11 @@ git commit -m "Record external login detection acceptance"
 - Consumes: completed implementation and Task 3 evidence.
 - Produces: one status model and accurate user instructions for independent external login.
 
-- [ ] **Step 1: Update planning status and links.**
+- [x] **Step 1: Update planning status and links.**
 
 Change Product Follow-up 8 and the matching bug-board entry from **Needs plan** to **Verification** only after Task 2 is implemented; before implementation they remain **Queued** and link this plan. Add this plan to the planning-board coverage index. Replace the old connection-plan known-limitation text with a link to this plan and its final evidence; update the roadmap/outline only with the actual completed state.
 
-- [ ] **Step 2: Update user-facing instructions only after the signed acceptance passes.**
+- [x] **Step 2: Update user-facing instructions only after the signed acceptance passes.**
 
 Add this bounded statement to `how-to.md` and the corresponding native-app section of `UsageProbe/README.md`:
 
@@ -393,7 +401,7 @@ Add this bounded statement to `how-to.md` and the corresponding native-app secti
 
 State the same ownership and privacy boundary in `outline.md`. If Task 3 has any unrun check, name it rather than claiming complete external-login acceptance.
 
-- [ ] **Step 3: Run documentation and final code verification.**
+- [x] **Step 3: Run documentation and final code verification.**
 
 Run:
 
@@ -405,7 +413,13 @@ git diff --check
 
 Expected: the focused regression and existing package tests pass, the signed app builds, and `git diff --check` reports no whitespace errors. Record live app observations separately from these commands.
 
-- [ ] **Step 4: Commit synchronized documentation.**
+### Task 4 verification evidence (2026-07-17)
+
+- `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-path CodexUsageMonitor` passed: 7 XCTest cases, 0 failures.
+- The signed app rebuilt successfully; `codesign --verify --deep --strict --verbose=2` reported a valid app satisfying its Designated Requirement, and `plutil -lint` reported `OK`.
+- `git diff --check` passed with no output.
+
+- [x] **Step 4: Commit synchronized documentation.**
 
 ```bash
 git add \

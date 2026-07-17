@@ -165,6 +165,8 @@ Both options require the Codex CLI. The first time you choose the CLI option, ma
 
 If Codex is signed out elsewhere while the monitor remains open, the next unavailable quota refresh rechecks `account/read` and moves the menu to the disconnected stage without requiring an app relaunch.
 
+If you complete `codex login` independently while that disconnected stage is open, the monitor reads the same Codex home again when the app becomes active and at most every 30 seconds while it remains disconnected. This uses read-only `account/read`; it does not read credential files or start another quota schedule. Isolated acceptance observed both routes, but the exact refresh count and repeated-event coalescing remain manual checks.
+
 The app performs the same three read-only `codex app-server` samples as the probe. It keeps a sanitized last-known-good result in `~/Library/Application Support/CodexUsageMonitor/last-known-good.json`, owner-readable only. That file contains a hashed account identity and normalized quota fields only—never a token, email address, prompt, or raw provider response.
 
 Confirmed live results are also appended to `~/Library/Application Support/CodexUsageMonitor/quota-history.json`. The app retains at most 500 observations from the last 90 days, with the same owner-only permissions and privacy boundary. It calculates a forecast only from at least three confirmed readings spanning 15 minutes in the same reset window, with a consistently positive trend. The rate is the median of adjacent slopes. A valid row shows **Projected exhaustion** plus low, medium, or high confidence; projections at or after reset are hidden.
