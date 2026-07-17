@@ -233,7 +233,7 @@ Reject a design that depends on unsupported access to SwiftUI's private `NSMenu`
 
 The ADR must record why true per-second animation outweighs the additional AppKit ownership or popover behavior. The prototype must demonstrate fixed geometry, correct VoiceOver output, keyboard navigation, Light/Dark rendering, refresh transitions, and the below-Quit regression test before production migration begins.
 
-Planning note (2026-07-17): the failed designs were not merely stale copy: per-second SwiftUI invalidation let the visible native menu and AppKit's tracked interaction geometry diverge, while an earlier timer-driven design recursively invalidated menu updates and crashed. Repository-level prevention now lives in [the native-menu dynamic-update guardrails](../../../AGENTS.md#native-menu-dynamic-update-guardrails). A future countdown must own a safe ticking surface and prove row stability; restoring a timer to the current SwiftUI menu tree is not an acceptable experiment.
+Planning note (2026-07-17): retain this deferred item on the centralized [Product Planning Board](../../product/planning-board.md#feature-board). The failed designs were not merely stale copy: per-second SwiftUI invalidation let the visible native menu and AppKit's tracked interaction geometry diverge, while an earlier timer-driven design recursively invalidated menu updates and crashed. Repository-level prevention now lives in [the native-menu dynamic-update guardrails](../../../AGENTS.md#native-menu-dynamic-update-guardrails). A future countdown must own a safe ticking surface and prove row stability; restoring a timer to the current SwiftUI menu tree is not an acceptable experiment.
 
 ---
 

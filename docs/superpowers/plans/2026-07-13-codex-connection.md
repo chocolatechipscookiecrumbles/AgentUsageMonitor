@@ -139,6 +139,7 @@
 - User-reported manual acceptance on 2026-07-13 confirmed the disconnected menu stage and successful browser/CLI authentication transitions. The implementation did not log out or alter the connected account automatically to manufacture those states.
 - Independent read-only review found no critical issues. Its two important findings (custom `CODEX_HOME` propagation and bounded subprocess shutdown) and two minor findings (stale disconnected plan display and privacy wording) were fixed; follow-up review reported no remaining critical or important issue.
 - Privacy boundary: source inspection confirms the connection module contains no auth-file read, token field, email field, account-response persistence, or raw-error UI path. Codex owns browser callback validation, token exchange, storage, and refresh.
+- Known limitation recorded on 2026-07-17: a user can remain on the disconnected stage after completing `codex login` independently, without first selecting either app sign-in action. `start()` reads status once; the bounded CLI watcher is created only by `signInWithCLI()`; and the later silent recheck is coupled to a failed quota refresh rather than to a newly valid external Provider Session. Runtime reproduction was not manufactured against the user's active account. The planned investigation and privacy-safe acceptance boundary are tracked in [Product Follow-up 8](../../product/follow-ups.md#8-detect-an-external-codex-login-while-disconnected).
 
 ## Self-review
 
