@@ -326,30 +326,29 @@ This should remain evidence-driven rather than attempting to guess unsupported f
 
 ## 8. Detect an external Codex login while disconnected
 
-Status: **Needs plan.** The user reported this path on 2026-07-17. Runtime reproduction was not attempted because it would require disrupting or substituting the user's active Codex session; the code-path evidence below explains the missing automatic transition and defines the next safe investigation.
+Status: **Verification.** The controller-owned implementation is complete. Isolated user acceptance on 2026-07-17 observed independent `codex login` reconnect within the 30-second bound and a prompt activation-triggered reconnect. The remaining exact refresh-count, repeated-event, negative-path, and teardown checks are intentionally still open in the dedicated [External Codex Login Detection Implementation Plan](../superpowers/plans/2026-07-17-external-codex-login-detection.md).
 
 Problem
 
 When Codex Usage Monitor is already showing its disconnected/sign-in stage, a user may ignore the app's Browser and CLI actions and run `codex login` independently in Terminal. Codex then owns a valid Provider Session, but the running app can remain on the disconnected stage instead of detecting the new session and returning to quota display automatically.
 
-Current code-path evidence
+Implementation evidence
 
-* `CodexConnectionController.start()` performs one status read at application startup.
-* The two-second `codex login status` watcher starts only inside `signInWithCLI()`, after the app opens Terminal itself.
-* `QuotaViewModel` requests a silent connection recheck only after a quota refresh publishes `.failed`. If the independent login makes the next quota refresh succeed, that success does not recheck or reconcile the still-disconnected connection state.
-* There is no disconnected-state poll, application-activation recheck, Provider Session change observer, or menu-presentation hook that fills this gap.
+* `CodexConnectionController` now starts one cancellable 30-second status watcher only after it enters `.disconnected`, and stops it after any non-disconnected state.
+* While disconnected, the controller also owns one application-activation observer. It silently calls the existing read-only `account/read` status reader and does not replace the disconnected menu with `.checking`.
+* The existing single `connectionTask` guard coalesces startup, manual, refresh-failure, interval, activation, and sign-in checks. A first non-startup transition from disconnected to connected invokes the existing authentication-refresh callback once.
+* The menu remains a consumer of published state; it owns no watcher, status process, or quota scheduler. The implementation reads no credential file, token, email, or raw provider output.
 
-Desired behavior
+Implemented behavior
 
-`CodexConnectionController` should own bounded detection of an externally changed Provider Session while its state is disconnected. The implementation plan should evaluate an immediate application-activation recheck plus a conservative, cancellable disconnected-state interval as complementary triggers. It must not make native-menu rendering own the check or create a second quota scheduler.
+`CodexConnectionController` owns bounded detection of an externally changed Provider Session while its state is disconnected. It combines an immediate application-activation recheck with a conservative, cancellable 30-second disconnected-state interval. Native-menu rendering does not own the check and no second quota scheduler is created.
 
-When a read-only `account/read` first confirms the external login, the controller should publish `.connected` and invoke the existing authentication-refresh callback exactly once. Detection must stop or idle after connection, coalesce overlapping status reads, preserve an explicit `CODEX_HOME`, and retain the existing privacy boundary: never read `auth.json`, tokens, email, or raw provider output.
+When a read-only `account/read` first confirms the external login, the controller publishes `.connected` and invokes the existing authentication-refresh callback once. Detection stops after connection, overlapping status reads coalesce, explicit `CODEX_HOME` remains preserved, and the existing privacy boundary remains: never read `auth.json`, tokens, email, or raw provider output.
 
 Acceptance
 
-* Start the signed app against an isolated disconnected Codex home and do not click either app sign-in action.
-* Complete `codex login` independently in Terminal using that same Codex home.
-* The running app detects the Provider Session within a documented bounded interval, replaces the disconnected stage with connected quota content, and performs exactly one authentication refresh without a relaunch or manual **Check again**.
-* Opening and closing the native menu does not start duplicate watchers, status processes, or refreshes.
-* Failed status reads remain retryable and do not trap the UI in `.checking` or `.signingIn`.
-* The existing in-app Browser and CLI flows, external-logout detection, sleep/wake behavior, custom `CODEX_HOME`, and process teardown remain intact.
+* **Observed:** a signed app ran against two fresh isolated disconnected Codex homes without either in-app sign-in action.
+* **Observed:** the user completed `codex login` independently in Terminal with each matching home.
+* **Observed:** the interval route changed the disconnected stage to connected roughly five seconds after login (within the 30-second bound); the activation route connected promptly in roughly two to three seconds. The time remaining to the interval tick was not measured.
+* **Not run:** Diagnostics confirmation of exactly one authentication refresh and repeated native-menu/activation event coalescing while a status check is in flight.
+* **Not run:** failed-read retryability, Browser/CLI regression, custom-home behavior beyond the observed independent-login paths, external logout, sleep/wake, controller teardown, and audit cleanup.

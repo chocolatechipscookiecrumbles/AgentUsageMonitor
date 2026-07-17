@@ -2,50 +2,166 @@ import AppKit
 import Combine
 import Foundation
 
+private final class ActivationObserver {
+    private let notificationCenter: NotificationCenter
+    private var token: NSObjectProtocol?
+
+    init(
+        notificationCenter: NotificationCenter,
+        notification: Notification.Name,
+        onActivation: @escaping @Sendable () -> Void
+    ) {
+        self.notificationCenter = notificationCenter
+        token = notificationCenter.addObserver(
+            forName: notification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            onActivation()
+        }
+    }
+
+    func cancel() {
+        guard let token else { return }
+        notificationCenter.removeObserver(token)
+        self.token = nil
+    }
+
+    deinit {
+        cancel()
+    }
+}
+
 @MainActor
 final class CodexConnectionController: ObservableObject {
     @Published private(set) var state: AgentConnectionState = .checking
 
     private let service: CodexConnectionService
     private let onConnected: @MainActor () -> Void
+    private let statusReader: @Sendable () async -> AgentConnectionState
+    private let notificationCenter: NotificationCenter
+    private let activationNotification: Notification.Name
+    private let disconnectedCheckInterval: Duration
     private var connectionTask: Task<Void, Never>?
+    private var disconnectedWatchTask: Task<Void, Never>?
+    private var activationObserver: ActivationObserver?
 
     init(
         service: CodexConnectionService = CodexConnectionService(),
-        onConnected: @escaping @MainActor () -> Void
+        onConnected: @escaping @MainActor () -> Void,
+        statusReader: (@Sendable () async -> AgentConnectionState)? = nil,
+        notificationCenter: NotificationCenter = .default,
+        activationNotification: Notification.Name? = nil,
+        disconnectedCheckInterval: Duration = .seconds(30)
     ) {
+        let activationNotification = activationNotification ?? NSApplication.didBecomeActiveNotification
         self.service = service
         self.onConnected = onConnected
+        self.statusReader = statusReader ?? { [service] in await service.readStatus() }
+        self.notificationCenter = notificationCenter
+        self.activationNotification = activationNotification
+        self.disconnectedCheckInterval = disconnectedCheckInterval
     }
 
     deinit {
         connectionTask?.cancel()
+        disconnectedWatchTask?.cancel()
     }
 
     func start() {
-        checkConnection()
+        detectConnection(trigger: .startup)
     }
 
     func checkConnection() {
-        detectConnection(showCheckingState: true)
+        detectConnection(trigger: .userInitiated)
     }
 
     func recheckConnection() {
-        detectConnection(showCheckingState: false)
+        detectConnection(trigger: .refreshFailure)
     }
 
-    private func detectConnection(showCheckingState: Bool) {
+    private func detectConnection(trigger: ConnectionCheckTrigger) {
         guard connectionTask == nil else { return }
-        if showCheckingState {
-            state = .checking
+        if trigger.showsCheckingState {
+            applyState(.checking)
         }
-        let service = service
-        connectionTask = Task { [weak self, service] in
-            let detectedState = await service.readStatus()
+        let statusReader = statusReader
+        connectionTask = Task { [weak self, statusReader] in
+            let detectedState = await statusReader()
             guard let self, !Task.isCancelled else { return }
-            state = detectedState
             connectionTask = nil
+            applyDetectedState(detectedState, trigger: trigger)
         }
+    }
+
+    private func applyDetectedState(
+        _ detectedState: AgentConnectionState,
+        trigger: ConnectionCheckTrigger
+    ) {
+        let wasConnected = state.isConnected
+        applyState(detectedState)
+
+        if trigger != .startup, !wasConnected, detectedState.isConnected {
+            onConnected()
+        }
+    }
+
+    private func applyState(_ newState: AgentConnectionState) {
+        state = newState
+        if case .disconnected = newState {
+            startDisconnectedWatchIfNeeded()
+            startActivationObserverIfNeeded()
+        } else {
+            stopDisconnectedWatch()
+            stopActivationObserver()
+        }
+    }
+
+    private func startDisconnectedWatchIfNeeded() {
+        guard disconnectedWatchTask == nil else { return }
+        let interval = disconnectedCheckInterval
+        disconnectedWatchTask = Task { [weak self] in
+            do {
+                while !Task.isCancelled {
+                    try await Task.sleep(for: interval)
+                    guard let self, !Task.isCancelled,
+                          case .disconnected = self.state
+                    else { return }
+                    self.detectConnection(trigger: .disconnectedInterval)
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                return
+            }
+        }
+    }
+
+    private func stopDisconnectedWatch() {
+        disconnectedWatchTask?.cancel()
+        disconnectedWatchTask = nil
+    }
+
+    private func recheckAfterApplicationActivation() {
+        guard case .disconnected = state else { return }
+        detectConnection(trigger: .applicationActivation)
+    }
+
+    private func startActivationObserverIfNeeded() {
+        guard activationObserver == nil else { return }
+        activationObserver = ActivationObserver(
+            notificationCenter: notificationCenter,
+            notification: activationNotification
+        ) { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.recheckAfterApplicationActivation()
+            }
+        }
+    }
+
+    private func stopActivationObserver() {
+        activationObserver?.cancel()
+        activationObserver = nil
     }
 
     func signInWithBrowser() {
@@ -56,7 +172,7 @@ final class CodexConnectionController: ObservableObject {
 
     func signInWithCLI() {
         guard connectionTask == nil else { return }
-        state = .signingIn(.cli)
+        applyState(.signingIn(.cli))
         let service = service
         connectionTask = Task { [weak self, service] in
             do {
@@ -67,11 +183,11 @@ final class CodexConnectionController: ObservableObject {
                 completeSignIn(account)
             } catch is CancellationError {
                 guard let self else { return }
-                state = .disconnected
+                applyState(.disconnected)
                 connectionTask = nil
             } catch {
                 guard let self else { return }
-                state = mappedFailure(error)
+                applyState(mappedFailure(error))
                 connectionTask = nil
             }
         }
@@ -82,7 +198,7 @@ final class CodexConnectionController: ObservableObject {
         operation: @escaping @Sendable () async throws -> AgentAccountSummary
     ) {
         guard connectionTask == nil else { return }
-        state = .signingIn(method)
+        applyState(.signingIn(method))
         connectionTask = Task { [weak self] in
             do {
                 let account = try await operation()
@@ -90,20 +206,32 @@ final class CodexConnectionController: ObservableObject {
                 completeSignIn(account)
             } catch is CancellationError {
                 guard let self else { return }
-                state = .disconnected
+                applyState(.disconnected)
                 connectionTask = nil
             } catch {
                 guard let self else { return }
-                state = mappedFailure(error)
+                applyState(mappedFailure(error))
                 connectionTask = nil
             }
         }
     }
 
     private func completeSignIn(_ account: AgentAccountSummary) {
-        state = .connected(account)
+        applyState(.connected(account))
         connectionTask = nil
         onConnected()
+    }
+
+    private enum ConnectionCheckTrigger: Equatable {
+        case startup
+        case userInitiated
+        case refreshFailure
+        case applicationActivation
+        case disconnectedInterval
+
+        var showsCheckingState: Bool {
+            self == .startup || self == .userInitiated
+        }
     }
 
     private func mappedFailure(_ error: Error) -> AgentConnectionState {
