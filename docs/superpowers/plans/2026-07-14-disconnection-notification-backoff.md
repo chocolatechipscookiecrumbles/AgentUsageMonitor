@@ -177,8 +177,8 @@ Do not include `NWPathMonitor` in the first implementation. It can later trigger
 - A code-path audit found that a missing account or rejection of `account/read` could be normalized as `invalid-response`. That could incorrectly let a signed-out state enter the operational interruption episode before connection-state rechecking completed.
 - `QuotaPresentation` now carries a typed, privacy-safe `QuotaCollectionFailureKind` from the collector boundary. Missing CLI maps to `codex-not-found`; rejected account request 2 and missing-account responses map to `not-authenticated`; timeout and other invalid responses remain separate.
 - `QuotaMonitor` consumes the typed kind before its legacy text fallback, so `codex-not-found` and `not-authenticated` remain excluded from the interruption counter. A signed-out live check remains manual because this audit did not mutate the user's authenticated account.
-- Known delivery limitation: the monitor persists the episode's backed-off state before notification submission. If submission fails or the process exits in that narrow interval, later retries do not currently re-offer the stable episode event. Preserve the stable delivery key and address retry eligibility before release rather than introducing a second counter.
-- [ ] Re-offer the same stable episode event on later backed-off attempts until `deliverOnce` confirms delivery; do not add another failure counter or generate a new key.
+- Delivery retry correction: the monitor still persists the episode's backed-off state before notification submission, and notification policy now re-offers its stable event on later backed-off attempts. `deliverOnce` remains the final successful-delivery and persisted-deduplication gate.
+- [x] Re-offer the same stable episode event on later backed-off attempts until `deliverOnce` confirms delivery; do not add another failure counter or generate a new key.
 
 ## Implementation verification — 2026-07-14
 
@@ -188,10 +188,11 @@ Do not include `NWPathMonitor` in the first implementation. It can later trigger
 - [ ] Automated Settings navigation was unavailable because `osascript` lacked macOS Accessibility access. Source layout uses the existing shared Settings components; direct signed-app visual acceptance of the new helper text remains manual.
 - [x] A controlled offline run remains manual because disabling the workstation network would disrupt user state. Observe the first two failures, the one third-failure alert, ten-minute retries, relaunch deduplication, manual retry, and recovery before release.
 - [x] Separately verify a signed-out or missing-CLI state presents connection guidance without consuming the interruption episode; typed classification is implemented, but user authentication was not changed for this audit.
+- [x] `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-path CodexUsageMonitor --filter NotificationPolicyTests/test_reoffersStableInterruptionEventForBackedOffEpisodeWithoutTransition` first failed because a backed-off episode with no transition produced no event, then passed after the retry-eligibility correction. This automated coverage verifies policy re-offering only; live notification submission and delivery remain unobserved.
 
 ## Self-review
 
 - Spec coverage: one alert on the third failure, a temporary 10-minute cadence, no repeated annoyance, recovery to the selected interval, stale-alert suppression, relaunch deduplication, and cautious copy each have an explicit task.
 - Scope control: no new timing setting, recovery notification, third-party reachability dependency, raw error exposure, provider expansion, or quiet-hours replacement is included.
-- Type consistency: `QuotaMonitor` produces `RefreshInterruptionTransition`; `AdaptiveRefreshPolicy` consumes `RefreshInterruptionState`; `NotificationPolicy` consumes the transition; `QuotaNotifier` retains final delivery and persisted deduplication.
-- Verification constraint: no automated tests or test commands are added; signed builds and controlled manual outage/recovery observation are the acceptance evidence.
+- Type consistency: `QuotaMonitor` owns and produces `RefreshInterruptionState` and `RefreshInterruptionTransition`; `AdaptiveRefreshPolicy` and `NotificationPolicy` consume the state; `QuotaNotifier` retains final delivery and persisted deduplication.
+- Verification constraint: automated coverage verifies policy re-offering and retry eligibility; live UN notification submission and delivery remain unobserved and require future manual acceptance.
