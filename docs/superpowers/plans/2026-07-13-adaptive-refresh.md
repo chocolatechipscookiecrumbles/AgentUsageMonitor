@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `executing-plans` task-by-task. Do not create or run automated tests for this branch; verify with Swift compilation, a signed app build, read-only inspection, and manual UI acceptance.
 
-**Goal:** Replace the fixed five-minute timer with persisted fixed and automatic refresh modes, publish a reliable next-refresh countdown, and make every UI consume one provider-neutral confirmed/completed or cached/paused display contract.
+**Goal:** Replace the fixed five-minute timer with persisted fixed and automatic refresh modes, publish reliable next-refresh timing, and make every UI consume one provider-neutral confirmed/completed or cached/paused display contract.
 
 **Architecture:** `AppSettings` owns the persisted user choice. A pure `AdaptiveRefreshPolicy` converts normalized `QuotaRecord` evidence plus recent outcome state into a `RefreshScheduleDecision`; it never calls Codex, reads storage, or mutates UI. Main-actor `QuotaMonitor` remains the single scheduling and display-state owner, uses a one-shot foreground timer, preserves single-flight collection, and publishes shallow state for `QuotaViewModel`. The menu and Settings render that state without deriving freshness from provider strings.
 
@@ -148,12 +148,13 @@ Run a signed build and inspect that views remain free of monitor/repository init
 
 ---
 
-### Task 5: Add working refresh controls and the live menu countdown
+### Task 5: Add working refresh controls and truthful native-menu timing
 
 **Files:**
 - Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/RefreshSettingsView.swift`
 - Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/QuotaMenuView.swift`
-- Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/NextRefreshCountdownView.swift`
+- Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/MenuRefreshTimingPresentation.swift`
+- Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/MenuRefreshTimingView.swift`
 
 - [x] **Step 1: Replace planned copy with a real refresh-mode picker**
 
@@ -163,13 +164,13 @@ Bind a Picker to `viewModel.settings.refreshMode`. Show Automatic, 1 minute, 1 m
 
 Replace the verification row with `Confirmed / completed` or `Cached / paused`. In paused mode show the normalized reason, last successful refresh when available, and last attempt. Keep quota values from the last confirmed record visibly labeled as cached. Preserve inline native menu commands and `.menuBarExtraStyle` behavior.
 
-- [x] **Step 3: Show a live next-refresh countdown beside refresh timing**
+- [x] **Step 3: Show event-driven absolute next-refresh timing**
 
-Use a plain SwiftUI `Text` row backed by a dedicated `RefreshCountdownClock`. The clock owns a one-second main-run-loop timer and publishes only when the formatted string changes; it stops while refreshing and after the deadline. Do not use `TimelineView`, timer-interval `Text`, or `NSViewRepresentable` inside the pull-down menu. Render `Last refresh: <time> · Next: <countdown>` when scheduled, `Refreshing…` during collection, and `Scheduling…` only before the first decision. The countdown must stop at zero rather than showing a negative duration.
+Use one plain SwiftUI `Text` row backed by immutable `MenuRefreshTimingPresentation`. Render `Last refresh: <time> · Next refresh: <absolute time>` when scheduled, `Refreshing…` during collection, and `Scheduling…` only before the first decision. Publish only semantic attempt/refresh/schedule replacements through the already-observed menu root. Do not attach a child-level observable clock, `TimelineView`, timer-interval `Text`, `NSViewRepresentable`, or another per-second invalidation source inside the pull-down menu.
 
 - [ ] **Step 4: Perform manual UI acceptance**
 
-Build and open the signed app only with user approval. Verify Settings mode changes reschedule immediately; fixed choices display exact intervals; the menu countdown advances while open; refresh commands remain inline; cached/paused copy does not claim cached data is current.
+Build and open the signed app only with user approval. Verify Settings mode changes reschedule immediately; fixed choices display exact intervals; the menu row changes at refresh start/completion; refresh commands remain inline; pointer/scroll highlighting remains aligned; and cached/paused copy does not claim cached data is current.
 
 ---
 
@@ -184,7 +185,7 @@ Build and open the signed app only with user approval. Verify Settings mode chan
 
 - [x] **Step 1: Document the controls and state language**
 
-Record every fixed choice, the two-minute default, Automatic’s bounded 30-second behavior, countdown meanings, launch/wake behavior, and confirmed/completed versus cached/paused semantics.
+Record every fixed choice, the two-minute default, Automatic’s bounded 30-second behavior, absolute next-refresh timing, launch/wake behavior, and confirmed/completed versus cached/paused semantics.
 
 - [x] **Step 2: Record branch dependency and Figma sequencing**
 
@@ -209,4 +210,10 @@ Manual observation found that the original `TimelineView(.periodic)` displayed t
 
 The macOS diagnostic reports at 16:03:28 and 16:03:46 show `EXC_BAD_ACCESS` after unbounded repetition of `MenuBehavior.menuNeedsUpdate`, `ViewRendererHost.render`, and `AttributeGraph.propagate_dirty` on the main thread. This is a stack overflow caused by timer-interval `Text` recursively invalidating the SwiftUI menu, not a quota collection or scheduling failure. An AppKit `NSViewRepresentable` avoided that recursion but was omitted by the pull-down menu renderer, removing both timestamps.
 
-The final implementation restores a supported plain `Text` menu row. `RefreshCountdownClock` owns the common-run-loop timer outside the view, produces one preformatted string update per elapsed second, suppresses duplicate strings, and invalidates its timer during refresh or after the deadline. Refresh transitions update the clock through `QuotaViewModel` without any self-scheduling SwiftUI view. Verification: the final signed app bundle built successfully (`Build complete! (0.14s)`), was relaunched, survived its launch refresh, and produced no new diagnostic report. The visible open-menu tick and **Refresh now** transition remain the user-run manual acceptance checks.
+The 2026-07-13 implementation restored a supported plain `Text` menu row. `RefreshCountdownClock` owned the common-run-loop timer outside the view, produced one preformatted string update per elapsed second, suppressed duplicate strings, and invalidated its timer during refresh or after the deadline. Refresh transitions updated the clock through `QuotaViewModel` without any self-scheduling SwiftUI view. Verification at that stage: the signed app bundle built successfully (`Build complete! (0.14s)`), was relaunched, survived its launch refresh, and produced no new diagnostic report.
+
+## Native-menu placement correction (2026-07-17)
+
+The per-second `@ObservedObject` child made the countdown work, but it also invalidated a SwiftUI row independently while AppKit tracked the open native menu. The previously accepted scrolling/highlight displacement then returned. The current repair removes `RefreshCountdownClock` and the countdown child, publishes an immutable `MenuRefreshTimingPresentation` only when attempt/refresh/schedule meaning changes, and renders one plain row from the already-observed menu root. Scheduled copy now uses an absolute next-refresh time, so it remains truthful without elapsed-second updates.
+
+The warnings-as-errors build and signed-app build passed. Direct inspection of the signed `MenuBarExtra` confirmed the connected/confirmed layout, absolute scheduled time, and native Refresh/Settings/Quit order in the current appearance; the audit instance survived scheduled refreshes without a new crash report. macOS denied accessibility control while the native menu was tracking, so pointer/scroll placement and the unmanufactured conditional-state matrix remain explicit manual acceptance in `2026-07-14-native-menu-refresh-row.md`.
