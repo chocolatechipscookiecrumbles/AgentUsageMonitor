@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` (recommended) or `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** **Queued.** This plan finishes the approved native Settings visual slice from current `main`; it does not revive or merge `feature/figma-settings-port`.
+**Status:** **In progress — Task 1 complete; Task 2 remains pending.** This plan finishes the approved native Settings visual slice from current `main`; it does not revive or merge `feature/figma-settings-port`.
 
 **Goal:** Complete the remaining approved Figma-inspired Settings behavior while preserving the current native global-sidebar theme, semantic colors, live System/Light/Dark presentation, controls, settings values, and all existing app behavior.
 
@@ -54,7 +54,7 @@ This plan implements only current, supported native behavior:
 - Modify `CodexUsageMonitor/Tests/CodexUsageMonitorTests/SettingsWindowLayoutTests.swift`: one focused geometry-invariant regression test.
 - Modify `AGENTS.md`, `docs/product/follow-ups.md`, `docs/product/planning-board.md`, this plan, `docs/superpowers/plans/2026-07-14-settings-provider-followups.md`, `how-to.md`, `UsageProbe/README.md`, and `outline.md`: reconcile the current shell contract, source status, operating behavior, and acceptance evidence after implementation.
 
-## Task 1: Reconcile the current Settings shell contract and make geometry deterministic
+## Task 1: Reconcile the current Settings shell contract and make geometry deterministic — complete
 
 **Files:**
 - Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsWindowLayout.swift`
@@ -66,7 +66,7 @@ This plan implements only current, supported native behavior:
 - Consumes centralized layout metrics and `Bool isContextRailVisible`.
 - Produces `SettingsWindowLayout` with stable sidebar/page dimensions and a content size that differs only by the rail allocation.
 
-- [ ] **Step 1: Correct the repository navigation guardrail before changing Settings source.**
+- [x] **Step 1: Correct the repository navigation guardrail before changing Settings source.**
 
 Replace the obsolete instruction that requires a top `TabView` with this exact current-shell constraint:
 
@@ -76,7 +76,7 @@ Replace the obsolete instruction that requires a top `TabView` with this exact c
 
 Keep all existing Form/LabeledContent, scrollability, semantic-color, and signed-app requirements unchanged.
 
-- [ ] **Step 2: Add the focused failing geometry regression.**
+- [x] **Step 2: Add the focused failing geometry regression.**
 
 ```swift
 import XCTest
@@ -91,6 +91,22 @@ final class SettingsWindowLayoutTests: XCTestCase {
         XCTAssertEqual(hidden.settingsPageWidth, visible.settingsPageWidth)
         XCTAssertEqual(hidden.contentSize.height, visible.contentSize.height)
         XCTAssertEqual(
+            hidden.contentSize,
+            CGSize(
+                width: SettingsLayoutMetrics.hiddenWindowWidth,
+                height: SettingsLayoutMetrics.targetWindowHeight
+            )
+        )
+        XCTAssertEqual(
+            visible.contentSize,
+            CGSize(
+                width: SettingsLayoutMetrics.hiddenWindowWidth
+                    + SettingsLayoutMetrics.contextRailWidth
+                    + SettingsLayoutMetrics.dividerWidth,
+                height: SettingsLayoutMetrics.targetWindowHeight
+            )
+        )
+        XCTAssertEqual(
             visible.contentSize.width - hidden.contentSize.width,
             SettingsLayoutMetrics.contextRailWidth + SettingsLayoutMetrics.dividerWidth
         )
@@ -104,19 +120,23 @@ Run:
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-path CodexUsageMonitor --filter SettingsWindowLayoutTests/test_contextRailOnlyChangesTheRightHandWindowAllocation
 ```
 
-Expected before production code: compilation fails because `SettingsWindowLayout`, `contextRailWidth`, and `dividerWidth` do not exist.
+Initial RED evidence showed the original missing `SettingsWindowLayout`, `contextRailWidth`, and `dividerWidth` symbols. The review follow-up added the exact 680 × 560 target assertions first; its focused test failed as intended because `targetWindowHeight` did not yet exist.
 
-- [ ] **Step 3: Add metrics and the pure layout model.**
+- [x] **Step 3: Add metrics and the pure layout model.**
 
 Keep all numbers in `SettingsLayoutMetrics`:
 
 ```swift
 static let hiddenWindowWidth: CGFloat = 680
-static let windowHeight: CGFloat = 560
+static let targetWindowHeight: CGFloat = 560
 static let sidebarWidth: CGFloat = 180
 static let contextRailWidth: CGFloat = 210
 static let dividerWidth: CGFloat = 1
 static let settingsPageWidth = hiddenWindowWidth - sidebarWidth - dividerWidth
+
+// Legacy SettingsView geometry remains unchanged until Task 2 applies the target layout.
+static let windowWidth: CGFloat = 780
+static let windowHeight: CGFloat = 520
 ```
 
 Create:
@@ -137,15 +157,15 @@ struct SettingsWindowLayout: Equatable {
             : 0
         contentSize = CGSize(
             width: SettingsLayoutMetrics.hiddenWindowWidth + railAllocation,
-            height: SettingsLayoutMetrics.windowHeight
+            height: SettingsLayoutMetrics.targetWindowHeight
         )
     }
 }
 ```
 
-Update existing uses of the old window-width/height metrics to use this model. Do not duplicate the arithmetic in a view.
+`SettingsWindowLayout` owns the Task 2 target contract (680 × 560 hidden, 891 × 560 visible). The current `SettingsView` keeps its existing 780 × 520 legacy frame in Task 1; applying the model to live geometry and performing signed-app acceptance are explicitly Task 2 work. Do not duplicate the arithmetic in a view.
 
-- [ ] **Step 4: Run the focused test green and commit the contract/layout slice.**
+- [x] **Step 4: Run the focused test green and commit the contract/layout slice.**
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-path CodexUsageMonitor --filter SettingsWindowLayoutTests/test_contextRailOnlyChangesTheRightHandWindowAllocation
@@ -153,7 +173,14 @@ git add AGENTS.md CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsL
 git commit -m "Stabilize Settings rail geometry"
 ```
 
-Expected: 1 test passes with 0 failures. The test proves the structural width invariant, not real-window behavior.
+Expected: 1 test passes with 0 failures. The test proves the structural width invariant and exact target dimensions, not real-window behavior.
+
+### Task 1 completion evidence and boundary
+
+- The initial contract/layout slice is commit `a8204e3 Stabilize Settings rail geometry`.
+- The reviewer follow-up restored the current live `SettingsView` metric to the pre-Task 1 legacy `windowHeight` of 520 and introduced the separate `targetWindowHeight` of 560. `SettingsWindowLayout` now uses only the target height.
+- The focused XCTest was run RED after the target assertions were added and failed only for the missing `targetWindowHeight` metric. The focused test and full package suite were then run after the correction; their command output and final follow-up commit are recorded in `.superpowers/sdd/task-1-report.md`.
+- No Task 2 source was started in this correction: `SettingsView` does not consume `SettingsWindowLayout`, the Context Rail frame is unchanged, and no signed app was built or visually inspected. Task 2 owns the live 680 × 560 hidden-size application, the 211-point visible-rail expansion, and all signed-app geometry acceptance.
 
 ## Task 2: Make the Context Rail a window-local, fixed-geometry transition
 

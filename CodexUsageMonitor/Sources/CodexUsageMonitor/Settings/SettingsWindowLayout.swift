@@ -13,7 +13,7 @@ struct SettingsWindowLayout: Equatable {
             : 0
         contentSize = CGSize(
             width: SettingsLayoutMetrics.hiddenWindowWidth + railAllocation,
-            height: SettingsLayoutMetrics.windowHeight
+            height: SettingsLayoutMetrics.targetWindowHeight
         )
     }
 }

@@ -2,15 +2,15 @@ import SwiftUI
 
 enum SettingsLayoutMetrics {
     static let hiddenWindowWidth: CGFloat = 680
-    static let windowHeight: CGFloat = 560
+    static let targetWindowHeight: CGFloat = 560
     static let sidebarWidth: CGFloat = 180
     static let contextRailWidth: CGFloat = 210
     static let dividerWidth: CGFloat = 1
     static let settingsPageWidth = hiddenWindowWidth - sidebarWidth - dividerWidth
 
-    // Temporary compatibility metrics for the existing SettingsView geometry.
-    // SettingsWindowLayout is the source of truth for the new rail contract.
+    // Legacy SettingsView geometry remains unchanged until Task 2 applies the target layout.
     static let windowWidth: CGFloat = 780
+    static let windowHeight: CGFloat = 520
     static let contextPanelWidth = contextRailWidth
     static let pageHeaderHeight: CGFloat = 52
     static let compactWidthBreakpoint: CGFloat = 500
