@@ -1,6 +1,6 @@
 # Settings and Multi-Agent Follow-ups Implementation Plan
 
-**Recovered status (2026-07-16): planned requirements only. No Swift implementation or behavior change has started.** Restored from `wip/figma-followups-2026-07-15`; split and revalidate this broad plan against current `main`, supported-provider capabilities, repository `AGENTS.md`, and the evidence-rich PR guidance before implementation.
+**Recovered status (2026-07-17): planned requirements only. No Swift implementation or behavior change has started.** The UI-only fixed-geometry and native-switch subset of Task 1 is now sequenced by the dedicated [Figma Settings Design Completion plan](2026-07-17-figma-settings-design-completion.md); Tasks 2–7 remain deferred and require revalidation against current `main`, supported-provider capabilities, repository `AGENTS.md`, and the evidence-rich PR guidance before implementation.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` (recommended) or `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Add focused automated coverage for deterministic state, migration, and policy seams; verify native presentation separately with warnings-as-errors compilation, a signed-app inspection, and controlled notification/connection acceptance.
 
