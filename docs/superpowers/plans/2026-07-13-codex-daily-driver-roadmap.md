@@ -54,7 +54,7 @@ The two user-facing modes are:
 | Notification settings | Implemented | Permission/persistence/natural-event manual acceptance |
 | Settings foundation and follow-ups | Implemented; superseded visually by Figma Settings port | Conditional states, shortcuts; Launch at Login skipped |
 | Adaptive refresh | Event-driven absolute-time repair implemented and accepted for the scrolling/highlight regression | Settings mode switching and natural cached/paused acceptance remain; a true live countdown is separately deferred |
-| Codex connection | Implemented and user-accepted for the in-app Browser/CLI flows | Plan [external Provider Session detection](../../product/follow-ups.md#8-detect-an-external-codex-login-while-disconnected) from the disconnected stage |
+| Codex connection | Implemented and user-accepted for the in-app Browser/CLI flows | Implement the queued [external Provider Session detection plan](2026-07-17-external-codex-login-detection.md) from the disconnected stage |
 | Menu-bar display and placement | Implemented | Immediate preview, missing/cached lane, width, and VoiceOver checks |
 | Interruption backoff | Implemented with one delivery-durability follow-up | Retry the same stable event after failed submission, then controlled outage/recovery and signed-out/missing-CLI acceptance |
 | Dashboard | Deferred by user; partial historical checklist retained | Resume the recovered [Dashboard plan](2026-07-14-dashboard.md) only on explicit direction and after revalidating it against current `main` |
@@ -109,7 +109,7 @@ Acceptance: neither path reads credentials; successful sign-in triggers a quota 
 
 Implementation status on 2026-07-13: the provider-neutral connection state, `account/read` detection, Codex-managed browser flow, visible Terminal CLI flow, explicit disconnected menu stage, and Agents Settings connection detail are implemented. The native menu renders exactly one of two top-level stages: connected quota controls, or connection guidance/actions; Settings and Quit remain the final shared commands. Compilation, confirmed live collection, signed-bundle launch, and isolated disconnected-process survival passed, and user-reported manual acceptance confirmed the disconnected menu plus successful browser/CLI transitions. The app does not log out the current account automatically to manufacture that state.
 
-Known limitation recorded on 2026-07-17: if the app is already disconnected and the user runs `codex login` independently without choosing either in-app sign-in action, the connection controller has no ongoing trigger that is guaranteed to reconcile the new Provider Session. This is tracked as [product follow-up 8](../../product/follow-ups.md#8-detect-an-external-codex-login-while-disconnected); it must remain controller-owned and must not add credential reads, a second quota scheduler, or a timer to the native menu.
+Queued follow-up recorded on 2026-07-17: if the app is already disconnected and the user runs `codex login` independently without choosing either in-app sign-in action, the connection controller has no ongoing trigger that is guaranteed to reconcile the new Provider Session. The [External Codex Login Detection Implementation Plan](2026-07-17-external-codex-login-detection.md) requires controller-owned status checks immediately on activation and at most every 30 seconds while disconnected; it must not add credential reads, a second quota scheduler, or a timer to the native menu.
 
 ### 5. `feature/menu-bar-display` — implemented; manual UI acceptance pending (stacked on Codex Connection)
 

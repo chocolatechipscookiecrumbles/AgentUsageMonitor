@@ -326,7 +326,7 @@ This should remain evidence-driven rather than attempting to guess unsupported f
 
 ## 8. Detect an external Codex login while disconnected
 
-Status: **Needs plan.** The user reported this path on 2026-07-17. Runtime reproduction was not attempted because it would require disrupting or substituting the user's active Codex session; the code-path evidence below explains the missing automatic transition and defines the next safe investigation.
+Status: **Queued.** The user reported this path on 2026-07-17. Runtime reproduction was not attempted because it would require disrupting or substituting the user's active Codex session; the code-path evidence below explains the missing automatic transition. The dedicated [External Codex Login Detection Implementation Plan](../superpowers/plans/2026-07-17-external-codex-login-detection.md) defines the controller-owned 30-second and activation-triggered implementation boundary.
 
 Problem
 
