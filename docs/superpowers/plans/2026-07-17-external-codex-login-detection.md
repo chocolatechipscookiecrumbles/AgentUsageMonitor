@@ -327,6 +327,13 @@ plutil -lint .build/CodexUsageMonitor.app/Contents/Info.plist
 
 Expected: the app builds, signature verification succeeds, and `Info.plist` reports `OK`.
 
+### Task 3 interim verification evidence (2026-07-17)
+
+- `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer bash CodexUsageMonitor/Scripts/build-app.sh` built the signed `.app` successfully.
+- `codesign --verify --deep --strict --verbose=2 CodexUsageMonitor/.build/CodexUsageMonitor.app` reported that the app is valid on disk and satisfies its Designated Requirement.
+- `plutil -lint CodexUsageMonitor/.build/CodexUsageMonitor.app/Contents/Info.plist` reported `OK`.
+- The isolated external-login checks remain pending the user's explicit `codex login` action; no credentials, account files, or user-owned app process have been touched.
+
 - [ ] **Step 2: Prepare, but do not destroy, an isolated Codex home.**
 
 Run only from a dedicated audit shell:
