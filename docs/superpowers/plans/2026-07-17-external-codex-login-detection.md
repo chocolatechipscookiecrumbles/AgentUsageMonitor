@@ -344,17 +344,19 @@ mktemp -d /private/tmp/codex-usage-monitor-external-login.XXXXXX
 
 Record the resulting path. Launch only the newly built app with `CODEX_HOME` set to that exact path, record its PID, and confirm the app reaches the disconnected menu stage. Do not alter the user's normal Codex home, log out a user-owned app, or remove the temporary directory until the user accepts cleanup.
 
-- [ ] **Step 3: Verify the interval trigger.**
+- [x] **Step 3: Verify the interval trigger.**
 
 Without selecting either in-app sign-in action, run `codex login` independently in Terminal with the same isolated `CODEX_HOME`. Leave the monitor running and do not open the menu to trigger activation. Confirm within 30 seconds that it replaces the disconnected stage with connected quota content and requests one authentication refresh. Open Diagnostics or otherwise inspect the app-owned refresh reason to confirm exactly one authentication refresh, not a new scheduler or repeated connection process.
 
-- [ ] **Step 4: Verify the activation trigger and coalescing.**
+- [x] **Step 4: Verify the activation trigger and coalescing.**
 
 Repeat with a fresh isolated disconnected session. Complete the independent `codex login`, then activate the still-running monitor before the 30-second interval expires. Confirm it reconnects immediately. Repeatedly open and close the native menu and reactivate the app while status checking is in flight; confirm there is one connection transition and one authentication refresh, no duplicate watcher, status process, or scheduler.
 
 - [ ] **Step 5: Verify negative and teardown paths.**
 
 With the same isolated home, confirm a failed status read remains retryable through the existing sign-in actions and **Check again** without a stuck `.checking` or `.signingIn` state. Confirm the existing in-app Browser and CLI paths, custom `CODEX_HOME` propagation, external-logout detection after an unavailable quota refresh, sleep/wake refresh behavior, and app teardown still work. Record any state that cannot be safely manufactured as **Not run** rather than inferring coverage.
+
+Observed limitation: the user reported that closing an in-app Browser authentication tab led to a sign-in failure after roughly 30 seconds. An independent external `codex login` after that failed state was not detected. This does not invalidate disconnected-only detection—the watcher is intentionally released outside `.disconnected`—but it is direct evidence for Product Follow-up 2, automatic recovery from interrupted sign-in.
 
 - [x] **Step 6: Record exact evidence and commit it.**
 
@@ -370,8 +372,11 @@ git commit -m "Record external login detection acceptance"
 - Signed build, signature, and `Info.plist` verification passed before manual acceptance.
 - Interval route: with a fresh isolated `CODEX_HOME`, the user completed `codex login` independently without selecting an in-app sign-in action or activating the monitor. The monitor changed from disconnected to connected after roughly five seconds. That satisfies the 30-second bound; the time remaining to the next watcher tick was not observed.
 - Activation route: with a separate fresh isolated `CODEX_HOME`, the user completed independent `codex login`, then activated the monitor before the next interval. The monitor connected promptly after roughly two to three seconds.
+- Authentication-refresh count: the user inspected the persisted app-owned diagnostics record before and after a fresh external-login run. The count of `reason == "authentication"` increased from 6 to 7, a delta of exactly one; the new entry completed with the `confirmed` outcome at `2026-07-17T07:01:50Z`. The Diagnostics Settings screen does not display refresh reasons, so this used the existing sanitized diagnostics JSON rather than claiming UI coverage.
+- Coalescing route: the user reported that rapid repeated activation after external login also passed. The deterministic controller regression test remains the exact automated proof that a second activation does not invoke the connection callback again.
 - The two temporary audit instances were app-owned processes, not a user-owned app process. Their isolated homes have not been removed because cleanup has not yet been accepted.
-- **Not run:** Diagnostics confirmation of exactly one `.authentication` refresh; repeated activation/menu-event coalescing while a status check is in flight; failed-read retryability; Browser/CLI regression, custom-home propagation beyond these independent-login paths; external logout, sleep/wake, controller teardown, and audit cleanup. No claim is made for those states.
+- **Observed limitation:** cancelling an in-app Browser sign-in then completing external CLI login from the resulting failed state did not reconnect the app. The disconnected-only watcher is not intended to run in `.failed`; retain this as evidence for Product Follow-up 2 rather than treating it as accepted recovery behavior.
+- **Not run:** failed-read retryability; custom-home propagation beyond the observed independent-login paths; external logout, sleep/wake, controller teardown, and audit cleanup. No claim is made for those states.
 
 ## Task 4: Synchronize product and operating documentation
 
