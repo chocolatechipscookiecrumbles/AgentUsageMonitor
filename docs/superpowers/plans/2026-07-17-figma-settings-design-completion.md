@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` (recommended) or `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** **In progress — Task 1 complete; Task 2 remains pending.** This plan finishes the approved native Settings visual slice from current `main`; it does not revive or merge `feature/figma-settings-port`.
+**Status:** **In progress — Tasks 1–2 implementation complete; signed-app visual acceptance remains pending.** This plan finishes the approved native Settings visual slice from current `main`; it does not revive or merge `feature/figma-settings-port`.
 
 **Goal:** Complete the remaining approved Figma-inspired Settings behavior while preserving the current native global-sidebar theme, semantic colors, live System/Light/Dark presentation, controls, settings values, and all existing app behavior.
 
@@ -194,7 +194,7 @@ Expected: 1 test passes with 0 failures. The test proves the structural width in
 - Consumes `SettingsWindowLayout.contentSize` and the existing `isPreviewVisible` window-local `@State`.
 - Produces a left-edge-preserving content-size update, a fixed-width Settings Page, and an accessible Show/Hide Context Rail button.
 
-- [ ] **Step 1: Add the geometry-only AppKit anchor.**
+- [x] **Step 1: Add the geometry-only AppKit anchor.**
 
 ```swift
 import AppKit
@@ -244,7 +244,7 @@ struct SettingsWindowWidthAnchor: NSViewRepresentable {
 
 This component must never write `appearance`, create a window, delay a write, or own Settings state.
 
-- [ ] **Step 2: Apply the layout once in `SettingsView`.**
+- [x] **Step 2: Apply the layout once in `SettingsView`.**
 
 Start from hidden rail state and keep the page fixed:
 
@@ -300,7 +300,7 @@ private var settingsPage: some View {
 
 Keep the existing Reduce Motion value-based rail transition. `SettingsContextPanel` retains `contextRailWidth`; do not let it request unbounded width.
 
-- [ ] **Step 3: Make the rail action understandable without color or icon-only ambiguity.**
+- [x] **Step 3: Make the rail action understandable without color or icon-only ambiguity.**
 
 Retain the trailing native button and add an explicit VoiceOver label/value:
 
@@ -325,6 +325,14 @@ plutil -lint CodexUsageMonitor/.build/CodexUsageMonitor.app/Contents/Info.plist
 ```
 
 Open only an audit-owned signed app instance. At default size, toggle the rail for every destination and verify: hidden starts at 680 × 560; visible adds 211 points at the right edge; left edge, sidebar, page, selection, search text, scroll, and focus do not move; rail content never covers a control. Repeat under Light, Dark, and System without changing `NSApplication.appearance`.
+
+### Task 2 implementation evidence and outstanding visual acceptance
+
+- `SettingsWindowWidthAnchor` applies only the target content size to its containing window and restores the prior left edge. Its coordinator is main-actor isolated and deduplicates unchanged sizes; it does not own Settings state or write appearance.
+- `SettingsView` now starts with the rail hidden, consumes `SettingsWindowLayout`, fixes the Settings Page to the layout width/height, and retains its existing `SystemAppearanceObserver` and concrete `preferredColorScheme` ownership. Showing the rail adds only the layout model's 211-point right-side allocation.
+- The header's icon presentation now has explicit Show/Hide Context Rail VoiceOver label, state value, and help text. `SettingsContextPanel` uses the centralized rail width directly.
+- The focused `SettingsWindowLayoutTests/test_contextRailOnlyChangesTheRightHandWindowAllocation` and full Swift package suite passed after the Task 2 source change (8 tests, 0 failures). The signed app built successfully; `codesign --verify --deep --strict --verbose=2` and `plutil -lint` passed.
+- **Not run:** direct signed-app window inspection and the Light/Dark/System, six-destination interaction matrix. This session could not safely identify an audit-owned app instance (`pgrep` process enumeration was unavailable), so it did not launch or interfere with a potentially user-owned monitor. Task 4 retains this mandatory manual acceptance gate.
 
 ## Task 3: Complete the approved General rail and native preference switches
 

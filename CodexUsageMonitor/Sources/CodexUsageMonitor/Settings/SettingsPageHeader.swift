@@ -12,13 +12,15 @@ struct SettingsPageHeader: View {
             Spacer(minLength: 0)
 
             Button(
-                isPreviewVisible ? "Hide Preview" : "Show Preview",
+                isPreviewVisible ? "Hide Context Rail" : "Show Context Rail",
                 systemImage: "sidebar.right",
                 action: togglePreview
             )
             .labelStyle(.iconOnly)
             .buttonStyle(.borderless)
-            .help(isPreviewVisible ? "Hide Preview" : "Show Preview")
+            .accessibilityLabel(isPreviewVisible ? "Hide Context Rail" : "Show Context Rail")
+            .accessibilityValue(isPreviewVisible ? "Visible" : "Hidden")
+            .help(isPreviewVisible ? "Hide Context Rail" : "Show Context Rail")
         }
         .padding(.horizontal, 20)
         .frame(height: SettingsLayoutMetrics.pageHeaderHeight)

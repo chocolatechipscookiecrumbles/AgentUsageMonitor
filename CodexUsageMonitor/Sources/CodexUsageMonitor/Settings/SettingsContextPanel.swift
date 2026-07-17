@@ -16,7 +16,7 @@ struct SettingsContextPanel<Content: View>: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 18)
         }
-        .frame(width: SettingsLayoutMetrics.contextPanelWidth)
+        .frame(width: SettingsLayoutMetrics.contextRailWidth)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 }
