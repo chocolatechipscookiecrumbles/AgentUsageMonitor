@@ -127,7 +127,7 @@ private let notificationCenter: NotificationCenter
 private let activationNotification: Notification.Name
 private let disconnectedCheckInterval: Duration
 private var disconnectedWatchTask: Task<Void, Never>?
-private var activationObserver: NSObjectProtocol?
+private var activationObserver: ActivationObserver?
 ```
 
 Extend the initializer without changing production call sites:
@@ -138,36 +138,48 @@ init(
     onConnected: @escaping @MainActor () -> Void,
     statusReader: (@Sendable () async -> AgentConnectionState)? = nil,
     notificationCenter: NotificationCenter = .default,
-    activationNotification: Notification.Name = NSApplication.didBecomeActiveNotification,
+    activationNotification: Notification.Name? = nil,
     disconnectedCheckInterval: Duration = .seconds(30)
 ) {
+    let activationNotification = activationNotification ?? NSApplication.didBecomeActiveNotification
     self.service = service
     self.onConnected = onConnected
     self.statusReader = statusReader ?? { [service] in await service.readStatus() }
     self.notificationCenter = notificationCenter
     self.activationNotification = activationNotification
     self.disconnectedCheckInterval = disconnectedCheckInterval
-    activationObserver = notificationCenter.addObserver(
-        forName: activationNotification,
-        object: nil,
-        queue: .main
-    ) { [weak self] _ in
-        Task { @MainActor [weak self] in
-            self?.recheckAfterApplicationActivation()
-        }
-    }
 }
 ```
 
-In `deinit`, cancel both owned tasks and remove the observer:
+Use a small token owner so the controller does not directly cross the AppKit observer token into `deinit`:
 
 ```swift
-connectionTask?.cancel()
-disconnectedWatchTask?.cancel()
-if let activationObserver {
-    notificationCenter.removeObserver(activationObserver)
+private final class ActivationObserver {
+    private let notificationCenter: NotificationCenter
+    private var token: NSObjectProtocol?
+
+    init(
+        notificationCenter: NotificationCenter,
+        notification: Notification.Name,
+        onActivation: @escaping @Sendable () -> Void
+    ) {
+        self.notificationCenter = notificationCenter
+        token = notificationCenter.addObserver(forName: notification, object: nil, queue: .main) { _ in
+            onActivation()
+        }
+    }
+
+    func cancel() {
+        guard let token else { return }
+        notificationCenter.removeObserver(token)
+        self.token = nil
+    }
+
+    deinit { cancel() }
 }
 ```
+
+The controller cancels its two tasks in `deinit`; releasing `activationObserver` lets the helper remove its token.
 
 - [x] **Step 2: Centralize status results and start only one 30-second watcher.**
 
@@ -195,13 +207,7 @@ private func applyDetectedState(
     trigger: ConnectionCheckTrigger
 ) {
     let wasConnected = state.isConnected
-    state = detectedState
-
-    if case .disconnected = detectedState {
-        startDisconnectedWatchIfNeeded()
-    } else {
-        stopDisconnectedWatch()
-    }
+    applyState(detectedState)
 
     if trigger != .startup, !wasConnected, detectedState.isConnected {
         onConnected()
@@ -231,6 +237,34 @@ private func startDisconnectedWatchIfNeeded() {
 private func stopDisconnectedWatch() {
     disconnectedWatchTask?.cancel()
     disconnectedWatchTask = nil
+}
+
+private func applyState(_ newState: AgentConnectionState) {
+    state = newState
+    if case .disconnected = newState {
+        startDisconnectedWatchIfNeeded()
+        startActivationObserverIfNeeded()
+    } else {
+        stopDisconnectedWatch()
+        stopActivationObserver()
+    }
+}
+
+private func startActivationObserverIfNeeded() {
+    guard activationObserver == nil else { return }
+    activationObserver = ActivationObserver(
+        notificationCenter: notificationCenter,
+        notification: activationNotification
+    ) { [weak self] in
+        Task { @MainActor [weak self] in
+            self?.recheckAfterApplicationActivation()
+        }
+    }
+}
+
+private func stopActivationObserver() {
+    activationObserver?.cancel()
+    activationObserver = nil
 }
 
 private func recheckAfterApplicationActivation() {
