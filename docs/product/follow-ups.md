@@ -326,7 +326,7 @@ This should remain evidence-driven rather than attempting to guess unsupported f
 
 ## 8. Detect an external Codex login while disconnected
 
-Status: **Verification.** The controller-owned implementation is complete. Isolated user acceptance on 2026-07-17 observed independent `codex login` reconnect within the 30-second bound and a prompt activation-triggered reconnect. The remaining exact refresh-count, repeated-event, negative-path, and teardown checks are intentionally still open in the dedicated [External Codex Login Detection Implementation Plan](../superpowers/plans/2026-07-17-external-codex-login-detection.md).
+Status: **Verification.** The controller-owned implementation is complete. Isolated user acceptance on 2026-07-17 observed independent `codex login` reconnect within the 30-second bound, a prompt activation-triggered reconnect, one persisted authentication refresh, and a repeated-activation check. Negative-path and teardown checks remain open in the dedicated [External Codex Login Detection Implementation Plan](../superpowers/plans/2026-07-17-external-codex-login-detection.md).
 
 Problem
 
@@ -350,5 +350,7 @@ Acceptance
 * **Observed:** a signed app ran against two fresh isolated disconnected Codex homes without either in-app sign-in action.
 * **Observed:** the user completed `codex login` independently in Terminal with each matching home.
 * **Observed:** the interval route changed the disconnected stage to connected roughly five seconds after login (within the 30-second bound); the activation route connected promptly in roughly two to three seconds. The time remaining to the interval tick was not measured.
-* **Not run:** Diagnostics confirmation of exactly one authentication refresh and repeated native-menu/activation event coalescing while a status check is in flight.
-* **Not run:** failed-read retryability, Browser/CLI regression, custom-home behavior beyond the observed independent-login paths, external logout, sleep/wake, controller teardown, and audit cleanup.
+* **Observed:** a before/after read of the sanitized app-owned diagnostics record showed exactly one new `authentication` refresh (6 to 7) with a confirmed outcome. The Diagnostics Settings screen does not expose reasons, so this was not a visible-Diagnostics check.
+* **Observed:** the user reported that rapid repeated activation after external login passed. The deterministic controller regression separately proves that a second activation does not invoke the callback again.
+* **Observed limitation:** after an in-app Browser sign-in was cancelled, the controller entered `.failed`; an independent external CLI login from that state was not detected. The watcher is intentionally scoped to `.disconnected`, and this is evidence for Product Follow-up 2 rather than accepted interrupted-sign-in recovery.
+* **Not run:** failed-read retryability, custom-home behavior beyond the observed independent-login paths, external logout, sleep/wake, controller teardown, and audit cleanup.
