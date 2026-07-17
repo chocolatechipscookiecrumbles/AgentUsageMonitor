@@ -24,7 +24,7 @@ When editing `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings`:
 - Bound wide controls such as pop-up pickers instead of allowing them to consume every available horizontal point.
 - Let explanatory and status text wrap vertically. Use adaptive system foreground styles and at least callout-sized text for information a user needs to understand or recover from a state.
 - Use explicit stack spacing. Do not create section gaps with transparent footer views such as `Color.clear.frame(height:)`.
-- Keep the top Settings `TabView` owned by `SettingsView`. Provider navigation belongs inside the lower Agents content region and must not resize, cover, or shift the top tab bar.
+- Keep `SettingsView` as the owner of the global `SettingsNavigationSidebar`, selected destination, `SettingsDetailView`, and Context Rail visibility. The sidebar and Settings Page frames must remain stable when the rail is hidden or shown; provider navigation belongs inside the Agents destination and must not create a second window-level navigation owner.
 - Preserve native SwiftUI controls and system colors unless a separately approved visual-design task explicitly changes the theme.
 
 ## Required visual acceptance for Settings changes
