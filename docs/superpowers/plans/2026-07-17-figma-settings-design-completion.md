@@ -133,10 +133,6 @@ static let sidebarWidth: CGFloat = 180
 static let contextRailWidth: CGFloat = 210
 static let dividerWidth: CGFloat = 1
 static let settingsPageWidth = hiddenWindowWidth - sidebarWidth - dividerWidth
-
-// Legacy SettingsView geometry remains unchanged until Task 2 applies the target layout.
-static let windowWidth: CGFloat = 780
-static let windowHeight: CGFloat = 520
 ```
 
 Create:
@@ -163,7 +159,7 @@ struct SettingsWindowLayout: Equatable {
 }
 ```
 
-`SettingsWindowLayout` owns the Task 2 target contract (680 × 560 hidden, 891 × 560 visible). The current `SettingsView` keeps its existing 780 × 520 legacy frame in Task 1; applying the model to live geometry and performing signed-app acceptance are explicitly Task 2 work. Do not duplicate the arithmetic in a view.
+`SettingsWindowLayout` owns the Task 2 target contract (680 × 560 hidden, 891 × 560 visible). During Task 1, `SettingsView` retains its pre-existing frame; Task 2 applies the model to live geometry. Do not duplicate the arithmetic in a view.
 
 - [x] **Step 4: Run the focused test green and commit the contract/layout slice.**
 
@@ -178,7 +174,7 @@ Expected: 1 test passes with 0 failures. The test proves the structural width in
 ### Task 1 completion evidence and boundary
 
 - The initial contract/layout slice is commit `a8204e3 Stabilize Settings rail geometry`.
-- The reviewer follow-up restored the current live `SettingsView` metric to the pre-Task 1 legacy `windowHeight` of 520 and introduced the separate `targetWindowHeight` of 560. `SettingsWindowLayout` now uses only the target height.
+- The reviewer follow-up kept the live Settings frame unchanged during Task 1 and introduced the separate `targetWindowHeight` of 560. `SettingsWindowLayout` uses only the target height; after Task 2 applied that model, the now-unused legacy 780 × 520 metrics were removed in `f5b3b38`.
 - The focused XCTest was run RED after the target assertions were added and failed only for the missing `targetWindowHeight` metric. The focused test and full package suite were then run after the correction; their command output and final follow-up commit are recorded in `.superpowers/sdd/task-1-report.md`.
 - No Task 2 source was started in this correction: `SettingsView` does not consume `SettingsWindowLayout`, the Context Rail frame is unchanged, and no signed app was built or visually inspected. Task 2 owns the live 680 × 560 hidden-size application, the 211-point visible-rail expansion, and all signed-app geometry acceptance.
 
