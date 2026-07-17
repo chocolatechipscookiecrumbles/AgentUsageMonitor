@@ -27,7 +27,7 @@ final class NotificationPolicy {
             previousConfirmed = presentation
         }
 
-        if case .alertEligible(let episode) = interruptionTransition {
+        if case .backedOff(let episode) = interruptionState {
             events.append(NotificationEvent(
                 key: "refresh-interruption-\(episode.id)",
                 title: "Codex usage updates are paused",
