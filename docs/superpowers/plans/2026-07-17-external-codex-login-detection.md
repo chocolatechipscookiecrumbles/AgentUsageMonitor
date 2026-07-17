@@ -41,7 +41,7 @@
 - Consumes: `AgentConnectionState`, `AgentAccountSummary`, `NotificationCenter`, and an injected `@Sendable () async -> AgentConnectionState` status reader.
 - Produces: a `CodexConnectionController` initializer accepting `statusReader`, `notificationCenter`, and `activationNotification` test seams while retaining production defaults.
 
-- [ ] **Step 1: Add a deterministic sequence source and the failing regression test.**
+- [x] **Step 1: Add a deterministic sequence source and the failing regression test.**
 
 ```swift
 import XCTest
@@ -97,7 +97,7 @@ final class CodexConnectionControllerTests: XCTestCase {
 }
 ```
 
-- [ ] **Step 2: Run the test before implementation.**
+- [x] **Step 2: Run the test before implementation.**
 
 Run:
 
@@ -117,7 +117,7 @@ Expected: the test does not compile because the controller has no injected statu
 - Consumes: `CodexConnectionService.readStatus() async -> AgentConnectionState`, the test-injected equivalent reader, and `NSApplication.didBecomeActiveNotification`.
 - Produces: `start()`, `checkConnection()`, and `recheckConnection()` with one coalesced task; a 30-second disconnected-only watch; and one `onConnected()` invocation for a new external connection.
 
-- [ ] **Step 1: Add controller-owned dependencies and teardown.**
+- [x] **Step 1: Add controller-owned dependencies and teardown.**
 
 Add these stored properties next to `connectionTask`:
 
@@ -169,7 +169,7 @@ if let activationObserver {
 }
 ```
 
-- [ ] **Step 2: Centralize status results and start only one 30-second watcher.**
+- [x] **Step 2: Centralize status results and start only one 30-second watcher.**
 
 Replace direct status-result assignment in `detectConnection` with `applyDetectedState(_:trigger:)`. Use this trigger type:
 
@@ -241,11 +241,11 @@ private func recheckAfterApplicationActivation() {
 
 Map public call sites to triggers: `start()` uses `.startup`; **Check again** uses `.userInitiated`; the existing quota-refresh failure path uses `.refreshFailure`; and the interval/activation helpers above use their matching internal cases. `detectConnection(trigger:)` must keep the existing `connectionTask == nil` guard, call `statusReader()`, clear `connectionTask`, and never set `.checking` for activation, interval, or refresh-failure checks.
 
-- [ ] **Step 3: Preserve in-app sign-in semantics.**
+- [x] **Step 3: Preserve in-app sign-in semantics.**
 
 Route all state assignments in `completeSignIn`, cancellation handling, and mapped sign-in failures through one helper that stops the disconnected watcher whenever state is not `.disconnected`. Keep `completeSignIn(_:)` as the only browser/CLI path that calls `onConnected()` directly. Do not call `onConnected()` from startup status detection, and do not call it again when an already-connected controller receives another connected status.
 
-- [ ] **Step 4: Run the focused regression test and inspect the exact behavior.**
+- [x] **Step 4: Run the focused regression test and inspect the exact behavior.**
 
 Run:
 
@@ -255,7 +255,7 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-pa
 
 Expected: PASS; the startup status becomes disconnected, the injected activation notification changes it to connected, and two activation posts invoke `onConnected` once.
 
-- [ ] **Step 5: Commit the behavioral slice.**
+- [x] **Step 5: Commit the behavioral slice.**
 
 ```bash
 git add \
@@ -263,6 +263,13 @@ git add \
   CodexUsageMonitor/Tests/CodexUsageMonitorTests/CodexConnectionControllerTests.swift
 git commit -m "Detect external Codex logins while disconnected"
 ```
+
+### Task 1/2 verification evidence (2026-07-17)
+
+- RED: Before the controller implementation, the focused test failed to compile with `extra arguments at positions #2, #3, #4 in call`; the compiler identified the existing `init(service:onConnected:)` as the only initializer.
+- GREEN: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-path CodexUsageMonitor --filter CodexConnectionControllerTests/test_activationRecheckConnectsOnceAfterExternalLogin` passed: `Executed 1 test, with 0 failures (0 unexpected)`.
+- Full package verification: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-path CodexUsageMonitor` passed: `Executed 7 tests, with 0 failures (0 unexpected)`.
+- Whitespace verification: `git diff --check` passed with no output.
 
 ## Task 3: Build the signed app and perform isolated external-login acceptance
 
