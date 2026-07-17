@@ -93,3 +93,22 @@ When changing refresh-failure, stale-data, connection, or recovery notifications
 - Do not attach LLDB to an already running app merely to open or focus a Settings window; debugger attachment can wait indefinitely and is not visual acceptance evidence.
 - Open the signed app through normal UI paths. If macOS Accessibility or foreground-control permissions prevent automated navigation, stop the audit command promptly, record the limitation in the active plan, and leave the remaining visual check for manual acceptance.
 - Track every temporary audit process before launch and close only the instance started by the audit. Never terminate a pre-existing user-owned app process.
+
+## Native menu dynamic-update guardrails
+
+The July 2026 refresh-row audits established that a SwiftUI `MenuBarExtra` can continue drawing updated text while AppKit's tracked row geometry and highlight map become stale. A timer-interval `Text` previously caused recursive `MenuBehavior.menuNeedsUpdate`/AttributeGraph crashes, and a child `@ObservedObject` publishing a different countdown string every second later reproduced scrolling and pointer highlights above the intended row. Replacing that child with one event-driven, absolute-time row restored correct interaction in the signed menu.
+
+When changing `CodexUsageMonitor/Sources/CodexUsageMonitor/Menu`:
+
+- Treat visible content, row identity, row geometry, hit testing, keyboard navigation, and highlight placement as one native-menu acceptance boundary.
+- Do not add `TimelineView`, timer-interval `Text`, a per-second child `ObservableObject`, or per-second root invalidation to the production `MenuBarExtra`.
+- Keep the row count, row type, identity, and width envelope stable while the menu is tracking. Publish only semantic events such as refresh start, refresh completion, connection transition, or a new schedule.
+- Prefer an absolute next-refresh time when the native menu does not own a safe ticking surface. Do not label a static relative value as a live countdown.
+- Keep connection/status polling and refresh scheduling outside the SwiftUI menu tree. A background state check may publish a semantic transition; opening or redrawing the menu must not become the scheduler.
+- Require a separate product decision, ADR, and prototype before restoring a true dynamic countdown. Compare an AppKit-owned fixed-geometry row, a window-style popover, and the stable native-menu alternative explicitly; do not reach into SwiftUI's private `NSMenu`.
+
+Before accepting any native-menu dynamic update:
+
+- Build and launch the signed `.app`, then inspect the actual `MenuBarExtra`; an isolated `NSHostingView`, source review, or compilation is not interaction evidence.
+- Keep the menu open across every affected semantic transition, point across every row, scroll above and below the visible command area, and activate the visibly highlighted command.
+- Check Light and Dark appearance, keyboard and VoiceOver navigation, long/localized content, repeated open/close cycles, and new crash reports. Record states that cannot be manufactured instead of inferring coverage.

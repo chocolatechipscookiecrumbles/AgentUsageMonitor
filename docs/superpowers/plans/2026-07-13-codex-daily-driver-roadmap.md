@@ -41,7 +41,7 @@ The two user-facing modes are:
 
 **Tech Stack:** Swift 6.2, SwiftUI, AppKit, Charts, ServiceManagement, UserNotifications, Foundation JSON persistence, Codex app-server/CLI; no third-party dependencies or proprietary backend.
 
-## Authoritative plan status — reconciled 2026-07-16
+## Authoritative plan status — reconciled 2026-07-17
 
 | Plan | Current state | Remaining gate |
 | --- | --- | --- |
@@ -51,7 +51,7 @@ The two user-facing modes are:
 | Reliability hardening | Implementation complete; observation active | Natural forecast/failure evidence and seven corrected calendar days |
 | Notification settings | Implemented | Permission/persistence/natural-event manual acceptance |
 | Settings foundation and follow-ups | Implemented; superseded visually by Figma Settings port | Conditional states, shortcuts; Launch at Login skipped |
-| Adaptive refresh | Implemented with an open-menu presentation regression | Execute the pending [native menu refresh-row plan](2026-07-14-native-menu-refresh-row.md): restore truthful refresh transitions without reviving stale menu hit-testing; Settings mode switching and natural cached/paused acceptance |
+| Adaptive refresh | Event-driven absolute-time repair implemented and accepted for the scrolling/highlight regression | Settings mode switching and natural cached/paused acceptance remain; a true live countdown is separately deferred |
 | Codex connection | Implemented and user-accepted | No account mutation required |
 | Menu-bar display and placement | Implemented | Immediate preview, missing/cached lane, width, and VoiceOver checks |
 | Interruption backoff | Implemented with one delivery-durability follow-up | Retry the same stable event after failed submission, then controlled outage/recovery and signed-out/missing-CLI acceptance |
@@ -95,7 +95,7 @@ Acceptance: one Settings window is focused on repeated opens; `Command-,` works;
 
 ### 3. `feature/adaptive-refresh` — implemented (stacked on Settings Foundation)
 
-Replace the fixed timer with a scheduling policy returning an effective interval and explanation. Fixed modes use 60/90/120/300/600 seconds. Automatic considers confirmed consumption slope, remaining percentage, reset proximity, forecast confidence, and recent failures. It may use 30 seconds for at most ten minutes and exits after the event or two failures. Add `nextRefreshAt`, effective-mode explanation, and the provider-neutral `QuotaDisplayState` to monitoring state; show a live countdown beside Last refresh and the two-state confirmed/completed or cached/paused status in the popover.
+Replace the fixed timer with a scheduling policy returning an effective interval and explanation. Fixed modes use 60/90/120/300/600 seconds. Automatic considers confirmed consumption slope, remaining percentage, reset proximity, forecast confidence, and recent failures. It may use 30 seconds for at most ten minutes and exits after the event or two failures. Add `nextRefreshAt`, effective-mode explanation, and the provider-neutral `QuotaDisplayState` to monitoring state; show the absolute next-refresh time beside Last refresh and the two-state confirmed/completed or cached/paused status in the popover. The native row changes only for semantic refresh/schedule transitions, not once per elapsed second.
 
 Acceptance: manual refresh never waits behind scheduled work; only one collection runs; the first two failures keep the existing fixed cadence (Automatic may fall back to five minutes), while the third starts a temporary ten-minute retry cadence in every mode; wake and launch always refresh. Confirmed-after-retry is confirmed/completed; cached, unconfirmed, and unavailable outcomes are cached/paused without replacing the last confirmed display record.
 

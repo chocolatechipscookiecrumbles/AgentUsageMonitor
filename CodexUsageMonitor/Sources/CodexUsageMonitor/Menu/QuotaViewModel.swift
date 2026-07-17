@@ -17,9 +17,9 @@ final class QuotaViewModel: ObservableObject {
     @Published private(set) var effectiveRefreshInterval: TimeInterval?
     @Published private(set) var refreshScheduleReason: RefreshScheduleReason?
     @Published private(set) var connectionState: AgentConnectionState = .checking
+    @Published private(set) var refreshTimingPresentation: MenuRefreshTimingPresentation
 
     let settings: AppSettings
-    let countdownClock: RefreshCountdownClock
     private let monitor: QuotaMonitor
     private let connectionController: CodexConnectionController
     private var subscriptions: Set<AnyCancellable> = []
@@ -34,10 +34,10 @@ final class QuotaViewModel: ObservableObject {
         }
         self.connectionController = connectionController
         displayState = monitor.displayState
-        countdownClock = RefreshCountdownClock(
+        refreshTimingPresentation = MenuRefreshTimingPresentation(
             lastRefreshAt: monitor.displayState.lastAttemptAt,
+            refreshState: .idle,
             nextRefreshAt: nil,
-            isRefreshing: false
         )
         alertsEnabled = settings.alertsEnabled
         monitor.$displayState.sink { [weak self] state in
@@ -47,20 +47,20 @@ final class QuotaViewModel: ObservableObject {
                 ?? QuotaPresentation.unavailable("No confirmed Codex quota result is available yet.")
             self?.fiveHourForecast = displayedRecord?.fiveHourForecast
             self?.weeklyForecast = displayedRecord?.weeklyForecast
-            self?.updateCountdownClock()
+            self?.updateRefreshTimingPresentation()
         }.store(in: &subscriptions)
         monitor.$refreshState.sink { [weak self] state in
             self?.refreshState = state
             if case .refreshing = state { self?.isRefreshing = true } else { self?.isRefreshing = false }
             if case .failed = state { self?.connectionController.recheckConnection() }
-            self?.updateCountdownClock()
+            self?.updateRefreshTimingPresentation()
         }.store(in: &subscriptions)
         monitor.$diagnosticSummary.sink { [weak self] summary in
             self?.diagnosticSummary = summary
         }.store(in: &subscriptions)
         monitor.$nextRefreshAt.sink { [weak self] nextRefreshAt in
             self?.nextRefreshAt = nextRefreshAt
-            self?.updateCountdownClock()
+            self?.updateRefreshTimingPresentation()
         }.store(in: &subscriptions)
         monitor.$effectiveRefreshInterval.sink { [weak self] in self?.effectiveRefreshInterval = $0 }.store(in: &subscriptions)
         monitor.$refreshScheduleReason.sink { [weak self] in self?.refreshScheduleReason = $0 }.store(in: &subscriptions)
@@ -126,11 +126,14 @@ final class QuotaViewModel: ObservableObject {
         NSWorkspace.shared.open(url)
     }
 
-    private func updateCountdownClock() {
-        countdownClock.update(
+    private func updateRefreshTimingPresentation() {
+        let newPresentation = MenuRefreshTimingPresentation(
             lastRefreshAt: displayState.lastAttemptAt,
+            refreshState: refreshState,
             nextRefreshAt: nextRefreshAt,
-            isRefreshing: isRefreshing
         )
+        if newPresentation != refreshTimingPresentation {
+            refreshTimingPresentation = newPresentation
+        }
     }
 }

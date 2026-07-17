@@ -43,7 +43,7 @@ struct ConnectedQuotaMenuView: View {
             Text("Last successful refresh: \(lastConfirmedAt.formatted(date: .omitted, time: .shortened))")
                 .font(.caption)
         }
-        NextRefreshCountdownView(clock: viewModel.countdownClock)
+        MenuRefreshTimingView(presentation: viewModel.refreshTimingPresentation)
         Toggle("Quota alerts", isOn: Binding(
             get: { viewModel.alertsEnabled },
             set: { viewModel.setAlertsEnabled($0) }
