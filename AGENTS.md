@@ -7,6 +7,7 @@ These instructions apply to the entire repository. More specific instructions in
 - Update the relevant implementation plan whenever behavior, scope, verification evidence, or a known limitation changes.
 - Update `UsageProbe/README.md` and `how-to.md` when a native-app change affects user-visible behavior or operating instructions.
 - Use `.agents/skills/preparing-evidence-rich-prs` and `docs/development/evidence-rich-pull-requests.md` when preparing or updating a pull request.
+- For future push or planned-PR requests, push only the approved scope and provide a filled repository-template PR draft for the user to create. Do not create the GitHub pull request unless the user explicitly asks Codex to create it in that same request.
 - Preserve existing user changes and keep unrelated edits out of the current task.
 
 ## macOS Settings UI guardrails

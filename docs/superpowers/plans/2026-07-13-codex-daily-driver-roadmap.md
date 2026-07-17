@@ -1,5 +1,7 @@
 # Codex Daily-Driver Roadmap
 
+Centralized status and file links: [Product Planning Board](../../product/planning-board.md).
+
 > **For agentic workers:** Implement one branch at a time with `executing-plans`. Add focused automated coverage for deterministic seams and use compilation, read-only live collection, schema inspection, signed-app inspection, and manual UI acceptance in proportion to the claim. Update `outline.md`, `how-to.md`, `UsageProbe/README.md`, and the active plan whenever behavior changes.
 
 **Goal:** Turn the proven Codex quota monitor into a dependable daily-driver with configurable warnings, adaptive refresh, safe account connection, separate Settings and Dashboard windows, and launch at login before adding another provider.
@@ -52,7 +54,7 @@ The two user-facing modes are:
 | Notification settings | Implemented | Permission/persistence/natural-event manual acceptance |
 | Settings foundation and follow-ups | Implemented; superseded visually by Figma Settings port | Conditional states, shortcuts; Launch at Login skipped |
 | Adaptive refresh | Event-driven absolute-time repair implemented and accepted for the scrolling/highlight regression | Settings mode switching and natural cached/paused acceptance remain; a true live countdown is separately deferred |
-| Codex connection | Implemented and user-accepted | No account mutation required |
+| Codex connection | Implemented and user-accepted for the in-app Browser/CLI flows | Plan [external Provider Session detection](../../product/follow-ups.md#8-detect-an-external-codex-login-while-disconnected) from the disconnected stage |
 | Menu-bar display and placement | Implemented | Immediate preview, missing/cached lane, width, and VoiceOver checks |
 | Interruption backoff | Implemented with one delivery-durability follow-up | Retry the same stable event after failed submission, then controlled outage/recovery and signed-out/missing-CLI acceptance |
 | Dashboard | Deferred by user; partial historical checklist retained | Resume the recovered [Dashboard plan](2026-07-14-dashboard.md) only on explicit direction and after revalidating it against current `main` |
@@ -106,6 +108,8 @@ Add a Codex connection module that distinguishes missing CLI, unauthenticated, c
 Acceptance: neither path reads credentials; successful sign-in triggers a quota refresh; missing Codex shows installation guidance; failures remain recoverable.
 
 Implementation status on 2026-07-13: the provider-neutral connection state, `account/read` detection, Codex-managed browser flow, visible Terminal CLI flow, explicit disconnected menu stage, and Agents Settings connection detail are implemented. The native menu renders exactly one of two top-level stages: connected quota controls, or connection guidance/actions; Settings and Quit remain the final shared commands. Compilation, confirmed live collection, signed-bundle launch, and isolated disconnected-process survival passed, and user-reported manual acceptance confirmed the disconnected menu plus successful browser/CLI transitions. The app does not log out the current account automatically to manufacture that state.
+
+Known limitation recorded on 2026-07-17: if the app is already disconnected and the user runs `codex login` independently without choosing either in-app sign-in action, the connection controller has no ongoing trigger that is guaranteed to reconcile the new Provider Session. This is tracked as [product follow-up 8](../../product/follow-ups.md#8-detect-an-external-codex-login-while-disconnected); it must remain controller-owned and must not add credential reads, a second quota scheduler, or a timer to the native menu.
 
 ### 5. `feature/menu-bar-display` — implemented; manual UI acceptance pending (stacked on Codex Connection)
 

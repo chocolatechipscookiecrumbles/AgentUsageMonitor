@@ -1,4 +1,8 @@
-1. Network-aware refresh scheduling and diagnostics
+# Product Follow-ups
+
+These source notes are indexed and status-tracked in the centralized [Product Planning Board](planning-board.md). Keep detailed problem statements here and update board status/next actions when an item changes.
+
+## 1. Network-aware refresh scheduling and diagnostics
 
 Problem
 
@@ -59,7 +63,7 @@ Acceptance
 
 ⸻
 
-2. Automatic recovery from interrupted sign-in flow
+## 2. Automatic recovery from interrupted sign-in flow
 
 Problem
 
@@ -104,7 +108,7 @@ Acceptance
 
 ⸻
 
-3. Menu popover layout regression
+## 3. Menu popover layout regression
 
 Problem
 
@@ -125,7 +129,9 @@ No overlapping controls under supported window sizes.
 
 ⸻
 
-4. Finish System appearance transition implementation
+## 4. Finish System appearance transition implementation
+
+Status: **Closed on 2026-07-16.** The live Settings presentation owner fixed the mixed Light/System/Dark hierarchy and completed signed-app acceptance across both host appearances and live macOS switching. Manufactured conditional states remain a verification item, not an open appearance implementation. See the [accepted appearance plan](../superpowers/plans/2026-07-15-settings-system-appearance-transition.md).
 
 Problem
 
@@ -177,7 +183,7 @@ No mixed appearance should remain.
 
 ⸻
 
-5. Simplify General Settings context rail
+## 5. Simplify General Settings context rail
 
 Problem
 
@@ -223,7 +229,7 @@ Acceptance
 
 ⸻
 
-6. Dedicated Permissions Settings destination
+## 6. Dedicated Permissions Settings destination
 
 Problem
 
@@ -292,7 +298,7 @@ Acceptance
 
 ⸻
 
-7. Future enhancement: richer refresh failure explanation
+## 7. Future enhancement: richer refresh failure explanation
 
 Beyond simple failure states, consider adding a structured “Why didn’t my refresh succeed?” section.
 
@@ -315,3 +321,35 @@ Each diagnosis should be accompanied by:
 * confidence level where multiple explanations are possible
 
 This should remain evidence-driven rather than attempting to guess unsupported failure causes.
+
+⸻
+
+## 8. Detect an external Codex login while disconnected
+
+Status: **Needs plan.** The user reported this path on 2026-07-17. Runtime reproduction was not attempted because it would require disrupting or substituting the user's active Codex session; the code-path evidence below explains the missing automatic transition and defines the next safe investigation.
+
+Problem
+
+When Codex Usage Monitor is already showing its disconnected/sign-in stage, a user may ignore the app's Browser and CLI actions and run `codex login` independently in Terminal. Codex then owns a valid Provider Session, but the running app can remain on the disconnected stage instead of detecting the new session and returning to quota display automatically.
+
+Current code-path evidence
+
+* `CodexConnectionController.start()` performs one status read at application startup.
+* The two-second `codex login status` watcher starts only inside `signInWithCLI()`, after the app opens Terminal itself.
+* `QuotaViewModel` requests a silent connection recheck only after a quota refresh publishes `.failed`. If the independent login makes the next quota refresh succeed, that success does not recheck or reconcile the still-disconnected connection state.
+* There is no disconnected-state poll, application-activation recheck, Provider Session change observer, or menu-presentation hook that fills this gap.
+
+Desired behavior
+
+`CodexConnectionController` should own bounded detection of an externally changed Provider Session while its state is disconnected. The implementation plan should evaluate an immediate application-activation recheck plus a conservative, cancellable disconnected-state interval as complementary triggers. It must not make native-menu rendering own the check or create a second quota scheduler.
+
+When a read-only `account/read` first confirms the external login, the controller should publish `.connected` and invoke the existing authentication-refresh callback exactly once. Detection must stop or idle after connection, coalesce overlapping status reads, preserve an explicit `CODEX_HOME`, and retain the existing privacy boundary: never read `auth.json`, tokens, email, or raw provider output.
+
+Acceptance
+
+* Start the signed app against an isolated disconnected Codex home and do not click either app sign-in action.
+* Complete `codex login` independently in Terminal using that same Codex home.
+* The running app detects the Provider Session within a documented bounded interval, replaces the disconnected stage with connected quota content, and performs exactly one authentication refresh without a relaunch or manual **Check again**.
+* Opening and closing the native menu does not start duplicate watchers, status processes, or refreshes.
+* Failed status reads remain retryable and do not trap the UI in `.checking` or `.signingIn`.
+* The existing in-app Browser and CLI flows, external-logout detection, sleep/wake behavior, custom `CODEX_HOME`, and process teardown remain intact.
