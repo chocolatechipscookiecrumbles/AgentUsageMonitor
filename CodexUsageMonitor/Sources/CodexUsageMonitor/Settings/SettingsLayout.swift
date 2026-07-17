@@ -8,10 +8,6 @@ enum SettingsLayoutMetrics {
     static let dividerWidth: CGFloat = 1
     static let settingsPageWidth = hiddenWindowWidth - sidebarWidth - dividerWidth
 
-    // Legacy SettingsView geometry remains unchanged until Task 2 applies the target layout.
-    static let windowWidth: CGFloat = 780
-    static let windowHeight: CGFloat = 520
-    static let contextPanelWidth = contextRailWidth
     static let pageHeaderHeight: CGFloat = 52
     static let compactWidthBreakpoint: CGFloat = 500
     static let labelWidth: CGFloat = 148
