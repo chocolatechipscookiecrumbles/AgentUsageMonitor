@@ -2,7 +2,6 @@ import Foundation
 
 enum RefreshMode: String, Codable, CaseIterable, Identifiable, Sendable {
     case automatic
-    case oneMinute = "one-minute"
     case ninetySeconds = "ninety-seconds"
     case twoMinutes = "two-minutes"
     case fiveMinutes = "five-minutes"
@@ -13,7 +12,6 @@ enum RefreshMode: String, Codable, CaseIterable, Identifiable, Sendable {
     var displayName: String {
         switch self {
         case .automatic: "Automatic"
-        case .oneMinute: "1 minute"
         case .ninetySeconds: "1 minute 30 seconds"
         case .twoMinutes: "2 minutes"
         case .fiveMinutes: "5 minutes"
@@ -24,7 +22,6 @@ enum RefreshMode: String, Codable, CaseIterable, Identifiable, Sendable {
     var fixedInterval: TimeInterval? {
         switch self {
         case .automatic: nil
-        case .oneMinute: 60
         case .ninetySeconds: 90
         case .twoMinutes: 120
         case .fiveMinutes: 300

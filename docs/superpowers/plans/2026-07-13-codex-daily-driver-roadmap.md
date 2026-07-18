@@ -70,7 +70,7 @@ The two user-facing modes are:
 - Do not read `auth.json`, store tokens, accept passwords, replay callback URLs, send prompts, or consume reset credits.
 - Add the smallest deterministic automated regression coverage permitted by the current repository rules; keep signed macOS UI and permission checks as separate manual evidence.
 - Keep fixed remaining-quota thresholds at 50%, 25%, 10%, and 5%.
-- Manual refresh choices are 1 minute, 1 minute 30 seconds, 2 minutes (default), 5 minutes, and 10 minutes.
+- Manual refresh choices are 1 minute 30 seconds, 2 minutes (default), 5 minutes, and 10 minutes. A persisted legacy one-minute selection migrates to 1 minute 30 seconds.
 - Automatic refresh may use 30 seconds only around an imminent threshold, qualified exhaustion, or reset verification.
 - Keep credits and earned reset-credit details in the menu popover, not the Dashboard.
 - Dashboard ranges are 24 hours, 7 days (default), 30 days, and 90 days; never draw a continuous series across reset windows.
@@ -99,7 +99,7 @@ Acceptance: one Settings window is focused on repeated opens; `Command-,` works;
 
 Replace the fixed timer with a scheduling policy returning an effective interval and explanation. Fixed modes use 60/90/120/300/600 seconds. Automatic considers confirmed consumption slope, remaining percentage, reset proximity, forecast confidence, and recent failures. It may use 30 seconds for at most ten minutes and exits after the event or two failures. Add `nextRefreshAt`, effective-mode explanation, and the provider-neutral `QuotaDisplayState` to monitoring state; show the absolute next-refresh time beside Last refresh and the two-state confirmed/completed or cached/paused status in the popover. The native row changes only for semantic refresh/schedule transitions, not once per elapsed second.
 
-Acceptance: manual refresh never waits behind scheduled work; only one collection runs; the first two failures keep the existing fixed cadence (Automatic may fall back to five minutes), while the third starts a temporary ten-minute retry cadence in every mode; wake and launch always refresh. Confirmed-after-retry is confirmed/completed; cached, unconfirmed, and unavailable outcomes are cached/paused without replacing the last confirmed display record.
+Acceptance: manual refresh never waits behind scheduled work; only one collection runs; the first two failures keep the existing fixed cadence (Automatic may fall back to five minutes), while the third starts a temporary ten-minute retry cadence in every mode; launch always refreshes and wake refreshes only when its persisted control is enabled. Opening the native menu never schedules a refresh. Confirmed-after-retry is confirmed/completed; cached, unconfirmed, and unavailable outcomes are cached/paused without replacing the last confirmed display record.
 
 ### 4. `feature/codex-connection` — implemented and user-accepted (stacked on Adaptive Refresh)
 

@@ -13,6 +13,7 @@ final class AppSettings: ObservableObject {
         static let staleDataWarnings = "notification.staleDataWarnings"
         static let refreshFailureWarnings = "notification.refreshFailureWarnings"
         static let refreshMode = "refresh.mode"
+        static let refreshOnWake = "refresh.onWake"
         static let menuBarDisplayStyle = "menuBar.displayStyle"
         static let quotaValueMode = "menuBar.valueMode"
         static let appearancePreference = "general.appearance"
@@ -38,6 +39,7 @@ final class AppSettings: ObservableObject {
     @Published var staleDataWarningsEnabled: Bool { didSet { defaults.set(staleDataWarningsEnabled, forKey: Key.staleDataWarnings) } }
     @Published var refreshFailureWarningsEnabled: Bool { didSet { defaults.set(refreshFailureWarningsEnabled, forKey: Key.refreshFailureWarnings) } }
     @Published var refreshMode: RefreshMode { didSet { defaults.set(refreshMode.rawValue, forKey: Key.refreshMode) } }
+    @Published var refreshOnWake: Bool { didSet { defaults.set(refreshOnWake, forKey: Key.refreshOnWake) } }
     @Published var menuBarDisplayStyle: MenuBarDisplayStyle { didSet { defaults.set(menuBarDisplayStyle.rawValue, forKey: Key.menuBarDisplayStyle) } }
     @Published var quotaValueMode: QuotaValueMode { didSet { defaults.set(quotaValueMode.rawValue, forKey: Key.quotaValueMode) } }
     @Published var appearancePreference: AppearancePreference { didSet { defaults.set(appearancePreference.rawValue, forKey: Key.appearancePreference) } }
@@ -52,7 +54,14 @@ final class AppSettings: ObservableObject {
         resetWarningsEnabled = Self.value(for: Key.resetWarnings, defaults: defaults, defaultValue: true)
         staleDataWarningsEnabled = Self.value(for: Key.staleDataWarnings, defaults: defaults, defaultValue: true)
         refreshFailureWarningsEnabled = Self.value(for: Key.refreshFailureWarnings, defaults: defaults, defaultValue: true)
-        refreshMode = defaults.string(forKey: Key.refreshMode).flatMap(RefreshMode.init(rawValue:)) ?? .twoMinutes
+        let storedRefreshMode = defaults.string(forKey: Key.refreshMode)
+        if storedRefreshMode == "one-minute" {
+            refreshMode = .ninetySeconds
+            defaults.set(RefreshMode.ninetySeconds.rawValue, forKey: Key.refreshMode)
+        } else {
+            refreshMode = storedRefreshMode.flatMap(RefreshMode.init(rawValue:)) ?? .twoMinutes
+        }
+        refreshOnWake = Self.value(for: Key.refreshOnWake, defaults: defaults, defaultValue: true)
         menuBarDisplayStyle = defaults.string(forKey: Key.menuBarDisplayStyle).flatMap(MenuBarDisplayStyle.init(rawValue:)) ?? .gaugeAndLowest
         quotaValueMode = defaults.string(forKey: Key.quotaValueMode).flatMap(QuotaValueMode.init(rawValue:)) ?? .remaining
         appearancePreference = defaults.string(forKey: Key.appearancePreference).flatMap(AppearancePreference.init(rawValue:)) ?? .system
