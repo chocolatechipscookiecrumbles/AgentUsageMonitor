@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsNavigationSidebar: View {
     @Binding var selection: SettingsTab
     @State private var searchText = ""
+    @Environment(\.settingsAppearancePalette) private var palette
 
     private var filteredTabs: [SettingsTab] {
         guard !searchText.isEmpty else { return SettingsTab.allCases }
@@ -20,7 +21,7 @@ struct SettingsNavigationSidebar: View {
             }
             .padding(.horizontal, 9)
             .padding(.vertical, 6)
-            .background(Color(nsColor: .controlBackgroundColor).opacity(0.7), in: .rect(cornerRadius: 7))
+            .background(palette.searchFieldBackground, in: .rect(cornerRadius: 7))
             .padding(.horizontal, 12)
             .padding(.top, 12)
             .padding(.bottom, 8)
@@ -47,7 +48,7 @@ struct SettingsNavigationSidebar: View {
                             .padding(.horizontal, 10)
                             .frame(height: 38)
                             .contentShape(.rect)
-                            .background(selection == tab ? Color(nsColor: .controlBackgroundColor) : .clear, in: .rect(cornerRadius: 7))
+                            .background(selection == tab ? palette.sidebarSelection : .clear, in: .rect(cornerRadius: 7))
                         }
                         .buttonStyle(.plain)
                         .accessibilityAddTraits(selection == tab ? .isSelected : [])
@@ -65,6 +66,6 @@ struct SettingsNavigationSidebar: View {
             }
         }
         .frame(width: SettingsLayoutMetrics.sidebarWidth)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(palette.sidebarBackground)
     }
 }

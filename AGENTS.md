@@ -24,7 +24,7 @@ When editing `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings`:
 - Bound wide controls such as pop-up pickers instead of allowing them to consume every available horizontal point.
 - Let explanatory and status text wrap vertically. Use adaptive system foreground styles and at least callout-sized text for information a user needs to understand or recover from a state.
 - Use explicit stack spacing. Do not create section gaps with transparent footer views such as `Color.clear.frame(height:)`.
-- Keep the top Settings `TabView` owned by `SettingsView`. Provider navigation belongs inside the lower Agents content region and must not resize, cover, or shift the top tab bar.
+- Keep `SettingsView` as the owner of the global `SettingsNavigationSidebar`, selected destination, `SettingsDetailView`, and Context Rail visibility. The sidebar and Settings Page frames must remain stable when the rail is hidden or shown; provider navigation belongs inside the Agents destination and must not create a second window-level navigation owner.
 - Preserve native SwiftUI controls and system colors unless a separately approved visual-design task explicitly changes the theme.
 
 ## Required visual acceptance for Settings changes
@@ -36,6 +36,22 @@ When editing `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings`:
 - Check both Light and Dark appearance when colors or contrast change. If one appearance cannot be inspected, state that limitation in the implementation plan and handoff instead of claiming complete visual coverage.
 - Capture or otherwise directly inspect the original failing page after the fix. Do not infer that a shared-layout change fixed every tab without opening those tabs.
 - Do not leave temporary audit app instances running or terminate an app process that was already owned by the user.
+
+## Settings card geometry and mixed-axis layout guardrails
+
+The July 18 Figma-layout audit found that a shared palette divider constrained only with `.frame(width: 1)` worked in an `HStack` but expanded to absorb the available height when reused in the Settings page's `VStack`. This split the page into a large empty upper region and a compressed lower region, which made the actual controls appear non-scrollable. The same audit found that General's fixed segmented control, leading-text minimum width, and card padding exceeded the 499-point Settings Page width, allowing that card to reach the trailing edge while other pages retained a gutter. Nested card and row vertical padding also made one-item cards visibly over-tall.
+
+When changing Settings rows, cards, or dividers:
+
+- Do not reuse an unconstrained `Rectangle` divider across axes. A vertical divider must set its width; a horizontal divider must set its height. Prefer a shared `SettingsPaletteDivider` with an explicit orientation when both are needed.
+- Calculate the complete width budget at the default hidden-rail Settings Page width before adding a fixed trailing control: page width minus page horizontal padding minus section horizontal padding must accommodate the leading-text minimum width, inter-column spacing, and control width. A child `.frame(maxWidth: .infinity)` does not prevent intrinsic-width overflow.
+- Keep every width, inset, row-padding, and title/description-spacing value in `SettingsLayoutMetrics`. Use one `SettingsPreferenceControlRow` for leading title/description plus trailing native picker/segment and one `SettingsPreferenceToggle` for Boolean controls.
+- Use `SettingsSectionRow` for the common Figma card row treatment. It owns the row's vertical inset and separator; `SettingsSection` owns only horizontal card inset. Do not stack additional vertical container padding around every row.
+- Keep a control's explanatory description inside its leading control row whenever it explains that specific control. It must share the same width and `preferenceTitleDescriptionSpacing` as the Notifications master-toggle description; use standalone `SettingsDescription` only for section-level policy or recovery information.
+- Keep General's related one-line controls in a single dense card where that improves scanability. Do not create a separate oversized card solely because it contains one toggle.
+- Do not apply `.id(selectedDestination)` to the full Settings detail subtree to mask a page-switch rendering defect. It turns a destination switch into removal/insertion and can visibly overlap or fade old and new page text. Trace the triggering transaction and host reuse first; never put a destination identity on `SettingsView`, the window, or the appearance owner.
+- The recorded Settings destination-switch defect can transiently duplicate and displace text across the whole window. The tested detail-subtree identity and disabled-animation transaction workarounds did not correct it and are prohibited as fixes. Defer further changes until a dedicated prototype can compare the existing branch switch, a native selection container, and an AppKit-hosted alternative with signed-app frame capture.
+- Before accepting a shared geometry change, inspect General and Notifications side by side at the default size with the Context Rail both hidden and visible. Check for empty regions, normal scrolling, equal card gutters, compact one-item cards, wrapped descriptions that do not run under controls, and fixed controls contained inside the page.
 
 ## Settings appearance-transition guardrails
 

@@ -19,7 +19,7 @@ struct StatusSettingsContextView: View {
             }
 
             if !values.isEmpty {
-                Divider()
+                SettingsPaletteDivider()
                 ForEach(values) { value in
                     SettingsContextValueRow(value: value)
                 }

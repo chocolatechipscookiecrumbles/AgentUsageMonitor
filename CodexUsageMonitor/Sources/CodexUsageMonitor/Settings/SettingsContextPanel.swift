@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsContextPanel<Content: View>: View {
     private let content: Content
+    @Environment(\.settingsAppearancePalette) private var palette
 
     init(@ViewBuilder content: () -> Content) {
         self.content = content()
@@ -16,7 +17,7 @@ struct SettingsContextPanel<Content: View>: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 18)
         }
-        .frame(width: SettingsLayoutMetrics.contextPanelWidth)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .frame(width: SettingsLayoutMetrics.contextRailWidth)
+        .background(palette.contextRailBackground)
     }
 }

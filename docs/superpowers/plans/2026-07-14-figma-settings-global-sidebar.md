@@ -2,6 +2,8 @@
 
 **Status (2026-07-16): implementation and signed Light/Dark appearance-transition acceptance are complete.** Manufactured conditional-state acceptance remains manual in `2026-07-15-settings-system-appearance-transition.md`.
 
+**2026-07-18 completion note:** The later [Figma Settings Design Completion plan](2026-07-17-figma-settings-design-completion.md) supersedes this document's 780 × 520 geometry with a 680 × 560 hidden rail and an 891 × 560 visible rail while preserving the global sidebar and fixed Settings Page. It also implements native switches and the General Context Rail cleanup. Its direct signed-app matrix remains unobserved, so this historical shell plan does not certify those later changes.
+
 **Documented follow-up:** Fixed-region geometry, indexed setting search, switch styling, scoped warning controls, provider notification identity, agent Disconnect, and the Agents selector/context redesign are planned—but not implemented—in `2026-07-14-settings-provider-followups.md`.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans inline. Do not create or run generated automated tests; verify with warnings-as-errors compilation, the signed app bundle, and direct Settings-window inspection.

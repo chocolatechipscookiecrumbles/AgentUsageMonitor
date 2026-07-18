@@ -4,6 +4,8 @@
 
 **Status (2026-07-16):** The reported Light → System/System-Dark regression is fixed. Signed-app acceptance now covers both macOS Light and Dark hosts, live OS appearance changes, the reciprocal native-menu boundary, and all six destinations in explicit Light. Manufactured conditional states remain manual.
 
+**2026-07-18 interaction note:** The later Settings Context Rail/switch completion preserves this plan's single `SettingsView` presentation owner and concrete `preferredColorScheme`. Its fresh package and signed-bundle checks pass, but its own six-destination rail/VoiceOver/conditional-state matrix was not run; do not apply this plan's earlier signed-app observations to the later geometry or control changes.
+
 **Goal:** Make the live Settings window transition completely between System, Light, and Dark without mixed AppKit/SwiftUI regions, reopening the window, resetting session state, or changing native menu appearance.
 
 **Verified architecture:** `AppSettings` remains the persisted choice owner. `SettingsView` is the only presentation owner and always supplies a concrete `preferredColorScheme`. Explicit Light/Dark map directly; System maps to a live observation of `NSApplication.effectiveAppearance`. System therefore remains a persisted semantic choice while its presentation continues following later macOS changes. The preference is scoped to the Settings presentation, and the native `MenuBarExtra` remains system-controlled.

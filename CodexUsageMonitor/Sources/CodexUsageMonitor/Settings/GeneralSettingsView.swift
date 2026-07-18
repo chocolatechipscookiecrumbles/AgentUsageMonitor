@@ -3,87 +3,80 @@ import SwiftUI
 struct GeneralSettingsView: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var launchAtLogin: LaunchAtLoginController
-    let status: SettingsStatus
-    let displayState: QuotaDisplayState
 
     var body: some View {
         SettingsPage {
-            SettingsSection("Startup") {
-                Toggle("Launch at login", isOn: launchAtLoginBinding)
-                    .disabled(!launchAtLogin.canChange)
-                if let guidanceMessage = launchAtLogin.guidanceMessage {
-                    Text(guidanceMessage)
-                        .font(.callout)
-                        .foregroundStyle(launchAtLogin.errorMessage == nil ? Color.secondary : Color.orange)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                if launchAtLogin.showsSystemSettingsButton {
-                    Button("Open Login Items…", action: launchAtLogin.openSystemSettings)
-                }
-            }
-
-            SettingsSection("Appearance") {
-                SettingsLabeledRow("App appearance") {
-                    Picker("App appearance", selection: $settings.appearancePreference) {
-                        ForEach(AppearancePreference.allCases) { appearance in
-                            Text(appearance.title).tag(appearance)
-                        }
-                    }
-                    .labelsHidden()
-                    .frame(width: SettingsLayoutMetrics.controlWidth)
-                }
-            }
-
-            SettingsSection("Keyboard Shortcuts") {
-                Toggle("Enable keyboard shortcuts", isOn: $settings.keyboardShortcutsEnabled)
-                SettingsDescription("Allows app shortcuts such as ⌘R for Refresh now.")
-                    .padding(.leading, 26)
-            }
-
-            SettingsSection("Menu Bar") {
-                SettingsLabeledRow("Appearance") {
-                    Picker("Appearance", selection: $settings.menuBarDisplayStyle) {
-                        ForEach(MenuBarDisplayStyle.allCases) { style in
-                            Text(style.title).tag(style)
-                        }
-                    }
-                    .labelsHidden()
-                    .frame(width: SettingsLayoutMetrics.controlWidth)
-                }
-
-                SettingsLabeledRow("Show") {
-                    Picker("Show", selection: $settings.quotaValueMode) {
-                        ForEach(QuotaValueMode.allCases) { mode in
-                            Text(mode.title).tag(mode)
-                        }
-                    }
-                    .labelsHidden()
-                    .frame(width: SettingsLayoutMetrics.controlWidth)
-                }
-
-                SettingsLabeledRow("Preview") {
-                    MenuBarLabelView(
-                        presentation: MenuBarLabelPresentation(
-                            displayState: displayState,
-                            style: settings.menuBarDisplayStyle,
-                            valueMode: settings.quotaValueMode
+            SettingsSection("Startup & Shortcuts") {
+                SettingsSectionRow {
+                    VStack(alignment: .leading, spacing: 8) {
+                        SettingsPreferenceToggle(
+                            "Launch at login",
+                            description: launchAtLogin.guidanceMessage,
+                            descriptionColor: launchAtLogin.errorMessage == nil ? .secondary : .orange,
+                            isOn: launchAtLoginBinding
                         )
+                            .disabled(!launchAtLogin.canChange)
+                        if launchAtLogin.showsSystemSettingsButton {
+                            Button("Open Login Items…", action: launchAtLogin.openSystemSettings)
+                        }
+                    }
+                }
+                SettingsSectionRow(showsDivider: false) {
+                    SettingsPreferenceToggle(
+                        "Enable keyboard shortcuts",
+                        description: "Allows app shortcuts such as ⌘R for Refresh now.",
+                        isOn: $settings.keyboardShortcutsEnabled
                     )
                 }
-
-                SettingsDescription("Updates after each quota refresh using the frequency selected in Refresh.")
-                    .settingsValueColumnAligned()
             }
 
-            SettingsSection("Application") {
-                SettingsLabeledRow("Name") { Text("Codex Usage Monitor") }
-                SettingsLabeledRow("Version") { Text(status.appVersion) }
-                SettingsLabeledRow("Build") { Text(status.buildNumber) }
-            }
+            SettingsSection("Menu Bar Icon") {
+                SettingsSectionRow {
+                    SettingsPreferenceControlRow("Style") {
+                        Picker("Style", selection: $settings.menuBarDisplayStyle) {
+                            ForEach(MenuBarDisplayStyle.allCases) { style in
+                                Text(style.title).tag(style)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                        .frame(width: SettingsLayoutMetrics.compactSegmentedControlWidth)
+                    }
+                }
 
-            SettingsSection("Current Scope") {
-                SettingsLabeledRow("Provider") { Text("OpenAI Codex") }
-                SettingsDescription("The daily-driver roadmap remains Codex-first. Additional providers are not active in this build.")
+                SettingsSectionRow {
+                    SettingsPreferenceControlRow(
+                        "Show",
+                        description: "Updates after each quota refresh using the frequency selected in Refresh."
+                    ) {
+                        Picker("Show", selection: $settings.quotaValueMode) {
+                            ForEach(QuotaValueMode.allCases) { mode in
+                                Text(mode.title).tag(mode)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                        .frame(width: SettingsLayoutMetrics.compactSegmentedControlWidth)
+                    }
+                }
+
+                SettingsSectionRow {
+                    SettingsPreferenceControlRow(
+                        "Appearance",
+                        description: "Controls the Settings window appearance. The menu bar follows macOS."
+                    ) {
+                        Picker("Appearance", selection: $settings.appearancePreference) {
+                            ForEach(AppearancePreference.allCases) { appearance in
+                                Text(appearance.title).tag(appearance)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                        .frame(width: SettingsLayoutMetrics.appearanceSegmentedControlWidth)
+                        .accessibilityLabel("Appearance")
+                    }
+                }
+
             }
         }
         .onAppear(perform: launchAtLogin.refresh)

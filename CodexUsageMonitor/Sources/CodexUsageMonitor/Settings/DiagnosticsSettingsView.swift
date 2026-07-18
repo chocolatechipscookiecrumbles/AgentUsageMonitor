@@ -14,43 +14,73 @@ struct DiagnosticsSettingsView: View {
     var body: some View {
         SettingsPage {
             SettingsSection("Latest refresh") {
-                SettingsLabeledRow("Status") { Text(status.displayMode.displayName) }
-                SettingsLabeledRow("Last attempt") {
-                    Text(status.lastAttemptAt.formatted(date: .abbreviated, time: .shortened))
+                SettingsSectionRow {
+                    SettingsLabeledRow("Status") { Text(status.displayMode.displayName) }
                 }
-                if let lastConfirmedAt = status.lastConfirmedAt {
-                    SettingsLabeledRow("Last confirmed") {
-                        Text(lastConfirmedAt.formatted(date: .abbreviated, time: .shortened))
+                SettingsSectionRow {
+                    SettingsLabeledRow("Last attempt") {
+                        Text(status.lastAttemptAt.formatted(date: .abbreviated, time: .shortened))
                     }
                 }
-                SettingsLabeledRow("Activity") { Text(status.refreshActivity) }
+                if let lastConfirmedAt = status.lastConfirmedAt {
+                    SettingsSectionRow {
+                        SettingsLabeledRow("Last confirmed") {
+                            Text(lastConfirmedAt.formatted(date: .abbreviated, time: .shortened))
+                        }
+                    }
+                }
+                SettingsSectionRow(showsDivider: false) {
+                    SettingsLabeledRow("Activity") { Text(status.refreshActivity) }
+                }
             }
 
             SettingsSection("Outcomes · last 30 days") {
-                if status.diagnostics.outcomes.isEmpty {
-                    Text("No recorded outcomes")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(outcomeOrder, id: \.rawValue) { outcome in
-                        if let count = status.diagnostics.outcomes[outcome] {
-                            SettingsLabeledRow(outcome.displayName) { Text(count.formatted()) }
+                SettingsSectionRow(showsDivider: false) {
+                    if status.diagnostics.outcomes.isEmpty {
+                        Text("No recorded outcomes")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        VStack(alignment: .leading, spacing: SettingsLayoutMetrics.sectionRowVerticalPadding) {
+                            ForEach(outcomeOrder, id: \.rawValue) { outcome in
+                                if let count = status.diagnostics.outcomes[outcome] {
+                                    SettingsLabeledRow(outcome.displayName) { Text(count.formatted()) }
+                                }
+                            }
                         }
                     }
                 }
             }
 
             SettingsSection("Classified failures · last 30 days") {
-                if status.diagnostics.failureKinds.isEmpty {
-                    Text("No classified failures")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(status.diagnostics.failureKinds.keys.sorted(), id: \.self) { failureKind in
-                        SettingsLabeledRow(failureKind) {
-                            Text(status.diagnostics.failureKinds[failureKind, default: 0].formatted())
+                SettingsSectionRow {
+                    if status.diagnostics.failureKinds.isEmpty {
+                        Text("No classified failures")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        VStack(alignment: .leading, spacing: SettingsLayoutMetrics.sectionRowVerticalPadding) {
+                            ForEach(status.diagnostics.failureKinds.keys.sorted(), id: \.self) { failureKind in
+                                SettingsLabeledRow(failureKind) {
+                                    Text(status.diagnostics.failureKinds[failureKind, default: 0].formatted())
+                                }
+                            }
                         }
                     }
                 }
-                SettingsDescription("Diagnostics contain stable classifications only, never raw provider error text or quota values.")
+                SettingsSectionRow(showsDivider: false) {
+                    SettingsDescription("Diagnostics contain stable classifications only, never raw provider error text or quota values.")
+                }
+            }
+
+            SettingsSection("Application") {
+                SettingsSectionRow {
+                    SettingsLabeledRow("Name") { Text("Codex Usage Monitor") }
+                }
+                SettingsSectionRow {
+                    SettingsLabeledRow("Version") { Text(status.appVersion) }
+                }
+                SettingsSectionRow(showsDivider: false) {
+                    SettingsLabeledRow("Build") { Text(status.buildNumber) }
+                }
             }
         }
     }

@@ -4,6 +4,7 @@ struct GeneralSettingsContextView: View {
     @ObservedObject var settings: AppSettings
     let status: SettingsStatus
     let displayState: QuotaDisplayState
+    @Environment(\.settingsAppearancePalette) private var palette
 
     private var presentation: QuotaPresentation? {
         displayState.displayedRecord?.presentation
@@ -11,24 +12,16 @@ struct GeneralSettingsContextView: View {
 
     var body: some View {
         SettingsContextCard("Menu Bar Preview") {
-            HStack {
-                Text("Current label")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Spacer()
-
-                MenuBarLabelView(
-                    presentation: MenuBarLabelPresentation(
-                        displayState: displayState,
-                        style: settings.menuBarDisplayStyle,
-                        valueMode: settings.quotaValueMode
-                    )
+            MenuBarLabelView(
+                presentation: MenuBarLabelPresentation(
+                    displayState: displayState,
+                    style: settings.menuBarDisplayStyle,
+                    valueMode: settings.quotaValueMode
                 )
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(.quaternary, in: .rect(cornerRadius: 6))
-            }
+            )
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.vertical, 14)
+            .background(palette.searchFieldBackground, in: .rect(cornerRadius: 8))
         }
 
         SettingsContextCard("Current Usage") {
@@ -40,12 +33,12 @@ struct GeneralSettingsContextView: View {
             )
 
             if let fiveHour = presentation?.fiveHour {
-                Divider()
+                SettingsPaletteDivider()
                 SettingsQuotaPreviewRow(title: "5-Hour Window", window: fiveHour, tint: .green)
             }
 
             if let weekly = presentation?.weekly {
-                Divider()
+                SettingsPaletteDivider()
                 SettingsQuotaPreviewRow(title: "Weekly Window", window: weekly, tint: .blue)
             }
 

@@ -10,9 +10,7 @@ struct SettingsDetailView: View {
         case .general:
             GeneralSettingsView(
                 settings: viewModel.settings,
-                launchAtLogin: launchAtLogin,
-                status: viewModel.settingsStatus,
-                displayState: viewModel.displayState
+                launchAtLogin: launchAtLogin
             )
         case .notifications:
             NotificationSettingsView(

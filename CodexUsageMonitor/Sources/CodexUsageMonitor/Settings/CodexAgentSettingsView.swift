@@ -9,29 +9,43 @@ struct CodexAgentSettingsView: View {
 
     var body: some View {
         SettingsSection("OpenAI Codex") {
-            SettingsLabeledRow("Status") { Text(connectionState.displayName) }
-            if let planName {
-                SettingsLabeledRow("Plan") { Text(planName) }
+            SettingsSectionRow {
+                SettingsLabeledRow("Status") { Text(connectionState.displayName) }
             }
-            SettingsLabeledRow("Quota status") { Text(status.displayMode.displayName) }
-            SettingsDescription("Codex is the only active agent integration in this build.")
+            if let planName {
+                SettingsSectionRow {
+                    SettingsLabeledRow("Plan") { Text(planName) }
+                }
+            }
+            SettingsSectionRow {
+                SettingsLabeledRow("Quota status") { Text(status.displayMode.displayName) }
+            }
+            SettingsSectionRow(showsDivider: false) {
+                SettingsDescription("Codex is the only active agent integration in this build.")
+            }
         }
 
         SettingsSection("Connection") {
-            connectionGuidance
-            if showsSignInActions {
-                Button("Sign in with browser", action: signInWithBrowser)
-                    .disabled(signInDisabled)
-                Button("Sign in with Codex CLI…", action: signInWithCLI)
-                    .disabled(signInDisabled)
-            }
-            if connectionState == .missingCLI {
-                Button("Check again", action: checkConnection)
+            SettingsSectionRow(showsDivider: false) {
+                VStack(alignment: .leading, spacing: 8) {
+                    connectionGuidance
+                    if showsSignInActions {
+                        Button("Sign in with browser", action: signInWithBrowser)
+                            .disabled(signInDisabled)
+                        Button("Sign in with Codex CLI…", action: signInWithCLI)
+                            .disabled(signInDisabled)
+                    }
+                    if connectionState == .missingCLI {
+                        Button("Check again", action: checkConnection)
+                    }
+                }
             }
         }
 
         SettingsSection("Codex Privacy") {
-            SettingsDescription("Codex owns sign-in and credential storage. This app never displays an email address, account fingerprint, credential, or authentication token.")
+            SettingsSectionRow(showsDivider: false) {
+                SettingsDescription("Codex owns sign-in and credential storage. This app never displays an email address, account fingerprint, credential, or authentication token.")
+            }
         }
     }
 
