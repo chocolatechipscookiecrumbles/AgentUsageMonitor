@@ -12,6 +12,7 @@ enum SettingsLayoutMetrics {
     static let compactWidthBreakpoint: CGFloat = 500
     static let labelWidth: CGFloat = 148
     static let controlWidth: CGFloat = 190
+    static let appearanceSegmentedControlWidth: CGFloat = 240
     static let sectionCornerRadius: CGFloat = 10
     static let sectionContentPadding: CGFloat = 14
     static let rowSpacing: CGFloat = 12

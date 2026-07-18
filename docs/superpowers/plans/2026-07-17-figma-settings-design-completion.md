@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` (recommended) or `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** **In progress — Tasks 1–4 are implemented; Task 5 is planned.** Signed-app visual acceptance remains pending. This plan does not revive or merge `feature/figma-settings-port`.
+**Status:** **In progress — Tasks 1–5 are implemented; Task 6 remains planned.** Signed-app visual acceptance remains pending. This plan does not revive or merge `feature/figma-settings-port`.
 
 **Goal:** Complete the remaining approved Figma-inspired Settings behavior while preserving the current native global-sidebar theme, semantic colors, live System/Light/Dark presentation, controls, settings values, and all existing app behavior.
 
@@ -489,7 +489,7 @@ Create `.worktrees/figma-settings-design-completion-PR.md` from `.github/pull_re
 - Consumes the existing `AppSettings.appearancePreference`, `MenuBarDisplayStyle`, `QuotaValueMode`, and `SettingsStatus` values.
 - Produces only a native presentation/layout reorganization; it creates no preference key, status field, appearance owner, or menu behavior.
 
-- [ ] **Step 1: Add the bounded segmented-control metric.**
+- [x] **Step 1: Add the bounded segmented-control metric.**
 
 In `SettingsLayoutMetrics`, add one shared value next to the existing control metric:
 
@@ -499,7 +499,7 @@ static let appearanceSegmentedControlWidth: CGFloat = 240
 
 Do not add view-local width or padding constants. The bounded 240-point control fits the fixed Settings Page value column while allowing the three System/Light/Dark segments to remain distinct.
 
-- [ ] **Step 2: Reorganize General without changing the persisted preference or appearance owner.**
+- [x] **Step 2: Reorganize General without changing the persisted preference or appearance owner.**
 
 Remove the standalone `SettingsSection("Appearance")` entirely. Rename the current `SettingsSection("Menu Bar")` to `SettingsSection("Menu Bar Icon")`, and rename its current `MenuBarDisplayStyle` row from **Appearance** to **Style** so it does not conflict with the app presentation preference.
 
@@ -524,7 +524,7 @@ SettingsDescription("Controls the Settings window appearance. The menu bar follo
 
 This is a native SwiftUI adaptation of the v4 reference's horizontal System/Light/Dark selector, not a port of its React `SegmentedControl`. Keep `SettingsView` as the sole resolver of the concrete `preferredColorScheme` through `SystemAppearanceObserver`; do not write `NSApplication.appearance` or `NSWindow.appearance`. Keep the existing menu-bar **Style** and **Show** pickers and their semantics unchanged.
 
-- [ ] **Step 3: Move the existing Application section to Diagnostics.**
+- [x] **Step 3: Move the existing Application section to Diagnostics.**
 
 Remove this block from the end of `GeneralSettingsView`:
 
@@ -538,7 +538,7 @@ SettingsSection("Application") {
 
 Append the exact same block at the end of `DiagnosticsSettingsView`'s `SettingsPage`. Keep the existing `status` input unchanged and do not add the reference's unsupported developer-information rows, export action, or log-copy action.
 
-- [ ] **Step 4: Run the allowed regression checks and record the manual native boundary.**
+- [x] **Step 4: Run the allowed regression checks and record the manual native boundary.**
 
 No additional automated UI test is added: this is native Settings presentation/reorganization, and the repository intentionally permits only the existing focused geometry regression rather than a generic UI-test suite. The existing appearance-presentation tests continue to protect the System/Light/Dark value semantics; direct native segmented-control presentation and live transition behavior require the signed app.
 
@@ -553,12 +553,17 @@ git diff --check
 
 In an audit-owned signed app, inspect General with both Context Rail states and verify **Menu Bar Icon** contains **Style**, **Show**, and a horizontal **Appearance** control with System, Light, and Dark. Verify selection changes the Settings presentation without changing native menu appearance, retains destination/search/scroll/rail/focus state, and remains usable in Light and Dark. Inspect Diagnostics to verify Name, Version, and Build are present exactly once and absent from General. If no audit-owned instance can be safely launched, record every visual result as **Not run** and leave the Draft/manual acceptance gate open.
 
-- [ ] **Step 5: Commit the native organization slice.**
+- [x] **Step 5: Commit the native organization slice.**
 
 ```bash
 git add CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsLayout.swift CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/GeneralSettingsView.swift CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/DiagnosticsSettingsView.swift docs/superpowers/plans/2026-07-17-figma-settings-design-completion.md
 git commit -m "Organize Settings appearance and diagnostics"
 ```
+
+### Task 5 completion evidence and remaining gate
+
+- **Run (2026-07-18):** the existing `SettingsAppearancePresentationTests` filter, full package suite, signed app build, strict `codesign` verification, `plutil -lint`, and `git diff --check` passed; command outputs are recorded in `.superpowers/sdd/task-5-report.md`.
+- **Not run:** no audit-owned signed app could be safely launched during this implementation task. Direct inspection of the General segmented control in both Context Rail states, Diagnostics metadata placement, live appearance transitions and session-state retention, native-menu independence, and Light/Dark usability remains the manual acceptance gate.
 
 ## Task 6: Synchronize post-Task-5 evidence without advancing manual acceptance
 

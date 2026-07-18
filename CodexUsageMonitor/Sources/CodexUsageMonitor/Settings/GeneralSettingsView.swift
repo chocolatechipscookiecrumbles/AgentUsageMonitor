@@ -22,18 +22,6 @@ struct GeneralSettingsView: View {
                 }
             }
 
-            SettingsSection("Appearance") {
-                SettingsLabeledRow("App appearance") {
-                    Picker("App appearance", selection: $settings.appearancePreference) {
-                        ForEach(AppearancePreference.allCases) { appearance in
-                            Text(appearance.title).tag(appearance)
-                        }
-                    }
-                    .labelsHidden()
-                    .frame(width: SettingsLayoutMetrics.controlWidth)
-                }
-            }
-
             SettingsSection("Keyboard Shortcuts") {
                 SettingsPreferenceToggle(
                     "Enable keyboard shortcuts",
@@ -42,9 +30,9 @@ struct GeneralSettingsView: View {
                 )
             }
 
-            SettingsSection("Menu Bar") {
-                SettingsLabeledRow("Appearance") {
-                    Picker("Appearance", selection: $settings.menuBarDisplayStyle) {
+            SettingsSection("Menu Bar Icon") {
+                SettingsLabeledRow("Style") {
+                    Picker("Style", selection: $settings.menuBarDisplayStyle) {
                         ForEach(MenuBarDisplayStyle.allCases) { style in
                             Text(style.title).tag(style)
                         }
@@ -63,16 +51,24 @@ struct GeneralSettingsView: View {
                     .frame(width: SettingsLayoutMetrics.controlWidth)
                 }
 
+                SettingsLabeledRow("Appearance") {
+                    Picker("Appearance", selection: $settings.appearancePreference) {
+                        ForEach(AppearancePreference.allCases) { appearance in
+                            Text(appearance.title).tag(appearance)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(width: SettingsLayoutMetrics.appearanceSegmentedControlWidth)
+                    .accessibilityLabel("Appearance")
+                }
+
+                SettingsDescription("Controls the Settings window appearance. The menu bar follows macOS.")
+                    .settingsValueColumnAligned()
+
                 SettingsDescription("Updates after each quota refresh using the frequency selected in Refresh.")
                     .settingsValueColumnAligned()
             }
-
-            SettingsSection("Application") {
-                SettingsLabeledRow("Name") { Text("Codex Usage Monitor") }
-                SettingsLabeledRow("Version") { Text(status.appVersion) }
-                SettingsLabeledRow("Build") { Text(status.buildNumber) }
-            }
-
         }
         .onAppear(perform: launchAtLogin.refresh)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in

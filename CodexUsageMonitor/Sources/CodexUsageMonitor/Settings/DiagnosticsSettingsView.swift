@@ -52,6 +52,12 @@ struct DiagnosticsSettingsView: View {
                 }
                 SettingsDescription("Diagnostics contain stable classifications only, never raw provider error text or quota values.")
             }
+
+            SettingsSection("Application") {
+                SettingsLabeledRow("Name") { Text("Codex Usage Monitor") }
+                SettingsLabeledRow("Version") { Text(status.appVersion) }
+                SettingsLabeledRow("Build") { Text(status.buildNumber) }
+            }
         }
     }
 }
