@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` (recommended) or `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** **In progress — Tasks 1–2 implementation complete; signed-app visual acceptance remains pending.** This plan finishes the approved native Settings visual slice from current `main`; it does not revive or merge `feature/figma-settings-port`.
+**Status:** **Implementation complete — signed-app visual acceptance remains pending.** Tasks 1–3 implemented the approved native Settings slice, and Task 4 recorded fresh static evidence and the manual acceptance boundary. This plan does not revive or merge `feature/figma-settings-port`.
 
 **Goal:** Complete the remaining approved Figma-inspired Settings behavior while preserving the current native global-sidebar theme, semantic colors, live System/Light/Dark presentation, controls, settings values, and all existing app behavior.
 
@@ -447,7 +447,7 @@ Expected: the focused layout regression and full test suite pass. Record any unm
 - Modify: `docs/product/planning-board.md`
 - Modify: `how-to.md`, `UsageProbe/README.md`, and `outline.md`
 
-- [ ] **Step 1: Run final static checks.**
+- [x] **Step 1: Run final static checks.**
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-path CodexUsageMonitor
@@ -463,11 +463,11 @@ For all six destinations, inspect Context Rail hidden then visible at the defaul
 
 Do not manufacture quota consumption, edit user credentials, or close a user-owned monitor process. If an isolated state cannot safely be created, list it as **Not run** in the plan and PR draft.
 
-- [ ] **Step 3: Reconcile sources without claiming unsupported Figma behavior.**
+- [x] **Step 3: Reconcile sources without claiming unsupported Figma behavior.**
 
 Mark Product Follow-up 5 and the planning-board design-completion rows **Verification** only after the acceptance matrix is observed. Update the provider follow-up plan to state that its UI-only Task 1 geometry/switch subset was implemented here; keep search and provider lifecycle tasks deferred. Keep Other Figma Surfaces deferred. Document the actual rail behavior and all remaining limitations in operating guides.
 
-- [ ] **Step 4: Prepare the manual PR handoff.**
+- [x] **Step 4: Prepare the manual PR handoff.**
 
 Create `.worktrees/figma-settings-design-completion-PR.md` from `.github/pull_request_template.md`. Include only observed evidence, the focused layout regression result, signed-app result, visual matrix outcome, limitations, rollback, and the fact that the user manually creates every GitHub PR. Do not invoke PR creation.
 
@@ -486,3 +486,10 @@ Create `.worktrees/figma-settings-design-completion-PR.md` from `.github/pull_re
 - Provider/window warning scope, notification identity, Disconnect, agent selector, and menu-bar-agent policy: Tasks 3–7 of the same plan, pending actual provider capability.
 - Dedicated Permissions destination and richer refresh explanation: Product Follow-ups 6 and 7, each still requiring a dedicated plan.
 - Dashboard, menu popover, widget, Watch, and other Figma surfaces: remain deferred until separately directed with approved current nodes.
+
+### Task 4 completion evidence and remaining gate
+
+- **Run (2026-07-18):** `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-path CodexUsageMonitor` passed: 8 tests, 0 failures, including `SettingsWindowLayoutTests/test_contextRailOnlyChangesTheRightHandWindowAllocation`.
+- **Run (2026-07-18):** the signed app build, strict `codesign` verification, `plutil -lint`, and `git diff --check` passed. These prove the package, bundle, signature, plist, and diff hygiene; they do not prove native Settings presentation or interaction.
+- **Not run:** the complete real-window matrix. No audit-owned monitor instance could be safely identified in this session, so no Settings app was launched, closed, or inspected. The six-destination hidden/visible Context Rail pass; General preview cleanup; notification, connection, quota, and long-status conditional states; scrollbar, keyboard, VoiceOver, and open/close cycles; the live System/Light/Dark transition matrix; and the native-menu appearance boundary all remain manual acceptance work.
+- Product Follow-up 5 and the related planning-board rows remain **Queued**, rather than advancing to Verification or Closed, until that signed-app matrix is directly observed. The local `High-fidelity macOS menu UI v4` artifact informed structure only; it is not a runtime dependency, source import, or asset input, and React/CSS/assets remain excluded.

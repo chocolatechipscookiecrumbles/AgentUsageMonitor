@@ -187,7 +187,7 @@ No mixed appearance should remain.
 
 ## 5. Simplify General Settings context rail
 
-**Status:** **Queued.** The current native-shell completion is specified in the [Figma Settings Design Completion plan](../superpowers/plans/2026-07-17-figma-settings-design-completion.md). It preserves the existing theme and Settings behavior while completing the documented rail geometry, native switches, General cleanup, and signed-app acceptance.
+**Status:** **Queued.** The [Figma Settings Design Completion plan](../superpowers/plans/2026-07-17-figma-settings-design-completion.md) implemented the native rail geometry, switches, and General cleanup while preserving the existing theme and Settings behavior. Fresh package and signed-bundle checks pass; this follow-up must not advance to Verification until direct signed-app acceptance covers both rail states and conditional content.
 
 Problem
 
