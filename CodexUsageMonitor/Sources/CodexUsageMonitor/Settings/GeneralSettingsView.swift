@@ -3,8 +3,6 @@ import SwiftUI
 struct GeneralSettingsView: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var launchAtLogin: LaunchAtLoginController
-    let status: SettingsStatus
-    let displayState: QuotaDisplayState
 
     var body: some View {
         SettingsPage {
