@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` (recommended) or `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** **Implementation complete — Tasks 1–6 are implemented.** Signed-app visual acceptance remains pending. This plan does not revive or merge `feature/figma-settings-port`.
+**Status:** **Implementation complete — Tasks 1–6 are implemented.** The user directly inspected the card/rail destination matrix; the later destination-switch rendering correction retains its own signed-app acceptance check. This plan does not revive or merge `feature/figma-settings-port`.
 
 **Goal:** Complete the remaining approved Figma-inspired Settings behavior while preserving the current native global-sidebar theme, semantic colors, live System/Light/Dark presentation, controls, settings values, and all existing app behavior.
 

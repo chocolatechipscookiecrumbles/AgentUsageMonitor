@@ -30,7 +30,7 @@ struct SettingsNavigationSidebar: View {
                 LazyVStack(spacing: 1) {
                     ForEach(filteredTabs) { tab in
                         Button {
-                            selection = tab
+                            SettingsDestinationSelection.select(tab, using: $selection)
                         } label: {
                             HStack(spacing: 10) {
                                 Image(systemName: tab.systemImage)

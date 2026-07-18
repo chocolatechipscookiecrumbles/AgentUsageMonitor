@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` (recommended) or `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** **Implementation complete — Draft manual acceptance remains open.** This slice deliberately adds no new automated test case and does not make either new Refresh switch operational.
+**Status:** **Implementation complete — Draft route-transition acceptance remains open.** The user directly inspected the final card presentation across the stated Settings matrix; the new non-animated destination-selection transaction still requires its own signed-app regression observation. This slice deliberately adds no new automated test case and does not make either new Refresh switch operational.
 
 **Goal:** Adapt the existing native Settings pages to the v4 Figma card-and-row layout while retaining supported current items, right-aligning General choice controls, porting the dark surface palette, and presenting the requested Refresh options without changing refresh scheduling.
 
@@ -75,6 +75,7 @@ The following Figma-only items remain excluded: Show in Menu Bar, Start Minimize
 
 | File | Responsibility |
 | --- | --- |
+| Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsDestinationSelection.swift` | One non-animated transaction boundary for all visible Settings-destination changes. |
 | Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsPreferenceControlRow.swift` | One reusable leading-text/trailing-native-control row for multi-value choices and explicit unavailable controls. |
 | Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsSectionRow.swift` | One shared Figma-style in-card row wrapper with standard inset and optional palette-aware separator. |
 | Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsAppearancePalette.swift` | Central light-semantic/dark-v4 palette value, injected through `EnvironmentValues`. |
@@ -514,14 +515,31 @@ During direct signed-app inspection, reusing a palette `Rectangle` constrained o
 
 General initially reached the page's trailing edge because the fixed 240-point segmented picker, 180-point leading-text minimum, inter-column spacing, and section/page padding exceeded the 499-point Settings Page budget. The repair uses centralized smaller bounded segments and leading minimum values that fit the page, with `SettingsSectionRow` explicitly filling its available width. The card density repair removes stacked outer vertical card padding and retains one 12-point row inset plus horizontal-only card padding. General's launch and keyboard controls share one dense card, while its control explanations use the same leading-column rhythm as the Notifications master switch.
 
-These causes and prevention rules are recorded in `AGENTS.md` under **Settings card geometry and mixed-axis layout guardrails**. The signed-app visual matrix remains open until the user confirms the repaired General width/density and the full cross-destination Light/Dark/rail matrix.
+These causes and the destination-identity prevention rule are recorded in `AGENTS.md` under **Settings card geometry and mixed-axis layout guardrails**. The signed-app visual matrix remains open until the user confirms the repaired General width/density and the full cross-destination Light/Dark/rail matrix.
+
+### Destination-switch rendering boundary — 2026-07-18
+
+The user observed one or two frames of the prior page's text while changing between General and Notifications. This is not selected-destination persistence: `AppSettings.selectedSettingsTab` is an in-memory `@Published` value written directly by `SettingsNavigationSidebar`, with no disk read, task, timer, or declared selection animation. Both destination branches enter the same `SettingsPage`/`ScrollView` host through `SettingsDetailView`.
+
+An identity-scoped experiment using `.id(settings.selectedSettingsTab)` was rejected after direct slow-motion observation: it made the behavior worse by treating the switch as removal/insertion and visibly fading/overlapping old and new text. The experiment was reverted. The remaining cause must be traced through the selection transaction and AppKit/SwiftUI host reconciliation before another repair is attempted.
+
+No new automated test case is added by user direction. Direct signed-app regression acceptance remains rapid repeated General → Notifications → General switching, including with the Context Rail both hidden and visible; the final manual visual result remains unobserved.
+
+### Video inspection evidence — 2026-07-18
+
+The user-provided `tab switch text bug.mov` is a 5.95-second, 60 fps recording of the current signed app. Its raw General → Notifications frames reproduce the defect: interleaved frames at 3.033, 3.067, and 3.100 seconds contain duplicated/displaced text across the full Settings hierarchy, including the unchanged sidebar and header, while adjacent frames settle correctly. The artifact is therefore not a Notifications-card spacing change or a delayed persisted selection; it is a whole-hierarchy SwiftUI/AppKit compositing transaction during sidebar selection.
+
+The failed `.id(settings.selectedSettingsTab)` experiment remains reverted because it introduced a visible removal/insertion fade. `SettingsDestinationSelection` now owns the non-animated transaction for both the sidebar binding and the existing menu-triggered Notification route. This preserves destination identity and all unrelated interactions while preventing an inherited animation transaction from producing transient text layers. Future `SettingsTab` cases use the same sidebar `ForEach` and selection boundary automatically; any future visible programmatic route must call the same owner. The existing package suite (8 tests, 0 failures), signed build, signature, plist, and diff checks pass. Direct signed-app acceptance of this transaction change remains unobserved.
+
+### User-observed Settings acceptance — 2026-07-18
+
+The user directly inspected and accepted the final General trailing gutter and compact card density. The user also directly inspected all six Settings destinations with the Context Rail hidden and visible, Light and Dark appearance, relevant conditional states, scrolling, keyboard traversal, VoiceOver, focus preservation, and the native-menu appearance boundary. Those observations apply to the completed card/palette presentation; they do not replace the dedicated post-fix destination-switch regression check or the separately documented System-appearance transition matrix.
 
 ### Implementation evidence — 2026-07-18
 
-- **Run:** `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-path CodexUsageMonitor` passed after the final layout adjustment: 8 tests, 0 failures. No test case was added by user direction; this is existing regression coverage only.
-- **Run:** the signed build script completed; `codesign --verify --deep --strict --verbose=2` reported a valid bundle satisfying its Designated Requirement; `plutil -lint` reported `OK`; and `git diff --check` passed.
+- **Run:** the existing package suite passed (8 tests, 0 failures) and the signed build/signature/plist/diff checks passed for the rejected destination-identity experiment. No test case was added by user direction; this is existing regression coverage only and is not acceptance evidence for the issue.
 - **Observed:** the initial signed-app audit exposed the divider expansion and General width/density regressions. After the axis-specific divider repair, the user confirmed the empty upper panel was gone and Settings scrolling was restored.
-- **Not run:** the user had not yet reported direct acceptance of the final compact-card/General-gutter revision, nor the complete six-destination, rail-hidden/visible, Light/Dark, appearance-transition, focus, VoiceOver, and native-menu matrices. The branch and manual PR handoff remain Draft for those limits.
+- **Not run:** a successful destination-switch repair and final compact-card/General-gutter revision, plus the complete six-destination, rail-hidden/visible, Light/Dark, appearance-transition, focus, VoiceOver, and native-menu matrices. The branch and manual PR handoff remain Draft for those limits.
 
 ## Acceptance criteria
 

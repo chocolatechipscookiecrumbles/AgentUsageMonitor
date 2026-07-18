@@ -23,7 +23,7 @@ struct QuotaMenuView: View {
     }
 
     private func openNotificationSettings() {
-        viewModel.settings.selectedSettingsTab = .notifications
+        SettingsDestinationSelection.select(.notifications, in: viewModel.settings)
         NSApp.activate(ignoringOtherApps: true)
         openSettings()
     }
