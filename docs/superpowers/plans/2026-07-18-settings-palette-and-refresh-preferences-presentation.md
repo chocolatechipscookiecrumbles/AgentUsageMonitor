@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` (recommended) or `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** **Implementation complete — Draft route-transition acceptance remains open.** The user directly inspected the final card presentation across the stated Settings matrix; the new non-animated destination-selection transaction still requires its own signed-app regression observation. This slice deliberately adds no new automated test case and does not make either new Refresh switch operational.
+**Status:** **Implementation complete — known destination-switch compositor defect deferred.** The user directly inspected the final card presentation across the stated Settings matrix. The page-switch artifact remains reproducible after two rejected workarounds and is deferred by user direction for a dedicated prototype; this slice deliberately adds no new automated test case and does not make either new Refresh switch operational.
 
 **Goal:** Adapt the existing native Settings pages to the v4 Figma card-and-row layout while retaining supported current items, right-aligning General choice controls, porting the dark surface palette, and presenting the requested Refresh options without changing refresh scheduling.
 
@@ -75,7 +75,6 @@ The following Figma-only items remain excluded: Show in Menu Bar, Start Minimize
 
 | File | Responsibility |
 | --- | --- |
-| Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsDestinationSelection.swift` | One non-animated transaction boundary for all visible Settings-destination changes. |
 | Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsPreferenceControlRow.swift` | One reusable leading-text/trailing-native-control row for multi-value choices and explicit unavailable controls. |
 | Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsSectionRow.swift` | One shared Figma-style in-card row wrapper with standard inset and optional palette-aware separator. |
 | Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsAppearancePalette.swift` | Central light-semantic/dark-v4 palette value, injected through `EnvironmentValues`. |
@@ -521,25 +520,26 @@ These causes and the destination-identity prevention rule are recorded in `AGENT
 
 The user observed one or two frames of the prior page's text while changing between General and Notifications. This is not selected-destination persistence: `AppSettings.selectedSettingsTab` is an in-memory `@Published` value written directly by `SettingsNavigationSidebar`, with no disk read, task, timer, or declared selection animation. Both destination branches enter the same `SettingsPage`/`ScrollView` host through `SettingsDetailView`.
 
-An identity-scoped experiment using `.id(settings.selectedSettingsTab)` was rejected after direct slow-motion observation: it made the behavior worse by treating the switch as removal/insertion and visibly fading/overlapping old and new text. The experiment was reverted. The remaining cause must be traced through the selection transaction and AppKit/SwiftUI host reconciliation before another repair is attempted.
+An identity-scoped experiment using `.id(settings.selectedSettingsTab)` was rejected after direct slow-motion observation: it made the behavior worse by treating the switch as removal/insertion and visibly fading/overlapping old and new text. A second experiment centralizing a disabled-animation transaction for sidebar and menu routes also left the defect visible in the signed app. Both experiments were reverted. The remaining cause must be isolated in a dedicated prototype that compares the existing branch switch, a native selection container, and an AppKit-hosted alternative with raw signed-app frame capture before another repair is attempted.
 
-No new automated test case is added by user direction. Direct signed-app regression acceptance remains rapid repeated General → Notifications → General switching, including with the Context Rail both hidden and visible; the final manual visual result remains unobserved.
+No new automated test case is added by user direction. The deferred repair's future signed-app regression boundary is rapid repeated switching across all six destinations, including both Context Rail states; no transition is currently claimed fixed.
 
 ### Video inspection evidence — 2026-07-18
 
 The user-provided `tab switch text bug.mov` is a 5.95-second, 60 fps recording of the current signed app. Its raw General → Notifications frames reproduce the defect: interleaved frames at 3.033, 3.067, and 3.100 seconds contain duplicated/displaced text across the full Settings hierarchy, including the unchanged sidebar and header, while adjacent frames settle correctly. The artifact is therefore not a Notifications-card spacing change or a delayed persisted selection; it is a whole-hierarchy SwiftUI/AppKit compositing transaction during sidebar selection.
 
-The failed `.id(settings.selectedSettingsTab)` experiment remains reverted because it introduced a visible removal/insertion fade. `SettingsDestinationSelection` now owns the non-animated transaction for both the sidebar binding and the existing menu-triggered Notification route. This preserves destination identity and all unrelated interactions while preventing an inherited animation transaction from producing transient text layers. Future `SettingsTab` cases use the same sidebar `ForEach` and selection boundary automatically; any future visible programmatic route must call the same owner. The existing package suite (8 tests, 0 failures), signed build, signature, plist, and diff checks pass. Direct signed-app acceptance of this transaction change remains unobserved.
+The failed `.id(settings.selectedSettingsTab)` experiment remains reverted because it introduced a visible removal/insertion fade. The subsequent disabled-animation route-transaction experiment also remains reverted: direct signed-app acceptance showed that it did not eliminate the artifact. The existing package suite, signed build, signature, plist, and diff checks are regression baseline only; they do not establish a compositor repair. The defect is explicitly deferred until the documented prototype comparison can produce raw signed-app frame evidence.
 
 ### User-observed Settings acceptance — 2026-07-18
 
-The user directly inspected and accepted the final General trailing gutter and compact card density. The user also directly inspected all six Settings destinations with the Context Rail hidden and visible, Light and Dark appearance, relevant conditional states, scrolling, keyboard traversal, VoiceOver, focus preservation, and the native-menu appearance boundary. Those observations apply to the completed card/palette presentation; they do not replace the dedicated post-fix destination-switch regression check or the separately documented System-appearance transition matrix.
+The user directly inspected and accepted the final General trailing gutter and compact card density. The user also directly inspected all six Settings destinations with the Context Rail hidden and visible, Light and Dark appearance, relevant conditional states, scrolling, keyboard traversal, VoiceOver, focus preservation, and the native-menu appearance boundary. Those observations apply to the completed card/palette presentation; they do not resolve the separately deferred destination-switch compositor defect or replace the separately documented System-appearance transition matrix.
 
 ### Implementation evidence — 2026-07-18
 
-- **Run:** the existing package suite passed (8 tests, 0 failures) and the signed build/signature/plist/diff checks passed for the rejected destination-identity experiment. No test case was added by user direction; this is existing regression coverage only and is not acceptance evidence for the issue.
+- **Run:** the existing package suite passed (8 tests, 0 failures) and the signed build/signature/plist/diff checks passed for the rejected experiments. No test case was added by user direction; this is existing regression coverage only and is not acceptance evidence for the issue.
 - **Observed:** the initial signed-app audit exposed the divider expansion and General width/density regressions. After the axis-specific divider repair, the user confirmed the empty upper panel was gone and Settings scrolling was restored.
-- **Not run:** a successful destination-switch repair and final compact-card/General-gutter revision, plus the complete six-destination, rail-hidden/visible, Light/Dark, appearance-transition, focus, VoiceOver, and native-menu matrices. The branch and manual PR handoff remain Draft for those limits.
+- **Observed:** the user accepted the final compact-card/General-gutter revision and the stated six-destination, rail-hidden/visible, Light/Dark, conditional-state, scrolling, keyboard, VoiceOver, focus-preservation, and native-menu appearance matrix.
+- **Deferred:** a successful destination-switch compositor repair. The `.id` and disabled-animation transaction trials failed and are absent from production source. The separate live System-appearance transition matrix remains **Not run**.
 
 ## Acceptance criteria
 
