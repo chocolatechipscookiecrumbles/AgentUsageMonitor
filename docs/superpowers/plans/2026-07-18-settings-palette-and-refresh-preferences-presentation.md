@@ -2,11 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` (recommended) or `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** **Implementation complete — known destination-switch compositor defect deferred.** The user directly inspected the final card presentation across the stated Settings matrix. The page-switch artifact remains reproducible after two rejected workarounds and is deferred by user direction for a dedicated prototype; this slice deliberately adds no new automated test case and does not make either new Refresh switch operational.
+**Status:** **Implementation complete — known destination-switch compositor defect deferred.** The user directly inspected the final card presentation across the stated Settings matrix. The page-switch artifact remains reproducible after two rejected workarounds and is deferred by user direction for a dedicated prototype. Its original presentation-only Refresh rows are superseded by the implemented [Refresh-on-Wake plan](2026-07-18-refresh-wake-and-menu-open.md); this plan itself added no automated test case.
+
+**Refresh scope correction — 2026-07-18:** This document's original Figma-derived **Refresh on open** affordance was intentionally not promoted to product behavior. The user rejected it as poor design. Treat any later uncompleted task text that mentions an open preference, `refresh.onOpen`, or `RefreshReason.menuOpen` as historical rejected design, not executable direction. The implemented behavior is the persisted wake-only control in the linked follow-on plan.
 
 **Goal:** Adapt the existing native Settings pages to the v4 Figma card-and-row layout while retaining supported current items, right-aligning General choice controls, porting the dark surface palette, and presenting the requested Refresh options without changing refresh scheduling.
 
-**Architecture:** The existing global sidebar, page header, content width, Context Rail, native controls, and supported settings remain intact. `SettingsView` remains the one owner of the concrete Settings presentation color scheme and injects a value-type `SettingsAppearancePalette` into that hierarchy. Figma-style preference groups use the existing card treatment with leading label/description and trailing native control alignment; `QuotaMonitor` remains the only scheduler and wake observer, so this slice only renders truthful, unavailable Refresh controls and preserves the existing `refreshMode` binding.
+**Architecture:** The existing global sidebar, page header, content width, Context Rail, native controls, and supported settings remain intact. `SettingsView` remains the one owner of the concrete Settings presentation color scheme and injects a value-type `SettingsAppearancePalette` into that hierarchy. Figma-style preference groups use the existing card treatment with leading label/description and trailing native control alignment. The later Refresh-on-Wake plan makes only wake functional while preserving `QuotaMonitor` as the only scheduler and coalescing owner; menu opening stays passive.
 
 **Tech Stack:** Swift 6.2, SwiftUI, AppKit semantic colors for the existing Light presentation, existing `AppSettings`/`QuotaMonitor`, and the signed macOS app build script.
 
@@ -17,7 +19,7 @@ The local v4 design reference is `High-fidelity macOS menu UI v4/src/components/
 | Reference location | Confirmed v4 element | Native adaptation in this plan |
 | --- | --- | --- |
 | lines 554–574 | `Menu Bar Icon` has a trailing `SegmentedControl(["System", "Light", "Dark"])`. | Keep the existing native `Picker(...).pickerStyle(.segmented)`, bind it only to `AppSettings.appearancePreference`, and place it in a trailing-control row. |
-| lines 648–672 | `Automatic Refresh` has a native-select-style **Refresh interval** row and trailing **Refresh on wake**/**Refresh on open** switches with the supplied descriptions. | Keep the existing `RefreshMode` picker and present the two requested switches as visibly unavailable, non-persistent controls until their behavior plan is approved. |
+| lines 648–672 | `Automatic Refresh` has a native-select-style **Refresh interval** row and trailing **Refresh on wake**/**Refresh on open** switches with the supplied descriptions. | Keep the existing `RefreshMode` picker and implement only the approved wake control. The user rejected Refresh on open; the reference does not add behavior authority. |
 | lines 765–773, 794–804, 813–845, 873–884 | Dark window/content is `#1e1e1e`; sidebar/context rail is `#1a1a1a`; search is white at 8% opacity; the primary border/divider is white at 6% opacity. | Resolve the approved values in a single Settings palette and apply them to all owned surfaces, rather than scattering hard-coded colors through pages. |
 | lines 130–163 | Section groups use a white 5.5%-opacity dark surface, with white 6%-opacity separators. | Use the palette for Settings and Context Rail cards and their dividers/borders. |
 | lines 64–95 | Segment track is white 8%; selected segment and native select fill are `#3a3a3c`; native-select border is white 10%. | Preserve native macOS control behavior; use these values only where native control/container styling can receive them without replacing system control semantics. |
@@ -58,7 +60,7 @@ The following Figma-only items remain excluded: Show in Menu Bar, Start Minimize
 ## Confirmed layout decisions — 2026-07-18
 
 1. **Destination scope:** Apply the Figma row separators and tighter card-row treatment consistently to all six Settings destinations through `SettingsSectionRow`, while retaining their supported current items and behavior.
-2. **Inactive Refresh affordance:** Use disabled native switches with visible factual statuses: wake is on/**Always on** because the monitor already refreshes on wake, while open is off/**Not available yet** because no menu-open refresh exists. This avoids a clickable nonfunctional preference.
+2. **Refresh behavior follow-on:** The presentation slice initially used truthful unavailable controls. The later implementation persists only wake; the user rejected Refresh on open, so it must be absent rather than clickable or disabled.
 3. **Verification:** Run the existing automated suite as regression coverage and perform final visual acceptance manually in an audit-owned signed app. No Figma Design URL or Desktop node is available for screenshot comparison.
 
 ## Global constraints
@@ -67,8 +69,8 @@ The following Figma-only items remain excluded: Show in Menu Bar, Start Minimize
 - Keep `SettingsView` as the single appearance owner. Continue resolving a concrete color scheme through `SystemAppearanceObserver`; do not set `NSApplication.appearance`, `NSWindow.appearance`, recreate a window, or reset selected destination, search query, scroll position, rail state, or focus.
 - Use `SettingsPage`, `SettingsSection`, `SettingsLabeledRow`, `SettingsDescription`, shared rows, and `SettingsLayoutMetrics`. Do not add a top-level `Form`, `LabeledContent`, duplicate alignment constants, transparent spacer content, a web runtime, React/CSS, or Figma assets.
 - Preserve native SwiftUI controls. A shared row may give a bounded picker or segmented picker a trailing position; it must not replace a native picker or switch with a hand-drawn imitation.
-- **No new automated test cases in this slice, by user direction.** Run the existing Swift package suite only as a regression baseline. Add focused deterministic regression coverage later, when a separate behavior plan introduces persisted wake/open preferences or menu-open refresh dispatch.
-- Do not add `AppSettings` keys, persistence, scheduler subscriptions, timers, menu polling, `RefreshReason` cases, diagnostics events, wake behavior changes, or menu-open refresh behavior here. `QuotaMonitor` remains the sole refresh scheduler and current wake observer.
+- **No new automated test cases in this slice, by user direction.** Run the existing Swift package suite only as a regression baseline. A later behavior plan introduced persisted wake preference; it added no test case by the same direction.
+- This presentation slice itself adds no `AppSettings` keys, persistence, scheduler subscriptions, timers, menu polling, `RefreshReason` cases, diagnostics events, or wake behavior changes. The later wake-only plan preserves `QuotaMonitor` as the sole refresh scheduler and explicitly prohibits menu-open refresh behavior.
 - The new UI must not falsely imply that an unavailable Refresh option has changed scheduling. It must expose a noninteractive state and explicit availability information to both sighted users and VoiceOver.
 
 ## File structure
@@ -399,7 +401,7 @@ git commit -m "Port Settings dark surface palette"
 
 Do not add a test case.
 
-### Task 4: Present Refresh interval, wake, and open controls without scheduling changes
+### Task 4: Historical presentation-only Refresh proposal — superseded
 
 **Files:**
 - Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/RefreshSettingsView.swift`
@@ -408,7 +410,7 @@ Do not add a test case.
 **Interfaces:**
 - Consumes the two rows from Task 1.
 - Keeps the existing writable `$settings.refreshMode` binding and every `RefreshMode.allCases` option.
-- Produces no new `Binding`, preference key, monitor subscription, `RefreshReason`, timer, notification observer, or menu-open callback.
+- Was limited to presentation before behavior approval. It is superseded by the wake-only follow-on plan; do not implement an open control or menu callback from this historical task.
 
 - [ ] **Step 1: Make the existing selector a trailing native Refresh interval menu.**
 
@@ -429,31 +431,17 @@ SettingsPreferenceControlRow("Refresh interval") {
 
 Do not replace `RefreshMode` with the v4 mockup's shorter option list: that would silently change supported behavior. Keep the read-only **Current Policy** and **Latest Collection** sections unchanged.
 
-- [ ] **Step 2: Add the two requested presentation-only rows with factual states.**
+- [x] **Step 2: Supersede the presentation-only wake/open rows.**
 
 ```swift
-SettingsUnavailablePreferenceControlRow(
-    "Refresh on wake",
-    description: "Immediately refresh after the system wakes from sleep.",
-    isOn: true,
-    availability: "Always on"
-)
-
-SettingsUnavailablePreferenceControlRow(
-    "Refresh on open",
-    description: "Refresh when the menu dropdown is opened.",
-    isOn: false,
-    availability: "Not available yet"
-)
-
-SettingsDescription("Refresh on wake is currently always enabled. Refresh on open is planned and does not refresh the menu yet.")
+The later behavior plan replaces the unavailable wake row with a persisted native switch. It removes the open row entirely after user rejection. Do not restore it as a disabled, planned, or interactive control.
 ```
 
-`true` for wake reflects the current unconditional `NSWorkspace.didWakeNotification` observer in `QuotaMonitor.start()`; `false` for open reflects that no menu-open `RefreshReason` or callback exists. The unavailable wrapper must be disabled and must not write a value.
+Wake is no longer unconditional: `QuotaMonitor` consults the persisted wake preference. Native-menu opening has no `RefreshReason` or callback.
 
-- [ ] **Step 3: Record the later behavior contract without implementing it.**
+- [x] **Step 3: Record the final behavior boundary.**
 
-A later plan may add `AppSettings` keys `refresh.onWake` (migration default `true`) and `refresh.onOpen` (migration default `false`). Only `QuotaMonitor` may subscribe to the wake key and decide whether its existing wake observer calls `refresh(reason: .wake)`. A menu opening may request one coalesced semantic monitor action only; it must not add a timer, polling loop, menu-tree state watcher, or second scheduler. That later plan must decide whether a `RefreshReason.menuOpen` diagnostic is needed and add the smallest deterministic regression coverage for disabled/enabled wake and one coalesced menu-open request.
+The follow-on plan adds only `AppSettings.refreshOnWake` with migration default `true`. Only `QuotaMonitor` consults it before its existing wake callback. A menu opening must not request any monitor action, timer, polling loop, menu-tree state watcher, or second scheduler.
 
 - [ ] **Step 4: Run the existing regression baseline and commit.**
 
@@ -479,16 +467,16 @@ Do not add a test case.
 
 In the original Figma completion plan, replace its obsolete blanket exclusion of refresh-on-wake/open with a link to this plan and state that the controls are separately approved for presentation only. Add this plan to the planning-board index and a **Queued** Settings slice row whose next action is Task 1 implementation; keep Product Follow-up 5 **Queued**.
 
-- [ ] **Step 2: Update user-facing guidance after implementation.**
+- [x] **Step 2: Update user-facing guidance after implementation.**
 
-In `how-to.md`, describe the Refresh page precisely: **Refresh interval** changes the existing schedule; **Refresh on wake** is currently always on; **Refresh on open** is visibly planned and has no effect yet. Do not imply that a disabled presentation row persists a preference.
+In `how-to.md`, describe the Refresh page precisely: **Refresh interval** changes the existing schedule; **Refresh on wake** defaults on and is configurable; there is no Refresh-on-open option, and opening the menu does not refresh it.
 
 - [ ] **Step 3: Directly inspect the signed app before completion.**
 
 Open only an audit-owned signed app instance through normal UI paths. At 680 × 560 hidden rail and 891 × 560 visible rail, inspect:
 
 1. General **Style**, **Show**, and all three **Appearance** segments share the trailing alignment of native switches and preserve existing values.
-2. Refresh interval is bounded and right aligned; wake is disabled/on with **Always on**; open is disabled/off with **Not available yet**; neither switch changes when clicked, and VoiceOver reports its unavailable state/hint.
+2. Refresh interval is bounded and right aligned; the persisted wake switch is interactive; no Refresh-on-open control appears; and opening the native menu does not schedule work.
 3. General, Refresh, Notifications, Agents, Data & Privacy, and Diagnostics in Light and Dark: page/header, sidebar, Context Rail, section/card fills, dividers, selected sidebar item, and search background have no stale/mixed region.
 4. Light → System while macOS is Dark; Dark → System while macOS is Light; System → Light → System; System → Dark → System; and a macOS appearance change while Settings stays open. Confirm destination, search text, scroll location, Context Rail visibility, preview state, and focused control survive.
 5. The native menu still follows macOS, not the Settings preference. Do not add menu refresh behavior or a timer.
@@ -546,7 +534,7 @@ The user directly inspected and accepted the final General trailing gutter and c
 - General **Style**, **Show**, and **Appearance** use a common leading-text/trailing-native-control layout; Appearance stays a bounded native System/Light/Dark segmented picker.
 - The dark palette applies the exact v4 surface values through one `SettingsView`-injected palette: `#1e1e1e`, `#1a1a1a`, white 5.5%, 6%, 8%, and 10% overlays, and `#3a3a3c` only where native-control compatibility permits. Light continues using semantic system colors.
 - No Settings surface holds an ad hoc dark color; pages share the same effective appearance, and no AppKit/application-wide appearance assignment is added.
-- Refresh presents **Refresh interval**, **Refresh on wake**, and **Refresh on open** in the v4-inspired leading-label/trailing-control format. The exact supplied descriptions are present.
-- Refresh interval retains its existing supported `RefreshMode` selection and behavior. Wake remains truthfully always on; open remains truthfully unavailable. Neither new row persists or changes a scheduling setting.
+- Refresh presents **Refresh interval** and the persisted **Refresh on wake** control in the v4-inspired leading-label/trailing-control format. No Refresh-on-open control appears.
+- Refresh interval retains its supported selection and behavior. Wake defaults on but persists its setting; menu opening remains passive.
 - No new automated test case is added. Existing tests serve only as a regression baseline; later behavior wiring has an explicit deterministic-regression requirement.
 - The signed-app visual matrix is recorded as direct observation or **Not run** without inference. No PR is created or pushed by an agent.

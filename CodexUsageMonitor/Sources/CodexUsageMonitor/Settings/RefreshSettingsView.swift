@@ -26,25 +26,13 @@ struct RefreshSettingsView: View {
                 }
 
                 SettingsSectionRow {
-                    SettingsUnavailablePreferenceControlRow(
+                    SettingsPreferenceToggle(
                         "Refresh on wake",
                         description: "Immediately refresh after the system wakes from sleep.",
-                        isOn: true,
-                        availability: "Always on"
+                        isOn: $settings.refreshOnWake
                     )
                 }
 
-                SettingsSectionRow(showsDivider: false) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        SettingsUnavailablePreferenceControlRow(
-                            "Refresh on open",
-                            description: "Refresh when the menu dropdown is opened.",
-                            isOn: false,
-                            availability: "Not available yet"
-                        )
-                        SettingsDescription("Refresh on wake is currently always enabled. Refresh on open is planned and does not refresh the menu yet.")
-                    }
-                }
             }
 
             SettingsSection("Current Policy") {
@@ -63,7 +51,7 @@ struct RefreshSettingsView: View {
                 }
                 SettingsSectionRow(showsDivider: false) {
                     VStack(alignment: .leading, spacing: 6) {
-                        SettingsDescription("The monitor refreshes at launch, after wake, on schedule, and when requested manually.")
+                        SettingsDescription("The monitor refreshes at launch, when the enabled wake trigger occurs, on schedule, and when requested manually.")
                         SettingsDescription("Automatic may temporarily refresh every 30 seconds near a warning threshold, qualified exhaustion, or quota reset. Fixed choices never use 30 seconds.")
                         SettingsDescription("After three unsuccessful refreshes, every mode temporarily retries every 10 minutes until an update is confirmed.")
                     }
@@ -97,7 +85,6 @@ struct RefreshSettingsView: View {
     private static func intervalName(_ interval: TimeInterval) -> String {
         switch Int(interval) {
         case 30: "30 seconds"
-        case 60: "1 minute"
         case 90: "1 minute 30 seconds"
         default: "\(Int(interval / 60)) minutes"
         }

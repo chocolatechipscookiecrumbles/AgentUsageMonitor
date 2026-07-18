@@ -129,6 +129,10 @@ Acceptance
 
 No overlapping controls under supported window sizes.
 
+Verification evidence — 2026-07-18
+
+The reported copy was `Resets: Jul 25, 2026 at 17:24`. It is not currently reproducible in the native menu, so no layout correction is claimed or implemented. Keep this item open for signed-app verification after future menu changes: inspect long reset copy beside **Quota alerts** at narrow supported widths, with localized/Dynamic Type text, Light/Dark, scrolling, pointer/keyboard/VoiceOver navigation, and command activation.
+
 ⸻
 
 ## 4. Finish System appearance transition implementation

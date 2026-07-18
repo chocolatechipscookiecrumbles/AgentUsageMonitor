@@ -77,7 +77,10 @@ final class QuotaMonitor: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            Task { @MainActor [weak self] in self?.refresh(reason: .wake) }
+            Task { @MainActor [weak self] in
+                guard let self, self.settings.refreshOnWake else { return }
+                self.refresh(reason: .wake)
+            }
         }
     }
 

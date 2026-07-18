@@ -8,15 +8,19 @@
 
 **Tech Stack:** Swift 6.2, SwiftUI, Combine, Foundation, AppKit, macOS 14+; no third-party dependencies and no storage-schema changes.
 
+**2026-07-18 correction:** The implemented [Refresh-on-Wake plan](2026-07-18-refresh-wake-and-menu-open.md) retires the selectable one-minute mode, migrates its stored raw value to 90 seconds, and makes wake dispatch conditional on a persisted control while retaining this monitor's single-flight scheduling boundary. Native-menu opening remains passive.
+
+**Historical-task correction:** The completed Task 1 wording below describes the pre-2026-07-18 mode set. The correction above is the current contract: `oneMinute` is retired and legacy storage migrates to `ninetySeconds`.
+
 ## Global constraints
 
 - Codex first, but scheduling and display contracts remain provider-neutral.
 - Do not create or run automated tests.
-- Fixed choices are 1 minute, 1 minute 30 seconds, 2 minutes (default), 5 minutes, and 10 minutes.
+- Fixed choices are 1 minute 30 seconds, 2 minutes (default), 5 minutes, and 10 minutes. A persisted legacy one-minute value migrates to 1 minute 30 seconds.
 - Automatic is the only mode allowed to use 30 seconds. A burst lasts no more than ten minutes and exits when its triggering condition passes or after two consecutive non-live results.
 - A trusted live result means `confirmed` or `confirmed-after-retry`. Cached, unconfirmed, and unavailable attempts enter cached/paused mode.
 - Cached/paused mode never replaces the last confirmed display record with unconfirmed values. With no confirmed record, show unavailable rather than zero usage.
-- Launch and wake always request an immediate refresh. Scheduled work never overlaps an in-flight manual, launch, or wake refresh.
+- Launch always requests an immediate refresh; wake honors its persisted control. Scheduled work never overlaps an in-flight manual, launch, or wake refresh, and opening the native menu does not request work.
 - These short foreground intervals use a one-shot `Timer`; `NSBackgroundActivityScheduler` is intentionally excluded because macOS treats it as deferrable work suited to intervals of roughly ten minutes or more.
 - Update `outline.md`, `how-to.md`, `UsageProbe/README.md`, the roadmap, and this plan whenever behavior changes.
 
