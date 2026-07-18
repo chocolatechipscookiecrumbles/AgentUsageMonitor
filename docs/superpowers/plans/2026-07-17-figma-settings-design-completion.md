@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` (recommended) or `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** **Implementation complete — signed-app visual acceptance remains pending.** Tasks 1–3 implemented the approved native Settings slice, and Task 4 recorded fresh static evidence and the manual acceptance boundary. This plan does not revive or merge `feature/figma-settings-port`.
+**Status:** **In progress — Tasks 1–4 are implemented; Task 5 is planned.** Signed-app visual acceptance remains pending. This plan does not revive or merge `feature/figma-settings-port`.
 
 **Goal:** Complete the remaining approved Figma-inspired Settings behavior while preserving the current native global-sidebar theme, semantic colors, live System/Light/Dark presentation, controls, settings values, and all existing app behavior.
 
-**Architecture:** `SettingsView` remains the single owner of the global navigation selection, Context Rail visibility, and concrete Settings presentation color scheme. A small value-type layout model fixes the Navigation Sidebar and Settings Page widths while the window adds or removes only the Context Rail allocation. `SettingsPreferenceToggle` standardizes real Boolean preferences on the native macOS switch; it does not create preferences or reinterpret non-Boolean controls. The General page loses its duplicate menu preview while `GeneralSettingsContextView` becomes the single full-width preview owner.
+**Architecture:** `SettingsView` remains the single owner of the global navigation selection, Context Rail visibility, and concrete Settings presentation color scheme. A small value-type layout model fixes the Navigation Sidebar and Settings Page widths while the window adds or removes only the Context Rail allocation. `SettingsPreferenceToggle` standardizes real Boolean preferences on the native macOS switch; it does not create preferences or reinterpret non-Boolean controls. The General page loses its duplicate menu preview while `GeneralSettingsContextView` becomes the single full-width preview owner. `GeneralSettingsView` presents the existing Settings appearance preference as a bounded native three-option segmented picker under Menu Bar Icon; Diagnostics owns existing Application metadata.
 
 **Tech Stack:** Swift 6.2, SwiftUI, AppKit window geometry only, existing Combine-backed `AppSettings`, XCTest for one deterministic layout invariant, and the signed macOS app build script.
 
@@ -23,7 +23,13 @@ This plan implements only current, supported native behavior:
 | Launch, keyboard, notification, threshold, and warning Boolean controls | Use one shared native switch presentation. |
 | Appearance and menu-bar style/value choices | Keep native pickers: they are multi-value choices, not switches. |
 | General menu-bar preview | Keep one larger full-width Context Rail preview; remove the duplicate page preview and Current Scope. |
+| Menu Bar Icon Appearance | Use the reference's System/Light/Dark horizontal selector as a native bounded `.segmented` picker for the existing Settings appearance preference. The native menu remains macOS-controlled. |
+| Application version metadata | Move the existing Name, Version, and Build rows from General to Diagnostics; do not add the reference's unsupported Swift, Codex-version, architecture, export, or log-copy fields. |
 | Figma-only Show in Menu Bar, Start Minimized, Open on Update, refresh-on-open/wake, notification summaries, credit-expiry preferences, cache reset, export, and generated provider controls | Do not port: no backed behavior, approved persistence, or product requirement exists. |
+
+### v4 reference confirmation — 2026-07-18
+
+The user-provided local `High-fidelity macOS menu UI v4/src/components/PreferencesWindow.tsx` is the structural, non-runtime reference for this slice. Its General **Menu Bar Icon** group contains an **Appearance** `SegmentedControl` with exactly **System**, **Light**, and **Dark** (lines 554–574), and its Diagnostics **Developer Information** group contains an app-version row (lines 723–756). No Figma MCP URL or Desktop selection is available, so no Figma screenshot is claimed; no React/CSS code or asset will be imported. The native app uses semantic SwiftUI controls and requires signed-app manual acceptance.
 
 ## Global constraints
 
@@ -36,6 +42,7 @@ This plan implements only current, supported native behavior:
 - Use `SettingsPage`, `SettingsSection`, `SettingsLabeledRow`, `SettingsDescription`, and centralized `SettingsLayoutMetrics`. Keep pages scrollable and controls bounded.
 - Use `SettingsPreferenceToggle` for every current independent Boolean preference. It must wrap a native `Toggle` using `.toggleStyle(.switch)` and semantic system styles. Checkboxes are reserved for future batch selection; no current preference needs one.
 - Keep pickers, buttons, permission recovery, status labels, Refresh Now, and future two-choice policies as their current native control types. Do not represent multi-value or destructive actions as switches.
+- The General **Menu Bar Icon** group owns the Settings-window **Appearance** segmented picker. Its choices are **System**, **Light**, and **Dark** and bind only to the existing `AppSettings.appearancePreference`; it must not set `NSApplication.appearance`, `NSWindow.appearance`, or alter native menu appearance.
 - Add one focused layout regression test only. Native layout, rail resizing, appearance, VoiceOver, and conditional-state verification require the signed app and direct inspection; do not add a generic UI-test suite.
 - Do not implement indexed exact-control search, provider warning scopes, provider controls, Permissions, or additional Figma surfaces here. Their separate plans remain deferred.
 
@@ -470,6 +477,113 @@ Mark Product Follow-up 5 and the planning-board design-completion rows **Verific
 - [x] **Step 4: Prepare the manual PR handoff.**
 
 Create `.worktrees/figma-settings-design-completion-PR.md` from `.github/pull_request_template.md`. Include only observed evidence, the focused layout regression result, signed-app result, visual matrix outcome, limitations, rollback, and the fact that the user manually creates every GitHub PR. Do not invoke PR creation.
+
+## Task 5: Group Appearance under Menu Bar Icon and move Application metadata to Diagnostics
+
+**Files:**
+- Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsLayout.swift`
+- Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/GeneralSettingsView.swift`
+- Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/DiagnosticsSettingsView.swift`
+
+**Interfaces:**
+- Consumes the existing `AppSettings.appearancePreference`, `MenuBarDisplayStyle`, `QuotaValueMode`, and `SettingsStatus` values.
+- Produces only a native presentation/layout reorganization; it creates no preference key, status field, appearance owner, or menu behavior.
+
+- [ ] **Step 1: Add the bounded segmented-control metric.**
+
+In `SettingsLayoutMetrics`, add one shared value next to the existing control metric:
+
+```swift
+static let appearanceSegmentedControlWidth: CGFloat = 240
+```
+
+Do not add view-local width or padding constants. The bounded 240-point control fits the fixed Settings Page value column while allowing the three System/Light/Dark segments to remain distinct.
+
+- [ ] **Step 2: Reorganize General without changing the persisted preference or appearance owner.**
+
+Remove the standalone `SettingsSection("Appearance")` entirely. Rename the current `SettingsSection("Menu Bar")` to `SettingsSection("Menu Bar Icon")`, and rename its current `MenuBarDisplayStyle` row from **Appearance** to **Style** so it does not conflict with the app presentation preference.
+
+After the existing **Show** row, add the native three-option horizontal selector:
+
+```swift
+SettingsLabeledRow("Appearance") {
+    Picker("Appearance", selection: $settings.appearancePreference) {
+        ForEach(AppearancePreference.allCases) { appearance in
+            Text(appearance.title).tag(appearance)
+        }
+    }
+    .labelsHidden()
+    .pickerStyle(.segmented)
+    .frame(width: SettingsLayoutMetrics.appearanceSegmentedControlWidth)
+    .accessibilityLabel("Appearance")
+}
+
+SettingsDescription("Controls the Settings window appearance. The menu bar follows macOS.")
+    .settingsValueColumnAligned()
+```
+
+This is a native SwiftUI adaptation of the v4 reference's horizontal System/Light/Dark selector, not a port of its React `SegmentedControl`. Keep `SettingsView` as the sole resolver of the concrete `preferredColorScheme` through `SystemAppearanceObserver`; do not write `NSApplication.appearance` or `NSWindow.appearance`. Keep the existing menu-bar **Style** and **Show** pickers and their semantics unchanged.
+
+- [ ] **Step 3: Move the existing Application section to Diagnostics.**
+
+Remove this block from the end of `GeneralSettingsView`:
+
+```swift
+SettingsSection("Application") {
+    SettingsLabeledRow("Name") { Text("Codex Usage Monitor") }
+    SettingsLabeledRow("Version") { Text(status.appVersion) }
+    SettingsLabeledRow("Build") { Text(status.buildNumber) }
+}
+```
+
+Append the exact same block at the end of `DiagnosticsSettingsView`'s `SettingsPage`. Keep the existing `status` input unchanged and do not add the reference's unsupported developer-information rows, export action, or log-copy action.
+
+- [ ] **Step 4: Run the allowed regression checks and record the manual native boundary.**
+
+No additional automated UI test is added: this is native Settings presentation/reorganization, and the repository intentionally permits only the existing focused geometry regression rather than a generic UI-test suite. The existing appearance-presentation tests continue to protect the System/Light/Dark value semantics; direct native segmented-control presentation and live transition behavior require the signed app.
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-path CodexUsageMonitor --filter SettingsAppearancePresentationTests
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-path CodexUsageMonitor
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer bash CodexUsageMonitor/Scripts/build-app.sh
+codesign --verify --deep --strict --verbose=2 CodexUsageMonitor/.build/CodexUsageMonitor.app
+plutil -lint CodexUsageMonitor/.build/CodexUsageMonitor.app/Contents/Info.plist
+git diff --check
+```
+
+In an audit-owned signed app, inspect General with both Context Rail states and verify **Menu Bar Icon** contains **Style**, **Show**, and a horizontal **Appearance** control with System, Light, and Dark. Verify selection changes the Settings presentation without changing native menu appearance, retains destination/search/scroll/rail/focus state, and remains usable in Light and Dark. Inspect Diagnostics to verify Name, Version, and Build are present exactly once and absent from General. If no audit-owned instance can be safely launched, record every visual result as **Not run** and leave the Draft/manual acceptance gate open.
+
+- [ ] **Step 5: Commit the native organization slice.**
+
+```bash
+git add CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsLayout.swift CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/GeneralSettingsView.swift CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/DiagnosticsSettingsView.swift docs/superpowers/plans/2026-07-17-figma-settings-design-completion.md
+git commit -m "Organize Settings appearance and diagnostics"
+```
+
+## Task 6: Synchronize post-Task-5 evidence without advancing manual acceptance
+
+**Files:**
+- Modify: `docs/superpowers/plans/2026-07-17-figma-settings-design-completion.md`
+- Modify: `docs/product/follow-ups.md`
+- Modify: `docs/product/planning-board.md`
+- Modify: `how-to.md`, `UsageProbe/README.md`, and `outline.md`
+- Modify (ignored handoff): `.worktrees/figma-settings-design-completion-PR.md`
+
+- [ ] **Step 1: Re-run final static checks and preserve the signed-app distinction.**
+
+Run the full package suite, signed build, strict code-signature validation, plist lint, and `git diff --check`. Record exact results as **Run**. Record the General segmented-control, Diagnostics relocation, live appearance transition, and native-menu checks as **Observed** only after direct signed-app inspection; otherwise retain **Not run**.
+
+- [ ] **Step 2: Update operating and planning wording.**
+
+Describe General's **Menu Bar Icon** group as containing **Style**, **Show**, and the Settings-window **Appearance** segmented control. State that the native menu remains system-controlled. Describe Diagnostics as the owner of Name, Version, and Build. Keep Product Follow-up 5 and related board rows **Queued** until the full signed-app matrix, including this new control, is observed. Update the ignored Draft PR handoff with the actual commit and evidence; never push or create a GitHub PR.
+
+## Task 5 acceptance criteria
+
+- General has no standalone Appearance section and no Application metadata section.
+- General's **Menu Bar Icon** section contains a native bounded System/Light/Dark horizontal **Appearance** picker plus the existing unchanged **Style** and **Show** pickers.
+- Selecting an appearance writes only the existing `general.appearance` preference and keeps `SettingsView`/`SystemAppearanceObserver` as the presentation owner; the native menu remains macOS-controlled.
+- Diagnostics contains Name, Version, and Build exactly once; no unsupported reference-only developer/diagnostic controls are introduced.
+- The existing focused geometry regression and appearance-presentation suite still pass; signed-app visual results are documented as Observed or Not run without inference.
 
 ## Acceptance criteria
 
