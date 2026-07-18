@@ -330,7 +330,7 @@ Open only an audit-owned signed app instance. At default size, toggle the rail f
 - The focused `SettingsWindowLayoutTests/test_contextRailOnlyChangesTheRightHandWindowAllocation` and full Swift package suite passed after the Task 2 source change (8 tests, 0 failures). The signed app built successfully; `codesign --verify --deep --strict --verbose=2` and `plutil -lint` passed.
 - **Not run:** direct signed-app window inspection and the Light/Dark/System, six-destination interaction matrix. This session could not safely identify an audit-owned app instance (`pgrep` process enumeration was unavailable), so it did not launch or interfere with a potentially user-owned monitor. Task 4 retains this mandatory manual acceptance gate.
 
-## Task 3: Complete the approved General rail and native preference switches
+## Task 3: Complete the approved General rail and native preference switches — complete
 
 **Files:**
 - Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsPreferenceToggle.swift`
@@ -342,7 +342,7 @@ Open only an audit-owned signed app instance. At default size, toggle the rail f
 - Produces `SettingsPreferenceToggle(title:description:isOn:)` for current Boolean bindings and exactly one General menu-bar preview in the Context Rail.
 - Consumes the existing bindings and callbacks unchanged; no new persistence key, notification category, permission, or menu behavior is introduced.
 
-- [ ] **Step 1: Add the shared native preference switch.**
+- [x] **Step 1: Add the shared native preference switch.**
 
 ```swift
 import SwiftUI
@@ -379,7 +379,7 @@ struct SettingsPreferenceToggle: View {
 
 Do not add custom checkbox graphics, custom colors, or a new storage owner. The surrounding section's `.disabled(...)` must continue disabling both the label and switch.
 
-- [ ] **Step 2: Replace only existing Boolean preference rows.**
+- [x] **Step 2: Replace only existing Boolean preference rows.**
 
 Use the component for Launch at Login, Enable keyboard shortcuts, Enable quota notifications, all `RemainingQuotaThreshold` rows, Forecasted exhaustion, Reset-credit expiration, Quota reset or reset failure, Stale quota data, and Extended update interruptions. Keep the existing `setAlertsEnabled`, threshold bindings, authorization message, permission button, disabled hierarchy, pickers, and Refresh Now action unchanged.
 
@@ -396,7 +396,7 @@ SettingsPreferenceToggle(
 
 Use the existing product copy for other settings where no new description is needed. Do not port unsupported reference-only Boolean controls.
 
-- [ ] **Step 3: Make General's Context Rail preview the one authoritative preview.**
+- [x] **Step 3: Make General's Context Rail preview the one authoritative preview.**
 
 Remove `SettingsLabeledRow("Preview")` from General's Menu Bar section and remove the entire `Current Scope` section. Replace the `Current label` HStack in `GeneralSettingsContextView` with one full-width preview:
 
@@ -417,7 +417,7 @@ SettingsContextCard("Menu Bar Preview") {
 
 Keep Current Usage and Collection cards only when they are based on existing live state. Do not add mock account data, credit-expiry cards, or Figma-generated status values.
 
-- [ ] **Step 4: Verify native controls and commit this visual slice.**
+- [x] **Step 4: Verify native controls and commit this visual slice.**
 
 In the signed app inspect the default window and both rail states: every converted control displays a native switch; the notification master correctly disables all child switches; denied permission still exposes recovery guidance; Launch at Login guidance still wraps; General has one preview and no Current Scope; keyboard and VoiceOver can reach the rail control and each switch. Check Light, Dark, and System with the existing appearance matrix.
 
@@ -428,6 +428,13 @@ git commit -m "Complete native Settings control styling"
 ```
 
 Expected: the focused layout regression and full test suite pass. Record any unmanufactured permission or connection state as **Not run**.
+
+### Task 3 completion evidence and boundary
+
+- `SettingsPreferenceToggle` now renders every current independent Boolean preference in General and Notifications as an accessibility-labelled native `.switch`, while retaining all existing bindings, disabled hierarchy, authorization guidance, permission recovery, pickers, and actions.
+- General's duplicate page preview and obsolete Current Scope section are removed. The Context Rail owns one full-width Menu Bar Preview; its Current Usage and Collection cards still derive only from existing live state.
+- The focused geometry regression and full package suite passed after the Task 3 change (8 tests, 0 failures). The signed app built successfully; `codesign --verify --deep --strict --verbose=2`, `plutil -lint`, and `git diff --check` passed.
+- **Not run:** direct signed-app visual acceptance of native switches, the denied-permission state, launch-at-login wrapping, VoiceOver/keyboard traversal, both rail states, and the Light/Dark/System appearance matrix. This task did not launch or interfere with a potentially user-owned monitor; Task 4 retains the mandatory manual acceptance gate.
 
 ## Task 4: Complete signed-app acceptance and synchronize planning sources
 

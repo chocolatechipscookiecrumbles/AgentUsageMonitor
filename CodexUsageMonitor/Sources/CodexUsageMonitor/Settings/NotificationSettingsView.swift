@@ -8,10 +8,14 @@ struct NotificationSettingsView: View {
     var body: some View {
         SettingsPage {
             SettingsSection("Notifications") {
-                Toggle("Enable quota notifications", isOn: Binding(
-                    get: { settings.alertsEnabled },
-                    set: { enabled in setAlertsEnabled(enabled) }
-                ))
+                SettingsPreferenceToggle(
+                    "Enable quota notifications",
+                    description: "Allow quota alerts after macOS notification permission is granted.",
+                    isOn: Binding(
+                        get: { settings.alertsEnabled },
+                        set: { enabled in setAlertsEnabled(enabled) }
+                    )
+                )
                 if let message = settings.notificationAuthorizationState.statusMessage {
                     Text(message)
                         .font(.callout)
@@ -27,7 +31,7 @@ struct NotificationSettingsView: View {
 
             SettingsSection("Remaining Quota") {
                 ForEach(RemainingQuotaThreshold.allCases) { threshold in
-                    Toggle(threshold.title, isOn: thresholdBinding(threshold))
+                    SettingsPreferenceToggle(threshold.title, isOn: thresholdBinding(threshold))
                 }
                 SettingsDescription("Applies to both the 5-hour and weekly limits.")
                     .padding(.leading, 26)
@@ -35,11 +39,11 @@ struct NotificationSettingsView: View {
             .disabled(!settings.alertsEnabled)
 
             SettingsSection("Other Warnings") {
-                Toggle("Forecasted exhaustion", isOn: $settings.forecastWarningsEnabled)
-                Toggle("Reset-credit expiration", isOn: $settings.resetCreditWarningsEnabled)
-                Toggle("Quota reset or reset failure", isOn: $settings.resetWarningsEnabled)
-                Toggle("Stale quota data", isOn: $settings.staleDataWarningsEnabled)
-                Toggle("Extended update interruptions", isOn: $settings.refreshFailureWarningsEnabled)
+                SettingsPreferenceToggle("Forecasted exhaustion", isOn: $settings.forecastWarningsEnabled)
+                SettingsPreferenceToggle("Reset-credit expiration", isOn: $settings.resetCreditWarningsEnabled)
+                SettingsPreferenceToggle("Quota reset or reset failure", isOn: $settings.resetWarningsEnabled)
+                SettingsPreferenceToggle("Stale quota data", isOn: $settings.staleDataWarningsEnabled)
+                SettingsPreferenceToggle("Extended update interruptions", isOn: $settings.refreshFailureWarningsEnabled)
                 SettingsDescription("Alerts once after three unsuccessful refreshes, then retries every 10 minutes.")
                     .padding(.leading, 26)
             }

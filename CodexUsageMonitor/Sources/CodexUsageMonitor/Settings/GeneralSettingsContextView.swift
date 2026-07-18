@@ -11,24 +11,16 @@ struct GeneralSettingsContextView: View {
 
     var body: some View {
         SettingsContextCard("Menu Bar Preview") {
-            HStack {
-                Text("Current label")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Spacer()
-
-                MenuBarLabelView(
-                    presentation: MenuBarLabelPresentation(
-                        displayState: displayState,
-                        style: settings.menuBarDisplayStyle,
-                        valueMode: settings.quotaValueMode
-                    )
+            MenuBarLabelView(
+                presentation: MenuBarLabelPresentation(
+                    displayState: displayState,
+                    style: settings.menuBarDisplayStyle,
+                    valueMode: settings.quotaValueMode
                 )
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(.quaternary, in: .rect(cornerRadius: 6))
-            }
+            )
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.vertical, 14)
+            .background(.quaternary, in: .rect(cornerRadius: 8))
         }
 
         SettingsContextCard("Current Usage") {

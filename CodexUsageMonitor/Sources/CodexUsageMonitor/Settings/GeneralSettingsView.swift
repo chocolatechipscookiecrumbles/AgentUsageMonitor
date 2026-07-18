@@ -9,7 +9,7 @@ struct GeneralSettingsView: View {
     var body: some View {
         SettingsPage {
             SettingsSection("Startup") {
-                Toggle("Launch at login", isOn: launchAtLoginBinding)
+                SettingsPreferenceToggle("Launch at login", isOn: launchAtLoginBinding)
                     .disabled(!launchAtLogin.canChange)
                 if let guidanceMessage = launchAtLogin.guidanceMessage {
                     Text(guidanceMessage)
@@ -35,9 +35,11 @@ struct GeneralSettingsView: View {
             }
 
             SettingsSection("Keyboard Shortcuts") {
-                Toggle("Enable keyboard shortcuts", isOn: $settings.keyboardShortcutsEnabled)
-                SettingsDescription("Allows app shortcuts such as ⌘R for Refresh now.")
-                    .padding(.leading, 26)
+                SettingsPreferenceToggle(
+                    "Enable keyboard shortcuts",
+                    description: "Allows app shortcuts such as ⌘R for Refresh now.",
+                    isOn: $settings.keyboardShortcutsEnabled
+                )
             }
 
             SettingsSection("Menu Bar") {
@@ -61,16 +63,6 @@ struct GeneralSettingsView: View {
                     .frame(width: SettingsLayoutMetrics.controlWidth)
                 }
 
-                SettingsLabeledRow("Preview") {
-                    MenuBarLabelView(
-                        presentation: MenuBarLabelPresentation(
-                            displayState: displayState,
-                            style: settings.menuBarDisplayStyle,
-                            valueMode: settings.quotaValueMode
-                        )
-                    )
-                }
-
                 SettingsDescription("Updates after each quota refresh using the frequency selected in Refresh.")
                     .settingsValueColumnAligned()
             }
@@ -81,10 +73,6 @@ struct GeneralSettingsView: View {
                 SettingsLabeledRow("Build") { Text(status.buildNumber) }
             }
 
-            SettingsSection("Current Scope") {
-                SettingsLabeledRow("Provider") { Text("OpenAI Codex") }
-                SettingsDescription("The daily-driver roadmap remains Codex-first. Additional providers are not active in this build.")
-            }
         }
         .onAppear(perform: launchAtLogin.refresh)
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
