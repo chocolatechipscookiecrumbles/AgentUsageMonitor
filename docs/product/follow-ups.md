@@ -187,7 +187,7 @@ No mixed appearance should remain.
 
 ## 5. Simplify General Settings context rail
 
-**Status:** **Queued.** The [Figma Settings Design Completion plan](../superpowers/plans/2026-07-17-figma-settings-design-completion.md) implemented the native rail geometry, switches, and General cleanup while preserving the existing theme and Settings behavior. Fresh package and signed-bundle checks pass; this follow-up must not advance to Verification until direct signed-app acceptance covers both rail states and conditional content.
+**Status:** **Queued.** The [Figma Settings Design Completion plan](../superpowers/plans/2026-07-17-figma-settings-design-completion.md) implemented the native rail geometry, switches, General cleanup, Menu Bar Icon **Style**/**Show** plus Settings-window System/Light/Dark **Appearance** segments, and Diagnostics ownership of Name, Version, and Build while preserving the existing theme and Settings behavior. Fresh package and signed-bundle checks pass; this follow-up must not advance to Verification until direct signed-app acceptance covers both rail states, the new segmented control, Diagnostics relocation, and conditional content.
 
 Problem
 

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` (recommended) or `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** **In progress — Tasks 1–5 are implemented; Task 6 remains planned.** Signed-app visual acceptance remains pending. This plan does not revive or merge `feature/figma-settings-port`.
+**Status:** **Implementation complete — Tasks 1–6 are implemented.** Signed-app visual acceptance remains pending. This plan does not revive or merge `feature/figma-settings-port`.
 
 **Goal:** Complete the remaining approved Figma-inspired Settings behavior while preserving the current native global-sidebar theme, semantic colors, live System/Light/Dark presentation, controls, settings values, and all existing app behavior.
 
@@ -574,13 +574,20 @@ git commit -m "Organize Settings appearance and diagnostics"
 - Modify: `how-to.md`, `UsageProbe/README.md`, and `outline.md`
 - Modify (ignored handoff): `.worktrees/figma-settings-design-completion-PR.md`
 
-- [ ] **Step 1: Re-run final static checks and preserve the signed-app distinction.**
+- [x] **Step 1: Re-run final static checks and preserve the signed-app distinction.**
 
 Run the full package suite, signed build, strict code-signature validation, plist lint, and `git diff --check`. Record exact results as **Run**. Record the General segmented-control, Diagnostics relocation, live appearance transition, and native-menu checks as **Observed** only after direct signed-app inspection; otherwise retain **Not run**.
 
-- [ ] **Step 2: Update operating and planning wording.**
+- [x] **Step 2: Update operating and planning wording.**
 
 Describe General's **Menu Bar Icon** group as containing **Style**, **Show**, and the Settings-window **Appearance** segmented control. State that the native menu remains system-controlled. Describe Diagnostics as the owner of Name, Version, and Build. Keep Product Follow-up 5 and related board rows **Queued** until the full signed-app matrix, including this new control, is observed. Update the ignored Draft PR handoff with the actual commit and evidence; never push or create a GitHub PR.
+
+### Task 6 completion evidence and remaining gate
+
+- **Run (2026-07-18):** `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-path CodexUsageMonitor` passed: 8 tests, 0 failures, including the focused Settings-window geometry regression and the existing Settings appearance-presentation tests.
+- **Run (2026-07-18):** `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer bash CodexUsageMonitor/Scripts/build-app.sh` built the signed app successfully; strict `codesign` verification reported a valid bundle satisfying its Designated Requirement; `plutil -lint` reported `OK`; and `git diff --check` passed.
+- **Not run:** no audit-owned signed app was safely available, so General's Menu Bar Icon **Style**, **Show**, and System/Light/Dark **Appearance** segments, Diagnostics' Name/Version/Build relocation, the live Settings appearance-transition matrix, and the native-menu system-appearance boundary were not directly inspected. These remain manual acceptance work; no static result is treated as presentation evidence.
+- Product Follow-up 5 and both related planning-board rows remain **Queued**, and the manual PR handoff remains **Draft**, until the complete signed-app matrix is observed.
 
 ## Task 5 acceptance criteria
 
