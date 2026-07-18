@@ -1,0 +1,440 @@
+# Settings Palette and Refresh Preferences Presentation Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` (recommended) or `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Status:** **Planned — presentation slice only.** It deliberately adds no new automated test case and does not make either new Refresh switch operational.
+
+**Goal:** Right-align the General appearance and menu-bar choice controls with native preference switches, port the v4 dark Settings surface palette through one Settings-owned token set, and present the requested Refresh options without changing refresh scheduling.
+
+**Architecture:** `SettingsView` remains the one owner of the concrete Settings presentation color scheme and injects a value-type `SettingsAppearancePalette` into the existing hierarchy. Shared trailing-control rows keep text and descriptions leading while bounded pickers and segmented controls align with `SettingsPreferenceToggle` at the trailing edge. `QuotaMonitor` remains the only scheduler and wake observer: this slice only renders truthful, unavailable Refresh controls and preserves the existing `refreshMode` binding.
+
+**Tech Stack:** Swift 6.2, SwiftUI, AppKit semantic colors for the existing Light presentation, existing `AppSettings`/`QuotaMonitor`, and the signed macOS app build script.
+
+## Source facts and scope boundary
+
+The local v4 design reference is `High-fidelity macOS menu UI v4/src/components/PreferencesWindow.tsx`; it is design evidence only, never an import source or runtime dependency. No Figma URL or Desktop node is available, so this plan cites the checked-in reference rather than claiming a Figma screenshot or variable export.
+
+| Reference location | Confirmed v4 element | Native adaptation in this plan |
+| --- | --- | --- |
+| lines 554–574 | `Menu Bar Icon` has a trailing `SegmentedControl(["System", "Light", "Dark"])`. | Keep the existing native `Picker(...).pickerStyle(.segmented)`, bind it only to `AppSettings.appearancePreference`, and place it in a trailing-control row. |
+| lines 648–672 | `Automatic Refresh` has a native-select-style **Refresh interval** row and trailing **Refresh on wake**/**Refresh on open** switches with the supplied descriptions. | Keep the existing `RefreshMode` picker and present the two requested switches as visibly unavailable, non-persistent controls until their behavior plan is approved. |
+| lines 765–773, 794–804, 813–845, 873–884 | Dark window/content is `#1e1e1e`; sidebar/context rail is `#1a1a1a`; search is white at 8% opacity; the primary border/divider is white at 6% opacity. | Resolve the approved values in a single Settings palette and apply them to all owned surfaces, rather than scattering hard-coded colors through pages. |
+| lines 130–163 | Section groups use a white 5.5%-opacity dark surface, with white 6%-opacity separators. | Use the palette for Settings and Context Rail cards and their dividers/borders. |
+| lines 64–95 | Segment track is white 8%; selected segment and native select fill are `#3a3a3c`; native-select border is white 10%. | Preserve native macOS control behavior; use these values only where native control/container styling can receive them without replacing system control semantics. |
+
+### Exact dark palette inventory
+
+| Token | v4 source value | Planned owner and use |
+| --- | --- | --- |
+| `windowBackground` | `#1e1e1e` | `SettingsView` root and Settings Page Header background. |
+| `sidebarBackground` | `#1a1a1a` | `SettingsNavigationSidebar` background. |
+| `pageBackground` | `#1e1e1e` | `SettingsPage` scrollable page background. |
+| `contextRailBackground` | `#1a1a1a` | `SettingsContextPanel` background. |
+| `sectionSurface` | `white.opacity(0.055)` | `SettingsSection` and `SettingsContextCard` fills. |
+| `divider` / `sectionBorder` | `white.opacity(0.06)` | Window dividers, section strokes, and internal Context Rail separators. |
+| `searchFieldBackground` | `white.opacity(0.08)` | `SettingsNavigationSidebar` search container. |
+| `sidebarSelection` | `white.opacity(0.10)` | Selected destination background only. |
+| `sidebarHover` | `white.opacity(0.06)` | Optional hover state, if a native button style needs an explicit background. |
+| `popupAndSelectedSegment` | `#3a3a3c` | Bounded menu-picker/selected-segment visual reference; retain native macOS controls when exact styling would change their behavior. |
+| `popupBorder` | `white.opacity(0.10)` | Any explicit native-picker container border, only if required after signed visual comparison. |
+| `primaryText` / `secondaryText` | `white` / `white.opacity(0.40)` | Use semantic foreground styles unless a palette-consuming custom surface needs an explicit counterpart. |
+
+Light appearance remains on existing AppKit semantic colors (`windowBackgroundColor`, `controlBackgroundColor`, and semantic foreground styles). The v4 color values above are not permission to set `NSApplication.appearance`, `NSWindow.appearance`, application-wide colors, or individual page-local color patches.
+
+## Global constraints
+
+- Preserve the global `SettingsNavigationSidebar`, `SettingsDetailView`, Context Rail, six destinations, 680 × 560 hidden-rail size, and right-only Context Rail expansion.
+- Keep `SettingsView` as the single appearance owner. Continue resolving a concrete color scheme through `SystemAppearanceObserver`; do not set `NSApplication.appearance`, `NSWindow.appearance`, recreate a window, or reset selected destination, search query, scroll position, rail state, or focus.
+- Use `SettingsPage`, `SettingsSection`, `SettingsLabeledRow`, `SettingsDescription`, shared rows, and `SettingsLayoutMetrics`. Do not add a top-level `Form`, `LabeledContent`, duplicate alignment constants, transparent spacer content, a web runtime, React/CSS, or Figma assets.
+- Preserve native SwiftUI controls. A shared row may give a bounded picker or segmented picker a trailing position; it must not replace a native picker or switch with a hand-drawn imitation.
+- **No new automated test cases in this slice, by user direction.** Run the existing Swift package suite only as a regression baseline. Add focused deterministic regression coverage later, when a separate behavior plan introduces persisted wake/open preferences or menu-open refresh dispatch.
+- Do not add `AppSettings` keys, persistence, scheduler subscriptions, timers, menu polling, `RefreshReason` cases, diagnostics events, wake behavior changes, or menu-open refresh behavior here. `QuotaMonitor` remains the sole refresh scheduler and current wake observer.
+- The new UI must not falsely imply that an unavailable Refresh option has changed scheduling. It must expose a noninteractive state and explicit availability information to both sighted users and VoiceOver.
+
+## File structure
+
+| File | Responsibility |
+| --- | --- |
+| Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsPreferenceControlRow.swift` | One reusable leading-text/trailing-native-control row for multi-value choices and explicit unavailable controls. |
+| Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsAppearancePalette.swift` | Central light-semantic/dark-v4 palette value, injected through `EnvironmentValues`. |
+| Modify `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsLayout.swift` | Centralize widths/spacing required by the shared row and make Settings surfaces consume the palette. |
+| Modify `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsView.swift` | Resolve the existing concrete scheme once and inject its matching palette across the complete Settings hierarchy. |
+| Modify `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsNavigationSidebar.swift`, `SettingsPageHeader.swift`, `SettingsContextPanel.swift`, `SettingsContextCard.swift` | Consume the injected palette for all window-owned visible surfaces. |
+| Modify `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/GeneralSettingsView.swift` | Move Style, Show, and System/Light/Dark Appearance into the shared trailing-control row without altering bindings. |
+| Modify `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/RefreshSettingsView.swift` | Present the existing interval menu with the shared row and add the two truthful unavailable rows; do not touch monitoring code. |
+| Modify `docs/superpowers/plans/2026-07-17-figma-settings-design-completion.md`, `docs/product/planning-board.md`, and `how-to.md` | Link the follow-on scope, record the no-behavior boundary, and document only observed visual verification. |
+
+---
+
+### Task 1: Establish the shared trailing-control row
+
+**Files:**
+- Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsPreferenceControlRow.swift`
+- Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsLayout.swift`
+
+**Interfaces:**
+- Produces `SettingsPreferenceControlRow<Control: View>` for a leading title/optional description and one trailing native control.
+- Produces `SettingsUnavailablePreferenceControlRow` for a fixed, inaccessible state with a VoiceOver availability hint.
+- Consumes centralized `preferenceControlMinimumTextWidth`, `unavailableControlStatusSpacing`, `controlWidth`, and `appearanceSegmentedControlWidth`.
+
+- [ ] **Step 1: Add the centralized layout values.**
+
+Add only these metrics to `SettingsLayoutMetrics`; do not put an alignment constant into a page:
+
+```swift
+static let preferenceControlMinimumTextWidth: CGFloat = 180
+static let unavailableControlStatusSpacing: CGFloat = 4
+```
+
+- [ ] **Step 2: Create the row that mirrors the existing switch geometry.**
+
+```swift
+struct SettingsPreferenceControlRow<Control: View>: View {
+    let title: String
+    let description: String?
+    private let control: Control
+
+    init(
+        _ title: String,
+        description: String? = nil,
+        @ViewBuilder control: () -> Control
+    ) {
+        self.title = title
+        self.description = description
+        self.control = control()
+    }
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: SettingsLayoutMetrics.rowSpacing) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                if let description { SettingsDescription(description) }
+            }
+            .frame(minWidth: SettingsLayoutMetrics.preferenceControlMinimumTextWidth, alignment: .leading)
+
+            Spacer(minLength: SettingsLayoutMetrics.rowSpacing)
+
+            control
+                .fixedSize(horizontal: true, vertical: false)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+```
+
+Do not give the trailing control `maxWidth: .infinity`; its fixed width and spacer place its trailing edge with the native switches.
+
+- [ ] **Step 3: Add an explicit unavailable-control wrapper instead of a writable placeholder binding.**
+
+```swift
+struct SettingsUnavailablePreferenceControlRow: View {
+    let title: String
+    let description: String
+    let isOn: Bool
+    let availability: String
+
+    var body: some View {
+        SettingsPreferenceControlRow(title, description: description) {
+            VStack(alignment: .trailing, spacing: SettingsLayoutMetrics.unavailableControlStatusSpacing) {
+                Toggle(title, isOn: .constant(isOn))
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .disabled(true)
+                Text(availability)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(title)
+            .accessibilityValue(availability)
+            .accessibilityHint("This control does not change refresh scheduling yet.")
+        }
+    }
+}
+```
+
+- [ ] **Step 4: Run the existing regression baseline and commit.**
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-path CodexUsageMonitor
+git diff --check
+git add CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsPreferenceControlRow.swift CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsLayout.swift
+git commit -m "Add trailing Settings control rows"
+```
+
+Expected: the existing suite passes and the diff has no whitespace errors. Do not create a test case.
+
+### Task 2: Align General choice controls with trailing switches
+
+**Files:**
+- Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/GeneralSettingsView.swift`
+
+**Interfaces:**
+- Consumes `SettingsPreferenceControlRow`.
+- Preserves bindings to `settings.menuBarDisplayStyle`, `settings.quotaValueMode`, and `settings.appearancePreference`.
+- Produces no new preference, color-scheme owner, or menu-bar appearance behavior.
+
+- [ ] **Step 1: Replace only the three Menu Bar Icon row containers.**
+
+```swift
+SettingsPreferenceControlRow("Style") {
+    Picker("Style", selection: $settings.menuBarDisplayStyle) {
+        ForEach(MenuBarDisplayStyle.allCases) { style in
+            Text(style.title).tag(style)
+        }
+    }
+    .labelsHidden()
+    .frame(width: SettingsLayoutMetrics.controlWidth)
+}
+
+SettingsPreferenceControlRow("Show") {
+    Picker("Show", selection: $settings.quotaValueMode) {
+        ForEach(QuotaValueMode.allCases) { mode in
+            Text(mode.title).tag(mode)
+        }
+    }
+    .labelsHidden()
+    .frame(width: SettingsLayoutMetrics.controlWidth)
+}
+
+SettingsPreferenceControlRow("Appearance") {
+    Picker("Appearance", selection: $settings.appearancePreference) {
+        ForEach(AppearancePreference.allCases) { appearance in
+            Text(appearance.title).tag(appearance)
+        }
+    }
+    .labelsHidden()
+    .pickerStyle(.segmented)
+    .frame(width: SettingsLayoutMetrics.appearanceSegmentedControlWidth)
+    .accessibilityLabel("Appearance")
+}
+```
+
+Keep the two existing descriptions directly below these rows, now without `.settingsValueColumnAligned()`: each is a section-level explanation, not a value-column continuation.
+
+- [ ] **Step 2: Check boundaries and commit.**
+
+Source-review that `SettingsView` still owns `.preferredColorScheme`, the controls retain their bindings, and neither `NSApplication.appearance` nor `NSWindow.appearance` is assigned. Run the existing package suite and `git diff --check`; add no test case.
+
+```bash
+git add CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/GeneralSettingsView.swift
+git commit -m "Align General choice controls"
+```
+
+### Task 3: Port the v4 dark palette through one Settings-owned environment value
+
+**Files:**
+- Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsAppearancePalette.swift`
+- Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsView.swift`, `SettingsLayout.swift`, `SettingsNavigationSidebar.swift`, `SettingsPageHeader.swift`, `SettingsContextPanel.swift`, and `SettingsContextCard.swift`
+
+**Interfaces:**
+- Produces `SettingsAppearancePalette.resolve(for:)` and `EnvironmentValues.settingsAppearancePalette`.
+- `SettingsView` computes `presentationColorScheme` once from the existing `AppearancePreference` and `SystemAppearanceObserver`, then supplies both the matching palette and `.preferredColorScheme(presentationColorScheme)`.
+- Every Settings-owned custom background/stroke reads `@Environment(\.settingsAppearancePalette)`; individual page views do not choose their own dark colors.
+
+- [ ] **Step 1: Define the palette and environment key.**
+
+```swift
+struct SettingsAppearancePalette {
+    let windowBackground: Color
+    let sidebarBackground: Color
+    let pageBackground: Color
+    let contextRailBackground: Color
+    let sectionSurface: Color
+    let divider: Color
+    let searchFieldBackground: Color
+    let sidebarSelection: Color
+
+    static func resolve(for colorScheme: ColorScheme) -> Self {
+        if colorScheme == .dark {
+            return Self(
+                windowBackground: Color(red: 30 / 255, green: 30 / 255, blue: 30 / 255),
+                sidebarBackground: Color(red: 26 / 255, green: 26 / 255, blue: 26 / 255),
+                pageBackground: Color(red: 30 / 255, green: 30 / 255, blue: 30 / 255),
+                contextRailBackground: Color(red: 26 / 255, green: 26 / 255, blue: 26 / 255),
+                sectionSurface: .white.opacity(0.055),
+                divider: .white.opacity(0.06),
+                searchFieldBackground: .white.opacity(0.08),
+                sidebarSelection: .white.opacity(0.10)
+            )
+        }
+
+        return Self(
+            windowBackground: Color(nsColor: .windowBackgroundColor),
+            sidebarBackground: Color(nsColor: .windowBackgroundColor),
+            pageBackground: Color(nsColor: .windowBackgroundColor),
+            contextRailBackground: Color(nsColor: .windowBackgroundColor),
+            sectionSurface: Color(nsColor: .controlBackgroundColor),
+            divider: .quaternary,
+            searchFieldBackground: Color(nsColor: .controlBackgroundColor).opacity(0.7),
+            sidebarSelection: Color(nsColor: .controlBackgroundColor)
+        )
+    }
+}
+```
+
+Add a private `EnvironmentKey` with a light palette default and an `EnvironmentValues.settingsAppearancePalette` accessor in the same file. Do not include text colors or custom toggle colors; existing semantic foregrounds and native control rendering remain authoritative.
+
+- [ ] **Step 2: Inject the single existing presentation scheme.**
+
+In `SettingsView`, introduce:
+
+```swift
+private var presentationColorScheme: ColorScheme {
+    settings.appearancePreference.presentationColorScheme(system: systemAppearance.colorScheme)
+}
+
+private var appearancePalette: SettingsAppearancePalette {
+    SettingsAppearancePalette.resolve(for: presentationColorScheme)
+}
+```
+
+Replace the inline `.preferredColorScheme(...)` argument with `.preferredColorScheme(presentationColorScheme)` and add `.environment(\.settingsAppearancePalette, appearancePalette)` at the same outer boundary. Do not change `SystemAppearanceObserver`, `AppearancePreference`, or any AppKit appearance assignment.
+
+- [ ] **Step 3: Replace owned surfaces, not native control semantics.**
+
+| View | Required substitution |
+| --- | --- |
+| `SettingsPage` | `pageBackground` |
+| `SettingsSection` | `sectionSurface` and `divider` for its stroke |
+| `SettingsNavigationSidebar` | `sidebarBackground`, `searchFieldBackground`, and `sidebarSelection` |
+| `SettingsPageHeader` | `windowBackground` |
+| `SettingsContextPanel` | `contextRailBackground` |
+| `SettingsContextCard` | `sectionSurface` and `divider` for its stroke |
+| `SettingsView` dividers | a palette-aware one-point divider without changing rail/window geometry |
+
+Do not apply `#3a3a3c`, an opacity overlay, or a hard-coded color directly in General, Refresh, Notifications, Agents, Data & Privacy, or Diagnostics. Do not restyle the native switch, picker, button, title bar, or native menu merely to imitate React/CSS.
+
+- [ ] **Step 4: Build and commit.**
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-path CodexUsageMonitor
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer bash CodexUsageMonitor/Scripts/build-app.sh
+codesign --verify --deep --strict --verbose=2 CodexUsageMonitor/.build/CodexUsageMonitor.app
+plutil -lint CodexUsageMonitor/.build/CodexUsageMonitor.app/Contents/Info.plist
+git diff --check
+git add CodexUsageMonitor/Sources/CodexUsageMonitor/Settings
+git commit -m "Port Settings dark surface palette"
+```
+
+Do not add a test case.
+
+### Task 4: Present Refresh interval, wake, and open controls without scheduling changes
+
+**Files:**
+- Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/RefreshSettingsView.swift`
+- Do not modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AppSettings.swift`, `CodexUsageMonitor/Sources/CodexUsageMonitor/Monitoring/QuotaMonitor.swift`, or `CodexUsageMonitor/Sources/CodexUsageMonitor/Monitoring/QuotaMonitoringState.swift`
+
+**Interfaces:**
+- Consumes the two rows from Task 1.
+- Keeps the existing writable `$settings.refreshMode` binding and every `RefreshMode.allCases` option.
+- Produces no new `Binding`, preference key, monitor subscription, `RefreshReason`, timer, notification observer, or menu-open callback.
+
+- [ ] **Step 1: Make the existing selector a trailing native Refresh interval menu.**
+
+Move the existing picker into a first `SettingsSection("Automatic Refresh")`, rename its visible label from **Refresh frequency** to **Refresh interval**, and retain every existing actual option including **Automatic** and **1 minute 30 seconds**:
+
+```swift
+SettingsPreferenceControlRow("Refresh interval") {
+    Picker("Refresh interval", selection: $settings.refreshMode) {
+        ForEach(RefreshMode.allCases) { mode in
+            Text(mode.displayName).tag(mode)
+        }
+    }
+    .labelsHidden()
+    .frame(width: SettingsLayoutMetrics.controlWidth)
+    .accessibilityLabel("Refresh interval")
+}
+```
+
+Do not replace `RefreshMode` with the v4 mockup's shorter option list: that would silently change supported behavior. Keep the read-only **Current Policy** and **Latest Collection** sections unchanged.
+
+- [ ] **Step 2: Add the two requested presentation-only rows with factual states.**
+
+```swift
+SettingsUnavailablePreferenceControlRow(
+    "Refresh on wake",
+    description: "Immediately refresh after the system wakes from sleep.",
+    isOn: true,
+    availability: "Always on"
+)
+
+SettingsUnavailablePreferenceControlRow(
+    "Refresh on open",
+    description: "Refresh when the menu dropdown is opened.",
+    isOn: false,
+    availability: "Not available yet"
+)
+
+SettingsDescription("Refresh on wake is currently always enabled. Refresh on open is planned and does not refresh the menu yet.")
+```
+
+`true` for wake reflects the current unconditional `NSWorkspace.didWakeNotification` observer in `QuotaMonitor.start()`; `false` for open reflects that no menu-open `RefreshReason` or callback exists. The unavailable wrapper must be disabled and must not write a value.
+
+- [ ] **Step 3: Record the later behavior contract without implementing it.**
+
+A later plan may add `AppSettings` keys `refresh.onWake` (migration default `true`) and `refresh.onOpen` (migration default `false`). Only `QuotaMonitor` may subscribe to the wake key and decide whether its existing wake observer calls `refresh(reason: .wake)`. A menu opening may request one coalesced semantic monitor action only; it must not add a timer, polling loop, menu-tree state watcher, or second scheduler. That later plan must decide whether a `RefreshReason.menuOpen` diagnostic is needed and add the smallest deterministic regression coverage for disabled/enabled wake and one coalesced menu-open request.
+
+- [ ] **Step 4: Run the existing regression baseline and commit.**
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-path CodexUsageMonitor
+git diff --check
+git add CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/RefreshSettingsView.swift
+git commit -m "Present upcoming Refresh preferences"
+```
+
+Do not add a test case.
+
+### Task 5: Document evidence and perform direct visual acceptance
+
+**Files:**
+- Modify: `docs/superpowers/plans/2026-07-17-figma-settings-design-completion.md`, `docs/product/planning-board.md`, `how-to.md`, and this plan.
+
+**Interfaces:**
+- Records only direct signed-app observations and leaves unobserved cells as **Not run**.
+- Adds no PR, push, test case, runtime setting, permission, dependency, migration, or compatibility change.
+
+- [ ] **Step 1: Reconcile plan and board scope.**
+
+In the original Figma completion plan, replace its obsolete blanket exclusion of refresh-on-wake/open with a link to this plan and state that the controls are separately approved for presentation only. Add this plan to the planning-board index and a **Queued** Settings slice row whose next action is Task 1 implementation; keep Product Follow-up 5 **Queued**.
+
+- [ ] **Step 2: Update user-facing guidance after implementation.**
+
+In `how-to.md`, describe the Refresh page precisely: **Refresh interval** changes the existing schedule; **Refresh on wake** is currently always on; **Refresh on open** is visibly planned and has no effect yet. Do not imply that a disabled presentation row persists a preference.
+
+- [ ] **Step 3: Directly inspect the signed app before completion.**
+
+Open only an audit-owned signed app instance through normal UI paths. At 680 × 560 hidden rail and 891 × 560 visible rail, inspect:
+
+1. General **Style**, **Show**, and all three **Appearance** segments share the trailing alignment of native switches and preserve existing values.
+2. Refresh interval is bounded and right aligned; wake is disabled/on with **Always on**; open is disabled/off with **Not available yet**; neither switch changes when clicked, and VoiceOver reports its unavailable state/hint.
+3. General, Refresh, Notifications, Agents, Data & Privacy, and Diagnostics in Light and Dark: page/header, sidebar, Context Rail, section/card fills, dividers, selected sidebar item, and search background have no stale/mixed region.
+4. Light → System while macOS is Dark; Dark → System while macOS is Light; System → Light → System; System → Dark → System; and a macOS appearance change while Settings stays open. Confirm destination, search text, scroll location, Context Rail visibility, preview state, and focused control survive.
+5. The native menu still follows macOS, not the Settings preference. Do not add menu refresh behavior or a timer.
+
+If normal UI automation cannot inspect a state, stop promptly, do not terminate a user-owned app, and record that cell as **Not run**.
+
+- [ ] **Step 4: Record exact verification and commit documentation.**
+
+Run the existing package suite, signed build, strict code-sign verification, plist lint, and `git diff --check`. Record every visual **Observed**/**Not run** cell in this plan and board. Do not create a PR or push.
+
+```bash
+git add docs/superpowers/plans docs/product/planning-board.md how-to.md
+git commit -m "Document Settings palette and Refresh presentation"
+```
+
+## Deferred behavior
+
+The disabled Refresh rows are visual evidence of supported future intent, not settings. A later implementation must separately approve persistence, defaults, migration, user-visible state, monitor ownership, coalescing, diagnostics, and the smallest deterministic regression coverage before it enables either switch. It must never make opening a native `MenuBarExtra` a polling surface or second scheduler.
+
+## Acceptance criteria
+
+- General **Style**, **Show**, and **Appearance** use a common leading-text/trailing-native-control layout; Appearance stays a bounded native System/Light/Dark segmented picker.
+- The dark palette applies the exact v4 surface values through one `SettingsView`-injected palette: `#1e1e1e`, `#1a1a1a`, white 5.5%, 6%, 8%, and 10% overlays, and `#3a3a3c` only where native-control compatibility permits. Light continues using semantic system colors.
+- No Settings surface holds an ad hoc dark color; pages share the same effective appearance, and no AppKit/application-wide appearance assignment is added.
+- Refresh presents **Refresh interval**, **Refresh on wake**, and **Refresh on open** in the v4-inspired leading-label/trailing-control format. The exact supplied descriptions are present.
+- Refresh interval retains its existing supported `RefreshMode` selection and behavior. Wake remains truthfully always on; open remains truthfully unavailable. Neither new row persists or changes a scheduling setting.
+- No new automated test case is added. Existing tests serve only as a regression baseline; later behavior wiring has an explicit deterministic-regression requirement.
+- The signed-app visual matrix is recorded as direct observation or **Not run** without inference. No PR is created or pushed by an agent.
+

@@ -25,7 +25,8 @@ This plan implements only current, supported native behavior:
 | General menu-bar preview | Keep one larger full-width Context Rail preview; remove the duplicate page preview and Current Scope. |
 | Menu Bar Icon Appearance | Use the reference's System/Light/Dark horizontal selector as a native bounded `.segmented` picker for the existing Settings appearance preference. The native menu remains macOS-controlled. |
 | Application version metadata | Move the existing Name, Version, and Build rows from General to Diagnostics; do not add the reference's unsupported Swift, Codex-version, architecture, export, or log-copy fields. |
-| Figma-only Show in Menu Bar, Start Minimized, Open on Update, refresh-on-open/wake, notification summaries, credit-expiry preferences, cache reset, export, and generated provider controls | Do not port: no backed behavior, approved persistence, or product requirement exists. |
+| Figma-only Show in Menu Bar, Start Minimized, Open on Update, notification summaries, credit-expiry preferences, cache reset, export, and generated provider controls | Do not port: no backed behavior, approved persistence, or product requirement exists. |
+| Refresh interval, Refresh on wake, and Refresh on open | Follow the separate [Settings Palette and Refresh Preferences Presentation plan](2026-07-18-settings-palette-and-refresh-preferences-presentation.md). Its presentation-only slice retains the real interval binding, reports wake as always on, and reports open as unavailable; it does not add persistence or scheduler behavior. |
 
 ### v4 reference confirmation — 2026-07-18
 
