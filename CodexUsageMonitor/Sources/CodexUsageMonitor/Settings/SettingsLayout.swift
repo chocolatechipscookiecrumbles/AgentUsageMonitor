@@ -12,10 +12,15 @@ enum SettingsLayoutMetrics {
     static let compactWidthBreakpoint: CGFloat = 500
     static let labelWidth: CGFloat = 148
     static let controlWidth: CGFloat = 190
-    static let appearanceSegmentedControlWidth: CGFloat = 240
+    static let compactSegmentedControlWidth: CGFloat = 220
+    static let appearanceSegmentedControlWidth: CGFloat = 220
     static let sectionCornerRadius: CGFloat = 10
-    static let sectionContentPadding: CGFloat = 14
+    static let sectionContentHorizontalPadding: CGFloat = 14
+    static let sectionRowVerticalPadding: CGFloat = 12
     static let rowSpacing: CGFloat = 12
+    static let preferenceTitleDescriptionSpacing: CGFloat = 3
+    static let preferenceControlMinimumTextWidth: CGFloat = 168
+    static let unavailableControlStatusSpacing: CGFloat = 4
     static let compactRowSpacing: CGFloat = 4
     static let regularPageHorizontalPadding: CGFloat = 20
     static let compactPageHorizontalPadding: CGFloat = 16
@@ -63,6 +68,7 @@ extension EnvironmentValues {
 
 struct SettingsPage<Content: View>: View {
     private let content: Content
+    @Environment(\.settingsAppearancePalette) private var palette
 
     init(@ViewBuilder content: () -> Content) {
         self.content = content()
@@ -80,7 +86,7 @@ struct SettingsPage<Content: View>: View {
                 .padding(.horizontal, SettingsLayoutMetrics.pageHorizontalPadding(for: layout))
                 .padding(.vertical, SettingsLayoutMetrics.pageVerticalPadding(for: layout))
             }
-            .background(Color(nsColor: .windowBackgroundColor))
+            .background(palette.pageBackground)
             .environment(\.settingsLayoutMode, layout)
         }
     }
@@ -89,6 +95,7 @@ struct SettingsPage<Content: View>: View {
 struct SettingsSection<Content: View>: View {
     let title: String
     private let content: Content
+    @Environment(\.settingsAppearancePalette) private var palette
 
     init(_ title: String, @ViewBuilder content: () -> Content) {
         self.title = title
@@ -105,15 +112,15 @@ struct SettingsSection<Content: View>: View {
                 .tracking(0.35)
                 .padding(.leading, 4)
 
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 0) {
                 content
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(SettingsLayoutMetrics.sectionContentPadding)
-            .background(Color(nsColor: .controlBackgroundColor), in: .rect(cornerRadius: SettingsLayoutMetrics.sectionCornerRadius))
+            .padding(.horizontal, SettingsLayoutMetrics.sectionContentHorizontalPadding)
+            .background(palette.sectionSurface, in: .rect(cornerRadius: SettingsLayoutMetrics.sectionCornerRadius))
             .overlay {
                 RoundedRectangle(cornerRadius: SettingsLayoutMetrics.sectionCornerRadius)
-                    .stroke(.quaternary, lineWidth: 0.5)
+                    .stroke(palette.divider, lineWidth: 0.5)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

@@ -4,6 +4,7 @@ struct GeneralSettingsContextView: View {
     @ObservedObject var settings: AppSettings
     let status: SettingsStatus
     let displayState: QuotaDisplayState
+    @Environment(\.settingsAppearancePalette) private var palette
 
     private var presentation: QuotaPresentation? {
         displayState.displayedRecord?.presentation
@@ -20,7 +21,7 @@ struct GeneralSettingsContextView: View {
             )
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.vertical, 14)
-            .background(.quaternary, in: .rect(cornerRadius: 8))
+            .background(palette.searchFieldBackground, in: .rect(cornerRadius: 8))
         }
 
         SettingsContextCard("Current Usage") {
@@ -32,12 +33,12 @@ struct GeneralSettingsContextView: View {
             )
 
             if let fiveHour = presentation?.fiveHour {
-                Divider()
+                SettingsPaletteDivider()
                 SettingsQuotaPreviewRow(title: "5-Hour Window", window: fiveHour, tint: .green)
             }
 
             if let weekly = presentation?.weekly {
-                Divider()
+                SettingsPaletteDivider()
                 SettingsQuotaPreviewRow(title: "Weekly Window", window: weekly, tint: .blue)
             }
 

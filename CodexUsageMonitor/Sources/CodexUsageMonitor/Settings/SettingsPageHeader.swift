@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsPageHeader: View {
     let title: String
     @Binding var isPreviewVisible: Bool
+    @Environment(\.settingsAppearancePalette) private var palette
 
     var body: some View {
         HStack(spacing: 12) {
@@ -24,7 +25,7 @@ struct SettingsPageHeader: View {
         }
         .padding(.horizontal, 20)
         .frame(height: SettingsLayoutMetrics.pageHeaderHeight)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(palette.windowBackground)
     }
 
     private func togglePreview() {

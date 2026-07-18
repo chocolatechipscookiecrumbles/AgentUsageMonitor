@@ -37,6 +37,20 @@ When editing `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings`:
 - Capture or otherwise directly inspect the original failing page after the fix. Do not infer that a shared-layout change fixed every tab without opening those tabs.
 - Do not leave temporary audit app instances running or terminate an app process that was already owned by the user.
 
+## Settings card geometry and mixed-axis layout guardrails
+
+The July 18 Figma-layout audit found that a shared palette divider constrained only with `.frame(width: 1)` worked in an `HStack` but expanded to absorb the available height when reused in the Settings page's `VStack`. This split the page into a large empty upper region and a compressed lower region, which made the actual controls appear non-scrollable. The same audit found that General's fixed segmented control, leading-text minimum width, and card padding exceeded the 499-point Settings Page width, allowing that card to reach the trailing edge while other pages retained a gutter. Nested card and row vertical padding also made one-item cards visibly over-tall.
+
+When changing Settings rows, cards, or dividers:
+
+- Do not reuse an unconstrained `Rectangle` divider across axes. A vertical divider must set its width; a horizontal divider must set its height. Prefer a shared `SettingsPaletteDivider` with an explicit orientation when both are needed.
+- Calculate the complete width budget at the default hidden-rail Settings Page width before adding a fixed trailing control: page width minus page horizontal padding minus section horizontal padding must accommodate the leading-text minimum width, inter-column spacing, and control width. A child `.frame(maxWidth: .infinity)` does not prevent intrinsic-width overflow.
+- Keep every width, inset, row-padding, and title/description-spacing value in `SettingsLayoutMetrics`. Use one `SettingsPreferenceControlRow` for leading title/description plus trailing native picker/segment and one `SettingsPreferenceToggle` for Boolean controls.
+- Use `SettingsSectionRow` for the common Figma card row treatment. It owns the row's vertical inset and separator; `SettingsSection` owns only horizontal card inset. Do not stack additional vertical container padding around every row.
+- Keep a control's explanatory description inside its leading control row whenever it explains that specific control. It must share the same width and `preferenceTitleDescriptionSpacing` as the Notifications master-toggle description; use standalone `SettingsDescription` only for section-level policy or recovery information.
+- Keep General's related one-line controls in a single dense card where that improves scanability. Do not create a separate oversized card solely because it contains one toggle.
+- Before accepting a shared geometry change, inspect General and Notifications side by side at the default size with the Context Rail both hidden and visible. Check for empty regions, normal scrolling, equal card gutters, compact one-item cards, wrapped descriptions that do not run under controls, and fixed controls contained inside the page.
+
 ## Settings appearance-transition guardrails
 
 The July 15 appearance audit found that changing a live Settings root from `.preferredColorScheme(.light)` to `.preferredColorScheme(nil)` does not reliably clear SwiftUI's presentation-level override. The picker persists **System** and AppKit chrome follows Dark, while the hosted SwiftUI content can remain Light, producing a mixed window with dark outlines/title bar and light page/card bodies.

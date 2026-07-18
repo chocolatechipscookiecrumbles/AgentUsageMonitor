@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` (recommended) or `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** **Planned — presentation slice only.** It deliberately adds no new automated test case and does not make either new Refresh switch operational.
+**Status:** **Implementation complete — Draft manual acceptance remains open.** This slice deliberately adds no new automated test case and does not make either new Refresh switch operational.
 
-**Goal:** Right-align the General appearance and menu-bar choice controls with native preference switches, port the v4 dark Settings surface palette through one Settings-owned token set, and present the requested Refresh options without changing refresh scheduling.
+**Goal:** Adapt the existing native Settings pages to the v4 Figma card-and-row layout while retaining supported current items, right-aligning General choice controls, porting the dark surface palette, and presenting the requested Refresh options without changing refresh scheduling.
 
-**Architecture:** `SettingsView` remains the one owner of the concrete Settings presentation color scheme and injects a value-type `SettingsAppearancePalette` into the existing hierarchy. Shared trailing-control rows keep text and descriptions leading while bounded pickers and segmented controls align with `SettingsPreferenceToggle` at the trailing edge. `QuotaMonitor` remains the only scheduler and wake observer: this slice only renders truthful, unavailable Refresh controls and preserves the existing `refreshMode` binding.
+**Architecture:** The existing global sidebar, page header, content width, Context Rail, native controls, and supported settings remain intact. `SettingsView` remains the one owner of the concrete Settings presentation color scheme and injects a value-type `SettingsAppearancePalette` into that hierarchy. Figma-style preference groups use the existing card treatment with leading label/description and trailing native control alignment; `QuotaMonitor` remains the only scheduler and wake observer, so this slice only renders truthful, unavailable Refresh controls and preserves the existing `refreshMode` binding.
 
 **Tech Stack:** Swift 6.2, SwiftUI, AppKit semantic colors for the existing Light presentation, existing `AppSettings`/`QuotaMonitor`, and the signed macOS app build script.
 
@@ -41,6 +41,26 @@ The local v4 design reference is `High-fidelity macOS menu UI v4/src/components/
 
 Light appearance remains on existing AppKit semantic colors (`windowBackgroundColor`, `controlBackgroundColor`, and semantic foreground styles). The v4 color values above are not permission to set `NSApplication.appearance`, `NSWindow.appearance`, application-wide colors, or individual page-local color patches.
 
+## Proposed Figma layout adaptation
+
+The target is the v4 structural layout, not a React/CSS port:
+
+| v4 structure | Current native element retained | Planned adaptation |
+| --- | --- | --- |
+| Global left navigation, section title, scrollable page, optional right context region | `SettingsNavigationSidebar`, `SettingsPageHeader`, `SettingsPage`, and Context Rail | Keep the current shell, its six destinations, and existing 680 × 560/891 × 560 geometry. |
+| Uppercase group title above a rounded card | `SettingsSection` | Preserve the current uppercase title and rounded native card. Align its padding, surfaces, and dividers with the shared palette rather than duplicating custom page layouts. |
+| Each preference row has a leading label/description and a trailing fixed-width switch, selector, or segmented control | `SettingsPreferenceToggle`, `SettingsLabeledRow`, and the new `SettingsPreferenceControlRow` | Use the shared trailing-control row for General's Style/Show/Appearance and Refresh's interval/wake/open entries. Keep all current labels, descriptions, and supported values unless this plan explicitly says otherwise. |
+| Separators between related rows | Existing section card | Add Figma-style separators only through a shared row-group/container primitive, never as page-local lines. The exact destination scope is the first clarification below. |
+| Automatic Refresh group | Current Refresh page | Put the existing writable interval selector first, then the requested visible-but-unavailable wake/open rows; preserve the current read-only Current Policy and Latest Collection information after it. |
+
+The following Figma-only items remain excluded: Show in Menu Bar, Start Minimized, Open on Update, unsupported notification summaries, credit-expiry settings, cache reset, export/log controls, and generated provider controls. No existing supported setting is removed merely to make the page look closer to the mockup.
+
+## Confirmed layout decisions — 2026-07-18
+
+1. **Destination scope:** Apply the Figma row separators and tighter card-row treatment consistently to all six Settings destinations through `SettingsSectionRow`, while retaining their supported current items and behavior.
+2. **Inactive Refresh affordance:** Use disabled native switches with visible factual statuses: wake is on/**Always on** because the monitor already refreshes on wake, while open is off/**Not available yet** because no menu-open refresh exists. This avoids a clickable nonfunctional preference.
+3. **Verification:** Run the existing automated suite as regression coverage and perform final visual acceptance manually in an audit-owned signed app. No Figma Design URL or Desktop node is available for screenshot comparison.
+
 ## Global constraints
 
 - Preserve the global `SettingsNavigationSidebar`, `SettingsDetailView`, Context Rail, six destinations, 680 × 560 hidden-rail size, and right-only Context Rail expansion.
@@ -56,6 +76,7 @@ Light appearance remains on existing AppKit semantic colors (`windowBackgroundCo
 | File | Responsibility |
 | --- | --- |
 | Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsPreferenceControlRow.swift` | One reusable leading-text/trailing-native-control row for multi-value choices and explicit unavailable controls. |
+| Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsSectionRow.swift` | One shared Figma-style in-card row wrapper with standard inset and optional palette-aware separator. |
 | Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsAppearancePalette.swift` | Central light-semantic/dark-v4 palette value, injected through `EnvironmentValues`. |
 | Modify `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsLayout.swift` | Centralize widths/spacing required by the shared row and make Settings surfaces consume the palette. |
 | Modify `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsView.swift` | Resolve the existing concrete scheme once and inject its matching palette across the complete Settings hierarchy. |
@@ -66,15 +87,17 @@ Light appearance remains on existing AppKit semantic colors (`windowBackgroundCo
 
 ---
 
-### Task 1: Establish the shared trailing-control row
+### Task 1: Establish shared Figma-style card rows and trailing controls
 
 **Files:**
 - Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsPreferenceControlRow.swift`
+- Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsSectionRow.swift`
 - Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsLayout.swift`
 
 **Interfaces:**
 - Produces `SettingsPreferenceControlRow<Control: View>` for a leading title/optional description and one trailing native control.
 - Produces `SettingsUnavailablePreferenceControlRow` for a fixed, inaccessible state with a VoiceOver availability hint.
+- Produces `SettingsSectionRow<Content: View>` so all six Settings destinations use the same row inset, vertical rhythm, and palette-aware separator.
 - Consumes centralized `preferenceControlMinimumTextWidth`, `unavailableControlStatusSpacing`, `controlWidth`, and `appearanceSegmentedControlWidth`.
 
 - [ ] **Step 1: Add the centralized layout values.**
@@ -86,7 +109,39 @@ static let preferenceControlMinimumTextWidth: CGFloat = 180
 static let unavailableControlStatusSpacing: CGFloat = 4
 ```
 
-- [ ] **Step 2: Create the row that mirrors the existing switch geometry.**
+- [ ] **Step 2: Create the shared in-card row wrapper.**
+
+```swift
+struct SettingsSectionRow<Content: View>: View {
+    let showsDivider: Bool
+    private let content: Content
+    @Environment(\.settingsAppearancePalette) private var palette
+
+    init(
+        showsDivider: Bool = true,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.showsDivider = showsDivider
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            content
+                .padding(.vertical, SettingsLayoutMetrics.sectionRowVerticalPadding)
+            if showsDivider {
+                Rectangle()
+                    .fill(palette.divider)
+                    .frame(height: SettingsLayoutMetrics.dividerWidth)
+            }
+        }
+    }
+}
+```
+
+Add `static let sectionRowVerticalPadding: CGFloat = 9` to `SettingsLayoutMetrics`, change `SettingsSection`'s inner stack to `spacing: 0`, and preserve its single outer `sectionContentPadding`. Every section's final row passes `showsDivider: false`.
+
+- [ ] **Step 3: Create the row that mirrors the existing switch geometry.**
 
 ```swift
 struct SettingsPreferenceControlRow<Control: View>: View {
@@ -124,7 +179,7 @@ struct SettingsPreferenceControlRow<Control: View>: View {
 
 Do not give the trailing control `maxWidth: .infinity`; its fixed width and spacer place its trailing edge with the native switches.
 
-- [ ] **Step 3: Add an explicit unavailable-control wrapper instead of a writable placeholder binding.**
+- [ ] **Step 4: Add an explicit unavailable-control wrapper instead of a writable placeholder binding.**
 
 ```swift
 struct SettingsUnavailablePreferenceControlRow: View {
@@ -153,28 +208,40 @@ struct SettingsUnavailablePreferenceControlRow: View {
 }
 ```
 
-- [ ] **Step 4: Run the existing regression baseline and commit.**
+- [ ] **Step 5: Run the existing regression baseline and commit.**
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-path CodexUsageMonitor
 git diff --check
-git add CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsPreferenceControlRow.swift CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsLayout.swift
+git add CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsPreferenceControlRow.swift CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsSectionRow.swift CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsLayout.swift
 git commit -m "Add trailing Settings control rows"
 ```
 
 Expected: the existing suite passes and the diff has no whitespace errors. Do not create a test case.
 
-### Task 2: Align General choice controls with trailing switches
+### Task 2: Apply the Figma card-and-row structure across all Settings destinations
 
 **Files:**
 - Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/GeneralSettingsView.swift`
+- Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/RefreshSettingsView.swift`
+- Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/NotificationSettingsView.swift`
+- Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AgentsSettingsView.swift`
+- Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/DataPrivacySettingsView.swift`
+- Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/DiagnosticsSettingsView.swift`
 
 **Interfaces:**
 - Consumes `SettingsPreferenceControlRow`.
+- Consumes `SettingsSectionRow` from Task 1 in every `SettingsSection` across all six destinations.
 - Preserves bindings to `settings.menuBarDisplayStyle`, `settings.quotaValueMode`, and `settings.appearancePreference`.
 - Produces no new preference, color-scheme owner, or menu-bar appearance behavior.
 
-- [ ] **Step 1: Replace only the three Menu Bar Icon row containers.**
+- [ ] **Step 1: Wrap every Settings-section child in the shared row wrapper.**
+
+For each `SettingsSection`, place each existing logical row, description, button, or conditional guidance block inside `SettingsSectionRow`. Preserve every current condition and value. Use `showsDivider: false` only for the final rendered row in each section; where the final row is conditional, keep the final unconditional content as the no-divider row and leave a preceding conditional row with the default divider.
+
+Do not merge semantically distinct current rows merely to reduce separators. In particular, retain Notification permission guidance, the threshold `ForEach`, Agent provider blocks, Data & Privacy inventory values, Diagnostics export/history sections, Refresh status/readout rows, and all Context Rail content.
+
+- [ ] **Step 2: Replace the three General Menu Bar Icon row containers.**
 
 ```swift
 SettingsPreferenceControlRow("Style") {
@@ -212,13 +279,26 @@ SettingsPreferenceControlRow("Appearance") {
 
 Keep the two existing descriptions directly below these rows, now without `.settingsValueColumnAligned()`: each is a section-level explanation, not a value-column continuation.
 
-- [ ] **Step 2: Check boundaries and commit.**
+- [ ] **Step 3: Preserve each destination's current information hierarchy.**
+
+Use this migration map exactly:
+
+| Destination | Keep in its current section/card | Figma-row effect |
+| --- | --- | --- |
+| General | Startup, Keyboard Shortcuts, Menu Bar Icon, Style, Show, Appearance, and existing descriptions | Switches, pop-up choices, and segments all share the trailing edge. |
+| Notifications | Master switch, permission guidance, remaining-quota thresholds, forecasts, reset credits, stale data, and refresh failures | Retain disabled states and explanatory text; add separators only through `SettingsSectionRow`. |
+| Refresh | Existing interval, effective policy/interval/activity, latest collection, and Refresh Now | The interval and the new presentational controls lead the page; readouts remain visible below. |
+| Agents | Provider state, connection actions, and planned-provider copy | Preserve navigation and action ownership; only adopt card row spacing/dividers. |
+| Data & Privacy | Local storage and inventory rows | Preserve file paths, text selection, and wrapping; do not clip long values. |
+| Diagnostics | Application metadata, diagnostics summary, history, and actions | Preserve existing labels and button behavior; only adopt card row spacing/dividers. |
+
+- [ ] **Step 4: Check boundaries and commit.**
 
 Source-review that `SettingsView` still owns `.preferredColorScheme`, the controls retain their bindings, and neither `NSApplication.appearance` nor `NSWindow.appearance` is assigned. Run the existing package suite and `git diff --check`; add no test case.
 
 ```bash
-git add CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/GeneralSettingsView.swift
-git commit -m "Align General choice controls"
+git add CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/GeneralSettingsView.swift CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/RefreshSettingsView.swift CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/NotificationSettingsView.swift CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AgentsSettingsView.swift CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/DataPrivacySettingsView.swift CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/DiagnosticsSettingsView.swift
+git commit -m "Apply Figma Settings card rows"
 ```
 
 ### Task 3: Port the v4 dark palette through one Settings-owned environment value
@@ -428,6 +508,21 @@ git commit -m "Document Settings palette and Refresh presentation"
 
 The disabled Refresh rows are visual evidence of supported future intent, not settings. A later implementation must separately approve persistence, defaults, migration, user-visible state, monitor ownership, coalescing, diagnostics, and the smallest deterministic regression coverage before it enables either switch. It must never make opening a native `MenuBarExtra` a polling surface or second scheduler.
 
+## Layout regression record — 2026-07-18
+
+During direct signed-app inspection, reusing a palette `Rectangle` constrained only by width inside both `HStack` and `VStack` contexts caused the vertical-page instance to consume the available height. The visible result was a large empty upper panel, controls pushed into a lower region, and apparently broken scrolling. The repair separates fixed-width vertical and fixed-height horizontal dividers.
+
+General initially reached the page's trailing edge because the fixed 240-point segmented picker, 180-point leading-text minimum, inter-column spacing, and section/page padding exceeded the 499-point Settings Page budget. The repair uses centralized smaller bounded segments and leading minimum values that fit the page, with `SettingsSectionRow` explicitly filling its available width. The card density repair removes stacked outer vertical card padding and retains one 12-point row inset plus horizontal-only card padding. General's launch and keyboard controls share one dense card, while its control explanations use the same leading-column rhythm as the Notifications master switch.
+
+These causes and prevention rules are recorded in `AGENTS.md` under **Settings card geometry and mixed-axis layout guardrails**. The signed-app visual matrix remains open until the user confirms the repaired General width/density and the full cross-destination Light/Dark/rail matrix.
+
+### Implementation evidence — 2026-07-18
+
+- **Run:** `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-path CodexUsageMonitor` passed after the final layout adjustment: 8 tests, 0 failures. No test case was added by user direction; this is existing regression coverage only.
+- **Run:** the signed build script completed; `codesign --verify --deep --strict --verbose=2` reported a valid bundle satisfying its Designated Requirement; `plutil -lint` reported `OK`; and `git diff --check` passed.
+- **Observed:** the initial signed-app audit exposed the divider expansion and General width/density regressions. After the axis-specific divider repair, the user confirmed the empty upper panel was gone and Settings scrolling was restored.
+- **Not run:** the user had not yet reported direct acceptance of the final compact-card/General-gutter revision, nor the complete six-destination, rail-hidden/visible, Light/Dark, appearance-transition, focus, VoiceOver, and native-menu matrices. The branch and manual PR handoff remain Draft for those limits.
+
 ## Acceptance criteria
 
 - General **Style**, **Show**, and **Appearance** use a common leading-text/trailing-native-control layout; Appearance stays a bounded native System/Light/Dark segmented picker.
@@ -437,4 +532,3 @@ The disabled Refresh rows are visual evidence of supported future intent, not se
 - Refresh interval retains its existing supported `RefreshMode` selection and behavior. Wake remains truthfully always on; open remains truthfully unavailable. Neither new row persists or changes a scheduling setting.
 - No new automated test case is added. Existing tests serve only as a regression baseline; later behavior wiring has an explicit deterministic-regression requirement.
 - The signed-app visual matrix is recorded as direct observation or **Not run** without inference. No PR is created or pushed by an agent.
-

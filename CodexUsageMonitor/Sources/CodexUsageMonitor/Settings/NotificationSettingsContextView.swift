@@ -33,7 +33,7 @@ struct NotificationSettingsContextView: View {
             }
 
             if settings.alertsEnabled && settings.resetCreditWarningsEnabled {
-                Divider()
+                SettingsPaletteDivider()
                 Label {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Reset Credit Expiry")

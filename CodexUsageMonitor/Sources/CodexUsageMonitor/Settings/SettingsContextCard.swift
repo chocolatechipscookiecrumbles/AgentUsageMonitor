@@ -3,6 +3,7 @@ import SwiftUI
 struct SettingsContextCard<Content: View>: View {
     let title: String
     private let content: Content
+    @Environment(\.settingsAppearancePalette) private var palette
 
     init(_ title: String, @ViewBuilder content: () -> Content) {
         self.title = title
@@ -23,10 +24,10 @@ struct SettingsContextCard<Content: View>: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(12)
-            .background(Color(nsColor: .controlBackgroundColor), in: .rect(cornerRadius: 9))
+            .background(palette.sectionSurface, in: .rect(cornerRadius: 9))
             .overlay {
                 RoundedRectangle(cornerRadius: 9)
-                    .stroke(.quaternary, lineWidth: 0.5)
+                    .stroke(palette.divider, lineWidth: 0.5)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
