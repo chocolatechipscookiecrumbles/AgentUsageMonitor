@@ -48,7 +48,9 @@ struct SettingsView: View {
     private var settingsPage: some View {
         VStack(spacing: 0) {
             SettingsPageHeader(
-                title: settings.selectedSettingsTab.title,
+                selection: settings.selectedSettingsTab,
+                entries: AgentSettingsCatalog.entries,
+                selectedAgent: $selectedSettingsAgent,
                 isPreviewVisible: $isPreviewVisible
             )
 

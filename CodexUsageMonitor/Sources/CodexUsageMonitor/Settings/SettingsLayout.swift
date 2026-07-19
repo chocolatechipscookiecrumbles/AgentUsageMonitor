@@ -9,6 +9,12 @@ enum SettingsLayoutMetrics {
     static let settingsPageWidth = hiddenWindowWidth - sidebarWidth - dividerWidth
 
     static let pageHeaderHeight: CGFloat = 52
+    static let pageHeaderHorizontalPadding: CGFloat = 20
+    static let pageHeaderContentSpacing: CGFloat = 12
+    static let agentHeaderItemHorizontalPadding: CGFloat = 12
+    static let agentHeaderIconSize: CGFloat = 16
+    static let agentHeaderItemSpacing: CGFloat = 6
+    static let agentHeaderUnderlineHeight: CGFloat = 2
     static let compactWidthBreakpoint: CGFloat = 500
     static let labelWidth: CGFloat = 148
     static let controlWidth: CGFloat = 190
