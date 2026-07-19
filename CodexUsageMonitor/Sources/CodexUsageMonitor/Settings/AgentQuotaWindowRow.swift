@@ -4,7 +4,7 @@ import SwiftUI
 /// An unavailable window remains visible so the page structure does not imply
 /// that a provider lacks a session window simply because it is currently idle.
 struct AgentQuotaWindowRow: View {
-    let title: String
+    let kind: AgentQuotaWindowKind
     let window: QuotaWindow?
     let provider: AgentProvider
     let valueMode: QuotaValueMode
@@ -14,7 +14,7 @@ struct AgentQuotaWindowRow: View {
         if let window {
             VStack(alignment: .leading, spacing: 5) {
                 HStack {
-                    Text(title)
+                    Text(kind.title)
                         .font(.caption)
                         .fontWeight(.semibold)
 
@@ -26,7 +26,11 @@ struct AgentQuotaWindowRow: View {
                         .monospacedDigit()
                 }
 
-                ProviderQuotaProgressBar(value: valueMode.value(for: window), provider: provider)
+                ProviderQuotaProgressBar(
+                    value: valueMode.value(for: window),
+                    tint: kind.progressTint(for: provider),
+                    accessibilityLabel: "\(provider.title) \(kind.title)"
+                )
 
                 if let resetAt = window.resetAt {
                     HStack(alignment: .firstTextBaseline) {
@@ -36,7 +40,7 @@ struct AgentQuotaWindowRow: View {
 
                         Spacer()
 
-                        Text(resetAt, format: .dateTime.hour().minute())
+                        Text(resetAt, format: .dateTime.month(.abbreviated).day().year().hour().minute())
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -45,7 +49,7 @@ struct AgentQuotaWindowRow: View {
         } else {
             VStack(alignment: .leading, spacing: 5) {
                 HStack {
-                    Text(title)
+                    Text(kind.title)
                         .font(.caption)
                         .fontWeight(.semibold)
 
@@ -56,7 +60,11 @@ struct AgentQuotaWindowRow: View {
                         .foregroundStyle(.secondary)
                 }
 
-                ProviderQuotaProgressBar(value: 0, provider: provider)
+                ProviderQuotaProgressBar(
+                    value: 0,
+                    tint: kind.progressTint(for: provider),
+                    accessibilityLabel: "\(provider.title) \(kind.title)"
+                )
 
                 Text("No active session window")
                     .font(.caption)

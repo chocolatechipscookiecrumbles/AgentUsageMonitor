@@ -13,6 +13,9 @@ struct AgentsSettingsView: View {
                     connectionState: viewModel.connectionState,
                     presentation: viewModel.presentation,
                     quotaValueMode: viewModel.settings.quotaValueMode,
+                    alertsEnabled: viewModel.settings.alertsEnabled,
+                    isWarningThresholdEnabled: viewModel.settings.isQuotaThresholdEnabled,
+                    setWarningThresholdEnabled: viewModel.settings.setQuotaThreshold,
                     signInWithBrowser: viewModel.signInWithBrowser,
                     signInWithCLI: viewModel.signInWithCLI,
                     checkConnection: viewModel.checkCodexConnection

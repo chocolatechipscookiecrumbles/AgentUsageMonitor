@@ -4,7 +4,8 @@ import SwiftUI
 /// tint, rather than a native control style that can darken it by appearance.
 struct ProviderQuotaProgressBar: View {
     let value: Int
-    let provider: AgentProvider
+    let tint: Color
+    let accessibilityLabel: String
 
     @Environment(\.settingsAppearancePalette) private var palette
 
@@ -15,13 +16,13 @@ struct ProviderQuotaProgressBar: View {
                     .fill(palette.divider)
 
                 Capsule()
-                    .fill(provider.settingsPresentationTint)
+                    .fill(tint)
                     .frame(width: geometry.size.width * progress)
             }
         }
         .frame(height: SettingsLayoutMetrics.agentQuotaProgressBarHeight)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(provider.title) quota")
+        .accessibilityLabel(accessibilityLabel)
         .accessibilityValue("\(value) percent")
     }
 

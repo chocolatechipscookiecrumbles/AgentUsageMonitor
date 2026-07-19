@@ -12,6 +12,7 @@ enum SettingsLayoutMetrics {
     static let pageHeaderHorizontalPadding: CGFloat = 20
     static let pageHeaderContentSpacing: CGFloat = 12
     static let agentHeaderItemHorizontalPadding: CGFloat = 12
+    static let agentHeaderTabWidth: CGFloat = 132
     static let agentHeaderIconSlotSize: CGFloat = 20
     static let agentHeaderIconArtworkMaxSize: CGFloat = 16
     static let agentContextIconSlotSize: CGFloat = 16
@@ -19,6 +20,12 @@ enum SettingsLayoutMetrics {
     static let agentQuotaProgressBarHeight: CGFloat = 6
     static let agentHeaderItemSpacing: CGFloat = 6
     static let agentHeaderUnderlineHeight: CGFloat = 2
+    static let agentHeaderUnderlineWidth: CGFloat = 96
+    static let agentHeaderDividerHeight: CGFloat = 22
+    static let agentWarningControlsSpacing: CGFloat = 10
+    static let agentWarningChipSpacing: CGFloat = 8
+    static let agentWarningChipWidth: CGFloat = 46
+    static let agentWarningDisabledChipOpacity: CGFloat = 0.55
     static let compactWidthBreakpoint: CGFloat = 500
     static let labelWidth: CGFloat = 148
     static let controlWidth: CGFloat = 190

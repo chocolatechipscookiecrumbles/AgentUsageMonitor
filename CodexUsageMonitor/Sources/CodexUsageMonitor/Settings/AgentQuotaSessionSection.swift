@@ -11,7 +11,7 @@ struct AgentQuotaSessionSection: View {
         SettingsSection("Current quota") {
             SettingsSectionRow {
                 AgentQuotaWindowRow(
-                    title: "5-Hour Window",
+                    kind: .fiveHour,
                     window: presentation.fiveHour,
                     provider: provider,
                     valueMode: valueMode,
@@ -20,7 +20,7 @@ struct AgentQuotaSessionSection: View {
             }
             SettingsSectionRow {
                 AgentQuotaWindowRow(
-                    title: "Weekly Window",
+                    kind: .weekly,
                     window: presentation.weekly,
                     provider: provider,
                     valueMode: valueMode,

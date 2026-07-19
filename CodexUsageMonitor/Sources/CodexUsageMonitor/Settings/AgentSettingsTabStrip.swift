@@ -6,6 +6,7 @@ import SwiftUI
 struct AgentSettingsTabStrip: View {
     let entries: [AgentSettingsCatalogEntry]
     @Binding var selection: AgentProvider
+    @Environment(\.settingsAppearancePalette) private var palette
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
@@ -22,7 +23,7 @@ struct AgentSettingsTabStrip: View {
 
     private var tabButtons: some View {
         HStack(spacing: 0) {
-            ForEach(entries) { entry in
+            ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
                 Button {
                     selection = entry.provider
                 } label: {
@@ -36,13 +37,18 @@ struct AgentSettingsTabStrip: View {
                     }
                     .font(.system(size: 14, weight: selection == entry.provider ? .semibold : .regular))
                     .foregroundStyle(selection == entry.provider ? .primary : .secondary)
-                    .padding(.horizontal, SettingsLayoutMetrics.agentHeaderItemHorizontalPadding)
-                    .frame(height: SettingsLayoutMetrics.pageHeaderHeight)
+                    .frame(
+                        width: SettingsLayoutMetrics.agentHeaderTabWidth,
+                        height: SettingsLayoutMetrics.pageHeaderHeight
+                    )
                     .overlay(alignment: .bottom) {
                         if selection == entry.provider {
                             Rectangle()
                                 .fill(entry.provider.settingsPresentationTint)
-                                .frame(height: SettingsLayoutMetrics.agentHeaderUnderlineHeight)
+                                .frame(
+                                    width: SettingsLayoutMetrics.agentHeaderUnderlineWidth,
+                                    height: SettingsLayoutMetrics.agentHeaderUnderlineHeight
+                                )
                                 .accessibilityHidden(true)
                         }
                     }
@@ -51,6 +57,16 @@ struct AgentSettingsTabStrip: View {
                 .accessibilityLabel(entry.provider.title)
                 .accessibilityValue(selection == entry.provider ? "Selected" : "Not selected")
                 .accessibilityAddTraits(selection == entry.provider ? .isSelected : [])
+
+                if index < entries.index(before: entries.endIndex) {
+                    Rectangle()
+                        .fill(palette.divider)
+                        .frame(
+                            width: SettingsLayoutMetrics.dividerWidth,
+                            height: SettingsLayoutMetrics.agentHeaderDividerHeight
+                        )
+                        .accessibilityHidden(true)
+                }
             }
         }
     }
