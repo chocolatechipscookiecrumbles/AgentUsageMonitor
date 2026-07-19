@@ -20,9 +20,6 @@ struct CodexAgentSettingsView: View {
             SettingsSectionRow {
                 SettingsLabeledRow("Quota status") { Text(status.displayMode.displayName) }
             }
-            SettingsSectionRow(showsDivider: false) {
-                SettingsDescription("Codex is the only active agent integration in this build.")
-            }
         }
 
         SettingsSection("Connection") {
@@ -42,7 +39,7 @@ struct CodexAgentSettingsView: View {
             }
         }
 
-        SettingsSection("Codex Privacy") {
+        SettingsSection("Privacy") {
             SettingsSectionRow(showsDivider: false) {
                 SettingsDescription("Codex owns sign-in and credential storage. This app never displays an email address, account fingerprint, credential, or authentication token.")
             }
