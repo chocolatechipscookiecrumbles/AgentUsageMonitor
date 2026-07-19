@@ -45,7 +45,7 @@ Every provider page that later has a sanitized quota presentation must use `Agen
 
 - Connection and quota facts use `SettingsPreferenceControlRow`, which keeps Status, Plan, Credits, reset counts, and expiry timestamps in the same right-aligned value column as Settings toggles and other trailing controls. Plan belongs in **Connection**, not Current quota.
 - Current quota always reserves **5-Hour Window** and **Weekly Window**. A missing window renders an explicit unavailable/idle state instead of removing the row; the provider tint is applied only to a real `ProgressView` value.
-- Credits and Banked resets use the existing sanitized `creditBalance` and `availableResetCredits` presentation fields. Every supplied reset-credit expiry is rendered with abbreviated month/day/year and hour/minute, matching the menu popover's date-and-time boundary. No token, account identity, or raw provider response is displayed.
+- Credits use the existing sanitized `creditBalance` presentation field. `AgentResetCreditsRow` groups the available reset count and all expiry annotations into one provider-template row: **Earned Reset Credits** has the provider-colored `N Available` value; each expiry is a left-aligned secondary calendar/date annotation with no repeated "reset expires" label. An empty expiry list uses a left-aligned availability annotation. No token, account identity, or raw provider response is displayed.
 - `Quota status` is intentionally absent from Current quota; connection state remains in Connection, while per-window availability is visible in the quota rows.
 - `AgentProvider.settingsPresentationTint` is the one provider-color source for the selected-tab underline, both quota-bar hues, usage-warning chips, and Context Rail status treatment. Codex uses **#576DFF**. `AgentQuotaWindowKind` owns the weekly bar's surface-composited opacity, not a second hue. Future providers must add their color once and use the shared components rather than hard-coding colors.
 - The Context Rail uses the same catalog icon as the provider selector in its own shared smaller slot. It must not fall back to a provider-specific SF Symbol where a catalog asset exists.
@@ -66,6 +66,8 @@ Native `ProgressView.tint` can apply an appearance-dependent control treatment t
 
 The Figma **Usage Warnings** card is ported as `AgentUsageWarningsSection`: compact 50/25/10/5% provider-colored chips control the existing threshold preference interface. For this Codex-only build those preferences are still the existing shared Codex thresholds and apply to both windows; the card must not be described as persisted per-provider or per-window scope. `AgentUsageWarningsSection` receives threshold read/write closures so a future real provider can supply its own scoped store after the deferred migration plan is implemented. Claude preview remains non-interactive.
 
+`AgentResetCreditsRow` is the required reset-credit presentation for a provider page. Do not split its count and expiry dates into independent Settings rows, right-align the dates, or add repeated expiration labels; the annotations must remain left-aligned under the one summary header.
+
 ### Deferred disconnect semantics
 
 The page may visibly reserve a disabled `Disconnect` control with plain-language availability copy. It must not act like an enabled button while doing nothing.
@@ -84,6 +86,7 @@ The user currently leans toward the CLI-session interpretation but has deferred 
 - [x] Move Plan into Connection, reserve both quota-window rows even when inactive, add the existing credits/reset-expiry fields, and centralize the #576DFF Codex color across selected-tab, quota, and Context Rail presentation.
 - [x] Keep concise provider facts right-aligned below the global compact breakpoint, honor General's Remaining/Used preference in both provider quota windows, and use the opaque shared provider-bar template rather than a native tinted progress style.
 - [x] Use the same provider hue for both horizons—with an opaque five-hour bar and surface-composited weekly bar—add complete reset dates, port the fixed-width/divided provider selector, and add the Codex threshold-chip presentation without changing the deferred provider/window preference model.
+- [x] Consolidate available reset credits and expiry timestamps into one left-aligned provider annotation row with the provider-colored available count.
 - [x] Verify `swift test` (8 tests, 0 failures), build the signed app, confirm `Assets.car` contains the three named provider assets, and perform strict codesign verification. `git diff --check` also passed.
 - [ ] Build and manually inspect the signed app: correct PDF artwork, repeated Codex/Claude selection, keyboard selection, disabled disconnect copy, current quota/session states, both Context Rail states, and Light/Dark. This is required before any visual-fix claim.
 

@@ -33,23 +33,12 @@ struct AgentQuotaSessionSection: View {
                         .monospacedDigit()
                 }
             }
-            SettingsSectionRow(showsDivider: !presentation.resetCreditExpiryDates.isEmpty) {
-                SettingsPreferenceControlRow("Banked resets") {
-                    Text(presentation.availableResetCredits.map { $0.formatted() } ?? "Unavailable")
-                        .monospacedDigit()
-                }
-            }
-            if !presentation.resetCreditExpiryDates.isEmpty {
-                SettingsSectionRow(showsDivider: false) {
-                    VStack(alignment: .leading, spacing: SettingsLayoutMetrics.preferenceTitleDescriptionSpacing) {
-                        ForEach(presentation.resetCreditExpiryDates, id: \.self) { expiry in
-                            SettingsPreferenceControlRow("Reset expires") {
-                            Text(expiry, format: .dateTime.month(.abbreviated).day().year().hour().minute())
-                                .monospacedDigit()
-                            }
-                        }
-                    }
-                }
+            SettingsSectionRow(showsDivider: false) {
+                AgentResetCreditsRow(
+                    provider: provider,
+                    availableCount: presentation.availableResetCredits,
+                    expiries: presentation.resetCreditExpiryDates
+                )
             }
         }
     }

@@ -26,6 +26,7 @@ enum SettingsLayoutMetrics {
     static let agentWarningChipSpacing: CGFloat = 8
     static let agentWarningChipWidth: CGFloat = 46
     static let agentWarningDisabledChipOpacity: CGFloat = 0.55
+    static let agentResetCreditsAnnotationSpacing: CGFloat = 8
     static let compactWidthBreakpoint: CGFloat = 500
     static let labelWidth: CGFloat = 148
     static let controlWidth: CGFloat = 190
