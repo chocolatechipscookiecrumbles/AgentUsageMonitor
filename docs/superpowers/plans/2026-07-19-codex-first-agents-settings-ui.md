@@ -39,6 +39,17 @@ The first port exposed three implementation boundaries that this follow-on compl
 2. **Reusable provider navigation and page shell.** The visible labels become the one-word `Codex`, `Claude`, and future `Copilot`, while full provider names remain available for factual page and accessibility labels. A shared adaptive tab strip owns selection, keyboard navigation, fixed icon geometry, and an overflow strategy; every provider page uses the same `AgentSettingsPageTemplate` shell. The current two providers must use a stable non-scrolling layout, so a scroll view cannot compete with button selection. A future catalog with more entries may opt into the strip's horizontal overflow behavior without each page inventing its own navigation.
 3. **Codex visual facts only.** The Codex page ports the Figma-style connection state and a current-quota/session card using existing in-memory `QuotaViewModel.presentation`: five-hour window, weekly window, and the count of banked reset credits when available. It must not show app-server path, protocol, Codex version, account identity, or credentials. Connection buttons are presented for design parity, but no new connection/disconnection behavior is introduced.
 
+### Provider-page presentation contract — 2026-07-19
+
+Every provider page that later has a sanitized quota presentation must use `AgentSettingsPageTemplate`, `AgentQuotaSessionSection`, `AgentQuotaWindowRow`, `AgentSettingsIcon`, and the provider's `settingsPresentationTint`; it must not duplicate per-page icon sizing, quota-bar color, or alignment offsets.
+
+- Connection facts use `SettingsLabeledRow`, which puts Status and Plan values in the same right-aligned value column as Settings toggles and other trailing controls. Plan belongs in **Connection**, not Current quota.
+- Current quota always reserves **5-Hour Window** and **Weekly Window**. A missing window renders an explicit unavailable/idle state instead of removing the row; the provider tint is applied only to a real `ProgressView` value.
+- Credits and Banked resets use the existing sanitized `creditBalance` and `availableResetCredits` presentation fields. Every supplied reset-credit expiry is rendered with abbreviated month/day/year and hour/minute, matching the menu popover's date-and-time boundary. No token, account identity, or raw provider response is displayed.
+- `Quota status` is intentionally absent from Current quota; connection state remains in Connection, while per-window availability is visible in the quota rows.
+- `AgentProvider.settingsPresentationTint` is the one provider-color source for the selected-tab underline, provider quota bars, and Context Rail status treatment. Codex uses **#576DFF**. Future providers must add their color once there and use the shared components rather than hard-coding colors.
+- The Context Rail uses the same catalog icon as the provider selector in its own shared smaller slot. It must not fall back to a provider-specific SF Symbol where a catalog asset exists.
+
 ### Deferred disconnect semantics
 
 The page may visibly reserve a disabled `Disconnect` control with plain-language availability copy. It must not act like an enabled button while doing nothing.
@@ -54,6 +65,7 @@ The user currently leans toward the CLI-session interpretation but has deferred 
 - [x] Replace the raw-file loader with a named `Bundle.main` asset image, compile the catalog during the signed-app build, and make the signed-artifact check fail before / pass after that packaging boundary.
 - [x] Standardize the tab label (`Codex`, `Claude`, future `Copilot`), fixed icon slot, adaptive tab-strip implementation, and provider-page template.
 - [x] Port existing Codex connection guidance plus visible, disabled disconnect affordance; add existing five-hour/weekly quota windows and banked reset count without reading new data.
+- [x] Move Plan into Connection, reserve both quota-window rows even when inactive, add the existing credits/reset-expiry fields, and centralize the #576DFF Codex color across selected-tab, quota, and Context Rail presentation.
 - [x] Verify `swift test` (8 tests, 0 failures), build the signed app, confirm `Assets.car` contains the three named provider assets, and perform strict codesign verification. `git diff --check` also passed.
 - [ ] Build and manually inspect the signed app: correct PDF artwork, repeated Codex/Claude selection, keyboard selection, disabled disconnect copy, current quota/session states, both Context Rail states, and Light/Dark. This is required before any visual-fix claim.
 

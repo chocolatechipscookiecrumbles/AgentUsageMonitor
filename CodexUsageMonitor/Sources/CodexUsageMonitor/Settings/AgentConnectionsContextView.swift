@@ -18,8 +18,15 @@ struct AgentConnectionsContextView: View {
 
     private var codexCard: some View {
         SettingsContextCard("Agent Status") {
-            Label(connectionState.displayName, systemImage: provider.systemImage)
-                .foregroundStyle(SettingsTab.agents.navigationTint)
+            HStack(spacing: SettingsLayoutMetrics.agentHeaderItemSpacing) {
+                AgentSettingsIcon(
+                    provider: provider,
+                    slotSize: SettingsLayoutMetrics.agentContextIconSlotSize,
+                    artworkMaxSize: SettingsLayoutMetrics.agentContextIconArtworkMaxSize
+                )
+                Text(connectionState.displayName)
+            }
+            .foregroundStyle(provider.settingsPresentationTint)
 
             SettingsPaletteDivider()
 

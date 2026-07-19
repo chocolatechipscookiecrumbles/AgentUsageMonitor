@@ -13,6 +13,11 @@ struct CodexAgentSettingsView: View {
             SettingsSectionRow {
                 SettingsLabeledRow("Status") { Text(connectionState.displayName) }
             }
+            if let planName {
+                SettingsSectionRow {
+                    SettingsLabeledRow("Plan") { Text(planName) }
+                }
+            }
             SettingsSectionRow(showsDivider: false) {
                 VStack(alignment: .leading, spacing: 8) {
                     connectionGuidance
@@ -21,39 +26,7 @@ struct CodexAgentSettingsView: View {
             }
         }
 
-        SettingsSection("Current quota") {
-            if let planName {
-                SettingsSectionRow {
-                    SettingsLabeledRow("Plan") { Text(planName) }
-                }
-            }
-            SettingsSectionRow {
-                SettingsLabeledRow("Quota status") { Text(status.displayMode.displayName) }
-            }
-            if let fiveHour = presentation.fiveHour {
-                SettingsSectionRow {
-                    SettingsQuotaPreviewRow(title: "5-Hour Window", window: fiveHour, tint: .green)
-                }
-            }
-            if let weekly = presentation.weekly {
-                SettingsSectionRow(showsDivider: presentation.availableResetCredits != nil) {
-                    SettingsQuotaPreviewRow(title: "Weekly Window", window: weekly, tint: .orange)
-                }
-            }
-            if let resetCredits = presentation.availableResetCredits {
-                SettingsSectionRow(showsDivider: false) {
-                    SettingsLabeledRow("Banked resets") {
-                        Text("\(resetCredits)")
-                            .monospacedDigit()
-                    }
-                }
-            }
-            if presentation.fiveHour == nil && presentation.weekly == nil {
-                SettingsSectionRow(showsDivider: false) {
-                    SettingsDescription("Current quota windows appear after Codex returns a confirmed usage result.")
-                }
-            }
-        }
+        AgentQuotaSessionSection(provider: .codex, presentation: presentation)
 
         SettingsSection("Privacy") {
             SettingsSectionRow(showsDivider: false) {

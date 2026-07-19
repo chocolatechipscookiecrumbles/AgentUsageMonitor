@@ -41,7 +41,7 @@ enum AgentProvider: String, CaseIterable, Identifiable {
 
     var settingsPresentationTint: Color {
         switch self {
-        case .codex: .blue
+        case .codex: Color(red: 87 / 255, green: 109 / 255, blue: 1)
         case .claudeCode: .orange
         case .githubCopilot: .secondary
         }
