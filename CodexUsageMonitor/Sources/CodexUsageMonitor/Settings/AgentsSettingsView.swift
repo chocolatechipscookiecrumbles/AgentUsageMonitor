@@ -12,6 +12,7 @@ struct AgentsSettingsView: View {
                     status: viewModel.settingsStatus,
                     connectionState: viewModel.connectionState,
                     presentation: viewModel.presentation,
+                    quotaValueMode: viewModel.settings.quotaValueMode,
                     signInWithBrowser: viewModel.signInWithBrowser,
                     signInWithCLI: viewModel.signInWithCLI,
                     checkConnection: viewModel.checkCodexConnection

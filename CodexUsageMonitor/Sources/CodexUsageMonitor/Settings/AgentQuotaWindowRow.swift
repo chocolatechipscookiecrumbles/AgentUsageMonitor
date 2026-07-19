@@ -7,15 +7,41 @@ struct AgentQuotaWindowRow: View {
     let title: String
     let window: QuotaWindow?
     let provider: AgentProvider
+    let valueMode: QuotaValueMode
     let unavailableText: String
 
     var body: some View {
         if let window {
-            SettingsQuotaPreviewRow(
-                title: title,
-                window: window,
-                tint: provider.settingsPresentationTint
-            )
+            VStack(alignment: .leading, spacing: 5) {
+                HStack {
+                    Text(title)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+
+                    Spacer()
+
+                    Text("\(valueMode.value(for: window))% \(valueMode.accessibilityName)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+
+                ProviderQuotaProgressBar(value: valueMode.value(for: window), provider: provider)
+
+                if let resetAt = window.resetAt {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("Resets")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        Spacer()
+
+                        Text(resetAt, format: .dateTime.hour().minute())
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
         } else {
             VStack(alignment: .leading, spacing: 5) {
                 HStack {
@@ -30,8 +56,7 @@ struct AgentQuotaWindowRow: View {
                         .foregroundStyle(.secondary)
                 }
 
-                ProgressView(value: 0, total: 100)
-                    .tint(provider.settingsPresentationTint)
+                ProviderQuotaProgressBar(value: 0, provider: provider)
 
                 Text("No active session window")
                     .font(.caption)
@@ -39,4 +64,5 @@ struct AgentQuotaWindowRow: View {
             }
         }
     }
+
 }

@@ -4,6 +4,7 @@ struct CodexAgentSettingsView: View {
     let status: SettingsStatus
     let connectionState: AgentConnectionState
     let presentation: QuotaPresentation
+    let quotaValueMode: QuotaValueMode
     let signInWithBrowser: () -> Void
     let signInWithCLI: () -> Void
     let checkConnection: () -> Void
@@ -11,11 +12,11 @@ struct CodexAgentSettingsView: View {
     var body: some View {
         SettingsSection("Connection") {
             SettingsSectionRow {
-                SettingsLabeledRow("Status") { Text(connectionState.displayName) }
+                SettingsPreferenceControlRow("Status") { Text(connectionState.displayName) }
             }
             if let planName {
                 SettingsSectionRow {
-                    SettingsLabeledRow("Plan") { Text(planName) }
+                    SettingsPreferenceControlRow("Plan") { Text(planName) }
                 }
             }
             SettingsSectionRow(showsDivider: false) {
@@ -26,7 +27,11 @@ struct CodexAgentSettingsView: View {
             }
         }
 
-        AgentQuotaSessionSection(provider: .codex, presentation: presentation)
+        AgentQuotaSessionSection(
+            provider: .codex,
+            presentation: presentation,
+            valueMode: quotaValueMode
+        )
 
         SettingsSection("Privacy") {
             SettingsSectionRow(showsDivider: false) {

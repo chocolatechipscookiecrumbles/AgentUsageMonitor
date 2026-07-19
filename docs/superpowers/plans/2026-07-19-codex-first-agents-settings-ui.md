@@ -43,12 +43,20 @@ The first port exposed three implementation boundaries that this follow-on compl
 
 Every provider page that later has a sanitized quota presentation must use `AgentSettingsPageTemplate`, `AgentQuotaSessionSection`, `AgentQuotaWindowRow`, `AgentSettingsIcon`, and the provider's `settingsPresentationTint`; it must not duplicate per-page icon sizing, quota-bar color, or alignment offsets.
 
-- Connection facts use `SettingsLabeledRow`, which puts Status and Plan values in the same right-aligned value column as Settings toggles and other trailing controls. Plan belongs in **Connection**, not Current quota.
+- Connection and quota facts use `SettingsPreferenceControlRow`, which keeps Status, Plan, Credits, reset counts, and expiry timestamps in the same right-aligned value column as Settings toggles and other trailing controls. Plan belongs in **Connection**, not Current quota.
 - Current quota always reserves **5-Hour Window** and **Weekly Window**. A missing window renders an explicit unavailable/idle state instead of removing the row; the provider tint is applied only to a real `ProgressView` value.
 - Credits and Banked resets use the existing sanitized `creditBalance` and `availableResetCredits` presentation fields. Every supplied reset-credit expiry is rendered with abbreviated month/day/year and hour/minute, matching the menu popover's date-and-time boundary. No token, account identity, or raw provider response is displayed.
 - `Quota status` is intentionally absent from Current quota; connection state remains in Connection, while per-window availability is visible in the quota rows.
 - `AgentProvider.settingsPresentationTint` is the one provider-color source for the selected-tab underline, provider quota bars, and Context Rail status treatment. Codex uses **#576DFF**. Future providers must add their color once there and use the shared components rather than hard-coding colors.
 - The Context Rail uses the same catalog icon as the provider selector in its own shared smaller slot. It must not fall back to a provider-specific SF Symbol where a catalog asset exists.
+
+### Alignment and quota-display correction — 2026-07-19
+
+At the hidden-rail default width, the Settings Page is one point below the generic compact-layout breakpoint. `SettingsLabeledRow` therefore correctly changed its own layout to vertical, but that is wrong for concise provider facts: Status, Plan, Credits, Banked resets, and reset-expiry timestamps should remain aligned with the right-hand control column. Provider factual rows now use the existing `SettingsPreferenceControlRow` instead of changing the global breakpoint or introducing a local alignment constant. This keeps every other destination's compact behavior intact.
+
+Provider quota windows receive the existing `QuotaValueMode` from General Settings. **Remaining** and **Used** control the displayed percentage and bar length for both five-hour and weekly rows; reset time remains supplemental rather than showing a conflicting second percentage.
+
+Native `ProgressView.tint` can apply an appearance-dependent control treatment that visibly darkens the requested provider color. `ProviderQuotaProgressBar` is the required provider-page bar template: a palette-derived track plus a fully opaque foreground `Capsule` filled directly with `settingsPresentationTint`. Do not apply an additional opacity, blend mode, overlay, or native progress style to the foreground. This preserves the exact #576DFF Codex color while allowing the track to adapt to Light/Dark.
 
 ### Deferred disconnect semantics
 
@@ -66,6 +74,7 @@ The user currently leans toward the CLI-session interpretation but has deferred 
 - [x] Standardize the tab label (`Codex`, `Claude`, future `Copilot`), fixed icon slot, adaptive tab-strip implementation, and provider-page template.
 - [x] Port existing Codex connection guidance plus visible, disabled disconnect affordance; add existing five-hour/weekly quota windows and banked reset count without reading new data.
 - [x] Move Plan into Connection, reserve both quota-window rows even when inactive, add the existing credits/reset-expiry fields, and centralize the #576DFF Codex color across selected-tab, quota, and Context Rail presentation.
+- [x] Keep concise provider facts right-aligned below the global compact breakpoint, honor General's Remaining/Used preference in both provider quota windows, and use the opaque shared provider-bar template rather than a native tinted progress style.
 - [x] Verify `swift test` (8 tests, 0 failures), build the signed app, confirm `Assets.car` contains the three named provider assets, and perform strict codesign verification. `git diff --check` also passed.
 - [ ] Build and manually inspect the signed app: correct PDF artwork, repeated Codex/Claude selection, keyboard selection, disabled disconnect copy, current quota/session states, both Context Rail states, and Light/Dark. This is required before any visual-fix claim.
 

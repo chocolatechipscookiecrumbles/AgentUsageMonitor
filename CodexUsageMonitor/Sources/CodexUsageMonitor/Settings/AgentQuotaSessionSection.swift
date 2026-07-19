@@ -5,6 +5,7 @@ import SwiftUI
 struct AgentQuotaSessionSection: View {
     let provider: AgentProvider
     let presentation: QuotaPresentation
+    let valueMode: QuotaValueMode
 
     var body: some View {
         SettingsSection("Current quota") {
@@ -13,6 +14,7 @@ struct AgentQuotaSessionSection: View {
                     title: "5-Hour Window",
                     window: presentation.fiveHour,
                     provider: provider,
+                    valueMode: valueMode,
                     unavailableText: presentation.weekly == nil ? "Unavailable" : "Not active"
                 )
             }
@@ -21,17 +23,18 @@ struct AgentQuotaSessionSection: View {
                     title: "Weekly Window",
                     window: presentation.weekly,
                     provider: provider,
+                    valueMode: valueMode,
                     unavailableText: "Unavailable"
                 )
             }
             SettingsSectionRow {
-                SettingsLabeledRow("Credits") {
+                SettingsPreferenceControlRow("Credits") {
                     Text(presentation.creditBalance ?? "Unavailable")
                         .monospacedDigit()
                 }
             }
             SettingsSectionRow(showsDivider: !presentation.resetCreditExpiryDates.isEmpty) {
-                SettingsLabeledRow("Banked resets") {
+                SettingsPreferenceControlRow("Banked resets") {
                     Text(presentation.availableResetCredits.map { $0.formatted() } ?? "Unavailable")
                         .monospacedDigit()
                 }
@@ -39,13 +42,11 @@ struct AgentQuotaSessionSection: View {
             if !presentation.resetCreditExpiryDates.isEmpty {
                 SettingsSectionRow(showsDivider: false) {
                     VStack(alignment: .leading, spacing: SettingsLayoutMetrics.preferenceTitleDescriptionSpacing) {
-                        Text("Reset credit expiry")
-                            .foregroundStyle(.secondary)
-
                         ForEach(presentation.resetCreditExpiryDates, id: \.self) { expiry in
+                            SettingsPreferenceControlRow("Reset expires") {
                             Text(expiry, format: .dateTime.month(.abbreviated).day().year().hour().minute())
-                                .frame(maxWidth: .infinity, alignment: .trailing)
                                 .monospacedDigit()
+                            }
                         }
                     }
                 }

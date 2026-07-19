@@ -16,6 +16,7 @@ enum SettingsLayoutMetrics {
     static let agentHeaderIconArtworkMaxSize: CGFloat = 16
     static let agentContextIconSlotSize: CGFloat = 16
     static let agentContextIconArtworkMaxSize: CGFloat = 12
+    static let agentQuotaProgressBarHeight: CGFloat = 6
     static let agentHeaderItemSpacing: CGFloat = 6
     static let agentHeaderUnderlineHeight: CGFloat = 2
     static let compactWidthBreakpoint: CGFloat = 500
