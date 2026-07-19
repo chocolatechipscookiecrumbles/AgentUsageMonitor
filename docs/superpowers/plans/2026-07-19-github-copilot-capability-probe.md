@@ -4,7 +4,7 @@
 
 **Goal:** Determine whether the user's Copilot entitlement exposes an official, privacy-safe personal usage or allowance signal that could justify a future provider adapter, without changing the app or rendering speculative Agents UI.
 
-**Architecture:** This is one user-authorized, read-only probe—not an app feature. A short-lived fine-grained GitHub token with only **Plan: read** calls two documented user billing endpoints through GitHub CLI. Raw responses remain in a private temporary directory; the repository records only a sanitized outcome. Current community projects also use GitHub's undocumented `copilot_internal/user` implementation endpoint, but that route is an experimental research lead only: it must not be adopted or tested without a separate explicit privacy, compatibility, and authentication decision. The existing Agents selector remains deferred until a later adapter actually declares support.
+**Architecture:** This is one user-authorized, read-only probe—not an app feature. A short-lived fine-grained GitHub token with only **Plan: read** calls two documented user billing endpoints through GitHub CLI. Raw responses remain in a private temporary directory; the repository records only a sanitized outcome. Current community projects also use GitHub's undocumented `copilot_internal/user` implementation endpoint. CodexBar's current reference implementation obtains an OAuth token through a user-initiated device flow, then sends that token to the internal endpoint. That is an experimental research lead only: it must not be adopted or tested without a separate explicit privacy, compatibility, and authentication decision. The existing Agents selector remains deferred until a later adapter actually declares support.
 
 **Tech Stack:** GitHub CLI (`gh`), GitHub REST API version `2026-03-10`, `jq`, macOS shell, planning documentation.
 
@@ -17,7 +17,8 @@
 - The endpoints report billed usage. Do not infer a remaining Copilot allowance, reset time, connection state, or authentication state from price, quantity, reporting period, or an empty array.
 - A `403`, `404`, empty response, or unpresentable contract is a valid outcome. Do not broaden permissions or try unofficial web/session/CLI scraping.
 - Treat `GET /copilot_internal/user` and `/copilot_internal/v2/token` as undocumented implementation endpoints even though GitHub lists the path family in its firewall allowlist. GitHub's public REST reference supplies no versioned schema, permission contract, rate-limit guidance, or stability commitment for personal quota retrieval through those paths.
-- Do not read `~/.config/github-copilot/apps.json`, OpenCode authentication files, IDE secret stores, browser cookies, or another application's OAuth tokens. Do not persist or display a Copilot OAuth access token. A future manual probe is permitted only after explicit user approval of an authentication design that avoids those sources.
+- Do not read `~/.config/github-copilot/apps.json`, OpenCode authentication files, IDE secret stores, browser cookies, or another application's OAuth tokens. Do not persist or display a Copilot OAuth access token. Do not reuse the VS Code OAuth client ID or any other application's OAuth registration. A future manual probe is permitted only after explicit user approval of an authentication design that avoids those sources and uses this product's own registered OAuth client.
+- Browser-budget scraping is out of scope. It requires browser cookies and anti-forgery request state, has no public personal REST contract, and must not become a fallback when the experimental quota request fails.
 - Make no app-source or general-test changes. A later reproducible adapter defect may earn one narrow deterministic regression test.
 - Do not change the global Settings sidebar, `AgentsSettingsView`, `AgentProvider`, `QuotaMonitor`, refresh cadence, notifications, or native menu. [Agent Selector Task 6](2026-07-14-settings-provider-followups.md#task-6-replace-the-agents-title-with-a-supported-agent-selector) remains separately gated on a real adapter.
 - The user manually creates any GitHub PR.
@@ -27,6 +28,7 @@
 - GitHub documents personal billing endpoints for Copilot usage billed directly to a user; organization- or enterprise-billed usage is excluded. User endpoints accept a fine-grained token with **Plan: read** and cover at most 24 months of history.
 - AI-credit and premium-request responses document period and usage items, not a user's included allowance, remaining allocation, reset schedule, or app session state.
 - A 2026 project audit found current scripts and applications calling the undocumented `api.github.com/copilot_internal/user` endpoint. Their observed payloads include `quota_snapshots` with `entitlement`, `remaining`, and reset fields, but their implementations obtain tokens from GitHub Copilot/OpenCode local authentication files, perform an internal token exchange, or require IDE-emulation headers. This evidence proves an experimental implementation path, not a supported product interface.
+- CodexBar's `copilot.md` documents a more bounded variant: an explicit GitHub OAuth device flow with `read:user`, followed by `copilot_internal/user`. It maps `premiumInteractions` first, then `chat`, and derives its plan label from `copilotPlan`. Its source nevertheless uses the VS Code client ID, persists the OAuth token in its own configuration, and sends VS Code/Copilot identifying headers. Its optional budget feature also imports browser cookies. None of those implementation choices is approved for this app.
 - `AgentProvider` presently includes `codex`, `claudeCode`, and `githubCopilot`, but only Codex has an adapter. Enum membership is not support evidence.
 - The supplied Agents Selector image is a structural reference for a horizontal, scrollable, non-color-only selection row. It does not approve the illustrated provider list, icons, colors, or metrics for production.
 
@@ -187,6 +189,34 @@ For `usage-only` or `unavailable`, set the Copilot board row back to **Deferred*
 - The documented personal billing endpoints remain insufficient: GitHub's own current UI can show included-credit consumption, while those REST reports are billed-usage reports and did not yield a presentable allowance contract in this probe.
 - Current community projects can instead query `api.github.com/copilot_internal/user`; their source parses entitlement, remaining, and reset fields from internal quota snapshots. GitHub publicly lists the path family as Copilot user-management traffic for firewall allowlists, but does not document it as a public quota API.
 - The discovered projects obtain an OAuth token from local Copilot/OpenCode state or use an internal token exchange and IDE-identifying headers. That violates this repository's no-credential-file/no-token-persistence boundary. The route is therefore recorded as **experimental-internal**, not adopted, and must not be used without a separate explicit decision.
+
+### CodexBar reference assessment — 2026-07-19
+
+CodexBar is the most complete current implementation examined. Its documented sequence is:
+
+1. The user begins a GitHub OAuth device flow with `read:user`.
+2. Its app receives an OAuth access token after the user completes GitHub's browser confirmation.
+3. It queries the undocumented `GET /copilot_internal/user` endpoint using that token and Copilot/VS Code-identifying headers.
+4. It reads `premiumInteractions` as the primary window, `chat` as a secondary window, `copilotPlan` as the plan label, and a quota reset field when present.
+
+That proves a practical experimental path, but it cannot be copied wholesale:
+
+| CodexBar element | Assessment for Codex Usage Monitor |
+| --- | --- |
+| User-initiated GitHub device flow | **Candidate only.** GitHub officially documents device flow, but this app must register and use its own OAuth client, obtain an explicit product/authentication decision, and explain that the later quota request is undocumented. |
+| VS Code OAuth client ID | **Rejected.** It is another application's registration and must not be shipped or impersonated. |
+| `copilot_internal/user` with editor/plugin headers | **Experimental only.** The response is useful but lacks a public schema, permission, rate-limit, and compatibility commitment. A change or `401`/`403` must disable the experiment rather than fall back to scraping. |
+| Persisting the OAuth token in an app config | **Rejected under current policy.** An ongoing monitor would require a new, explicit decision about secure storage, retention, revocation, and account switching; the current experiment may retain a token only in process memory for the user-triggered request. |
+| Optional billing-budget fetch using browser cookies and nonce | **Rejected.** It reads browser session material and is web scraping, not a provider adapter fallback. |
+| Local Copilot usage/cache discovery | **Not found.** The examined CodexBar Copilot path uses GitHub OAuth plus a network request, not a local Copilot cache as its quota source. |
+
+#### Required ADR decision before any experimental prototype
+
+- Register a product-owned GitHub OAuth app with device flow enabled. Do not use CodexBar's or VS Code's client ID.
+- Limit the first prototype to one explicit **Check experimental Copilot quota** action. Hold its OAuth token only in memory for that request, do not automatically refresh, do not add it to diagnostics, and discard raw payload bytes after typed decoding.
+- Display only an Experimental result whose fields were present and semantically valid: plan label, available percentage/amount, and reset time only when the response supplies it. Do not synthesize a reset date or report an entitlement as a guaranteed plan allowance.
+- Treat authorization failure, a changed schema, missing expected fields, enterprise-only behavior, or provider incompatibility as a disabled experimental result with recovery guidance—not as permission to read cookies, local credentials, or a different application's secrets.
+- Define the user's revocation route before shipping any authentication UI. The prototype does not authorize durable refresh, notifications, the Agents selector, Keychain persistence, or a Copilot provider release.
 
 - [ ] **Step 4: Run documentation checks.**
 
