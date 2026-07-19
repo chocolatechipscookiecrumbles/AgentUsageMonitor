@@ -3,6 +3,9 @@ import SwiftUI
 struct SettingsPreviewView: View {
     let selection: SettingsTab
     @ObservedObject var viewModel: QuotaViewModel
+    let selectedAgent: AgentProvider
+    let connectionState: AgentConnectionState
+    let settingsStatus: SettingsStatus
 
     var body: some View {
         switch selection {
@@ -17,15 +20,10 @@ struct SettingsPreviewView: View {
         case .refresh:
             RefreshSettingsContextView(viewModel: viewModel)
         case .agents:
-            StatusSettingsContextView(
-                title: "Agent Status",
-                summary: viewModel.connectionState.displayName,
-                systemImage: "person.2.fill",
-                color: .blue,
-                values: [
-                    SettingsContextValue(label: "Current", value: AgentProvider.codex.title),
-                    SettingsContextValue(label: "Planned", value: "2 integrations"),
-                ]
+            AgentConnectionsContextView(
+                provider: selectedAgent,
+                connectionState: connectionState,
+                status: settingsStatus
             )
         case .dataPrivacy:
             StatusSettingsContextView(

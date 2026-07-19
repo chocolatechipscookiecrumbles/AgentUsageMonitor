@@ -31,7 +31,10 @@ struct SettingsView: View {
                 SettingsContextPanel {
                     SettingsPreviewView(
                         selection: settings.selectedSettingsTab,
-                        viewModel: viewModel
+                        viewModel: viewModel,
+                        selectedAgent: selectedSettingsAgent,
+                        connectionState: viewModel.connectionState,
+                        settingsStatus: viewModel.settingsStatus
                     )
                 }
                 .transition(.move(edge: .trailing).combined(with: .opacity))
