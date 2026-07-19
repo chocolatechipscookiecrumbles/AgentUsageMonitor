@@ -1,3 +1,5 @@
+import SwiftUI
+
 enum AgentProvider: String, CaseIterable, Identifiable {
     case codex
     case claudeCode
@@ -18,6 +20,14 @@ enum AgentProvider: String, CaseIterable, Identifiable {
         case .codex: "sparkles"
         case .claudeCode: "terminal"
         case .githubCopilot: "chevron.left.forwardslash.chevron.right"
+        }
+    }
+
+    var settingsPresentationTint: Color {
+        switch self {
+        case .codex: .blue
+        case .claudeCode: .orange
+        case .githubCopilot: .secondary
         }
     }
 

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AgentsSettingsView: View {
     @ObservedObject var viewModel: QuotaViewModel
+    let selectedAgent: AgentProvider
 
     var body: some View {
         SettingsPage {
@@ -12,9 +13,6 @@ struct AgentsSettingsView: View {
                 signInWithCLI: viewModel.signInWithCLI,
                 checkConnection: viewModel.checkCodexConnection
             )
-
-            PlannedAgentSettingsView(agent: .claudeCode)
-            PlannedAgentSettingsView(agent: .githubCopilot)
         }
     }
 }

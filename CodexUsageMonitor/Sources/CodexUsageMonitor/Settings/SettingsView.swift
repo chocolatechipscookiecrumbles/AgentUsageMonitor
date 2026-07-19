@@ -7,6 +7,7 @@ struct SettingsView: View {
     @StateObject private var launchAtLogin = LaunchAtLoginController()
     @StateObject private var systemAppearance = SystemAppearanceObserver()
     @State private var isPreviewVisible = false
+    @State private var selectedSettingsAgent: AgentProvider = .codex
 
     init(viewModel: QuotaViewModel) {
         self.viewModel = viewModel
@@ -41,6 +42,7 @@ struct SettingsView: View {
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: isPreviewVisible)
         .environment(\.settingsAppearancePalette, appearancePalette)
         .preferredColorScheme(presentationColorScheme)
+        .onAppear(perform: repairSelectedSettingsAgentIfNeeded)
     }
 
     private var settingsPage: some View {
@@ -55,9 +57,18 @@ struct SettingsView: View {
             SettingsDetailView(
                 selection: settings.selectedSettingsTab,
                 viewModel: viewModel,
-                launchAtLogin: launchAtLogin
+                launchAtLogin: launchAtLogin,
+                selectedSettingsAgent: selectedSettingsAgent
             )
         }
+    }
+
+    private func repairSelectedSettingsAgentIfNeeded() {
+        guard !AgentSettingsCatalog.entries.contains(where: { $0.provider == selectedSettingsAgent }) else {
+            return
+        }
+
+        selectedSettingsAgent = .codex
     }
 
     private var presentationColorScheme: ColorScheme {

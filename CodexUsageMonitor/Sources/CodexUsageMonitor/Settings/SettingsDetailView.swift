@@ -4,6 +4,7 @@ struct SettingsDetailView: View {
     let selection: SettingsTab
     @ObservedObject var viewModel: QuotaViewModel
     @ObservedObject var launchAtLogin: LaunchAtLoginController
+    let selectedSettingsAgent: AgentProvider
 
     var body: some View {
         switch selection {
@@ -21,7 +22,10 @@ struct SettingsDetailView: View {
         case .refresh:
             RefreshSettingsView(viewModel: viewModel)
         case .agents:
-            AgentsSettingsView(viewModel: viewModel)
+            AgentsSettingsView(
+                viewModel: viewModel,
+                selectedAgent: selectedSettingsAgent
+            )
         case .dataPrivacy:
             DataPrivacySettingsView()
         case .diagnostics:
