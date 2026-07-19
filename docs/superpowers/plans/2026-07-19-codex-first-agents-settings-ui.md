@@ -35,7 +35,9 @@
 
 Entering Agents in the signed app crashed with `EXC_BREAKPOINT` before the page could render. The macOS crash report identifies `AgentSettingsIcon.body`, then SwiftPM's generated `NSBundle.module` accessor, which calls `fatalError` because the signed app did not contain the generated resource bundle. `build-app.sh` copied the executable and `Info.plist` only, while Task 2 had introduced a SwiftPM resource target and `.module` lookup.
 
-The correction keeps the checked-in PNGs as runtime assets but treats them as application resources, not SwiftPM module resources: `build-app.sh` installs both files directly into `CodexUsageMonitor.app/Contents/Resources`, and `AgentSettingsIcon` uses `Bundle.main`. `Package.swift` returns to its ordinary executable target so the failing module accessor is no longer linked into the app.
+The correction keeps the checked-in PNGs as runtime assets but treats them as application resources, not SwiftPM module resources: `build-app.sh` installs both files directly into `CodexUsageMonitor.app/Contents/Resources`, and `AgentSettingsIconResource` resolves each file with an explicit `Bundle.main.resourceURL`/`NSImage` load. `Package.swift` returns to its ordinary executable target so the failing module accessor is no longer linked into the app.
+
+Every current and future provider icon uses the same `20 × 20`-point slot and a `16 × 16`-point maximum artwork frame from `SettingsLayoutMetrics`. Artwork therefore scales within a common window rather than moving labels or selector geometry according to its intrinsic dimensions.
 
 `Scripts/verify-signed-app-resources.sh` is the narrow regression check. It first failed against the broken signed app because `codex-agent.png` was absent, then passed after the correction alongside a signed build, strict codesign verification, and the existing eight Swift tests. A manual signed-app Agents navigation check remains required; no claim is made until that direct check observes the original route without a crash.
 
@@ -221,12 +223,14 @@ struct AgentSettingsHeader: View {
 
 struct AgentSettingsIcon: View {
     let provider: AgentProvider
-    let size: CGFloat
+    let slotSize: CGFloat
+    let artworkMaxSize: CGFloat
 }
 
 extension SettingsLayoutMetrics {
     static let agentHeaderItemHorizontalPadding: CGFloat = 12
-    static let agentHeaderIconSize: CGFloat = 16
+    static let agentHeaderIconSlotSize: CGFloat = 20
+    static let agentHeaderIconArtworkMaxSize: CGFloat = 16
     static let agentHeaderItemSpacing: CGFloat = 6
     static let agentHeaderUnderlineHeight: CGFloat = 2
 }

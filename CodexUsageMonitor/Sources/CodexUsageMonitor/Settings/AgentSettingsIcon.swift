@@ -2,13 +2,19 @@ import SwiftUI
 
 struct AgentSettingsIcon: View {
     let provider: AgentProvider
-    let size: CGFloat
+    let slotSize: CGFloat
+    let artworkMaxSize: CGFloat
 
     var body: some View {
-        Image(provider == .codex ? "codex-agent" : "claude-code-agent", bundle: .main)
-            .resizable()
-            .scaledToFit()
-            .frame(width: size, height: size)
-            .accessibilityHidden(true)
+        Group {
+            if let image = AgentSettingsIconResource.image(for: provider) {
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: artworkMaxSize, maxHeight: artworkMaxSize)
+            }
+        }
+        .frame(width: slotSize, height: slotSize)
+        .accessibilityHidden(true)
     }
 }

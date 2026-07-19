@@ -17,7 +17,8 @@ struct AgentSettingsHeader: View {
                             HStack(spacing: SettingsLayoutMetrics.agentHeaderItemSpacing) {
                                 AgentSettingsIcon(
                                     provider: entry.provider,
-                                    size: SettingsLayoutMetrics.agentHeaderIconSize
+                                    slotSize: SettingsLayoutMetrics.agentHeaderIconSlotSize,
+                                    artworkMaxSize: SettingsLayoutMetrics.agentHeaderIconArtworkMaxSize
                                 )
                                 Text(entry.provider.title)
                             }
