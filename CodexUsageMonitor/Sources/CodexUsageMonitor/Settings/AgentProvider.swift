@@ -15,6 +15,22 @@ enum AgentProvider: String, CaseIterable, Identifiable {
         }
     }
 
+    var tabTitle: String {
+        switch self {
+        case .codex: "Codex"
+        case .claudeCode: "Claude"
+        case .githubCopilot: "Copilot"
+        }
+    }
+
+    var settingsAssetName: String {
+        switch self {
+        case .codex: "Codex"
+        case .claudeCode: "Claude"
+        case .githubCopilot: "Copilot"
+        }
+    }
+
     var systemImage: String {
         switch self {
         case .codex: "sparkles"

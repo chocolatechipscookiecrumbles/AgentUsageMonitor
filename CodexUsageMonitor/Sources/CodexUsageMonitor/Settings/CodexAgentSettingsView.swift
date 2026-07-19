@@ -3,15 +3,25 @@ import SwiftUI
 struct CodexAgentSettingsView: View {
     let status: SettingsStatus
     let connectionState: AgentConnectionState
+    let presentation: QuotaPresentation
     let signInWithBrowser: () -> Void
     let signInWithCLI: () -> Void
     let checkConnection: () -> Void
 
     var body: some View {
-        SettingsSection("OpenAI Codex") {
+        SettingsSection("Connection") {
             SettingsSectionRow {
                 SettingsLabeledRow("Status") { Text(connectionState.displayName) }
             }
+            SettingsSectionRow(showsDivider: false) {
+                VStack(alignment: .leading, spacing: 8) {
+                    connectionGuidance
+                    connectionActions
+                }
+            }
+        }
+
+        SettingsSection("Current quota") {
             if let planName {
                 SettingsSectionRow {
                     SettingsLabeledRow("Plan") { Text(planName) }
@@ -20,21 +30,27 @@ struct CodexAgentSettingsView: View {
             SettingsSectionRow {
                 SettingsLabeledRow("Quota status") { Text(status.displayMode.displayName) }
             }
-        }
-
-        SettingsSection("Connection") {
-            SettingsSectionRow(showsDivider: false) {
-                VStack(alignment: .leading, spacing: 8) {
-                    connectionGuidance
-                    if showsSignInActions {
-                        Button("Sign in with browser", action: signInWithBrowser)
-                            .disabled(signInDisabled)
-                        Button("Sign in with Codex CLI…", action: signInWithCLI)
-                            .disabled(signInDisabled)
+            if let fiveHour = presentation.fiveHour {
+                SettingsSectionRow {
+                    SettingsQuotaPreviewRow(title: "5-Hour Window", window: fiveHour, tint: .green)
+                }
+            }
+            if let weekly = presentation.weekly {
+                SettingsSectionRow(showsDivider: presentation.availableResetCredits != nil) {
+                    SettingsQuotaPreviewRow(title: "Weekly Window", window: weekly, tint: .orange)
+                }
+            }
+            if let resetCredits = presentation.availableResetCredits {
+                SettingsSectionRow(showsDivider: false) {
+                    SettingsLabeledRow("Banked resets") {
+                        Text("\(resetCredits)")
+                            .monospacedDigit()
                     }
-                    if connectionState == .missingCLI {
-                        Button("Check again", action: checkConnection)
-                    }
+                }
+            }
+            if presentation.fiveHour == nil && presentation.weekly == nil {
+                SettingsSectionRow(showsDivider: false) {
+                    SettingsDescription("Current quota windows appear after Codex returns a confirmed usage result.")
                 }
             }
         }
@@ -44,11 +60,6 @@ struct CodexAgentSettingsView: View {
                 SettingsDescription("Codex owns sign-in and credential storage. This app never displays an email address, account fingerprint, credential, or authentication token.")
             }
         }
-    }
-
-    private var planName: String? {
-        guard case .connected(let account) = connectionState else { return nil }
-        return account.planType?.capitalized ?? status.planName
     }
 
     @ViewBuilder
@@ -80,6 +91,29 @@ struct CodexAgentSettingsView: View {
             true
         case .checking, .missingCLI, .connected:
             false
+        }
+    }
+
+    private var planName: String? {
+        guard case .connected(let account) = connectionState else { return nil }
+        return account.planType?.capitalized ?? status.planName
+    }
+
+    @ViewBuilder
+    private var connectionActions: some View {
+        if showsSignInActions {
+            Button("Connect with browser", action: signInWithBrowser)
+                .disabled(signInDisabled)
+            Button("Connect with Codex CLI…", action: signInWithCLI)
+                .disabled(signInDisabled)
+        }
+        if connectionState == .missingCLI {
+            Button("Check again", action: checkConnection)
+        }
+        if case .connected = connectionState {
+            Button("Disconnect") {}
+                .disabled(true)
+            SettingsDescription("Disconnect is planned. It does not yet change this app or your Codex CLI session.")
         }
     }
 

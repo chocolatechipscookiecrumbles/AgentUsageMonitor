@@ -31,15 +31,43 @@
 4. Use the approved Codex and Claude icon sources from `assets/icons for agents/` after converting and bundling them as native app resources. GitHub Copilot’s supplied icon remains unrendered until that provider passes its capability gate.
 5. This plan deliberately stops before the broader [supported-agent selector](2026-07-14-settings-provider-followups.md#task-6-replace-the-agents-title-with-a-supported-agent-selector). That task begins only when a second real adapter can truthfully populate the supported catalog; it must replace the preview exception rather than treating it as support evidence.
 
+## Follow-on scope — 2026-07-19
+
+The first port exposed three implementation boundaries that this follow-on completes without expanding provider capability:
+
+1. **Apple vector asset catalog.** The original SVG files remain design-source material under `assets/icons for agents/`. The application uses their user-supplied, single-page PDF conversions in `Resources/Assets.xcassets`, with Preserve Vector Data set for each image set. The signed-app build compiles that catalog into `Assets.car`; SwiftUI loads named assets from the application bundle rather than opening raw icon files. Codex, Claude, and the retained future Copilot asset each render inside the same shared `20 × 20` slot with `16 × 16` maximum artwork, so a provider's intrinsic art bounds never alter selector geometry.
+2. **Reusable provider navigation and page shell.** The visible labels become the one-word `Codex`, `Claude`, and future `Copilot`, while full provider names remain available for factual page and accessibility labels. A shared adaptive tab strip owns selection, keyboard navigation, fixed icon geometry, and an overflow strategy; every provider page uses the same `AgentSettingsPageTemplate` shell. The current two providers must use a stable non-scrolling layout, so a scroll view cannot compete with button selection. A future catalog with more entries may opt into the strip's horizontal overflow behavior without each page inventing its own navigation.
+3. **Codex visual facts only.** The Codex page ports the Figma-style connection state and a current-quota/session card using existing in-memory `QuotaViewModel.presentation`: five-hour window, weekly window, and the count of banked reset credits when available. It must not show app-server path, protocol, Codex version, account identity, or credentials. Connection buttons are presented for design parity, but no new connection/disconnection behavior is introduced.
+
+### Deferred disconnect semantics
+
+The page may visibly reserve a disabled `Disconnect` control with plain-language availability copy. It must not act like an enabled button while doing nothing.
+
+- **App-local disconnect** would stop this app's monitoring or mark its Codex presentation disconnected while deliberately retaining the user's independent CLI session. It is less destructive, but potentially misleading because it does not sign the user out of Codex.
+- **CLI-session logout** would invoke the official `codex logout` flow, then reconcile application state. This matches a literal "Disconnect" expectation, but can unexpectedly affect other Terminal/editor Codex workflows and therefore requires an explicit product decision, confirmation design, recovery behavior, and a separate implementation/acceptance plan.
+
+The user currently leans toward the CLI-session interpretation but has deferred both behaviors. This UI-only work must neither choose nor implement either option.
+
+### Current execution checklist
+
+- [x] Replace raw generated images with user-supplied, Preserve-Vector-Data PDF image sets for Codex, Claude, and retained future Copilot art.
+- [x] Replace the raw-file loader with a named `Bundle.main` asset image, compile the catalog during the signed-app build, and make the signed-artifact check fail before / pass after that packaging boundary.
+- [x] Standardize the tab label (`Codex`, `Claude`, future `Copilot`), fixed icon slot, adaptive tab-strip implementation, and provider-page template.
+- [x] Port existing Codex connection guidance plus visible, disabled disconnect affordance; add existing five-hour/weekly quota windows and banked reset count without reading new data.
+- [x] Verify `swift test` (8 tests, 0 failures), build the signed app, confirm `Assets.car` contains the three named provider assets, and perform strict codesign verification. `git diff --check` also passed.
+- [ ] Build and manually inspect the signed app: correct PDF artwork, repeated Codex/Claude selection, keyboard selection, disabled disconnect copy, current quota/session states, both Context Rail states, and Light/Dark. This is required before any visual-fix claim.
+
+The historical Task 2 raster-conversion commands below record why the original source failed and are superseded by this vector-asset workflow. They are not instructions to recreate raster runtime assets.
+
 ## Signed-app icon packaging correction — 2026-07-19
 
 Entering Agents in the signed app crashed with `EXC_BREAKPOINT` before the page could render. The macOS crash report identifies `AgentSettingsIcon.body`, then SwiftPM's generated `NSBundle.module` accessor, which calls `fatalError` because the signed app did not contain the generated resource bundle. `build-app.sh` copied the executable and `Info.plist` only, while Task 2 had introduced a SwiftPM resource target and `.module` lookup.
 
-The correction keeps the checked-in PNGs as runtime assets but treats them as application resources, not SwiftPM module resources: `build-app.sh` installs both files directly into `CodexUsageMonitor.app/Contents/Resources`, and `AgentSettingsIconResource` resolves each file with an explicit `Bundle.main.resourceURL`/`NSImage` load. `Package.swift` returns to its ordinary executable target so the failing module accessor is no longer linked into the app.
+The initial raw-PNG correction removed the crash but the user observed that the converted Codex art was nearly blank. The durable replacement uses the user-provided PDF vectors in an Apple asset catalog. `build-app.sh` invokes `actool` to compile `Resources/Assets.xcassets` into `Contents/Resources/Assets.car`; `AgentSettingsIcon` loads a named image through `Image(_:bundle: .main)`. `Package.swift` remains an ordinary executable target, so the failing SwiftPM module-resource accessor is no longer linked into the app.
 
 Every current and future provider icon uses the same `20 × 20`-point slot and a `16 × 16`-point maximum artwork frame from `SettingsLayoutMetrics`. Artwork therefore scales within a common window rather than moving labels or selector geometry according to its intrinsic dimensions.
 
-`Scripts/verify-signed-app-resources.sh` is the narrow regression check. It first failed against the broken signed app because `codex-agent.png` was absent, then passed after the correction alongside a signed build, strict codesign verification, and the existing eight Swift tests. A manual signed-app Agents navigation check remains required; no claim is made until that direct check observes the original route without a crash.
+`Scripts/verify-signed-app-resources.sh` is the narrow regression check. It failed before the catalog build because `Assets.car` was absent, then passed after a signed build and confirms that Codex, Claude, and retained Copilot asset names exist in the compiled catalog. Strict codesign verification also passed. A manual signed-app Agents navigation check remains required; no claim is made until it directly observes the original route without a crash and the correct vector art.
 
 ## File structure
 
@@ -48,6 +76,8 @@ Every current and future provider icon uses the same `20 × 20`-point slot and a
 | Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AgentSettingsCatalog.swift` | Declare supported versus preview display entries independently of planned enum cases. |
 | Modify `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AgentProvider.swift` | Supply display title and semantic presentation tint for catalog entries. |
 | Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AgentSettingsHeader.swift` | Render the compact selectable Codex/Claude header row and preserve the Context Rail control. |
+| Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AgentSettingsTabStrip.swift` | Keep provider selection, keyboard routing, icon slots, and adaptive overflow in one reusable selector. |
+| Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AgentSettingsPageTemplate.swift` | Give current and future provider pages the same Settings page shell without changing global navigation ownership. |
 | Modify `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsView.swift` | Own ephemeral Settings Agent selection and route the Agents header/Context Rail state. |
 | Modify `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsPageHeader.swift` | Retain the normal title header for five destinations and delegate the Agents header only for `.agents`. |
 | Modify `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsDetailView.swift` | Pass the current Settings Agent only into the Agents destination. |
@@ -58,6 +88,9 @@ Every current and future provider icon uses the same `20 × 20`-point slot and a
 | Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AgentConnectionsContextView.swift` | Render a factual Codex card or static Claude preview card for the Context Rail. |
 | Modify `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsPreviewView.swift` | Route Agents Context Rail content through `AgentConnectionsContextView`; leave five other destinations unchanged. |
 | Modify `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsLayout.swift` | Hold selector geometry metrics beside existing shared Settings metrics. |
+| Create `CodexUsageMonitor/Resources/Assets.xcassets` | Hold user-supplied Codex, Claude, and retained Copilot PDF vector assets. |
+| Modify `CodexUsageMonitor/Scripts/build-app.sh` | Compile the app asset catalog into the signed application bundle. |
+| Modify `CodexUsageMonitor/Scripts/verify-signed-app-resources.sh` | Assert the compiled catalog and provider asset names are present in the signed bundle. |
 | Modify `docs/product/planning-board.md` | Record the Codex-first UI integration separately from the still-deferred multi-provider selector. |
 | Modify this plan | Record executed scope, signed-build results, visual evidence, and any limitation. |
 
