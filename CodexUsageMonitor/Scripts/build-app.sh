@@ -10,6 +10,9 @@ DEVELOPER_DIR="$developer_dir" "$swift_tool" build --package-path "$root"
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 install -m 755 "$root/.build/debug/CodexUsageMonitor" "$app/Contents/MacOS/CodexUsageMonitor"
 install -m 644 "$root/Resources/Info.plist" "$app/Contents/Info.plist"
+for resource in codex-agent.png claude-code-agent.png; do
+  install -m 644 "$root/Resources/AgentIcons/$resource" "$app/Contents/Resources/$resource"
+done
 codesign --force --sign - --identifier com.david.codex-usage-monitor "$app"
 
 echo "Built $app"

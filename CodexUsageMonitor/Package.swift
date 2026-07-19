@@ -8,17 +8,7 @@ let package = Package(
         .executable(name: "CodexUsageMonitor", targets: ["CodexUsageMonitor"]),
     ],
     targets: [
-        .executableTarget(
-            name: "CodexUsageMonitor",
-            path: ".",
-            exclude: [
-                "Resources/Info.plist",
-                "Scripts",
-                "Tests",
-            ],
-            sources: ["Sources/CodexUsageMonitor"],
-            resources: [.process("Resources/AgentIcons")]
-        ),
+        .executableTarget(name: "CodexUsageMonitor"),
         .testTarget(
             name: "CodexUsageMonitorTests",
             dependencies: ["CodexUsageMonitor"]

@@ -31,6 +31,14 @@
 4. Use the approved Codex and Claude icon sources from `assets/icons for agents/` after converting and bundling them as native app resources. GitHub Copilot’s supplied icon remains unrendered until that provider passes its capability gate.
 5. This plan deliberately stops before the broader [supported-agent selector](2026-07-14-settings-provider-followups.md#task-6-replace-the-agents-title-with-a-supported-agent-selector). That task begins only when a second real adapter can truthfully populate the supported catalog; it must replace the preview exception rather than treating it as support evidence.
 
+## Signed-app icon packaging correction — 2026-07-19
+
+Entering Agents in the signed app crashed with `EXC_BREAKPOINT` before the page could render. The macOS crash report identifies `AgentSettingsIcon.body`, then SwiftPM's generated `NSBundle.module` accessor, which calls `fatalError` because the signed app did not contain the generated resource bundle. `build-app.sh` copied the executable and `Info.plist` only, while Task 2 had introduced a SwiftPM resource target and `.module` lookup.
+
+The correction keeps the checked-in PNGs as runtime assets but treats them as application resources, not SwiftPM module resources: `build-app.sh` installs both files directly into `CodexUsageMonitor.app/Contents/Resources`, and `AgentSettingsIcon` uses `Bundle.main`. `Package.swift` returns to its ordinary executable target so the failing module accessor is no longer linked into the app.
+
+`Scripts/verify-signed-app-resources.sh` is the narrow regression check. It first failed against the broken signed app because `codex-agent.png` was absent, then passed after the correction alongside a signed build, strict codesign verification, and the existing eight Swift tests. A manual signed-app Agents navigation check remains required; no claim is made until that direct check observes the original route without a crash.
+
 ## File structure
 
 | File | Responsibility |
@@ -60,6 +68,7 @@
 - Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AgentProvider.swift`
 - Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsView.swift`
 - Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsDetailView.swift`
+- Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AgentsSettingsView.swift`
 
 **Interfaces:**
 
@@ -142,7 +151,18 @@ Invoke it from an `.onAppear` on `SettingsView`. Do not use `.id`, view removal/
 
 - [ ] **Step 3: Thread the selected agent solely through the Agents destination.**
 
-Change the `.agents` branch of `SettingsDetailView` to pass the selection:
+Change the `.agents` branch of `SettingsDetailView` to pass the selection, and add `let selectedAgent: AgentProvider` to `AgentsSettingsView` so this routing boundary compiles. Remove its two old `PlannedAgentSettingsView` calls in the same change: retaining them would keep a visible GitHub Copilot placeholder after the display catalog explicitly excludes Copilot. Preserve the remaining Codex-only body in this task; Task 3 will make the already-threaded value select the center content and delete the now-unused generic view file.
+
+```swift
+struct AgentsSettingsView: View {
+    @ObservedObject var viewModel: QuotaViewModel
+    let selectedAgent: AgentProvider
+
+    // Existing body remains Codex-only until Task 3.
+}
+```
+
+Use the new argument from `SettingsDetailView`:
 
 ```swift
 case .agents:
@@ -170,7 +190,8 @@ Expected: build succeeds. Do not add a new test for this presentation-only catal
 git add CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AgentSettingsCatalog.swift \
   CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AgentProvider.swift \
   CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsView.swift \
-  CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsDetailView.swift
+  CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsDetailView.swift \
+  CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AgentsSettingsView.swift
 git diff --cached --check
 git commit -m "Add Agents Settings display catalog"
 ```
@@ -236,16 +257,27 @@ file CodexUsageMonitor/Resources/AgentIcons/codex-agent.png \
 
 Expected: two PNG files with alpha-capable native raster data. If `magick` is unavailable or either conversion fails, stop the icon task and record the tool failure; do not substitute an unofficial download, a copied web asset, or a system icon without an explicit user decision.
 
-Add only the icon directory as a processed SwiftPM resource:
+On 2026-07-19, ImageMagick rejected the supplied Codex SVG path data after the root-dimension substitution, while macOS Quick Look rendered that same source as a 64 × 64 RGBA PNG. Therefore, use this approved native fallback only for a failed ImageMagick conversion; it preserves the exact user-supplied SVG and does not introduce substitute artwork:
 
-```swift
-.executableTarget(
-    name: "CodexUsageMonitor",
-    resources: [.process("Resources/AgentIcons")]
-),
+```zsh
+rm -f CodexUsageMonitor/Resources/AgentIcons/codex-agent.png
+qlmanage -t -s 64 -o "$icon_temp_dir" "$icon_temp_dir/codex-color.svg" >/dev/null
+mv "$icon_temp_dir/codex-color.svg.png" \
+  CodexUsageMonitor/Resources/AgentIcons/codex-agent.png
+file CodexUsageMonitor/Resources/AgentIcons/codex-agent.png
 ```
 
-Do not process `Resources/Info.plist` as a SwiftPM resource; the signed app build script remains its owner.
+Expected fallback result: `PNG image data, 64 x 64, 8-bit/color RGBA`. If native Quick Look also fails, stop the icon task and record the failure; do not substitute an unofficial download, copied web asset, or system icon.
+
+Keep `Package.swift` as the ordinary executable target; do not make the icons a SwiftPM module resource. The signed app is assembled outside SwiftPM, so `build-app.sh` must install both checked-in PNGs into `Contents/Resources` after installing `Info.plist`:
+
+```zsh
+for resource in codex-agent.png claude-code-agent.png; do
+  install -m 644 "$root/Resources/AgentIcons/$resource" "$app/Contents/Resources/$resource"
+done
+```
+
+`Scripts/verify-signed-app-resources.sh` must fail when either resource is absent and pass after the signed build. This prevents the `Bundle.module` crash found during implementation.
 
 - [ ] **Step 2: Add all Agents-header geometry values to `SettingsLayoutMetrics`.**
 
@@ -257,7 +289,7 @@ Implement the icon view with the two bundled names and no GitHub fallback:
 
 ```swift
 var body: some View {
-    Image(provider == .codex ? "codex-agent" : "claude-code-agent", bundle: .module)
+    Image(provider == .codex ? "codex-agent" : "claude-code-agent", bundle: .main)
         .resizable()
         .scaledToFit()
         .frame(width: size, height: size)
@@ -333,6 +365,7 @@ Run:
 
 ```zsh
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer bash CodexUsageMonitor/Scripts/build-app.sh
+zsh CodexUsageMonitor/Scripts/verify-signed-app-resources.sh
 codesign --verify --deep --strict --verbose=2 CodexUsageMonitor/.build/CodexUsageMonitor.app
 ```
 
@@ -457,6 +490,7 @@ git commit -m "Add Claude preview Agents page"
 **Files:**
 - Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AgentConnectionsContextView.swift`
 - Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsPreviewView.swift`
+- Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsView.swift`
 
 **Interfaces:**
 
@@ -517,7 +551,8 @@ If a state cannot be safely produced, record it as not run. Do not manufacture c
 
 ```zsh
 git add CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AgentConnectionsContextView.swift \
-  CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsPreviewView.swift
+  CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsPreviewView.swift \
+  CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsView.swift
 git diff --cached --check
 git commit -m "Add selected agent status context rail"
 ```

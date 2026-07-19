@@ -5,7 +5,7 @@ struct AgentSettingsIcon: View {
     let size: CGFloat
 
     var body: some View {
-        Image(provider == .codex ? "codex-agent" : "claude-code-agent", bundle: .module)
+        Image(provider == .codex ? "codex-agent" : "claude-code-agent", bundle: .main)
             .resizable()
             .scaledToFit()
             .frame(width: size, height: size)
