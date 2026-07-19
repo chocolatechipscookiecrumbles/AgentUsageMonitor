@@ -4,7 +4,7 @@
 
 **Goal:** Determine whether the user's Copilot entitlement exposes an official, privacy-safe personal usage or allowance signal that could justify a future provider adapter, without changing the app or rendering speculative Agents UI.
 
-**Architecture:** This is one user-authorized, read-only probe—not an app feature. A short-lived fine-grained GitHub token with only **Plan: read** calls two documented user billing endpoints through GitHub CLI. Raw responses remain in a private temporary directory; the repository records only a sanitized outcome. The existing Agents selector remains deferred until a later adapter actually declares support.
+**Architecture:** This is one user-authorized, read-only probe—not an app feature. A short-lived fine-grained GitHub token with only **Plan: read** calls two documented user billing endpoints through GitHub CLI. Raw responses remain in a private temporary directory; the repository records only a sanitized outcome. Current community projects also use GitHub's undocumented `copilot_internal/user` implementation endpoint, but that route is an experimental research lead only: it must not be adopted or tested without a separate explicit privacy, compatibility, and authentication decision. The existing Agents selector remains deferred until a later adapter actually declares support.
 
 **Tech Stack:** GitHub CLI (`gh`), GitHub REST API version `2026-03-10`, `jq`, macOS shell, planning documentation.
 
@@ -16,6 +16,8 @@
 - Call only `GET /users/{username}/settings/billing/ai_credit/usage` and `GET /users/{username}/settings/billing/premium_request/usage`. Do not query organization, enterprise, Copilot-chat, or model endpoints.
 - The endpoints report billed usage. Do not infer a remaining Copilot allowance, reset time, connection state, or authentication state from price, quantity, reporting period, or an empty array.
 - A `403`, `404`, empty response, or unpresentable contract is a valid outcome. Do not broaden permissions or try unofficial web/session/CLI scraping.
+- Treat `GET /copilot_internal/user` and `/copilot_internal/v2/token` as undocumented implementation endpoints even though GitHub lists the path family in its firewall allowlist. GitHub's public REST reference supplies no versioned schema, permission contract, rate-limit guidance, or stability commitment for personal quota retrieval through those paths.
+- Do not read `~/.config/github-copilot/apps.json`, OpenCode authentication files, IDE secret stores, browser cookies, or another application's OAuth tokens. Do not persist or display a Copilot OAuth access token. A future manual probe is permitted only after explicit user approval of an authentication design that avoids those sources.
 - Make no app-source or general-test changes. A later reproducible adapter defect may earn one narrow deterministic regression test.
 - Do not change the global Settings sidebar, `AgentsSettingsView`, `AgentProvider`, `QuotaMonitor`, refresh cadence, notifications, or native menu. [Agent Selector Task 6](2026-07-14-settings-provider-followups.md#task-6-replace-the-agents-title-with-a-supported-agent-selector) remains separately gated on a real adapter.
 - The user manually creates any GitHub PR.
@@ -24,6 +26,7 @@
 
 - GitHub documents personal billing endpoints for Copilot usage billed directly to a user; organization- or enterprise-billed usage is excluded. User endpoints accept a fine-grained token with **Plan: read** and cover at most 24 months of history.
 - AI-credit and premium-request responses document period and usage items, not a user's included allowance, remaining allocation, reset schedule, or app session state.
+- A 2026 project audit found current scripts and applications calling the undocumented `api.github.com/copilot_internal/user` endpoint. Their observed payloads include `quota_snapshots` with `entitlement`, `remaining`, and reset fields, but their implementations obtain tokens from GitHub Copilot/OpenCode local authentication files, perform an internal token exchange, or require IDE-emulation headers. This evidence proves an experimental implementation path, not a supported product interface.
 - `AgentProvider` presently includes `codex`, `claudeCode`, and `githubCopilot`, but only Codex has an adapter. Enum membership is not support evidence.
 - The supplied Agents Selector image is a structural reference for a horizontal, scrollable, non-color-only selection row. It does not approve the illustrated provider list, icons, colors, or metrics for production.
 
@@ -31,6 +34,7 @@
 | --- | --- | --- |
 | **usage-only** | At least one documented endpoint returns `200`, but no official included limit, remaining amount, or reset semantics are present. | Record personal billed-usage evidence. Do not add a quota adapter or enable Copilot in the selector. |
 | **allowance-capable** | An authorized documented response supplies an explicit allowance or remaining amount with clear period/reset semantics, and the user approves its presentation. | Write a separate `feature/copilot-provider` plan covering adapter, connection, cache/freshness, errors, cadence, privacy, and signed Settings acceptance. |
+| **experimental-internal** | An explicit future decision accepts the undocumented internal route and a user-mediated authentication design can obtain a disposable token without reading credential files, cookies, or another app's secret store. | Write a dedicated ADR and experimental-prototype plan. It must use no automatic polling, use a user-triggered request only, clearly label the source Experimental, preserve no token, and define immediate removal on schema/auth failure. It does not authorize a shipped provider or selector entry. |
 | **unavailable** | The response is `403`, `404`, `400`, `5xx`, has no personally billed Copilot data, or cannot be presented truthfully. | Record only the category, revoke the token, keep Copilot planned, and do not try undocumented sources. |
 
 ## File structure
@@ -177,6 +181,12 @@ For `usage-only` or `unavailable`, set the Copilot board row back to **Deferred*
 - Premium-request endpoint: command exit `0`, HTTP `200`; scalar field paths reported: none.
 - Result: **unavailable** — the observed responses supplied no reported scalar personally billed-usage fields and no explicit allowance, remaining amount, or reset contract.
 - Decision: keep GitHub Copilot planned. Do not build a provider adapter, quota display, refresh loop, or Agents-selector entry from these responses. No raw response, account identifier, token, monetary amount, usage count, or billing history is retained in this repository.
+
+### Research correction — 2026-07-19
+
+- The documented personal billing endpoints remain insufficient: GitHub's own current UI can show included-credit consumption, while those REST reports are billed-usage reports and did not yield a presentable allowance contract in this probe.
+- Current community projects can instead query `api.github.com/copilot_internal/user`; their source parses entitlement, remaining, and reset fields from internal quota snapshots. GitHub publicly lists the path family as Copilot user-management traffic for firewall allowlists, but does not document it as a public quota API.
+- The discovered projects obtain an OAuth token from local Copilot/OpenCode state or use an internal token exchange and IDE-identifying headers. That violates this repository's no-credential-file/no-token-persistence boundary. The route is therefore recorded as **experimental-internal**, not adopted, and must not be used without a separate explicit decision.
 
 - [ ] **Step 4: Run documentation checks.**
 
