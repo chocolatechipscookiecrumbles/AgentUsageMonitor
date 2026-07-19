@@ -7,6 +7,7 @@ struct SettingsView: View {
     @StateObject private var launchAtLogin = LaunchAtLoginController()
     @StateObject private var systemAppearance = SystemAppearanceObserver()
     @State private var isPreviewVisible = false
+    @State private var selectedSettingsAgent: AgentProvider = .codex
 
     init(viewModel: QuotaViewModel) {
         self.viewModel = viewModel
@@ -30,7 +31,10 @@ struct SettingsView: View {
                 SettingsContextPanel {
                     SettingsPreviewView(
                         selection: settings.selectedSettingsTab,
-                        viewModel: viewModel
+                        viewModel: viewModel,
+                        selectedAgent: selectedSettingsAgent,
+                        connectionState: viewModel.connectionState,
+                        settingsStatus: viewModel.settingsStatus
                     )
                 }
                 .transition(.move(edge: .trailing).combined(with: .opacity))
@@ -41,12 +45,15 @@ struct SettingsView: View {
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: isPreviewVisible)
         .environment(\.settingsAppearancePalette, appearancePalette)
         .preferredColorScheme(presentationColorScheme)
+        .onAppear(perform: repairSelectedSettingsAgentIfNeeded)
     }
 
     private var settingsPage: some View {
         VStack(spacing: 0) {
             SettingsPageHeader(
-                title: settings.selectedSettingsTab.title,
+                selection: settings.selectedSettingsTab,
+                entries: AgentSettingsCatalog.entries,
+                selectedAgent: $selectedSettingsAgent,
                 isPreviewVisible: $isPreviewVisible
             )
 
@@ -55,9 +62,18 @@ struct SettingsView: View {
             SettingsDetailView(
                 selection: settings.selectedSettingsTab,
                 viewModel: viewModel,
-                launchAtLogin: launchAtLogin
+                launchAtLogin: launchAtLogin,
+                selectedSettingsAgent: selectedSettingsAgent
             )
         }
+    }
+
+    private func repairSelectedSettingsAgentIfNeeded() {
+        guard !AgentSettingsCatalog.entries.contains(where: { $0.provider == selectedSettingsAgent }) else {
+            return
+        }
+
+        selectedSettingsAgent = .codex
     }
 
     private var presentationColorScheme: ColorScheme {

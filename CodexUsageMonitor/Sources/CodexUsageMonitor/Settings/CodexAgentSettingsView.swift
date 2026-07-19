@@ -3,55 +3,46 @@ import SwiftUI
 struct CodexAgentSettingsView: View {
     let status: SettingsStatus
     let connectionState: AgentConnectionState
+    let presentation: QuotaPresentation
+    let quotaValueMode: QuotaValueMode
+    let alertsEnabled: Bool
+    let isWarningThresholdEnabled: (RemainingQuotaThreshold) -> Bool
+    let setWarningThresholdEnabled: (RemainingQuotaThreshold, Bool) -> Void
     let signInWithBrowser: () -> Void
     let signInWithCLI: () -> Void
     let checkConnection: () -> Void
 
     var body: some View {
-        SettingsSection("OpenAI Codex") {
+        SettingsSection("Connection") {
             SettingsSectionRow {
-                SettingsLabeledRow("Status") { Text(connectionState.displayName) }
+                SettingsPreferenceControlRow("Status") { Text(connectionState.displayName) }
             }
             if let planName {
                 SettingsSectionRow {
-                    SettingsLabeledRow("Plan") { Text(planName) }
+                    SettingsPreferenceControlRow("Plan") { Text(planName) }
                 }
             }
-            SettingsSectionRow {
-                SettingsLabeledRow("Quota status") { Text(status.displayMode.displayName) }
-            }
-            SettingsSectionRow(showsDivider: false) {
-                SettingsDescription("Codex is the only active agent integration in this build.")
-            }
-        }
-
-        SettingsSection("Connection") {
             SettingsSectionRow(showsDivider: false) {
                 VStack(alignment: .leading, spacing: 8) {
                     connectionGuidance
-                    if showsSignInActions {
-                        Button("Sign in with browser", action: signInWithBrowser)
-                            .disabled(signInDisabled)
-                        Button("Sign in with Codex CLI…", action: signInWithCLI)
-                            .disabled(signInDisabled)
-                    }
-                    if connectionState == .missingCLI {
-                        Button("Check again", action: checkConnection)
-                    }
+                    connectionActions
                 }
             }
         }
 
-        SettingsSection("Codex Privacy") {
-            SettingsSectionRow(showsDivider: false) {
-                SettingsDescription("Codex owns sign-in and credential storage. This app never displays an email address, account fingerprint, credential, or authentication token.")
-            }
-        }
-    }
+        AgentQuotaSessionSection(
+            provider: .codex,
+            presentation: presentation,
+            valueMode: quotaValueMode
+        )
 
-    private var planName: String? {
-        guard case .connected(let account) = connectionState else { return nil }
-        return account.planType?.capitalized ?? status.planName
+        AgentUsageWarningsSection(
+            provider: .codex,
+            alertsEnabled: alertsEnabled,
+            isThresholdEnabled: isWarningThresholdEnabled,
+            setThresholdEnabled: setWarningThresholdEnabled
+        )
+
     }
 
     @ViewBuilder
@@ -83,6 +74,29 @@ struct CodexAgentSettingsView: View {
             true
         case .checking, .missingCLI, .connected:
             false
+        }
+    }
+
+    private var planName: String? {
+        guard case .connected(let account) = connectionState else { return nil }
+        return account.planType?.capitalized ?? status.planName
+    }
+
+    @ViewBuilder
+    private var connectionActions: some View {
+        if showsSignInActions {
+            Button("Connect with browser", action: signInWithBrowser)
+                .disabled(signInDisabled)
+            Button("Connect with Codex CLI…", action: signInWithCLI)
+                .disabled(signInDisabled)
+        }
+        if connectionState == .missingCLI {
+            Button("Check again", action: checkConnection)
+        }
+        if case .connected = connectionState {
+            Button("Disconnect") {}
+                .disabled(true)
+            SettingsDescription("Disconnect is planned. It does not yet change this app or your Codex CLI session.")
         }
     }
 
