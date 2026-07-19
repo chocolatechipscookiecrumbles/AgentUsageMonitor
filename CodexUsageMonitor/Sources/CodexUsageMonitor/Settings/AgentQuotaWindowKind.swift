@@ -13,11 +13,15 @@ enum AgentQuotaWindowKind {
     }
 
     func progressTint(for provider: AgentProvider) -> Color {
+        provider.settingsPresentationTint
+    }
+
+    var progressOpacity: CGFloat {
         switch self {
         case .fiveHour:
-            provider.settingsPresentationTint
+            1
         case .weekly:
-            Color(red: 1, green: 175 / 255, blue: 12 / 255)
+            0.72
         }
     }
 }

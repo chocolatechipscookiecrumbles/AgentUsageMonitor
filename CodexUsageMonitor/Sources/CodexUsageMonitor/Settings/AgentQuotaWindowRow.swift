@@ -29,6 +29,7 @@ struct AgentQuotaWindowRow: View {
                 ProviderQuotaProgressBar(
                     value: valueMode.value(for: window),
                     tint: kind.progressTint(for: provider),
+                    foregroundOpacity: kind.progressOpacity,
                     accessibilityLabel: "\(provider.title) \(kind.title)"
                 )
 
@@ -63,6 +64,7 @@ struct AgentQuotaWindowRow: View {
                 ProviderQuotaProgressBar(
                     value: 0,
                     tint: kind.progressTint(for: provider),
+                    foregroundOpacity: kind.progressOpacity,
                     accessibilityLabel: "\(provider.title) \(kind.title)"
                 )
 

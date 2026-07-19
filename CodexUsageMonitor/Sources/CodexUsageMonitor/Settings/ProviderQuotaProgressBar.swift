@@ -5,6 +5,7 @@ import SwiftUI
 struct ProviderQuotaProgressBar: View {
     let value: Int
     let tint: Color
+    let foregroundOpacity: CGFloat
     let accessibilityLabel: String
 
     @Environment(\.settingsAppearancePalette) private var palette
@@ -16,7 +17,7 @@ struct ProviderQuotaProgressBar: View {
                     .fill(palette.divider)
 
                 Capsule()
-                    .fill(tint)
+                    .fill(tint.opacity(foregroundOpacity))
                     .frame(width: geometry.size.width * progress)
             }
         }

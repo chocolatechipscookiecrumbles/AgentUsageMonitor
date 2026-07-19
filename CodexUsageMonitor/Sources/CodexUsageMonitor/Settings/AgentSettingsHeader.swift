@@ -24,7 +24,7 @@ struct AgentSettingsHeader: View {
             .accessibilityValue(isContextRailVisible ? "Visible" : "Hidden")
             .help(isContextRailVisible ? "Hide Context Rail" : "Show Context Rail")
         }
-        .padding(.horizontal, SettingsLayoutMetrics.pageHeaderHorizontalPadding)
+        .padding(.trailing, SettingsLayoutMetrics.pageHeaderHorizontalPadding)
         .frame(height: SettingsLayoutMetrics.pageHeaderHeight)
         .background(palette.windowBackground)
     }
