@@ -43,6 +43,8 @@ The first port exposed three implementation boundaries that this follow-on compl
 
 Every provider page that later has a sanitized quota presentation must use `AgentSettingsPageTemplate`, `AgentQuotaSessionSection`, `AgentQuotaWindowRow`, `AgentQuotaWindowKind`, `AgentSettingsIcon`, and `ProviderQuotaProgressBar`; it must not duplicate per-page icon sizing, horizon-bar color, or alignment offsets.
 
+Provider pages do not add a boilerplate Privacy section. The app-wide Data & Privacy destination remains the single Settings home for privacy inventory and policy. Provider implementation plans must document new provider data separately before exposing it in Agents.
+
 - Connection and quota facts use `SettingsPreferenceControlRow`, which keeps Status, Plan, Credits, reset counts, and expiry timestamps in the same right-aligned value column as Settings toggles and other trailing controls. Plan belongs in **Connection**, not Current quota.
 - Current quota always reserves **5-Hour Window** and **Weekly Window**. A missing window renders an explicit unavailable/idle state instead of removing the row; the provider tint is applied only to a real `ProgressView` value.
 - Credits use the existing sanitized `creditBalance` presentation field. `AgentResetCreditsRow` groups the available reset count and all expiry annotations into one provider-template row: **Earned Reset Credits** has the provider-colored `N Available` value; each expiry is a left-aligned secondary calendar/date annotation with no repeated "reset expires" label. An empty expiry list uses a left-aligned availability annotation. No token, account identity, or raw provider response is displayed.
@@ -87,8 +89,10 @@ The user currently leans toward the CLI-session interpretation but has deferred 
 - [x] Keep concise provider facts right-aligned below the global compact breakpoint, honor General's Remaining/Used preference in both provider quota windows, and use the opaque shared provider-bar template rather than a native tinted progress style.
 - [x] Use the same provider hue for both horizons—with an opaque five-hour bar and surface-composited weekly bar—add complete reset dates, port the fixed-width/divided provider selector, and add the Codex threshold-chip presentation without changing the deferred provider/window preference model.
 - [x] Consolidate available reset credits and expiry timestamps into one left-aligned provider annotation row with the provider-colored available count.
+- [x] Remove the redundant provider-page Privacy card; the shared provider-page template routes privacy policy to Data & Privacy instead.
 - [x] Verify `swift test` (8 tests, 0 failures), build the signed app, confirm `Assets.car` contains the three named provider assets, and perform strict codesign verification. `git diff --check` also passed.
-- [ ] Build and manually inspect the signed app: correct PDF artwork, repeated Codex/Claude selection, keyboard selection, disabled disconnect copy, current quota/session states, both Context Rail states, and Light/Dark. This is required before any visual-fix claim.
+- [x] User reported signed-app visual acceptance for the implemented Agents UI: the provider pages, visual layout, and current quota/reset presentation passed direct inspection. This observation covers the approved Codex/Claude presentation, not a substitute for the exhaustive Settings matrix below.
+- [ ] Run the remaining exhaustive acceptance matrix: all six destinations, both Context Rail states, Light/Dark, conditional states, scrolling, keyboard navigation, VoiceOver, focus preservation, and the native-menu appearance boundary.
 
 The historical Task 2 raster-conversion commands below record why the original source failed and are superseded by this vector-asset workflow. They are not instructions to recreate raster runtime assets.
 
@@ -115,7 +119,7 @@ Every current and future provider icon uses the same `20 × 20`-point slot and a
 | Modify `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsPageHeader.swift` | Retain the normal title header for five destinations and delegate the Agents header only for `.agents`. |
 | Modify `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsDetailView.swift` | Pass the current Settings Agent only into the Agents destination. |
 | Modify `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AgentsSettingsView.swift` | Render the selected supported Codex page or static Claude preview page. |
-| Modify `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/CodexAgentSettingsView.swift` | Keep existing Codex facts/actions but organize them as concise Connection, Usage, and Privacy cards. |
+| Modify `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/CodexAgentSettingsView.swift` | Keep existing Codex facts/actions but organize them as concise Connection and Usage cards; retain privacy policy only in Data & Privacy. |
 | Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/ClaudeCodePreviewSettingsView.swift` | Render the static unavailable Claude Code preview page without an integration action. |
 | Delete `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/PlannedAgentSettingsView.swift` | Remove the static planned-provider Settings presentation. |
 | Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AgentConnectionsContextView.swift` | Render a factual Codex card or static Claude preview card for the Context Rail. |
@@ -672,7 +676,7 @@ git commit -m "Document Codex and Claude preview Agents UI"
 
 - Agents shows compact, selectable OpenAI Codex and Claude Code identity buttons; click and keyboard selection update the page and Context Rail for the open Settings window only.
 - Codex renders factual center/Context Rail content. Claude renders only a static Preview/Not available page and card. GitHub Copilot does not appear in the live Settings UI.
-- Existing connection state, plan, quota-status, privacy, Browser sign-in, CLI sign-in, and Check again behavior are preserved without new credential or network access.
+- Existing connection state, plan, quota status, Browser sign-in, CLI sign-in, and Check again behavior are preserved without new credential or network access. Privacy policy remains centralized in Data & Privacy rather than repeated in a provider page.
 - General, Notifications, Refresh, Data & Privacy, and Diagnostics retain their title header, geometry, Context Rail behavior, and content.
-- The signed app is built and directly inspected in Light and Dark with the rail hidden/visible; affected states that are not observed are recorded rather than inferred.
+- The signed app is built; user-reported visual acceptance covers the implemented Agents presentation. Light/Dark, both rail states, and the remaining cross-destination matrix are recorded as unobserved rather than inferred.
 - A real multi-provider selector, Claude adapter, OpenCode integration, and Copilot experimental integration remain explicitly Deferred.

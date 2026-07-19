@@ -43,11 +43,6 @@ struct CodexAgentSettingsView: View {
             setThresholdEnabled: setWarningThresholdEnabled
         )
 
-        SettingsSection("Privacy") {
-            SettingsSectionRow(showsDivider: false) {
-                SettingsDescription("Codex owns sign-in and credential storage. This app never displays an email address, account fingerprint, credential, or authentication token.")
-            }
-        }
     }
 
     @ViewBuilder
