@@ -99,6 +99,7 @@ Every implementation plan currently in `docs/superpowers/plans` is indexed below
 - [Claude StatusLine Usage Bridge](../superpowers/plans/2026-07-20-claude-statusline-usage-bridge.md) — implements and tests the `ClaudeUsageBridge` script and `ClaudeRateLimitSnapshotReader` as an isolated component (13 Python + 8 Swift tests passing); no Settings UI, connection controller, or refresh cycle wired in yet.
 - [Claude Usage Monitor Owner](../superpowers/plans/2026-07-20-claude-usage-monitor-owner.md) — implements and tests `ClaudeUsageMonitor` (single read-cycle owner) and `ClaudeStatusLineInstaller` (non-destructive setup) as isolated components (10 new Swift tests, 26 total passing); no Settings UI yet, and the installer's production bridge path awaits `ClaudeUsageBridge/` being bundled into the signed app.
 - [Claude Usage Provider](../superpowers/plans/2026-07-20-claude-usage-provider.md) — implements and tests the OAuth-primary, statusLine-fallback, cache-last-resort coordinator (`ClaudeUsageCollector`), with Keychain and live-API schemas verified against a real account (25 new Swift tests, 52 total passing); tier 3 (CLI `/usage` probe) and all Settings UI are explicitly deferred, not dropped.
+- [OpenCode Capability Research and Integration Gate](../superpowers/plans/2026-07-19-opencode-capability-research.md) — explicitly approved read-only research; connection/adapter behavior stays gated, but a field-scoped `opencode stats` reader is authorized to explore by 2026-07-20 user direction.
 
 ### Implemented with verification remaining
 
