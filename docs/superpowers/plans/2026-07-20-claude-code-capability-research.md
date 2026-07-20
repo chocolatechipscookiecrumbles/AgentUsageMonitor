@@ -2,7 +2,7 @@
 
 **Goal:** Determine whether Claude Code can provide privacy-safe, zero/near-zero-cost, user-meaningful personal usage/quota information before any real (non-preview) Claude Settings row, connection controller, refresh cycle, or notification behavior is built.
 
-**Status:** Deferred research gate for any real connection controller, refresh cycle, or notification behavior. As of 2026-07-20, a narrow field-scoped local usage-signal reader is authorized to explore/prototype under "Local usage-signal decision update" below; it does not by itself authorize shipping a visible provider adapter or replacing `ClaudeCodePreviewSettingsView`. It follows the same gate structure as the [OpenCode capability research](2026-07-19-opencode-capability-research.md) and [GitHub Copilot capability probe](2026-07-19-github-copilot-capability-probe.md), per the roadmap's [later-provider-branches](2026-07-13-codex-daily-driver-roadmap.md#later-provider-branches) rule: normally sequenced after the Codex daily-driver release, opened early here only by explicit user direction and scoped to research, not implementation.
+**Status:** Deferred research gate for any real connection controller, refresh cycle, or notification behavior. As of 2026-07-20, two things are authorized to explore/prototype — the `statusLine`-sourced `rate_limits` reader (recommended primary path, see "Authoritative-signal probe" below) and a narrow field-scoped local-JSONL reader (see "Local usage-signal decision update" below) — but neither by itself authorizes shipping a visible provider adapter or replacing `ClaudeCodePreviewSettingsView`. The OAuth-endpoint path (`api/oauth/usage`) is closed outright by Anthropic policy, not deferred. This follows the same gate structure as the [OpenCode capability research](2026-07-19-opencode-capability-research.md) and [GitHub Copilot capability probe](2026-07-19-github-copilot-capability-probe.md), per the roadmap's [later-provider-branches](2026-07-13-codex-daily-driver-roadmap.md#later-provider-branches) rule: normally sequenced after the Codex daily-driver release, opened early here only by explicit user direction and scoped to research, not implementation.
 
 ## Why this bar, not a lower one
 
@@ -10,7 +10,7 @@
 
 ## Research findings — 2026-07-20
 
-**No official personal-quota API exists for a Pro/Max subscriber running Claude Code locally.** Every documented programmatic usage surface is either enterprise/org-admin-scoped or API-key/billing-scoped, not a personal subscription seat:
+**No official *programmatic API* exists for a Pro/Max subscriber to pull personal-quota state on demand — but an official *passive* signal does, found during the 2026-07-20 follow-up below.** Every documented on-demand programmatic surface is either enterprise/org-admin-scoped or API-key/billing-scoped, not a personal subscription seat:
 
 - **Claude Code Analytics API** and **Enterprise Analytics API** — return per-user usage, but require an org Admin API key / `read:analytics` scope created by a Primary Owner. Not available to an individual Pro/Max user monitoring their own seat.
 - **Claude Console usage page / workspace spend limits** — API-key billing, not subscription-seat quota.
@@ -43,19 +43,73 @@ Carried forward unmodified from the OpenCode gate and `AGENTS.md`'s existing Usa
 | Shell out to `claude -p "/usage" --output-format json` (or equivalent) on a timer | The same plan-limit bars a user sees interactively | **Rejected as currently specified.** Anthropic's own docs do not guarantee `/usage` is free of token cost, and nothing confirms the plan-limit bars are even reachable through `--output-format json` rather than being TUI-rendered only. Revisit only if Anthropic documents a zero-cost, scriptable output for this data. |
 | Claude Code Analytics API / Enterprise Analytics API | Per-user usage and cost | **Rejected.** Requires an org Admin/Analytics API key; out of scope for a personal seat and out of scope for this app's no-credential boundary. |
 | OpenTelemetry self-export | Real per-invocation token/cost metrics as they happen | **Deferred candidate, not a quota read.** Requires the user to already run an OTLP collector and would report consumption as it happens, not "how much is left" — a materially different product than the Codex quota display. Worth a separate, narrower research pass if a self-hosted metrics pipeline is ever in scope. |
-| Wait for an official, documented, zero-cost personal usage/quota endpoint | A true Codex-equivalent read | **Future research direction.** This is the only approach that would clear the existing UsageProbe bar without a compromise. No such endpoint is documented today. |
+| Read `rate_limits` from Claude Code's own `statusLine` JSON stdin | Exact 5-hour/weekly `used_percentage` + `resets_at`, sourced passively from real API response headers, not a token-count estimate | **Accepted — recommended primary path (2026-07-20, see "Authoritative-signal probe" below).** Official (`code.claude.com/docs/en/statusline`), zero additional cost, no credentials touched. This is the Codex-equivalent read the row below was waiting for; requires one-time user opt-in (a `statusLine` script) and only refreshes on active Claude Code use. |
+| `GET https://api.anthropic.com/api/oauth/usage` via a dedicated first-party OAuth client | Session + weekly windows, per-model breakdown, plan tier, spend limits — richer than the statusLine signal | **Rejected — policy, not complexity (2026-07-20, see "Authoritative-signal probe" below).** Anthropic's Legal and Compliance page explicitly prohibits any third-party product from using consumer OAuth tokens outside Claude Code/Claude.ai, with reserved and already-exercised enforcement. Not revisitable without an official Anthropic-sanctioned integration path. |
 
 ## Gate before implementation
 
 Create a Claude adapter with real connection, refresh, or usage behavior — replacing `ClaudeCodePreviewSettingsView` — only after all of the following are answered with direct, isolated evidence, mirroring the OpenCode gate:
 
-1. Anthropic documents a way to read personal Pro/Max plan-limit state (percentage used, reset time) that does not consume tokens or reset credits, confirmed the same way UsageProbe confirms Codex's `account/rateLimits/read` is non-consuming.
-2. That source requires no admin/analytics API key and no `.credentials.json` read, and — if it is the field-scoped local JSONL reader rather than an official API — the implementation demonstrably never reads conversation content, per "Local usage-signal decision update" below.
+1. ~~Anthropic documents a way to read personal Pro/Max plan-limit state (percentage used, reset time) that does not consume tokens or reset credits~~ — **satisfied 2026-07-20** by the `statusLine`-sourced `rate_limits` fields (see "Authoritative-signal probe" below), confirmed official and zero-cost the same way UsageProbe confirms Codex's `account/rateLimits/read` is non-consuming.
+2. That source requires no admin/analytics API key, no `.credentials.json` read, and no OAuth token our app requests or stores itself (the `api/oauth/usage` path is closed by policy, not just by cost) — and, if it is the field-scoped local JSONL reader rather than the `statusLine` signal, the implementation demonstrably never reads conversation content, per "Local usage-signal decision update" below.
 3. The product copy correctly scopes what the number means (Claude Code only vs. shared with Claude chat/Cowork) based on direct evidence for the plan type in use, not assumption.
 4. A single owner exists for the read cycle (mirroring `QuotaMonitor`'s ownership for Codex), with explicit teardown and no second polling source.
 5. If no zero-cost source exists, the fallback is an explicit, permanent "not available" state (as `ClaudeCodePreviewSettingsView` already shows) — not a best-effort estimate presented as a quota.
 
-Until gate criteria 1–2 are met, Claude Code remains a static preview: no connection controller, no refresh cycle, no notifications, no usage read of any kind.
+Criteria 1–2 are now satisfiable via the `statusLine` signal; criteria 3–5 (product-copy accuracy, single owner, "not available" fallback) are not yet evidenced. Until all five are met, Claude Code remains a static preview: no connection controller, no refresh cycle, no notifications, no usage read of any kind.
+
+## Authoritative-signal probe: statusLine vs. OAuth endpoint — 2026-07-20
+
+User direction: verify the `/usage` token-cost claim, model its cost at a 2-minute refresh cadence against Pro/Max pricing, and probe two candidate authoritative (non-estimate) signals surfaced during that research — Claude Code's own `statusLine` JSON and the `api.anthropic.com/api/oauth/usage` endpoint CodexBar uses — for accuracy and user-experience impact, including whether the OAuth path is "just a browser sign-in" or something harder.
+
+### `/usage` token cost: confirmed as a real claim, but sources conflict on magnitude
+
+Anthropic's own docs state it twice, independently (`code.claude.com/docs/en/costs`, and quoted verbatim in [GitHub issue #33978](https://github.com/anthropics/claude-code/issues/33978)): *"Some commands like `/usage` may generate requests to check status... These background processes consume a small amount of tokens (typically under $0.04 per session) even without active interaction."* CodexBar's own docs claim the opposite for its CLI-PTY `/usage`-parsing fallback ("Token cost: None"). Neither source gives exact per-invocation numbers, and "per session" is ambiguous (once per Claude Code session vs. per `/usage` call). This is a **primary-source vs. secondary-tool conflict that remains unresolved by documentation alone** — the finding below makes it moot for this app's design either way.
+
+**Cost modeling at a 2-minute refresh cadence**, using Anthropic's own worst-case figure ($0.04/check) as a notional API-equivalent value (subscribers aren't billed per check, but Anthropic states the tokens genuinely count against the account, so this is the closest available proxy for scale):
+
+| Polling pattern | Checks/month | Notional cost/month | vs. plan price |
+| --- | --- | --- | --- |
+| Every 2 min, 24/7 | ~21,600 | ~$864 | 4.3× a $200/mo Max 20x plan |
+| Every 2 min, 8h/day, 22 workdays | ~5,280 | ~$211 | 10.6× a $20/mo Pro plan; ~2× a $100/mo Max 5x plan |
+
+Even restricted to working hours, a `/usage`-based poller could notionally consume several times a subscriber's entire monthly plan value just checking status, before any real coding. This confirms the earlier "hold the zero-cost line" decision regardless of which cost figure is correct, and motivated probing the two signals below instead of resolving the `/usage` cost dispute further.
+
+### Signal A — `rate_limits` in Claude Code's `statusLine` JSON (recommended)
+
+Per `code.claude.com/docs/en/statusline`, every time Claude Code renders its status line — after a real turn the user already initiated — it writes JSON to the configured script's stdin, including:
+
+```
+rate_limits.five_hour.used_percentage   (0–100, exact float)
+rate_limits.five_hour.resets_at         (Unix epoch seconds)
+rate_limits.seven_day.used_percentage
+rate_limits.seven_day.resets_at
+```
+
+This is populated passively from the same `anthropic-ratelimit-unified-*` response headers Anthropic returns on every real API call Claude Code makes — not a new request, not an estimate derived from token counts. The docs note it "appears only for Claude.ai subscribers (Pro/Max) after the first API response in the session" and each window "may be independently absent."
+
+- **Cost:** Zero. No new request; it rides on turns the user was already going to make.
+- **Accuracy:** High for the two fields it covers — an exact float from Anthropic's own enforcement layer, not a locally-estimated dollar figure. Narrower in scope than the OAuth endpoint: no per-model breakdown, no plan tier, no spend-limit data — just the two rolling-window percentages and reset times.
+- **Freshness:** Only as fresh as the user's last Claude Code turn. Absent entirely before the first API call in a session, and does not update while the user is away from Claude Code — this app would show a "last known" snapshot the same way it already caches Codex quota data, not a live-anytime read.
+- **User experience:** No browser, no sign-in, no consent screen. Requires one-time setup: the user (or an installer we ship) adds/merges a `statusLine.command` entry in `~/.claude/settings.json` that writes the `rate_limits` fields to a small local file this app reads. Claude Code supports only one `statusLine` hook, so if the user already runs a custom one, setup must merge with it rather than silently replace it. Cross-device/cross-session freshness is local-only — a Claude Code session on another machine won't update this machine's file.
+- **Privacy:** Clean. No credentials, no conversation content, no new network request from this app.
+
+### Signal B — `GET https://api.anthropic.com/api/oauth/usage` (rejected — policy, not complexity)
+
+CodexBar's docs describe this as an official Anthropic endpoint (`user:profile` OAuth scope) returning session + weekly windows, per-model breakdown, plan tier, and spend limits — richer data than Signal A. Mechanically, obtaining an OAuth token this way **is** "just a browser sign-in": Claude Code's own login is a standard 4-step OAuth 2.0 + PKCE flow (`claude` starts a local callback listener, opens the browser to Anthropic's consent page, receives a redirect with an authorization code, exchanges it for access/refresh tokens) — about 10 seconds, no special complexity, the same flow `claude login` already uses.
+
+The reason this path is closed isn't engineering difficulty — it's policy, confirmed directly on Anthropic's own site:
+
+- **Anthropic does not offer third-party OAuth client registration at all.** Claude Code's client ID is hard-coded to that one application; there is no public developer flow to register a distinct client ID for another app the way, e.g., "Sign in with Google" works for arbitrary third parties.
+- **Anthropic's official Legal and Compliance page** (`code.claude.com/docs/en/legal-and-compliance`, updated 2026-02-19) states directly: *"OAuth authentication is intended exclusively for purchasers of Claude Free, Pro, Max, Team, and Enterprise subscription plans and is designed to support ordinary use of Claude Code and other native Anthropic applications... Anthropic does not permit third-party developers to offer Claude.ai login or to route requests through Free, Pro, or Max plan credentials on behalf of their users. Anthropic reserves the right to take measures to enforce these restrictions and may do so without prior notice."*
+- This is actively enforced, not theoretical: reporting from February 2026 (The Register, WinBuzzer, Gigazine) confirms Anthropic deployed server-side blocks against exactly this pattern, and named tools (Auto-Claude, Goose, OpenCode) were forced to drop OAuth reuse and switch to standard API keys as a result.
+- The credential-reuse fallback CodexBar also documents (reading Claude Code's own Keychain-stored token) was already rejected on privacy grounds in this doc's original boundary — this policy finding rejects the "build our own OAuth client instead" alternative too, closing off Signal B entirely rather than leaving it as a future direction.
+
+**Decision: Signal B is rejected outright**, superseding the earlier framing of "a product-owned OAuth client, mirroring the Copilot pattern" as a viable future path for Claude specifically — Copilot's device-flow route doesn't carry this same explicit consumer-OAuth prohibition, but Claude's does.
+
+### Net effect on this plan
+
+Signal A is now the primary recommended path for a real (non-estimate) Claude usage read, ahead of the field-scoped local-JSONL reader described below. The two are complementary, not competing: Signal A gives authoritative percentage/reset-time for the two rolling windows (when fresh); the JSONL reader gives historical token/cost totals Signal A doesn't provide. Signal B is closed.
 
 ## Local usage-signal decision update — 2026-07-20
 
@@ -84,3 +138,8 @@ This unblocks design/prototyping of the field-scoped reader. It does not by itse
 - [haasonsaas/claude-usage-tracker](https://github.com/haasonsaas/claude-usage-tracker), [aarora79/claude-code-usage-analyzer](https://github.com/aarora79/claude-code-usage-analyzer) — same JSONL-parsing pattern, corroborating it is the community-standard (not official) approach.
 - [Existing UsageProbe safety boundary](../../../UsageProbe/README.md#safety-boundary) — the zero-cost bar this research is measured against.
 - [OpenCode capability research](2026-07-19-opencode-capability-research.md) — precedent gate structure and privacy-boundary language reused here.
+- [Claude Code — Customize your status line](https://code.claude.com/docs/en/statusline) — official `rate_limits.five_hour`/`seven_day` JSON fields (Signal A), source of the recommended primary path.
+- [CodexBar — Claude usage data collection docs](https://github.com/steipete/CodexBar/blob/main/docs/claude.md) — documents the `api/oauth/usage` endpoint (Signal B), its OAuth scope, and the CLI-PTY/web-cookie fallbacks this app rejects on privacy grounds independent of the policy finding below.
+- [Claude Code — Legal and compliance](https://code.claude.com/docs/en/legal-and-compliance) — primary-source policy text closing Signal B: consumer OAuth tokens are restricted to Claude Code/Claude.ai, with reserved enforcement rights.
+- [GitHub issue #33978 — Built-in Usage Analytics Command](https://github.com/anthropics/claude-code/issues/33978) — corroborates the `/usage` background-token-cost claim verbatim from Anthropic's docs.
+- Reporting on the February 2026 OAuth policy enforcement: [The Register](https://www.theregister.com/2026/02/20/anthropic_clarifies_ban_third_party_claude_access/), [WinBuzzer](https://winbuzzer.com/2026/02/19/anthropic-bans-claude-subscription-oauth-in-third-party-apps-xcxwbn/) — corroborate active server-side enforcement against third-party OAuth reuse (Auto-Claude, Goose, OpenCode named as affected).
