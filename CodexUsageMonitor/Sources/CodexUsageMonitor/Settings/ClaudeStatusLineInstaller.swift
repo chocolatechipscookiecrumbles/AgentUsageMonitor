@@ -16,7 +16,15 @@ struct ClaudeStatusLineInstaller {
 
     init(settingsURL: URL, bridgeDirectory: URL) {
         self.settingsURL = settingsURL
-        self.bridgeCommand = "cd \(bridgeDirectory.path) && python3 -m claude_usage_bridge --quiet"
+        self.bridgeCommand = "cd \(Self.shellQuoted(bridgeDirectory.path)) && python3 -m claude_usage_bridge --quiet"
+    }
+
+    /// Single-quotes a path for safe use inside the shell command Claude
+    /// Code's statusLine executes. Without this, a path containing a space
+    /// (e.g. a directory literally named "agent usage") splits into multiple
+    /// shell words and the command fails.
+    private static func shellQuoted(_ path: String) -> String {
+        "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
     func install() -> ClaudeStatusLineInstallResult {
