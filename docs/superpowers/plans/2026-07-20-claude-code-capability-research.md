@@ -142,6 +142,8 @@ This does not change the underlying facts recorded above — worth restating pla
 
 **Revised decision:** Signal B is **accepted for this personal build only**, as the primary source, ahead of the statusLine signal. Implementation proceeds per the [Claude usage provider plan](2026-07-20-claude-usage-provider.md), which also keeps the existing statusLine bridge (Signal A) as the documented fallback tier, exactly as the gate below already established it.
 
+**2026-07-20 implementation note:** `ClaudeUsageCollector` (see the usage provider plan) implements and tests the full OAuth → statusLine → cache order end-to-end — `ClaudeKeychainCredentialStore`, `ClaudeOAuthUsageSource`, `ClaudeUsageCache`, and the coordinator itself, 25 new Swift tests, 52 total passing, zero regressions. Both the Keychain credential shape and the live `GET /api/oauth/usage` response shape were verified against one real, read-only call to this account (no token or identity data ever printed, logged, or persisted) — the real schema differs from `claude_probe_plan`'s assumed field names in several places (`utilization` not `used_percent`, ISO 8601 microsecond timestamps not Unix epoch, no account-identity field in the response at all), documented in the provider plan so future readers trust the verified schema over the original plan document. Tier 3 (user-authorized CLI `/usage` PTY probe) and all Settings UI remain deferred, named explicitly, not silently dropped.
+
 ## Sources
 
 - [Claude Code — Manage costs effectively](https://code.claude.com/docs/en/costs) — `/usage` plan-limit bars, background token usage on `/usage`, Analytics/Enterprise API scope, OpenTelemetry.
