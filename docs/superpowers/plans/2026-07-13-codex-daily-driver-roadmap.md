@@ -66,7 +66,7 @@ The two user-facing modes are:
 
 ## Global constraints
 
-- Codex first. Defer Claude and GitHub Copilot until the Codex daily-driver release passes acceptance.
+- Codex remains the only shipped provider. Defer Claude and every GitHub Copilot feature until the Codex daily-driver release passes acceptance; an explicitly user-approved, read-only GitHub Copilot capability probe may run earlier and cannot itself add an adapter or UI.
 - Do not read `auth.json`, store tokens, accept passwords, replay callback URLs, send prompts, or consume reset credits.
 - Add the smallest deterministic automated regression coverage permitted by the current repository rules; keep signed macOS UI and permission checks as separate manual evidence.
 - Keep fixed remaining-quota thresholds at 50%, 25%, 10%, and 5%.
@@ -181,7 +181,7 @@ Reconcile all branch plans and docs, finish the seven-day reliability gate, buil
 
 ## Later provider branches
 
-After the Codex release, create independent research branches before implementations:
+After the Codex release, or earlier only by explicit user direction for a read-only probe, create independent research branches before implementations:
 
 1. `research/copilot-capability` then `feature/copilot-provider` only if an official personal allowance path is verified.
 2. `research/claude-local-analytics` then `feature/claude-local-analytics`; quota remains experimental until separately proven.
