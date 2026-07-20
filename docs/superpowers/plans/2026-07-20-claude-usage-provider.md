@@ -251,8 +251,9 @@ final class ClaudeKeychainCredentialStoreTests: XCTestCase {
     """
 
     func testLoadCredentialParsesRealShapedFixture() throws {
+        let fixture = realShapedFixture
         let store = ClaudeKeychainCredentialStore(
-            rawDataReader: { .success(Data(self.realShapedFixture.utf8)) }
+            rawDataReader: { .success(Data(fixture.utf8)) }
         )
 
         let credential = try store.loadCredential()
