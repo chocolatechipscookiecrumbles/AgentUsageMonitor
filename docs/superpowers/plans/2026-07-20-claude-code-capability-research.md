@@ -2,7 +2,7 @@
 
 **Goal:** Determine whether Claude Code can provide privacy-safe, zero/near-zero-cost, user-meaningful personal usage/quota information before any real (non-preview) Claude Settings row, connection controller, refresh cycle, or notification behavior is built.
 
-**Status:** Deferred research gate. This plan authorizes no application implementation. It follows the same gate structure as the [OpenCode capability research](2026-07-19-opencode-capability-research.md) and [GitHub Copilot capability probe](2026-07-19-github-copilot-capability-probe.md), per the roadmap's [later-provider-branches](2026-07-13-codex-daily-driver-roadmap.md#later-provider-branches) rule: normally sequenced after the Codex daily-driver release, opened early here only by explicit user direction and scoped to research, not implementation.
+**Status:** Deferred research gate for any real connection controller, refresh cycle, or notification behavior. As of 2026-07-20, a narrow field-scoped local usage-signal reader is authorized to explore/prototype under "Local usage-signal decision update" below; it does not by itself authorize shipping a visible provider adapter or replacing `ClaudeCodePreviewSettingsView`. It follows the same gate structure as the [OpenCode capability research](2026-07-19-opencode-capability-research.md) and [GitHub Copilot capability probe](2026-07-19-github-copilot-capability-probe.md), per the roadmap's [later-provider-branches](2026-07-13-codex-daily-driver-roadmap.md#later-provider-branches) rule: normally sequenced after the Codex daily-driver release, opened early here only by explicit user direction and scoped to research, not implementation.
 
 ## Why this bar, not a lower one
 
@@ -23,13 +23,13 @@
 - Anthropic's docs state directly, under "Background token usage": *"Some commands like `/usage` may generate requests to check status... These background processes consume a small amount of tokens (typically under $0.04 per session) even without active interaction."* **This means the closest thing Claude Code has to `account/rateLimits/read` is not confirmed to be free.** A UsageProbe-style prober that shells out to `claude` to read `/usage` would not meet the same "cannot consume reset credits" guarantee this app makes for Codex.
 - For Team/Enterprise seats specifically, Anthropic's docs also confirm the rolling 5-hour/weekly allowance "is shared with Claude chat and Cowork" — so even a perfect read would describe a shared pool, not a Claude-Code-only number, which needs careful product copy (an issue Codex does not have).
 
-**Third-party tools (ccusage and similar) read local session transcripts, not a quota API — and that source conflicts with this project's own privacy boundary.** `ccusage`, `claude-usage-tracker`, `claude-usage`, and several forks all work the same way: Claude Code writes one JSONL file per session under `~/.claude/projects/**/*.jsonl`, and these tools parse those files for per-message token counts, model names, and timestamps to estimate historical cost. This is architecturally the same shape as the OpenCode `opencode stats`/session-export source this project already rejected: it is **historical consumption, not an authoritative remaining allowance**, and the source files sit alongside conversation content, project paths, and other session detail this app has committed not to read. `AGENTS.md` and the OpenCode gate both draw the line at "no session files, no session history, no prompts" — that line applies here without modification.
+**Third-party tools (ccusage and similar) read local session transcripts, not a quota API.** `ccusage`, `claude-usage-tracker`, `claude-usage`, and several forks all work the same way: Claude Code writes one JSONL file per session under `~/.claude/projects/**/*.jsonl`, and these tools parse those files for per-message token counts, model names, and timestamps to estimate historical cost. This is architecturally the same shape as the OpenCode `opencode stats`/session-export source, and — per the 2026-07-20 decision below — is accepted on the same narrowed terms: it remains **historical consumption, not an authoritative remaining allowance**, and the source files sit alongside conversation content, project paths, and other session detail this app still does not read; a reader must extract only usage-metric fields and leave everything else untouched.
 
 ## Privacy and product boundary
 
 Carried forward unmodified from the OpenCode gate and `AGENTS.md`'s existing UsageProbe boundary; the same reasoning applies to Claude Code's local state:
 
-- Do not read `~/.claude/projects/**/*.jsonl`, `~/.claude/.credentials.json`, `~/.claude/settings.json` contents, shell environment variables, or any file containing prompts, conversation content, or project paths.
+- Do not read `~/.claude/.credentials.json`, `~/.claude/settings.json` contents, shell environment variables, or any file containing prompts or conversation content. `~/.claude/projects/**/*.jsonl` may be read, but only for the narrow token/cost/model/timestamp fields described in "Local usage-signal decision update" below — never message content, tool inputs/outputs, or the full project directory name/path beyond what's needed to attribute a total.
 - Do not require or store an Admin API key, `read:analytics` key, or any API/Console credential. This app monitors a personal seat, not an organization.
 - Do not launch a background `claude -p` invocation, and do not treat any invocation that Anthropic's own docs describe as capable of consuming tokens as a zero-cost read, however small.
 - Do not present historical token/cost totals (session-block figures, ccusage-style aggregates) as a remaining allowance, reset time, or plan-limit percentage. Those are different claims and this app already distinguishes them for Codex.
@@ -39,7 +39,7 @@ Carried forward unmodified from the OpenCode gate and `AGENTS.md`'s existing Usa
 
 | Approach | What it could prove | Decision |
 | --- | --- | --- |
-| Parse `~/.claude/projects/**/*.jsonl` locally (the ccusage approach) | Estimated historical token/cost totals per session/day | **Rejected as a quota source**, same reasoning as the OpenCode `opencode stats` rejection: historical, not an authoritative remaining allowance, and the source sits inside data this app has committed not to read. A narrower question — whether a strict token-count-only reader could be made privacy-safe — is scoped separately below; it is not authorized by this decision. |
+| Parse `~/.claude/projects/**/*.jsonl` locally (the ccusage approach) | Estimated historical token/cost totals per session/day | **Accepted as the only currently viable local usage signal (revised 2026-07-20 — see "Local usage-signal decision update" below), narrowly scoped to token/cost/model/timestamp fields only.** It remains historical, not an authoritative remaining allowance — that is a product-copy constraint, not a privacy blocker. |
 | Shell out to `claude -p "/usage" --output-format json` (or equivalent) on a timer | The same plan-limit bars a user sees interactively | **Rejected as currently specified.** Anthropic's own docs do not guarantee `/usage` is free of token cost, and nothing confirms the plan-limit bars are even reachable through `--output-format json` rather than being TUI-rendered only. Revisit only if Anthropic documents a zero-cost, scriptable output for this data. |
 | Claude Code Analytics API / Enterprise Analytics API | Per-user usage and cost | **Rejected.** Requires an org Admin/Analytics API key; out of scope for a personal seat and out of scope for this app's no-credential boundary. |
 | OpenTelemetry self-export | Real per-invocation token/cost metrics as they happen | **Deferred candidate, not a quota read.** Requires the user to already run an OTLP collector and would report consumption as it happens, not "how much is left" — a materially different product than the Codex quota display. Worth a separate, narrower research pass if a self-hosted metrics pipeline is ever in scope. |
@@ -50,25 +50,30 @@ Carried forward unmodified from the OpenCode gate and `AGENTS.md`'s existing Usa
 Create a Claude adapter with real connection, refresh, or usage behavior — replacing `ClaudeCodePreviewSettingsView` — only after all of the following are answered with direct, isolated evidence, mirroring the OpenCode gate:
 
 1. Anthropic documents a way to read personal Pro/Max plan-limit state (percentage used, reset time) that does not consume tokens or reset credits, confirmed the same way UsageProbe confirms Codex's `account/rateLimits/read` is non-consuming.
-2. That source requires no admin/analytics API key, no `.credentials.json`/session-file read, and no conversation content.
+2. That source requires no admin/analytics API key and no `.credentials.json` read, and — if it is the field-scoped local JSONL reader rather than an official API — the implementation demonstrably never reads conversation content, per "Local usage-signal decision update" below.
 3. The product copy correctly scopes what the number means (Claude Code only vs. shared with Claude chat/Cowork) based on direct evidence for the plan type in use, not assumption.
 4. A single owner exists for the read cycle (mirroring `QuotaMonitor`'s ownership for Codex), with explicit teardown and no second polling source.
 5. If no zero-cost source exists, the fallback is an explicit, permanent "not available" state (as `ClaudeCodePreviewSettingsView` already shows) — not a best-effort estimate presented as a quota.
 
 Until gate criteria 1–2 are met, Claude Code remains a static preview: no connection controller, no refresh cycle, no notifications, no usage read of any kind.
 
-## Deferred follow-up — token-count-only JSONL reader
+## Local usage-signal decision update — 2026-07-20
 
-User direction on 2026-07-20: the full ccusage-style transcript reader stays rejected, but a narrower question is worth a separate research pass: could a reader be scoped tightly enough to `~/.claude/projects/**/*.jsonl` to be privacy-safe — extracting only `usage` token-count fields, model name, and timestamp per line, and provably never touching `message.content`, file paths beyond the immediate project-folder name, or any other field?
+User direction: since no zero-cost official API exists (per the gate above) and `/usage` is not confirmed free, local-JSONL parsing is accepted as the only currently viable usage signal — with exploration starting from the narrowest safe scope, not the full ccusage-style transcript reader:
 
-This is **not authorized by the current gate** and does not change the "Rejected as a quota source" decision above — token counts from local transcripts remain historical consumption, not a remaining allowance, no matter how narrowly they're read. A follow-up study should answer, before any code is written:
+- A reader may extract only `usage` token-count fields (`input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`), model name, and timestamp per JSONL line. It must not read, log, or retain `message.content`, tool inputs/outputs, or any field not needed for a token/cost total.
+- The credential/config prohibitions above are unchanged: `.credentials.json` and `settings.json` contents stay off-limits regardless of this update.
+- This remains historical consumption, not a remaining allowance or reset time — any UI built on it must label it as an estimate, as plainly as UsageProbe's "experimental" label does for Codex.
+- Explore the narrow field-scoped reader first; broaden scope only if it cannot produce a meaningful number.
+
+Before implementation code is written, the following need direct evidence, not assumption:
 
 1. Can the reader be implemented as a streaming line-by-line JSON field-picker that never materializes `message.content`, `message.role`-adjacent text, or tool inputs/outputs in memory, not merely one that discards them after parsing the full line?
-2. Does Claude Code's JSONL schema keep token-usage fields (`input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens`, model name, timestamp) structurally separate from message content in a way a field-picker can rely on across versions, or could a schema change silently pull content into the read path?
-3. What product claim would this support? It would still only be a historical/derived estimate, not a plan-limit percentage or reset time — the UI copy would need to say so as plainly as the existing Codex "experimental" labeling does.
-4. Does reading files that live inside `~/.claude/projects/<project-name>/...` — where the directory name is a working-directory-derived project identifier — cross the "no project/source paths" line even if file contents are field-filtered? This needs a direct answer, not an assumption.
+2. Does Claude Code's JSONL schema keep token-usage fields structurally separate from message content in a way a field-picker can rely on across versions, or could a schema change silently pull content into the read path? If so, what detects that drift before it ships?
+3. Does reading files that live inside `~/.claude/projects/<project-name>/...` — where the directory name is a working-directory-derived project identifier — need any additional handling of that identifier (e.g., excluding it from anything persisted or displayed) even though file contents are field-filtered?
+4. What single component owns this read cycle, mirroring `QuotaMonitor`'s ownership for Codex, and what is its teardown/refresh-cadence story?
 
-Resume only on explicit user direction; this section records the open question, not a plan.
+This unblocks design/prototyping of the field-scoped reader. It does not by itself authorize shipping a visible Claude usage UI or replacing `ClaudeCodePreviewSettingsView` — the full gate above (owner, product-copy accuracy, "not available" fallback) still applies before that.
 
 ## Sources
 
