@@ -34,7 +34,7 @@ Claude Code supports one `statusLine` command. Add or merge this into
 {
   "statusLine": {
     "type": "command",
-    "command": "cd /absolute/path/to/ClaudeUsageBridge && python3 -m claude_usage_bridge --quiet"
+    "command": "cd '/absolute/path/to/ClaudeUsageBridge' && python3 -m claude_usage_bridge --quiet"
   }
 }
 ```
