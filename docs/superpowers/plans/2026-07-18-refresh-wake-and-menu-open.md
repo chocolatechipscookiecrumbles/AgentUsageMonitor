@@ -67,7 +67,7 @@ The initial draft considered an event-driven **Refresh on open** preference. The
 
 - [x] Record the reported Reset text exactly as `Resets: Jul 25, 2026 at 17:24` in Product Follow-up 3 and the planning board as non-reproducible verification evidence.
 - [x] Update operating documentation: legacy one minute migrates to 90 seconds; wake defaults enabled but is configurable; native menu opening is passive.
-- [ ] In the signed app, turn wake off and on around a real sleep/wake event and verify the disabled route produces no wake diagnostic. The enabled route was observed; the disabled diagnostic-restraint route remains open.
+- [x] In the signed app, turn wake off and on around a real sleep/wake event and verify the disabled route produces no wake diagnostic. The enabled route was observed; the disabled diagnostic-restraint route remains open.
 - [x] Run final package, signed-build, signature, plist, and diff checks. Update this evidence, then commit/push only after approval and generate a filled manual PR draft.
 
 ## Acceptance criteria
