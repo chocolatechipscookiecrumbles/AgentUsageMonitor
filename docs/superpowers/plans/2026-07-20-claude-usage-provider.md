@@ -470,9 +470,10 @@ final class ClaudeOAuthUsageSourceTests: XCTestCase {
     }
 
     func testFetchMapsRealShapedResponseIntoNormalizedSnapshot() async throws {
+        let response = realShapedResponse
         let source = ClaudeOAuthUsageSource(
             credentialStore: credentialStore(),
-            requestExecutor: { _ in (Data(self.realShapedResponse.utf8), Self.httpResponse(status: 200)) }
+            requestExecutor: { _ in (Data(response.utf8), Self.httpResponse(status: 200)) }
         )
 
         let snapshot = try await source.fetch()
@@ -498,6 +499,8 @@ final class ClaudeOAuthUsageSourceTests: XCTestCase {
             XCTFail("expected an error")
         } catch let error as ClaudeOAuthError {
             XCTAssertEqual(error, .credentialsNotFound)
+        } catch {
+            XCTFail("unexpected error: \(error)")
         }
     }
 
@@ -512,6 +515,8 @@ final class ClaudeOAuthUsageSourceTests: XCTestCase {
             XCTFail("expected an error")
         } catch let error as ClaudeOAuthError {
             XCTAssertEqual(error, .insufficientScope)
+        } catch {
+            XCTFail("unexpected error: \(error)")
         }
     }
 
@@ -526,6 +531,8 @@ final class ClaudeOAuthUsageSourceTests: XCTestCase {
             XCTFail("expected an error")
         } catch let error as ClaudeOAuthError {
             XCTAssertEqual(error, .unauthorized)
+        } catch {
+            XCTFail("unexpected error: \(error)")
         }
     }
 
@@ -540,6 +547,8 @@ final class ClaudeOAuthUsageSourceTests: XCTestCase {
             XCTFail("expected an error")
         } catch let error as ClaudeOAuthError {
             XCTAssertEqual(error, .serverFailure(statusCode: 500))
+        } catch {
+            XCTFail("unexpected error: \(error)")
         }
     }
 
@@ -554,29 +563,36 @@ final class ClaudeOAuthUsageSourceTests: XCTestCase {
             XCTFail("expected an error")
         } catch let error as ClaudeOAuthError {
             XCTAssertEqual(error, .malformedResponse)
+        } catch {
+            XCTFail("unexpected error: \(error)")
         }
     }
 
     func testFetchSetsAuthorizationHeaderAndBetaHeaderWithoutLoggingToken() async throws {
-        var capturedRequest: URLRequest?
+        let response = realShapedResponse
+        let captured = CapturedRequestBox()
         let source = ClaudeOAuthUsageSource(
             credentialStore: credentialStore(),
             requestExecutor: { request in
-                capturedRequest = request
-                return (Data(self.realShapedResponse.utf8), Self.httpResponse(status: 200))
+                captured.request = request
+                return (Data(response.utf8), Self.httpResponse(status: 200))
             }
         )
 
         _ = try await source.fetch()
 
-        XCTAssertEqual(capturedRequest?.url?.absoluteString, "https://api.anthropic.com/api/oauth/usage")
-        XCTAssertEqual(capturedRequest?.value(forHTTPHeaderField: "Authorization"), "Bearer fixture-token")
-        XCTAssertEqual(capturedRequest?.value(forHTTPHeaderField: "anthropic-beta"), "oauth-2025-04-20")
+        XCTAssertEqual(captured.request?.url?.absoluteString, "https://api.anthropic.com/api/oauth/usage")
+        XCTAssertEqual(captured.request?.value(forHTTPHeaderField: "Authorization"), "Bearer fixture-token")
+        XCTAssertEqual(captured.request?.value(forHTTPHeaderField: "anthropic-beta"), "oauth-2025-04-20")
     }
 
     private static func httpResponse(status: Int) -> URLResponse {
         HTTPURLResponse(url: URL(string: "https://api.anthropic.com/api/oauth/usage")!, statusCode: status, httpVersion: nil, headerFields: nil)!
     }
+}
+
+private final class CapturedRequestBox: @unchecked Sendable {
+    var request: URLRequest?
 }
 
 private struct FakeCredentialStore: ClaudeCredentialProviding {
@@ -620,13 +636,16 @@ enum ClaudeOAuthDateParsing {
         withFractionalSeconds.date(from: string) ?? withoutFractionalSeconds.date(from: string)
     }
 
-    private static let withFractionalSeconds: ISO8601DateFormatter = {
+    // ISO8601DateFormatter isn't Sendable, but these instances are only ever
+    // read from after configuration (parsing is thread-safe in practice);
+    // nonisolated(unsafe) opts out of the compiler's conservative check.
+    private nonisolated(unsafe) static let withFractionalSeconds: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter
     }()
 
-    private static let withoutFractionalSeconds: ISO8601DateFormatter = {
+    private nonisolated(unsafe) static let withoutFractionalSeconds: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
         return formatter
