@@ -1,45 +1,89 @@
 # PR 1 — Claude usage provider
 
-**Branch:** `feature/claude-usage-provider` → `main`
-**Merge first** — PRs 2 and 3 both build on this.
+**Branch:** `feature/claude-usage-provider` → `main` · **Merge first** (PRs 2 and 3 build on it)
 
-## What this does
+## Summary
 
-Makes Claude Code a real, user-reachable usage provider instead of a static preview, and hardens the credential path it depends on.
+- Claude Code becomes a real, user-reachable usage provider instead of a static preview: live five-hour and weekly figures on its own Settings page, read through a four-tier source hierarchy.
+- Automatic refreshes can no longer raise a Keychain prompt, and the app signs with a stable identity so an "Always Allow" grant survives rebuilds.
+- The cache stops decaying: a degraded refresh can no longer overwrite a current reading with an older one.
 
-Claude usage now reads live through a four-tier hierarchy and is visible on its own Settings page, built on the same shared components as Codex.
+## Problem and root cause
 
-## Source hierarchy
+**Symptom 1 — Claude showed nothing.** `ClaudeCodePreviewSettingsView` was a static card; no usage was reachable by a user.
+**Cause:** `ClaudeUsageMonitor` polled `ClaudeRateLimitSnapshotReader` directly every 30s and bypassed `ClaudeUsageCollector` entirely, so the OAuth tier never ran in the app and two parallel representations of the same data coexisted.
 
-| Tier | Source | Status |
+**Symptom 2 — the Keychain prompt returned after every "Always Allow".**
+**Cause:** `Scripts/build-app.sh` signed ad-hoc. An ad-hoc signature has no certificate, so its designated requirement is pinned to the binary's cdhash, which changes on every build. Keychain ACL entries key off that requirement, so each rebuild presented as a different application.
+**Evidence:** `codesign -dv` reported `Signature=adhoc`, `TeamIdentifier=not set`.
+
+**Symptom 3 — the cache held day-old data.**
+**Cause:** `ClaudeUsageCollector` wrote whatever the fallback produced regardless of age, and ranked tier 3 above tier 4 unconditionally.
+**Evidence:** a cache written seconds earlier contained a 47-hour-old statusLine capture (`5h 5%`, no weekly), having clobbered a current OAuth read (`5h 44%`, `7d 28%`).
+
+## Scope and non-goals
+
+**Included:**
+- Tier 1 OAuth via Claude Code's Keychain credential; `KeychainPromptPolicy`; composite credential resolution with a visible degrade.
+- Tier 2 CLI `/usage` probe — **manual only**, behind consent.
+- Tier 3/4 freshness correctness.
+- `ClaudeAgentSettingsView` built on the shared `AgentQuotaSessionSection`; `ClaudeConnectionController` wired to real state.
+
+**Not included:**
+- Menu-bar Claude card (PR 3 plans it).
+- Browser sign-in via `claude setup-token` — implemented and unit-tested but **wired to nothing and shelved as unverified**; it must not be presented as working.
+- Self-run PKCE OAuth — deliberately dropped to avoid `client_id` impersonation.
+
+## Design and ownership
+
+`ClaudeUsageMonitor` is the single owner of the Claude read cycle, mirroring `QuotaMonitor` for Codex. It owns `ClaudeUsageCollector` and polls on a 12-minute network-appropriate cadence (the previous 30s file poll would now mean an API call every 30 seconds).
+
+Flow: `ClaudeUsageMonitor` → `ClaudeUsageCollector` → tier 1 `ClaudeOAuthUsageSource` (credential from `ClaudeCompositeCredentialStore`) → tier 3 `ClaudeRateLimitSnapshotReader` → tier 4 `ClaudeUsageCache`. Tier 2 sits outside this chain and is only invoked from the UI.
+
+**Recovery boundary:** every tier failure degrades to the next; exhausting all of them yields an explicit `.unavailable(reason:)` state, never a zeroed quota. `ClaudeRefreshReason` decides whether a Keychain read may prompt — only `.userInitiated` may.
+
+## Privacy, compatibility, and migration
+
+- No token is persisted outside the Keychain, logged, or placed in the cache. A test asserts the setup-token never appears in a thrown error's description; a manual check greps the cache files for `sk-ant-`.
+- Background reads pass `kSecUseAuthenticationUIFail`, so a scheduled refresh is structurally unable to prompt.
+- Reading Claude Code's credential remains an explicit, disclosed user action, not a default side effect.
+- **Migration:** none. The `.cli` case added to `ClaudeUsageSource` is additive; existing cache files decode unchanged.
+
+## Regression proof
+
+`ClaudeUsageCacheFreshnessTests.testOlderSnapshotDoesNotOverwriteNewerOne` recreates the observed failure: save a current OAuth snapshot, then a 47-hour-old statusLine one. **Before:** the stale snapshot won and the cache reported `5%`. **After:** the fresh OAuth read is retained.
+
+`ClaudeCollectorFreshnessTests.testStaleStatusLineLosesToFresherCache` covers the ordering half — a 47h capture no longer outranks a recent cached read — while `testFreshStatusLineStillWinsOverOlderCache` pins the normal case unchanged.
+
+`ClaudeUsageMonitorTests.testStopCancelsPolling` caught a cancellation bug: `start()` queued a task whose first action was the launch refresh with no cancellation check, so `stop()` immediately after could not prevent that read.
+
+## Verification
+
+| Check | State | Result |
 |---|---|---|
-| 1 | **OAuth** — via Claude Code credentials (Keychain) | live, working |
-| 2 | **CLI `/usage` probe** | built, **manual only** — costs tokens |
-| 3 | statusLine passive capture | live |
-| 4 | cached last-known-good | live |
+| `swift test` | Run | 168 passed, 0 failures (44 baseline → 168) |
+| Debug app launch | Run | Launches, no crash |
+| Tier 1 live read | Observed | `plan pro · 5h 44% · 7d 28% · delivery live/oauth · via claudeCodeCredentials` |
+| Tier 3/4 degrade | Observed | Invalid token → `tier 1 unavailable: unauthorized`, delivery falls to `passiveSnapshot` |
+| Cache holds no secrets | Run | `grep 'sk-ant-'` over Application Support JSON → no match |
+| Signed `.app` build | Run | `TeamIdentifier=<APPLE_TEAM_ID>` (was `not set`) |
+| **Signed-app visual acceptance** | **Not run** | Settings page never opened by a human |
+| **Tier 2 against real CLI output** | **Not run** | Costs tokens; parser tested on synthetic fixtures only |
 
-Verified live against a Pro account: `plan pro · 5h 44% · 7d 28% · delivery live/oauth`.
+## Risks, rollback, and limitations
 
-## Notable decisions
+**Risk:** the tier-2 parser targets `/usage` panel wording that is not a documented contract. If it drifts, the probe reports "the CLI ran but its usage output could not be read" — it fails closed and never fabricates a figure.
 
-**Tier 2 is deliberately not automatic.** Anthropic documents that `/usage` consumes tokens (~$0.04/session). Putting it in the scheduled fallback order would spend quota to measure quota, precisely when OAuth is already failing. It sits behind a button with the cost stated in a footnote and a first-use confirmation prompt; consent defaults to false.
+**Rollback:** revert the branch. No schema or file-format migration to unwind; the cache regenerates on the next refresh.
 
-**Background refreshes can no longer raise a Keychain prompt.** `KeychainPromptPolicy` maps every automatic reason to `.never`, which sets `kSecUseAuthenticationUIFail`; only `.userInitiated` may prompt. A denied read degrades to the next tier instead of erroring.
+**Known limitations / unrun checks:**
+- No human click-through of the Settings UI — button states, disconnect, and failure copy are test-covered but visually unverified.
+- Tier-2 output parsing unverified against a real run.
+- Running `.build/debug/CodexUsageMonitor` directly still prompts on every rebuild; only the signed `.app` carries a stable identity.
+- The live cache is already corrupted from before the fix and self-heals on the next successful OAuth read.
 
-**Browser sign-in (`claude setup-token`) is shelved as unverified, not shipped.** A live attempt returned 401, but the control endpoint also 401'd, so the result proves nothing either way. It is implemented and unit-tested but wired to nothing, and must not be presented as working. See the [spike findings addendum](docs/superpowers/plans/2026-07-21-claude-oauth-web-login-spike-findings.md).
+## Documentation and review focus
 
-## Bugs found and fixed
+Plans: `2026-07-21-claude-oauth-web-login-provider.md`, `2026-07-21-claude-usage-provider-wiring.md`, and the spike-findings addendum. Operating doc: `docs/claude-usage-verification.md`. Gate updated: `2026-07-20-claude-code-capability-research.md`.
 
-- **The cache decayed instead of preserving the best reading.** A degraded refresh overwrote a current OAuth read (5h 44%) with a 47-hour-old statusLine capture (5h 5%). `save` now refuses to replace newer data with older, and the collector ranks tier 3 vs 4 by capture time rather than assuming statusLine is fresher.
-- **`start()` could not be cancelled.** The launch refresh ran even when `stop()` was called immediately after.
-- **The app signed ad-hoc**, so its designated requirement was pinned to a cdhash that changed every build — silently invalidating "Always Allow" each rebuild. Now signs with the Developer ID identity.
-- **`~/.local/bin/claude` was not a locator candidate**, and a GUI `.app` does not inherit the login shell's `PATH`.
-
-## Testing
-
-168 tests (44 baseline → 168). App verified to launch. Manual verification guide: [docs/claude-usage-verification.md](docs/claude-usage-verification.md).
-
-## Not done
-
-- The Settings UI has had no human click-through — button states, disconnect, and failure copy are covered by tests but unexercised by hand.
-- The tier-2 parser is tested against synthetic fixtures; its real `/usage` output format is **unverified**, since confirming it costs tokens.
+**Riskiest decision to review:** making tier 2 manual-and-consented rather than an automatic tier. Anthropic documents `/usage` as consuming tokens, so an automatic fallback would spend quota to measure quota precisely when OAuth is already failing. The alternative is an automatic tier with a recurring cost.

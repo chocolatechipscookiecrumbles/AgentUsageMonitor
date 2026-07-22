@@ -1,33 +1,65 @@
 # PR 3 — Menu bar popover: design preservation and port plan
 
-**Branch:** `feature/menu-bar-popover-update` → `main`
-**Merge after:** PR 1. Docs only — no production code changes.
+**Branch:** `feature/menu-bar-popover-update` → `main` · **Merge after PR 1** · **Docs only — no production code**
 
-## What this does
+## Summary
 
-Preserves the v6 Figma menu bar design and plans its port. **No behavior changes** — the menu is untouched.
+- Preserves the v6 Figma menu bar design in the repo; it was untracked and existed on one machine only.
+- Records the directed layout revision and plans the SwiftUI port.
+- No behaviour changes — the menu bar is untouched.
 
-## Why it matters now
+## Problem and root cause
 
-The Figma export folder was **untracked in git**. It existed on one machine only; a fresh clone or an errant delete would have lost it. `docs/design/menu-bar-popover/` is now the durable copy: the 473-line source verbatim, the three provider marks, and a `SPEC.md` extracting tokens and structure so the design is usable **without running the React app**.
+**Symptom — the design existed nowhere durable.** `High-fidelity macOS menu UI v6 agent view update/` is **untracked in git** (not ignored — never added). A fresh clone, a reset, or an errant delete would have lost the only copy.
+**Cause:** the export was dropped into the working tree as a scratch reference and never brought under version control.
 
-## Layout revision recorded
+**Second problem — the menu is single-provider.** `QuotaMenuView` renders Codex content directly with no notion of a provider, and the menu bar label shows one number. With Claude live (PR 1), there is no surface for it.
 
-Directed revision of the export: removes the header "Refresh Now" pill (duplicate — the action stays in the bottom menu), the entire primary quota card, and the entire freshness metadata card; moves the status pill into the header's right slot; replaces the generic gradient glyph with the active provider's own mark.
+## Scope and non-goals
 
-Three consequences are recorded as an unresolved gate rather than glossed: the plan name loses its only home, the at-a-glance "lowest remaining" figure disappears, and provenance is no longer shown — which matters for Claude, where OAuth / statusLine / cache differ in freshness and authority.
+**Included:**
+- `docs/design/menu-bar-popover/reference/` — the 473-line `MenuBarDropdown.tsx` verbatim plus the three provider marks.
+- `SPEC.md` — tokens, structure, states, and six issues not to port verbatim.
+- `2026-07-22-menu-bar-popover-figma-port.md` — the port plan, superseding the earlier multi-provider plan.
 
-## Defects flagged — do not port verbatim
+**Not included:**
+- Any implementation. `MenuBarExtra` still uses the default `.menu` style.
+- Desktop widget and watch complication, also present in the export.
 
-1. **The "% used" figure is wrong.** `WindowCard` renders `{remaining}% used` alongside `Remaining {remaining}%`, so 61% used displays as "39% used" while the bar fills to the other value. Survives the revision unfixed.
-2. A `copilot` tab whose capability gate has not passed.
-3. Codex-only branding and credits shown on every tab.
-4. No sign-in state anywhere in the design.
+## Design and ownership
 
-## The blocker the plan opens with
+`docs/design/menu-bar-popover/SPEC.md` is the authoritative target; `reference/MenuBarDropdown.tsx` holds the original export. **Where they disagree, SPEC §3 wins** — the export contains the pre-revision layout.
 
-`MenuBarExtra`'s default `.menu` style **cannot** render this design — `.window` is required, and that loses native dismissal, keyboard traversal, and standard metrics. The plan opens with a spike gate on exactly that, because a popover that will not close is worse than the plain menu we have.
+The revision removes the header "Refresh Now" pill (duplicate; the action remains in the bottom menu), the entire primary quota card, and the entire freshness metadata card; moves the status pill to the header's right slot; and replaces the generic gradient glyph with the active provider's own mark.
 
-## Testing
+## Privacy, compatibility, and migration
 
-168 tests green (unchanged — docs only).
+Not applicable — documentation and design assets only. The added SVGs are UI marks with no data implications.
+
+## Regression proof
+
+Not applicable — no behaviour changes. The 168-test suite is unchanged from PR 1 and confirms nothing regressed.
+
+## Verification
+
+| Check | State | Result |
+|---|---|---|
+| `swift test` | Run | 168 passed, 0 failures (unchanged from PR 1) |
+| Design assets present on branch | Run | `SPEC.md`, `MenuBarDropdown.tsx`, 3 SVGs |
+| **Visual acceptance** | **Not applicable** | No UI changes in this PR |
+
+## Risks, rollback, and limitations
+
+**Risk:** low — no shipped behaviour changes. The forward risk is in the *plan*: `MenuBarExtra`'s default `.menu` style cannot render this design, so the port requires `.window`, which loses native dismissal, keyboard traversal, and standard metrics. The plan opens with a spike gate on exactly that, because a popover that will not close is worse than the current menu.
+
+**Rollback:** revert the branch; only documentation disappears.
+
+**Known limitations / unrun checks:**
+- Three decisions remain open in the plan (Task 5a): where the plan name goes, whether the at-a-glance figure is missed, and where provenance lives now that the metadata card is removed. The last matters for Claude, where OAuth / statusLine / cache differ in freshness and authority.
+- The export's **"% used" figure is wrong** and survives the revision unfixed: `WindowCard` renders `{remaining}% used` alongside `Remaining {remaining}%`, so 61% used displays as "39% used" while the bar fills to the other value. Recorded in SPEC §5.1 as do-not-port.
+
+## Documentation and review focus
+
+Adds `docs/design/menu-bar-popover/` and `2026-07-22-menu-bar-popover-figma-port.md`; marks `2026-07-22-multiprovider-menubar-popover.md` superseded.
+
+**Riskiest decision to review:** treating `docs/design/menu-bar-popover/` as the source of truth rather than the untracked Figma folder. If the design is re-exported, the SPEC must be updated deliberately — it will not follow automatically.

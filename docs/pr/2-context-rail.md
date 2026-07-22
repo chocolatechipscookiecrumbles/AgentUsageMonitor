@@ -1,38 +1,76 @@
 # PR 2 — Multi-provider context rail
 
-**Branch:** `feature/context-rail` → `main`
-**Merge after:** PR 1 (`feature/claude-usage-provider`) — this builds on it.
+**Branch:** `feature/context-rail` → `main` · **Merge after PR 1** (builds on it)
 
-## What this does
+## Summary
 
-Turns the Settings context rail from one card describing the *selected* agent into **one status block per active provider**, showing the numbers the rail is actually opened for.
+- The Settings context rail shows one status block per active provider instead of one card describing the selected agent.
+- Each block shows the numbers the rail is actually opened for: plan, five-hour, weekly, connected status, and last refresh — with the provider named beside its icon.
+- Removes a false privacy claim from shipped UI.
 
-| Row | Before | After |
+## Problem and root cause
+
+**Symptom 1 — the rail carried little useful information.** It showed a `Current` row restating the page you were already on, and a `Quota status` row reporting refresh *mode* rather than whether the provider was connected. Neither answers "how close am I to a limit."
+**Cause:** the rail was written when Codex was the only provider, so it described the selection rather than comparing providers.
+
+**Symptom 2 — the Claude rail card asserted this app "does not read its files, credentials, usage, or account data."**
+**Cause:** that copy was written while Claude was a static preview and was never revisited when Claude went live in PR 1. It is a false statement about data handling, not merely stale wording.
+
+## Scope and non-goals
+
+**Included:**
+- `ProviderContextSummary` plus pure Codex and Claude adapters.
+- `ProviderContextCard`, and `AgentConnectionsContextView` as a `ForEach` over active providers.
+- `RelativeTimeText`, extracted so both providers render "last refresh" identically.
+- Deletion of the Claude preview card and its privacy copy.
+
+**Not included:**
+- GitHub Copilot block — its capability gate has not passed.
+- Any refresh action in the rail; it stays read-only.
+- Live-ticking relative times — computed at render, not on a timer.
+
+## Design and ownership
+
+`ProviderContextSummary` is the single provider-neutral value type the rail renders; the view has no per-provider branching and no formatting logic. Two static adapters build it — Codex from `AgentConnectionState` + `QuotaPresentation` + `lastConfirmedAt`, Claude from `ClaudeConnectionState` + `ClaudeUsageDisplayModel` (reused, not re-derived).
+
+`SettingsPreviewView` owns assembly, reading published state already on `QuotaViewModel`. `ProviderContextSummary.activeProviders(claudeIsUsable:)` is the single place deciding which providers appear.
+
+**Recovery boundary:** an absent value renders `Unavailable` and a disconnected provider reads `Disconnected`. No path produces `0%`.
+
+## Privacy, compatibility, and migration
+
+- Removes an inaccurate privacy assertion; adds none. The rail renders only already-sanitized presentation values and touches no credential.
+- **Migration:** none. No stored state added or changed.
+
+## Regression proof
+
+`ProviderContextSummaryTests.testCodexDisconnectedNeverShowsZeroPercent` and `testClaudeUnavailableNeverShowsZeroPercent` assert explicitly that a missing window is the placeholder and `XCTAssertNotEqual(..., "0%")` — the rail is the easiest surface in the app to invent a quota, and this is the guard against it.
+
+`testCodexWithoutAConfirmedRefreshShowsUnavailable` encodes the decision that only a *successful* timestamp counts: a provider whose refreshes are failing must not read as recently refreshed.
+
+`testBothProvidersShareTheSameRelativeWording` pins Codex and Claude to identical output, so the two cannot drift once someone edits one.
+
+## Verification
+
+| Check | State | Result |
 |---|---|---|
-| header | icon + state | icon **+ provider name** ("Codex" / "Claude") |
-| `Current` | "OpenAI Codex" | **removed** — restated the page you were already on |
-| Plan | ✓ | unchanged |
-| Five-hour | — | **added** |
-| Weekly | — | **added** |
-| `Quota status` | refresh mode | **repurposed** → `Connected` / `Disconnected` |
-| Last refresh | — | **added** |
+| `swift test` | Run | 178 passed, 0 failures |
+| Debug app launch | Run | Launches, no crash |
+| **Signed-app visual acceptance** | **Not run** | Rail never viewed rendered |
+| **Two stacked cards at `contextRailWidth`** | **Not run** | Spacing/scroll behaviour unverified |
 
-## Correctness fix, not just a redesign
+## Risks, rollback, and limitations
 
-The Claude branch still rendered a **"Preview / Not available yet"** card asserting this app *"does not read its files, credentials, usage, or account data."* That stopped being true when Claude went live — a false privacy claim in shipped UI. It is deleted.
+**Risk:** the rail now renders two cards where it rendered one, at a fixed width inside an existing `ScrollView`. Layout crowding is plausible and unverified.
 
-## Decisions
+**Rollback:** revert the branch; the previous single-card rail returns. No stored state to unwind.
 
-- **All active providers, always** — the rail no longer tracks the selected agent; it is an at-a-glance comparison. Copilot stays absent until its capability gate passes.
-- **"Last refresh" is the last *successful* data timestamp** — Codex's `lastConfirmedAt`, not `lastAttemptAt`. Showing the attempt would describe a provider whose refreshes are failing as recently refreshed.
-- **Absent values render "Unavailable"**, disconnected reads "Disconnected". A test asserts neither ever becomes `0%` — the rail is the easiest place in the app to invent a quota.
+**Known limitations / unrun checks:**
+- Not viewed rendered — the main gap.
+- Relative times do not tick; "8 minutes ago" is correct at render and then ages silently until the next redraw.
 
-Both providers share one `RelativeTimeText` formatter (extracted from `ClaudeUsageDisplayModel`) with a test pinning their output equal, so wording cannot drift.
+## Documentation and review focus
 
-## Testing
+Plan: `docs/superpowers/plans/2026-07-22-multi-provider-context-rail.md`, whose Task 1 records the four settled decisions.
 
-178 tests, all green. App verified to launch.
-
-## Not done
-
-The rail has not been viewed rendered — two stacked cards at the fixed `contextRailWidth` may need spacing attention.
+**Riskiest decision to review:** using the last *successful* timestamp rather than the last attempt. It is the honest choice, but it means a provider that has been failing for hours shows an old "last refresh" with a `Connected` status — the alternative wording would be more alarming but arguably clearer.
