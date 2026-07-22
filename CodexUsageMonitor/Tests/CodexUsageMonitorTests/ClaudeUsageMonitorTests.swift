@@ -1,82 +1,145 @@
 import XCTest
 @testable import CodexUsageMonitor
 
-final class ClaudeUsageMonitorTests: XCTestCase {
-    private var tempDirectory: URL!
-    private var fileURL: URL!
+/// Stands in for ClaudeUsageCollector so the monitor can be driven without
+/// touching the Keychain, the network, or the filesystem.
+private final class FakeCollector: ClaudeUsageCollecting, @unchecked Sendable {
+    private let lock = NSLock()
+    private var result: ClaudeUsagePresentation
+    private var reasons: [ClaudeRefreshReason] = []
 
-    override func setUpWithError() throws {
-        tempDirectory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("ClaudeUsageMonitorTests-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
-        fileURL = tempDirectory.appendingPathComponent("claude-rate-limits.json")
+    init(_ result: ClaudeUsagePresentation) {
+        self.result = result
     }
 
-    override func tearDownWithError() throws {
-        try? FileManager.default.removeItem(at: tempDirectory)
-    }
+    var seenReasons: [ClaudeRefreshReason] { lock.withLock { reasons } }
 
-    @MainActor
-    func testStateIsNotAvailableBeforeAnySnapshotExists() {
-        let monitor = ClaudeUsageMonitor(reader: ClaudeRateLimitSnapshotReader(fileURL: fileURL))
-
-        monitor.refreshNow()
-
-        XCTAssertEqual(monitor.state, .notAvailable)
-    }
-
-    @MainActor
-    func testStateBecomesAvailableAfterSnapshotWritten() throws {
-        let monitor = ClaudeUsageMonitor(reader: ClaudeRateLimitSnapshotReader(fileURL: fileURL))
-        let json = """
-        {"schemaVersion": 1, "capturedAt": 1700000000, "fiveHour": {"usedPercentage": 5.0, "resetsAt": 1800000000}}
-        """
-        try Data(json.utf8).write(to: fileURL)
-
-        monitor.refreshNow()
-
-        guard case .available(let snapshot) = monitor.state else {
-            return XCTFail("Expected .available")
+    func refresh(reason: ClaudeRefreshReason) async -> ClaudeUsagePresentation {
+        lock.withLock {
+            reasons.append(reason)
+            return result
         }
-        XCTAssertEqual(snapshot.fiveHour?.usedPercentage, 5.0)
+    }
+}
+
+private func presentation(
+    delivery: ClaudeUsageDelivery,
+    source: ClaudeUsageSource = .oauth,
+    fiveHour: Double? = 10,
+    warnings: [String] = []
+) -> ClaudeUsagePresentation {
+    ClaudeUsagePresentation(
+        snapshot: ClaudeUsageSnapshot(
+            planHint: "pro",
+            fiveHour: fiveHour.map { ClaudeLimitWindow(usedPercent: $0, resetsAt: nil) },
+            sevenDay: nil,
+            scopedWindows: [],
+            extraUsage: nil,
+            source: source,
+            capturedAt: .now,
+            schemaVersion: 1
+        ),
+        delivery: delivery,
+        warnings: warnings
+    )
+}
+
+@MainActor
+final class ClaudeUsageMonitorTests: XCTestCase {
+    func testRefreshPublishesLivePresentationFromCollector() async {
+        let collector = FakeCollector(presentation(delivery: .live))
+        let monitor = ClaudeUsageMonitor(collector: collector)
+
+        await monitor.refreshNow(reason: .userInitiated)
+
+        guard case .available(let published) = monitor.state else {
+            return XCTFail("expected .available")
+        }
+        XCTAssertEqual(published.delivery, .live)
+        XCTAssertEqual(published.snapshot.source, .oauth)
+        XCTAssertEqual(published.snapshot.fiveHour?.usedPercent, 10)
     }
 
-    @MainActor
-    func testStateReturnsToNotAvailableIfSnapshotDisappears() throws {
-        let monitor = ClaudeUsageMonitor(reader: ClaudeRateLimitSnapshotReader(fileURL: fileURL))
-        try Data("""
-        {"schemaVersion": 1, "capturedAt": 1700000000, "fiveHour": {"usedPercentage": 5.0, "resetsAt": 1800000000}}
-        """.utf8).write(to: fileURL)
-        monitor.refreshNow()
-        XCTAssertNotEqual(monitor.state, .notAvailable)
+    func testDeliveryIsPreservedSeparatelyFromSource() async {
+        let collector = FakeCollector(presentation(delivery: .cached, source: .statusLine))
+        let monitor = ClaudeUsageMonitor(collector: collector)
 
-        try FileManager.default.removeItem(at: fileURL)
-        monitor.refreshNow()
+        await monitor.refreshNow(reason: .scheduled)
 
-        XCTAssertEqual(monitor.state, .notAvailable)
+        guard case .available(let published) = monitor.state else {
+            return XCTFail("expected .available")
+        }
+        XCTAssertEqual(published.delivery, .cached, "cached delivery must not be reported as live")
+        XCTAssertEqual(published.snapshot.source, .statusLine, "origin is independent of freshness")
     }
 
-    @MainActor
-    func testStartReadsImmediatelyWithoutWaitingForFirstTick() {
-        let monitor = ClaudeUsageMonitor(reader: ClaudeRateLimitSnapshotReader(fileURL: fileURL), pollInterval: .seconds(300))
+    /// Gate criterion #5: no usable source must be an explicit unavailable
+    /// state, never a zeroed snapshot presented as a quota.
+    func testNoUsableSourcePublishesUnavailable() async {
+        let empty = ClaudeUsagePresentation(
+            snapshot: ClaudeUsageSnapshot(
+                planHint: nil, fiveHour: nil, sevenDay: nil, scopedWindows: [], extraUsage: nil,
+                source: .oauth, capturedAt: .now, schemaVersion: 1
+            ),
+            delivery: .cached,
+            warnings: ["No Claude usage source is currently available."]
+        )
+        let monitor = ClaudeUsageMonitor(collector: FakeCollector(empty))
+
+        await monitor.refreshNow(reason: .scheduled)
+
+        guard case .unavailable(let reason) = monitor.state else {
+            return XCTFail("expected .unavailable, got \(monitor.state)")
+        }
+        XCTAssertEqual(reason, "No Claude usage source is currently available.")
+    }
+
+    func testUserInitiatedRefreshPassesUserInitiatedReason() async {
+        let collector = FakeCollector(presentation(delivery: .live))
+        let monitor = ClaudeUsageMonitor(collector: collector)
+
+        await monitor.refreshNow(reason: .userInitiated)
+
+        XCTAssertEqual(collector.seenReasons, [.userInitiated])
+    }
+
+    func testMenuOpenedRefreshPassesMenuOpenedReason() async {
+        let collector = FakeCollector(presentation(delivery: .live))
+        let monitor = ClaudeUsageMonitor(collector: collector)
+
+        await monitor.refreshNow(reason: .menuOpened)
+
+        XCTAssertEqual(collector.seenReasons, [.menuOpened])
+    }
+
+    func testStartRefreshesImmediatelyWithAppLaunchReason() async {
+        let collector = FakeCollector(presentation(delivery: .live))
+        let monitor = ClaudeUsageMonitor(collector: collector, pollInterval: .seconds(600))
 
         monitor.start()
-
-        XCTAssertEqual(monitor.state, .notAvailable)
+        for _ in 0..<500 where collector.seenReasons.isEmpty {
+            await Task.yield()
+        }
         monitor.stop()
+
+        XCTAssertEqual(collector.seenReasons.first, .appLaunch, "app launch must not wait a full interval")
     }
 
-    @MainActor
-    func testStopPreventsFurtherPolling() async throws {
-        let monitor = ClaudeUsageMonitor(reader: ClaudeRateLimitSnapshotReader(fileURL: fileURL), pollInterval: .milliseconds(20))
+    func testStopCancelsPolling() async throws {
+        let collector = FakeCollector(presentation(delivery: .live))
+        let monitor = ClaudeUsageMonitor(collector: collector, pollInterval: .milliseconds(20))
+
         monitor.start()
         monitor.stop()
-        try Data("""
-        {"schemaVersion": 1, "capturedAt": 1700000000, "fiveHour": {"usedPercentage": 5.0, "resetsAt": 1800000000}}
-        """.utf8).write(to: fileURL)
+        let countAfterStop = collector.seenReasons.count
+        try await Task.sleep(for: .milliseconds(120))
 
-        try await Task.sleep(for: .milliseconds(100))
+        XCTAssertEqual(collector.seenReasons.count, countAfterStop, "no polling after stop")
+    }
 
-        XCTAssertEqual(monitor.state, .notAvailable)
+    /// The cadence is network-appropriate now that a refresh can reach OAuth —
+    /// the previous 30s local-file poll would mean an API call every 30s.
+    func testDefaultPollIntervalIsNetworkAppropriate() {
+        XCTAssertGreaterThanOrEqual(ClaudeUsageMonitor.defaultPollInterval, .seconds(600))
     }
 }

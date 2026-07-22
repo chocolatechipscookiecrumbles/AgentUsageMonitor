@@ -21,7 +21,12 @@ struct AgentsSettingsView: View {
                     checkConnection: viewModel.checkCodexConnection
                 )
             case .claudeCode:
-                ClaudeCodePreviewSettingsView()
+                ClaudeUsageStatusView(
+                    state: viewModel.claudeState,
+                    signInMethod: .claudeCodeCredentials,
+                    refresh: viewModel.refreshClaude,
+                    useClaudeCodeCredentials: viewModel.refreshClaude
+                )
             case .githubCopilot:
                 EmptyView()
             }

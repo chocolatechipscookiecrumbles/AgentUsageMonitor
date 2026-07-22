@@ -1,15 +1,36 @@
 import Foundation
 
+/// Seam so the monitor can be driven by a fake in tests without reaching the
+/// Keychain, the network, or the filesystem.
+protocol ClaudeUsageCollecting: Sendable {
+    func refresh(reason: ClaudeRefreshReason) async -> ClaudeUsagePresentation
+}
+
+extension ClaudeUsageCollector: ClaudeUsageCollecting {}
+
 @MainActor
 final class ClaudeUsageMonitor: ObservableObject {
-    @Published private(set) var state: ClaudeUsageState = .notAvailable
+    /// Network-appropriate: a refresh can now reach the OAuth endpoint, so the
+    /// old 30s local-file cadence would mean an API call every 30 seconds.
+    /// The collector's own fallback order handles the cheap statusLine/cache
+    /// paths within each refresh, so this only paces the expensive one.
+    static let defaultPollInterval: Duration = .seconds(12 * 60)
 
-    private let reader: ClaudeRateLimitSnapshotReader
+    @Published private(set) var state: ClaudeUsageState = .unavailable(reason: ClaudeUsageState.notConnectedReason)
+
+    private let collector: ClaudeUsageCollecting
     private let pollInterval: Duration
     private var pollTask: Task<Void, Never>?
 
-    init(reader: ClaudeRateLimitSnapshotReader = ClaudeRateLimitSnapshotReader(), pollInterval: Duration = .seconds(30)) {
-        self.reader = reader
+    init(
+        collector: ClaudeUsageCollecting = ClaudeUsageCollector(
+            oauthSource: ClaudeOAuthUsageSource(credentialStore: ClaudeCompositeCredentialStore()),
+            statusLineReader: ClaudeRateLimitSnapshotReader(),
+            cache: ClaudeUsageCache()
+        ),
+        pollInterval: Duration = ClaudeUsageMonitor.defaultPollInterval
+    ) {
+        self.collector = collector
         self.pollInterval = pollInterval
     }
 
@@ -17,19 +38,20 @@ final class ClaudeUsageMonitor: ObservableObject {
         pollTask?.cancel()
     }
 
-    /// Starts polling. Reads once immediately so callers see a state without
-    /// waiting a full interval, then re-reads on the configured cadence.
-    /// Polling only re-reads a small local file — unlike Codex's network
-    /// refresh, this carries no cost or rate-limit concern at any interval.
+    /// Refreshes once immediately so callers see a state without waiting a
+    /// full interval, then re-refreshes on the configured cadence.
     func start() {
         guard pollTask == nil else { return }
-        refreshNow()
         pollTask = Task { [weak self] in
             guard let self else { return }
+            // Checked before the launch refresh too: stopping immediately
+            // after starting must prevent the read, not just later polls.
+            guard !Task.isCancelled else { return }
+            await refreshNow(reason: .appLaunch)
             while !Task.isCancelled {
                 try? await Task.sleep(for: self.pollInterval)
                 guard !Task.isCancelled else { return }
-                await self.refreshNow()
+                await self.refreshNow(reason: .scheduled)
             }
         }
     }
@@ -39,11 +61,23 @@ final class ClaudeUsageMonitor: ObservableObject {
         pollTask = nil
     }
 
-    func refreshNow() {
-        if let snapshot = reader.readSnapshot() {
-            state = .available(snapshot)
-        } else {
-            state = .notAvailable
+    /// The reason is load-bearing: it decides whether the Keychain read is
+    /// allowed to prompt (only `.userInitiated` is).
+    func refreshNow(reason: ClaudeRefreshReason) async {
+        let presentation = await collector.refresh(reason: reason)
+        state = Self.mapState(presentation)
+    }
+
+    /// A presentation with no windows at all is the collector's "no usable
+    /// source" case — it must surface as an explicit unavailable state, never
+    /// as a zeroed quota (capability gate criterion #5).
+    private static func mapState(_ presentation: ClaudeUsagePresentation) -> ClaudeUsageState {
+        let hasData = presentation.snapshot.fiveHour != nil
+            || presentation.snapshot.sevenDay != nil
+            || !presentation.snapshot.scopedWindows.isEmpty
+        guard hasData else {
+            return .unavailable(reason: presentation.warnings.first ?? ClaudeUsageState.notConnectedReason)
         }
+        return .available(presentation)
     }
 }

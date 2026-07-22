@@ -18,9 +18,12 @@ final class QuotaViewModel: ObservableObject {
     @Published private(set) var refreshScheduleReason: RefreshScheduleReason?
     @Published private(set) var connectionState: AgentConnectionState = .checking
     @Published private(set) var refreshTimingPresentation: MenuRefreshTimingPresentation
+    /// Claude's read cycle, owned here the same way Codex's QuotaMonitor is.
+    @Published private(set) var claudeState: ClaudeUsageState = .unavailable(reason: ClaudeUsageState.notConnectedReason)
 
     let settings: AppSettings
     private let monitor: QuotaMonitor
+    private let claudeMonitor: ClaudeUsageMonitor
     private let connectionController: CodexConnectionController
     private var subscriptions: Set<AnyCancellable> = []
 
@@ -33,6 +36,8 @@ final class QuotaViewModel: ObservableObject {
             monitor.refresh(reason: .authentication)
         }
         self.connectionController = connectionController
+        let claudeMonitor = ClaudeUsageMonitor()
+        self.claudeMonitor = claudeMonitor
         displayState = monitor.displayState
         refreshTimingPresentation = MenuRefreshTimingPresentation(
             lastRefreshAt: monitor.displayState.lastAttemptAt,
@@ -73,6 +78,9 @@ final class QuotaViewModel: ObservableObject {
         connectionController.$state.removeDuplicates().sink { [weak self] state in
             self?.connectionState = state
         }.store(in: &subscriptions)
+        claudeMonitor.$state.sink { [weak self] state in
+            self?.claudeState = state
+        }.store(in: &subscriptions)
         if !CommandLine.arguments.contains("--live-read-once")
             && !CommandLine.arguments.contains(ClaudeUsageProbeCommand.flag) {
             start()
@@ -90,6 +98,7 @@ final class QuotaViewModel: ObservableObject {
     func start() {
         connectionController.start()
         monitor.start()
+        claudeMonitor.start()
         Task { [weak self] in
             guard let self else { return }
             _ = await monitor.refreshNotificationAuthorization()
@@ -136,5 +145,24 @@ final class QuotaViewModel: ObservableObject {
         if newPresentation != refreshTimingPresentation {
             refreshTimingPresentation = newPresentation
         }
+    }
+
+    /// User-initiated: this is the only path allowed to raise a Keychain
+    /// prompt, so it must never be called from a background trigger.
+    func refreshClaude() {
+        Task { [claudeMonitor] in
+            await claudeMonitor.refreshNow(reason: .userInitiated)
+        }
+    }
+
+    /// Menu-open refresh — reads with interaction forbidden.
+    func refreshClaudeOnMenuOpen() {
+        Task { [claudeMonitor] in
+            await claudeMonitor.refreshNow(reason: .menuOpened)
+        }
+    }
+
+    func stopClaude() {
+        claudeMonitor.stop()
     }
 }
