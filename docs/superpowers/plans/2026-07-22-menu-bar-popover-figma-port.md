@@ -6,6 +6,16 @@
 
 **Supersedes** [2026-07-22-multiprovider-menubar-popover.md](2026-07-22-multiprovider-menubar-popover.md). That plan was written before the Figma export was reviewed and independently proposed a provider tab strip; the design already specifies one, so this plan absorbs it. The earlier plan's two hard findings still hold and are carried forward below.
 
+## Layout revision (2026-07-22)
+
+The exported layout was revised before porting — see [SPEC §6](../../design/menu-bar-popover/SPEC.md#6-revision--2026-07-22-supersedes-the-raw-v6-export). Summary:
+
+- **Removed:** the header "Refresh Now" pill (duplicate — the action stays in the bottom menu), the **entire primary quota card** (plan name, "Lowest remaining", the 64pt ring), and the **entire freshness metadata card** (Collected/Source/Confirmation/Collector).
+- **Moved:** the status pill from inside the primary card to the **header's right slot**.
+- **Changed:** the header icon from a generic gradient glyph to the **active provider's own mark** (assets already in `reference/`).
+
+Net effect: a shorter popover that is tabs → header (icon, title, pill) → window cards → credits (Codex only) → action menu. Port against SPEC §3, not against `reference/MenuBarDropdown.tsx`.
+
 ## Where this sits (state as of 2026-07-22)
 
 - **Current menu is 168 lines of plain rows** across [QuotaMenuView.swift](../../../CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/QuotaMenuView.swift) (31), [ConnectedQuotaMenuView.swift](../../../CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/ConnectedQuotaMenuView.swift) (66) and [CodexDisconnectedMenuView.swift](../../../CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/CodexDisconnectedMenuView.swift) (71). It is Codex-only and has no provider concept.
@@ -32,10 +42,10 @@ From [SPEC.md §5](../../design/menu-bar-popover/SPEC.md):
 
 - **`MenuPopoverTheme`** — the tokens from SPEC §1–2 as a single Swift type (surfaces, radii, shadows, semantic colors, the ≤10/≤25 threshold rule) so no view hardcodes a hex.
 - **`MenuPopoverChrome`** — shell: 340pt card, radius, border, shadow, window/card surfaces, light+dark.
-- **Primitives**: `UsageProgressBar` (4pt), `UsageProgressRing` (64pt, 4.5 stroke, rounded cap), `StatusPill`, `MetadataRow`.
+- **Primitives**: `UsageProgressBar` (4pt), `StatusPill` (now header-mounted), `ProviderIconTile` (28pt, radius 8, renders the active provider's mark). The `UsageProgressRing` and `MetadataRow` primitives are **no longer needed** — the revision removed the primary quota card and the freshness metadata card.
 - **`MenuProviderTabStrip`** — driven by `AgentProvider` (already carries `tabTitle`, `systemImage`, tint) filtered to providers with a real read.
-- **`CodexMenuContent`** — plan card, window cards, credits card, freshness card, mapped from the existing `QuotaPresentation`/`QuotaDisplayState`. **Behavior-preserving**: every affordance in today's menu must survive.
-- **`ClaudeMenuContent`** — plan, 5h/7d window cards, source + capture-time metadata, shared-pool caveat, explicit unavailable state. Built from `ClaudeUsageDisplayModel`.
+- **`CodexMenuContent`** — window cards + credits card, mapped from the existing `QuotaPresentation`/`QuotaDisplayState`. **Behavior-preserving**: every affordance in today's menu must survive. Per the revision, there is no primary quota card and no freshness metadata card.
+- **`ClaudeMenuContent`** — 5h/7d window cards, shared-pool caveat, explicit unavailable state, built from `ClaudeUsageDisplayModel`. No credits card. **Open question from the revision:** provenance (OAuth vs statusLine vs cache) has no home now that the metadata card is gone — see Task 5a.
 - **`MenuActionFooter`** — Refresh Now / Notification Settings / Preferences… / Quit.
 - **Presentation stays in testable structs** (`MenuBarLabelPresentation`, `ClaudeUsageDisplayModel`, a new `CodexMenuPresentation`), never in view bodies.
 
@@ -79,15 +89,24 @@ From [SPEC.md §5](../../design/menu-bar-popover/SPEC.md):
 
 - [ ] **Step 1: Failing tests**: `availableProviders` includes Codex always, Claude only when its state is usable, **never Copilot**; the persisted selection falls back to the default when the persisted provider is unavailable.
 - [ ] **Step 2: Run to verify they fail.**
-- [ ] **Step 3: Implement** `MenuPopoverChrome` + `MenuProviderTabStrip` + the root `MenuBarPopoverView` (strip, content, footer).
+- [ ] **Step 3: Implement** `MenuPopoverChrome` + `MenuProviderTabStrip` + `ProviderIconTile` + the header row (provider icon, title/subtitle, status pill) + the root `MenuBarPopoverView` (strip, header, content, footer). The provider marks are full-color SVGs, so pick the tile background deliberately rather than reusing the old blue-violet gradient.
 - [ ] **Step 4: Run the full suite. Commit.**
 
 ## Task 5: Codex content — behavior-preserving port
 
-- [ ] **Step 1: Failing tests** for `CodexMenuPresentation`: plan name, lowest-remaining figure and its threshold color, window rows (used %, remaining %, reset time + time-until), credit balance and reset-credit expiries, and the four freshness rows. Assert **`% used` shows used, not remaining** (design defect #1).
+- [ ] **Step 1: Failing tests** for `CodexMenuPresentation`: window rows (used %, remaining %, reset time + time-until), credit balance and reset-credit expiries, and the status-pill state. Assert **`% used` shows used, not remaining** (design defect #1 — still unfixed in the revision). No primary-card or metadata-row assertions; those elements are removed.
 - [ ] **Step 2: Run to verify they fail.**
 - [ ] **Step 3: Implement** `CodexMenuContent` from `QuotaPresentation`/`QuotaDisplayState`, including the cached warning strip and the unavailable card.
 - [ ] **Step 4: Manually verify every existing affordance still works** — sign-in (browser + CLI), alerts toggle, refresh now, notification-settings link, forecasts, cached/paused status. **Commit.**
+
+## Task 5a: Decide where the removed information goes (DESIGN GATE)
+
+The revision removed three pieces of information from the popover. Settle each **before** building Claude's tab, since two of them affect it directly.
+
+- [ ] **Plan name** ("Pro") — had no home outside the removed card. Decide: header subtitle, a window-card header, or accept that plan tier lives only in Settings.
+- [ ] **"Lowest remaining %"** — the at-a-glance figure and ring are gone. Decide whether per-window numbers suffice, or whether the menu bar label now carries that role (it overlaps with Task 2's rule).
+- [ ] **Provenance** (`Source` / `Collector`) — **the consequential one.** Claude's data can come from OAuth, a statusLine capture, or cache, and these differ materially in freshness and authority; `claude_probe_plan` §9 asks for source labelling. Options: fold the source into the status pill text, put it in the header subtitle, or accept the loss on the menu given `ClaudeUsageStatusView` in Settings already shows "Read from: <source> · <relative time>". **Record the choice here.**
+- [ ] **Commit the decision** as an edit to this plan before Task 6.
 
 ## Task 6: Claude content
 
@@ -117,7 +136,7 @@ From [SPEC.md §5](../../design/menu-bar-popover/SPEC.md):
 
 ## Completion criteria
 
-- The menu bar shows the v6 popover: 340pt card, provider tabs (Codex + Claude only), ring, window cards, freshness metadata, action footer, in light and dark.
+- The menu bar shows the revised v6 popover: 340pt card, provider tabs (Codex + Claude only), header with the active provider's icon and the status pill, window cards, credits (Codex only), action footer — light and dark.
 - **The popover dismisses correctly** after every action (Task 1's gate).
 - Every Codex affordance from the old menu still works; no data regression.
 - Claude's tab labels stale/cached data and shows an explicit unavailable state rather than zeros.
