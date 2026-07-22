@@ -42,7 +42,7 @@
 - Consumes: `ClaudeRateLimitSnapshotReader`/`ClaudeRateLimitSnapshot` from the statusLine bridge plan.
 - Produces: `enum ClaudeUsageState: Equatable, Sendable { case notAvailable; case available(ClaudeRateLimitSnapshot) }`; `@MainActor final class ClaudeUsageMonitor: ObservableObject` with `@Published private(set) var state`, `init(reader:pollInterval:)`, `func start()`, `func stop()`, `func refreshNow()`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `CodexUsageMonitor/Tests/CodexUsageMonitorTests/ClaudeUsageMonitorTests.swift`:
 
@@ -131,12 +131,12 @@ final class ClaudeUsageMonitorTests: XCTestCase {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cd CodexUsageMonitor && swift test --filter ClaudeUsageMonitorTests`
 Expected: FAIL to build — `cannot find 'ClaudeUsageMonitor' in scope`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeUsageState.swift`:
 
@@ -208,7 +208,7 @@ final class ClaudeUsageMonitor: ObservableObject {
 Run: `cd CodexUsageMonitor && swift test --filter ClaudeUsageMonitorTests`
 Expected: PASS (5 tests)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeUsageState.swift \
@@ -228,7 +228,7 @@ git commit -m "Add ClaudeUsageMonitor as the sole owner of the Claude rate-limit
 **Interfaces:**
 - Produces: `enum ClaudeStatusLineInstallResult: Equatable { case installed; case alreadyInstalled; case existingCustomStatusLineFound; case unableToUpdateSettings }`; `struct ClaudeStatusLineInstaller { init(settingsURL: URL, bridgeDirectory: URL); func install() -> ClaudeStatusLineInstallResult }`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `CodexUsageMonitor/Tests/CodexUsageMonitorTests/ClaudeStatusLineInstallerTests.swift`:
 
@@ -311,12 +311,12 @@ final class ClaudeStatusLineInstallerTests: XCTestCase {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cd CodexUsageMonitor && swift test --filter ClaudeStatusLineInstallerTests`
 Expected: FAIL to build — `cannot find 'ClaudeStatusLineInstaller' in scope`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/ClaudeStatusLineInstaller.swift`:
 
@@ -387,7 +387,7 @@ Expected: PASS (5 tests)
 Run: `cd CodexUsageMonitor && swift test`
 Expected: PASS (all existing tests plus the 10 new ones from Tasks 1–2)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/ClaudeStatusLineInstaller.swift \
@@ -403,7 +403,7 @@ git commit -m "Add non-destructive one-click Claude statusLine installer"
 - Modify: `docs/superpowers/plans/2026-07-20-claude-code-capability-research.md`
 - Modify: `docs/product/planning-board.md`
 
-- [ ] **Step 1: Update the capability research doc**
+- [x] **Step 1: Update the capability research doc**
 
 Under "Gate before implementation," append a dated note under criterion 4 confirming the owner now exists:
 
@@ -411,11 +411,11 @@ Under "Gate before implementation," append a dated note under criterion 4 confir
 - **2026-07-20 implementation note:** `ClaudeUsageMonitor` (see [usage monitor owner plan](2026-07-20-claude-usage-monitor-owner.md)) is the single owner of the Claude read cycle, with explicit `start()`/`stop()` teardown. `ClaudeStatusLineInstaller` provides a tested, non-destructive setup path. Criteria 3 and 5 (product-copy accuracy, visible "not available" fallback) remain open — no Settings UI exists yet.
 ```
 
-- [ ] **Step 2: Update the planning board**
+- [x] **Step 2: Update the planning board**
 
 Update the Claude local analytics/provider research row's "Next action" to reference this plan, and add it to the plan coverage index.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/superpowers/plans/2026-07-20-claude-code-capability-research.md docs/product/planning-board.md

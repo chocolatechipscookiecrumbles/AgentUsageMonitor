@@ -109,7 +109,7 @@ Mirrors the Codex connection layer one-for-one so Claude reads as part of the sa
 
 ## Task 6 (LAST RESORT, optional): self-run PKCE `ClaudeOAuthLoginService`
 
-Only for environments with no `claude` CLI. Carries the `client_id`-impersonation caveat; behind an "Advanced" disclosure, never a peer of the two main methods. **May be dropped entirely.**
+Only for environments with no `claude` CLI. Carries the `client_id`-impersonation caveat; behind an "Advanced" disclosure, never a peer of the two main methods. **DROPPED (2026-07-21):** `setup-token` covers the browser method without impersonation, so this is deliberately not shipped. Kept here as a documented, rejected option.
 
 - [ ] **Step 1: Failing tests** (injected `requestExecutor` + browser-opener + callback-source): `code_challenge` = base64url-unpadded SHA-256 of verifier, `S256`; authorize URL carries the spike's exact params; `state` mismatch rejected (CSRF); `200` → persisted, non-200 → typed error and nothing persisted.
 - [ ] **Step 2: Run to verify they fail.**
@@ -118,9 +118,9 @@ Only for environments with no `claude` CLI. Carries the `client_id`-impersonatio
 
 ## Task 7: Probe + docs
 
-- [ ] **Step 1:** Teach `--claude-live-read-once` to report which tier-1 **method** resolved — `browser (setup-token)`, `claude-code-credentials`, or `pkce` — plus the tier that ultimately served the data. Never print the token.
-- [ ] **Step 2:** Update the [capability research gate](2026-07-20-claude-code-capability-research.md#gate-before-implementation) and planning board: tier 1 now has two user-selectable methods; record the tier 1–4 hierarchy table above.
-- [ ] **Step 3: Commit.**
+- [x] **Step 1:** Teach `--claude-live-read-once` to report which tier-1 **method** resolved — `browser (setup-token)`, `claude-code-credentials`, or `pkce` — plus the tier that ultimately served the data. Never print the token.
+- [x] **Step 2:** Update the [capability research gate](2026-07-20-claude-code-capability-research.md#gate-before-implementation) and planning board: tier 1 now has two user-selectable methods; record the tier 1–4 hierarchy table above.
+- [x] **Step 3: Commit.**
 
 ---
 
