@@ -14,6 +14,13 @@ struct ClaudeAgentSettingsView: View {
     let connectWithCredentials: () -> Void
     let disconnect: () -> Void
     let refresh: () -> Void
+    let isRunningCLIProbe: Bool
+    let cliProbeError: String?
+    let hasConsentedToCLIProbe: Bool
+    let setCLIProbeConsent: (Bool) -> Void
+    let runCLIProbe: () -> Void
+
+    @State private var showCLIConsent = false
 
     var body: some View {
         // Built once per render: it does date math and currency formatting,
@@ -69,6 +76,46 @@ struct ClaudeAgentSettingsView: View {
             SettingsSectionRow(showsDivider: false) {
                 Button("Refresh Claude usage", action: refresh)
             }
+        }
+
+        forceCLISection
+    }
+
+    /// Tier 2 — deliberately separated from the free refresh above, with the
+    /// cost stated before the user presses it and confirmed on first use.
+    @ViewBuilder
+    private var forceCLISection: some View {
+        SettingsSection("Force a reading") {
+            SettingsSectionRow {
+                Button(isRunningCLIProbe ? "Reading usage…" : "Force refresh with Claude CLI…") {
+                    if hasConsentedToCLIProbe {
+                        runCLIProbe()
+                    } else {
+                        showCLIConsent = true
+                    }
+                }
+                .disabled(isRunningCLIProbe)
+            }
+            SettingsSectionRow(showsDivider: cliProbeError != nil) {
+                SettingsDescription(ClaudeCLIUsageProbe.buttonFootnote)
+            }
+            if let cliProbeError {
+                SettingsSectionRow(showsDivider: false) {
+                    Text(cliProbeError)
+                        .font(.callout)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+        .alert(ClaudeCLIUsageProbe.consentTitle, isPresented: $showCLIConsent) {
+            Button("Cancel", role: .cancel) {}
+            Button("Run the check") {
+                setCLIProbeConsent(true)
+                runCLIProbe()
+            }
+        } message: {
+            Text(ClaudeCLIUsageProbe.consentMessage)
         }
     }
 

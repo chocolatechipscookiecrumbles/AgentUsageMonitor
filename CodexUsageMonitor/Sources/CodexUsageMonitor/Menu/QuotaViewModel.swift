@@ -21,6 +21,10 @@ final class QuotaViewModel: ObservableObject {
     /// Claude's read cycle, owned here the same way Codex's QuotaMonitor is.
     @Published private(set) var claudeState: ClaudeUsageState = .unavailable(reason: ClaudeUsageState.notConnectedReason)
     @Published private(set) var claudeConnectionState: ClaudeConnectionState = .notConnected
+    /// Result of the last manual CLI probe, so the page can report a failure
+    /// the user paid tokens for.
+    @Published private(set) var claudeCLIProbeError: String?
+    @Published private(set) var isRunningClaudeCLIProbe = false
 
     let settings: AppSettings
     private let monitor: QuotaMonitor
@@ -194,6 +198,40 @@ final class QuotaViewModel: ObservableObject {
 
     func disconnectClaude() {
         claudeConnectionController.signOut()
+    }
+
+    /// Tier 2. Manual only, and only after the user has consented to the
+    /// token cost — never called from a scheduled refresh.
+    func runClaudeCLIProbe() {
+        guard !isRunningClaudeCLIProbe else { return }
+        isRunningClaudeCLIProbe = true
+        claudeCLIProbeError = nil
+        Task { [weak self] in
+            defer { Task { @MainActor [weak self] in self?.isRunningClaudeCLIProbe = false } }
+            do {
+                let snapshot = try await ClaudeCLIUsageProbe().run()
+                await MainActor.run { [weak self] in
+                    self?.claudeMonitor.applyManualSnapshot(snapshot)
+                }
+            } catch {
+                await MainActor.run { [weak self] in
+                    self?.claudeCLIProbeError = Self.cliProbeMessage(for: error)
+                }
+            }
+        }
+    }
+
+    private static func cliProbeMessage(for error: Error) -> String {
+        switch error as? ClaudeCLIProbeError {
+        case .missingCLI:
+            "The Claude Code CLI could not be found. Install it, then try again."
+        case .commandFailed:
+            "The Claude Code CLI could not complete the check. Make sure you are signed in to it."
+        case .couldNotParseOutput:
+            "The CLI ran but its usage output could not be read. This build may need updating for a newer CLI."
+        case nil:
+            "The usage check could not be completed."
+        }
     }
 
     func stopClaude() {

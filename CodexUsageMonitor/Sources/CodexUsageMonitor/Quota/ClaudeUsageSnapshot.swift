@@ -22,6 +22,9 @@ struct ClaudeExtraUsage: Codable, Sendable, Equatable {
 enum ClaudeUsageSource: String, Codable, Sendable, Equatable {
     case oauth
     case statusLine
+    /// Tier 2 — a user-initiated read via the Claude Code CLI. Never produced
+    /// by an automatic refresh, because it costs tokens.
+    case cli
     case cache
 }
 

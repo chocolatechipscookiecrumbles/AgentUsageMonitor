@@ -27,7 +27,12 @@ struct AgentsSettingsView: View {
                     valueMode: viewModel.settings.quotaValueMode,
                     connectWithCredentials: viewModel.connectClaudeWithCredentials,
                     disconnect: viewModel.disconnectClaude,
-                    refresh: viewModel.refreshClaude
+                    refresh: viewModel.refreshClaude,
+                    isRunningCLIProbe: viewModel.isRunningClaudeCLIProbe,
+                    cliProbeError: viewModel.claudeCLIProbeError,
+                    hasConsentedToCLIProbe: viewModel.settings.claudeCLIProbeConsented,
+                    setCLIProbeConsent: { viewModel.settings.claudeCLIProbeConsented = $0 },
+                    runCLIProbe: viewModel.runClaudeCLIProbe
                 )
             case .githubCopilot:
                 EmptyView()

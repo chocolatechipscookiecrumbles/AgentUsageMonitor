@@ -74,9 +74,10 @@ enum ClaudeUsageProbeCommand {
                                 detail: "unavailable: \(error)"))
         }
 
-        // Tier 2: CLI /usage PTY probe — deliberately deferred to its own plan.
-        layers.append(.init(tier: 2, name: "CLI /usage PTY probe", available: false,
-                            detail: "deferred — not implemented in the coordinator"))
+        // Tier 2: built, but deliberately outside the automatic order —
+        // /usage consumes tokens, so it only runs when the user asks.
+        layers.append(.init(tier: 2, name: "CLI /usage probe", available: false,
+                            detail: "manual only — costs tokens, so never part of an automatic refresh"))
 
         // Tier 3: statusLine passive snapshot (written by the Python bridge).
         if let snap = statusLineReader.readSnapshot() {

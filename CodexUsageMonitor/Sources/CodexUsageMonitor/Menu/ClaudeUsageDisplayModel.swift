@@ -85,6 +85,7 @@ struct ClaudeUsageDisplayModel {
         switch source {
         case .oauth: origin = "Claude OAuth"
         case .statusLine: origin = "Claude Code capture"
+        case .cli: origin = "Claude Code CLI"
         case .cache: origin = "cached result"
         }
         switch delivery {

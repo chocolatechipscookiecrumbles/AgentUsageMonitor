@@ -68,6 +68,15 @@ final class ClaudeUsageMonitor: ObservableObject {
         state = Self.mapState(presentation)
     }
 
+    /// Publishes a snapshot obtained outside the automatic hierarchy — the
+    /// user-initiated CLI probe. Marked `.live` because the user just paid
+    /// tokens for a fresh reading.
+    func applyManualSnapshot(_ snapshot: ClaudeUsageSnapshot) {
+        state = Self.mapState(
+            ClaudeUsagePresentation(snapshot: snapshot, delivery: .live, warnings: [])
+        )
+    }
+
     /// A presentation with no windows at all is the collector's "no usable
     /// source" case — it must surface as an explicit unavailable state, never
     /// as a zeroed quota (capability gate criterion #5).
