@@ -133,10 +133,81 @@ final class ClaudeUsageCollectorTests: XCTestCase {
 
 private struct FakeCredentialStore: ClaudeCredentialProviding {
     let result: Result<ClaudeOAuthCredential, ClaudeCredentialError>
-    func loadCredential() throws -> ClaudeOAuthCredential {
+    /// Records the policy it was asked with, so tests can assert that an
+    /// automatic refresh never requests interaction.
+    let policyRecorder: PolicyRecorder?
+
+    init(result: Result<ClaudeOAuthCredential, ClaudeCredentialError>, policyRecorder: PolicyRecorder? = nil) {
+        self.result = result
+        self.policyRecorder = policyRecorder
+    }
+
+    func loadCredential(promptPolicy: KeychainPromptPolicy) throws -> ClaudeOAuthCredential {
+        policyRecorder?.record(promptPolicy)
         switch result {
         case .success(let credential): return credential
         case .failure(let error): throw error
         }
+    }
+}
+
+final class PolicyRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [KeychainPromptPolicy] = []
+    var recorded: [KeychainPromptPolicy] { lock.withLock { values } }
+    func record(_ policy: KeychainPromptPolicy) { lock.withLock { values.append(policy) } }
+}
+
+/// The safety property this whole policy exists for: an automatic refresh
+/// must be structurally unable to raise a Keychain dialog, and only an
+/// explicit user action may.
+final class ClaudeCollectorPromptPolicyTests: XCTestCase {
+    private func makeCollector(recorder: PolicyRecorder) -> ClaudeUsageCollector {
+        let store = FakeCredentialStore(
+            result: .success(
+                ClaudeOAuthCredential(
+                    accessToken: "t", refreshToken: nil, expiresAt: nil,
+                    scopes: ["user:profile"], subscriptionType: "pro"
+                )
+            ),
+            policyRecorder: recorder
+        )
+        // Fail the network so the collector falls through; we only care which
+        // policy reached the credential read.
+        let source = ClaudeOAuthUsageSource(
+            credentialStore: store,
+            requestExecutor: { _ in throw URLError(.notConnectedToInternet) }
+        )
+        return ClaudeUsageCollector(
+            oauthSource: source,
+            statusLineReader: ClaudeRateLimitSnapshotReader(
+                fileURL: URL(fileURLWithPath: "/nonexistent/claude-rate-limits.json")
+            ),
+            cache: ClaudeUsageCache(fileURL: URL(fileURLWithPath: "/nonexistent/cache.json"))
+        )
+    }
+
+    func testScheduledRefreshNeverRequestsInteraction() async {
+        let recorder = PolicyRecorder()
+        _ = await makeCollector(recorder: recorder).refresh(reason: .scheduled)
+        XCTAssertEqual(recorder.recorded, [.never])
+    }
+
+    func testMenuOpenedRefreshNeverRequestsInteraction() async {
+        let recorder = PolicyRecorder()
+        _ = await makeCollector(recorder: recorder).refresh(reason: .menuOpened)
+        XCTAssertEqual(recorder.recorded, [.never])
+    }
+
+    func testAppLaunchRefreshNeverRequestsInteraction() async {
+        let recorder = PolicyRecorder()
+        _ = await makeCollector(recorder: recorder).refresh(reason: .appLaunch)
+        XCTAssertEqual(recorder.recorded, [.never])
+    }
+
+    func testUserInitiatedRefreshMayPrompt() async {
+        let recorder = PolicyRecorder()
+        _ = await makeCollector(recorder: recorder).refresh(reason: .userInitiated)
+        XCTAssertEqual(recorder.recorded, [.userInitiatedOnly])
     }
 }

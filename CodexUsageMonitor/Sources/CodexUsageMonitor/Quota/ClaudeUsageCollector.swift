@@ -5,6 +5,16 @@ enum ClaudeRefreshReason: Sendable {
     case scheduled
     case menuOpened
     case userInitiated
+
+    /// Only an explicit user action may raise the Keychain dialog. Every
+    /// automatic refresh reads with interaction forbidden, so a scheduled
+    /// poll can never interrupt the user with a permission prompt.
+    var keychainPromptPolicy: KeychainPromptPolicy {
+        switch self {
+        case .userInitiated: .userInitiatedOnly
+        case .appLaunch, .scheduled, .menuOpened: .never
+        }
+    }
 }
 
 /// Maps the existing, already-shipped statusLine bridge's snapshot type into
@@ -40,7 +50,7 @@ actor ClaudeUsageCollector {
     }
 
     func refresh(reason: ClaudeRefreshReason) async -> ClaudeUsagePresentation {
-        if let snapshot = try? await oauthSource.fetch() {
+        if let snapshot = try? await oauthSource.fetch(promptPolicy: reason.keychainPromptPolicy) {
             cache.save(snapshot)
             return ClaudeUsagePresentation(snapshot: snapshot, delivery: .live, warnings: [])
         }

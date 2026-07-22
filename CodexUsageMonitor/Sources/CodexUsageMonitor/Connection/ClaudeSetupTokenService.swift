@@ -185,5 +185,8 @@ actor ClaudeSetupTokenService {
 private struct StaticCredentialProvider: ClaudeCredentialProviding {
     let credential: ClaudeOAuthCredential
 
-    func loadCredential() throws -> ClaudeOAuthCredential { credential }
+    /// Already in hand — no Keychain involved, so the policy is irrelevant.
+    func loadCredential(promptPolicy: KeychainPromptPolicy = .never) throws -> ClaudeOAuthCredential {
+        credential
+    }
 }

@@ -41,8 +41,11 @@ struct ClaudeCompositeCredentialStore: ClaudeCredentialProviding {
     private let borrowed: ClaudeCredentialProviding
     private let recorder: ClaudeEffectiveMethodRecorder?
 
+    /// Defaults to `.claudeCodeCredentials`: it is the only method proven to
+    /// return authoritative usage. Browser sign-in is shelved pending a
+    /// decisive re-test — see the spike findings addendum.
     init(
-        selectedMethod: ClaudeSignInMethod,
+        selectedMethod: ClaudeSignInMethod = .claudeCodeCredentials,
         selfIssued: ClaudeSelfIssuedCredentialStoring = ClaudeSelfIssuedCredentialStore(),
         borrowed: ClaudeCredentialProviding = ClaudeKeychainCredentialStore(),
         recorder: ClaudeEffectiveMethodRecorder? = nil
@@ -53,11 +56,11 @@ struct ClaudeCompositeCredentialStore: ClaudeCredentialProviding {
         self.recorder = recorder
     }
 
-    func loadCredential() throws -> ClaudeOAuthCredential {
-        try resolve().credential
+    func loadCredential(promptPolicy: KeychainPromptPolicy = .never) throws -> ClaudeOAuthCredential {
+        try resolve(promptPolicy: promptPolicy).credential
     }
 
-    func resolve() throws -> ClaudeCredentialResolution {
+    func resolve(promptPolicy: KeychainPromptPolicy = .never) throws -> ClaudeCredentialResolution {
         let order: [ClaudeSignInMethod] = selectedMethod == .browser
             ? [.browser, .claudeCodeCredentials]
             : [.claudeCodeCredentials, .browser]
@@ -65,7 +68,7 @@ struct ClaudeCompositeCredentialStore: ClaudeCredentialProviding {
         var selectedError: Error?
         for method in order {
             do {
-                let credential = try provider(for: method).loadCredential()
+                let credential = try provider(for: method).loadCredential(promptPolicy: promptPolicy)
                 recorder?.effectiveMethod = method
                 return ClaudeCredentialResolution(credential: credential, method: method)
             } catch {

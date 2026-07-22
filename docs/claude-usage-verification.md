@@ -37,12 +37,12 @@ Run these first — if they fail, don't bother with the live checks.
 ```bash
 cd CodexUsageMonitor && swift test
 ```
-**Expected:** `Executed 105 tests, with 0 failures`
+**Expected:** `Executed 119 tests, with 0 failures`
 
 ```bash
 cd CodexUsageMonitor && swift test --filter Claude
 ```
-**Expected:** `Executed 97 tests, with 0 failures`
+**Expected:** `Executed 111 tests, with 0 failures`
 
 ```bash
 cd ClaudeUsageBridge && /opt/anaconda3/bin/pytest -q
@@ -173,6 +173,28 @@ cd CodexUsageMonitor && CLAUDE_CODE_OAUTH_TOKEN='sk-ant-oat01-REPLACE_ME' \
 **Expected with a valid token:** `"tier1Method" : "browser"` — and **no Keychain dialog**, because the environment token is resolved before our Keychain item is ever consulted.
 
 `CLAUDE_CODE_OAUTH_TOKEN` is honoured at **read** time, not only during sign-in (`ClaudeSelfIssuedCredentialStore` resolves env → own Keychain item). This is the only way to exercise method (a) on a machine without the `claude` CLI.
+
+### 3b-2. Prompt policy — background refreshes must never raise a dialog
+
+The safety property behind method (b): only an explicit user action may prompt.
+`ClaudeRefreshReason` maps `.userInitiated` → `.userInitiatedOnly`; `.scheduled`,
+`.menuOpened` and `.appLaunch` all map to `.never`, which sets
+`kSecUseAuthenticationUI = kSecUseAuthenticationUIFail` on the Keychain query so
+macOS fails the read instead of showing a dialog. A denied read degrades to the
+next tier rather than erroring.
+
+```bash
+cd CodexUsageMonitor && swift test --filter PromptPolicy
+```
+**Expected:** `Executed 10 tests, with 0 failures` — covering the query flags, the
+`errSecInteractionNotAllowed` → `.accessDenied` mapping, and that each automatic
+refresh reason reaches the credential read with `.never`.
+
+> ⚠️ **This cannot be verified empirically once you have clicked "Always Allow".** With a
+> standing ACL grant the read succeeds without a dialog either way, so the prompt path is
+> unreachable on this machine. The unit tests asserting the constructed query are the
+> available verification. To exercise it for real you would need to revoke the grant in
+> Keychain Access (delete the app's entry in the item's Access Control tab).
 
 ### 3c. Inspect / clear our own Keychain item
 

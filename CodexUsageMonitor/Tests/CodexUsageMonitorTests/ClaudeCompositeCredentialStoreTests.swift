@@ -6,16 +6,18 @@ private final class SpyCredentialProvider: ClaudeSelfIssuedCredentialStoring, @u
     private var result: Result<ClaudeOAuthCredential, ClaudeCredentialError>
     private var loads = 0
     private var deletes = 0
+    private var policies: [KeychainPromptPolicy] = []
 
     init(_ result: Result<ClaudeOAuthCredential, ClaudeCredentialError>) {
         self.result = result
     }
 
     var loadCount: Int { lock.withLock { loads } }
+    var seenPolicies: [KeychainPromptPolicy] { lock.withLock { policies } }
     var deleteCount: Int { lock.withLock { deletes } }
 
-    func loadCredential() throws -> ClaudeOAuthCredential {
-        lock.withLock { loads += 1 }
+    func loadCredential(promptPolicy: KeychainPromptPolicy) throws -> ClaudeOAuthCredential {
+        lock.withLock { loads += 1; policies.append(promptPolicy) }
         switch lock.withLock({ result }) {
         case .success(let credential): return credential
         case .failure(let error): throw error
@@ -122,6 +124,46 @@ final class ClaudeCompositeCredentialStoreTests: XCTestCase {
         XCTAssertEqual(selfIssued.deleteCount, 1)
         XCTAssertEqual(resolution.credential.accessToken, "borrowed")
         XCTAssertEqual(resolution.method, .claudeCodeCredentials)
+    }
+
+    func testPromptPolicyIsForwardedToTheUnderlyingProvider() throws {
+        let borrowed = SpyCredentialProvider(.success(credential("borrowed")))
+        let store = ClaudeCompositeCredentialStore(
+            selectedMethod: .claudeCodeCredentials,
+            selfIssued: SpyCredentialProvider(.failure(.notFound)),
+            borrowed: borrowed
+        )
+
+        _ = try store.resolve(promptPolicy: .userInitiatedOnly)
+
+        XCTAssertEqual(borrowed.seenPolicies, [.userInitiatedOnly])
+    }
+
+    func testDefaultResolveNeverRequestsInteraction() throws {
+        let borrowed = SpyCredentialProvider(.success(credential("borrowed")))
+        let store = ClaudeCompositeCredentialStore(
+            selectedMethod: .claudeCodeCredentials,
+            selfIssued: SpyCredentialProvider(.failure(.notFound)),
+            borrowed: borrowed
+        )
+
+        _ = try store.resolve()
+
+        XCTAssertEqual(borrowed.seenPolicies, [.never], "the default must never be able to prompt")
+    }
+
+    /// A degrade must not smuggle an interactive read into the other method.
+    func testDegradePreservesThePromptPolicy() throws {
+        let borrowed = SpyCredentialProvider(.success(credential("borrowed")))
+        let store = ClaudeCompositeCredentialStore(
+            selectedMethod: .browser,
+            selfIssued: SpyCredentialProvider(.failure(.notFound)),
+            borrowed: borrowed
+        )
+
+        _ = try store.resolve(promptPolicy: .never)
+
+        XCTAssertEqual(borrowed.seenPolicies, [.never])
     }
 
     func testLoadCredentialConformanceDelegatesToResolve() throws {

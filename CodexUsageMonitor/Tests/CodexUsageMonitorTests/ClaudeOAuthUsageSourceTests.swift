@@ -154,7 +154,17 @@ private final class CapturedRequestBox: @unchecked Sendable {
 
 private struct FakeCredentialStore: ClaudeCredentialProviding {
     let result: Result<ClaudeOAuthCredential, ClaudeCredentialError>
-    func loadCredential() throws -> ClaudeOAuthCredential {
+    /// Records the policy it was asked with, so tests can assert that an
+    /// automatic refresh never requests interaction.
+    let policyRecorder: PolicyRecorder?
+
+    init(result: Result<ClaudeOAuthCredential, ClaudeCredentialError>, policyRecorder: PolicyRecorder? = nil) {
+        self.result = result
+        self.policyRecorder = policyRecorder
+    }
+
+    func loadCredential(promptPolicy: KeychainPromptPolicy) throws -> ClaudeOAuthCredential {
+        policyRecorder?.record(promptPolicy)
         switch result {
         case .success(let credential): return credential
         case .failure(let error): throw error

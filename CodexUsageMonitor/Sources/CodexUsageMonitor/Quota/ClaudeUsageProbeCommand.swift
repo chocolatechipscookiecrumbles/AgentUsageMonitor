@@ -40,11 +40,13 @@ enum ClaudeUsageProbeCommand {
     }
 
     static func run() async {
-        // Prefer a token this app obtained itself (browser sign-in), degrading
-        // to Claude Code's own Keychain credential. The recorder reports which
+        // Claude Code credentials is the working default (browser sign-in is
+        // shelved pending a decisive re-test). The recorder reports which
         // method actually served, so a degrade is never invisible.
         let recorder = ClaudeEffectiveMethodRecorder()
-        let credentialStore = ClaudeCompositeCredentialStore(selectedMethod: .browser, recorder: recorder)
+        let credentialStore = ClaudeCompositeCredentialStore(
+            selectedMethod: .claudeCodeCredentials, recorder: recorder
+        )
         let oauthSource = ClaudeOAuthUsageSource(credentialStore: credentialStore)
         let statusLineReader = ClaudeRateLimitSnapshotReader()
         let cache = ClaudeUsageCache()
@@ -56,7 +58,11 @@ enum ClaudeUsageProbeCommand {
         // prompt if it degrades to the Claude Code credentials method — that is
         // acceptable here (the user ran this command).
         do {
-            let snapshot = try await oauthSource.fetch()
+            // The user ran this command, so an interactive Keychain read is
+            // permitted here — unlike any automatic refresh.
+            let snapshot = try await oauthSource.fetch(
+                promptPolicy: ClaudeRefreshReason.userInitiated.keychainPromptPolicy
+            )
             tier1Method = recorder.effectiveMethod?.rawValue
             let five = snapshot.fiveHour.map { String(format: "%.1f%%", $0.usedPercent) } ?? "—"
             let seven = snapshot.sevenDay.map { String(format: "%.1f%%", $0.usedPercent) } ?? "—"

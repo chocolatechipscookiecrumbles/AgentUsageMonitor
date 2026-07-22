@@ -49,7 +49,9 @@ struct ClaudeSelfIssuedCredentialStore: ClaudeCredentialProviding {
     /// sign-in) so a `claude setup-token` value can drive the app on machines
     /// where the CLI isn't installed, matching how comparable tools resolve
     /// credentials.
-    func loadCredential() throws -> ClaudeOAuthCredential {
+    /// `promptPolicy` is accepted for protocol conformance but has no effect:
+    /// this item belongs to us, so reading it never raises an ACL dialog.
+    func loadCredential(promptPolicy: KeychainPromptPolicy = .never) throws -> ClaudeOAuthCredential {
         if let token = environmentReader(Self.environmentTokenVariable)?
             .trimmingCharacters(in: .whitespacesAndNewlines),
             !token.isEmpty {

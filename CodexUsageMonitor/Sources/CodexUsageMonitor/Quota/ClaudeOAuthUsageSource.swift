@@ -103,10 +103,12 @@ struct ClaudeOAuthUsageSource {
         self.requestExecutor = requestExecutor
     }
 
-    func fetch() async throws -> ClaudeUsageSnapshot {
+    /// `promptPolicy` defaults to the safe value: a caller that does not think
+    /// about it cannot introduce a background Keychain prompt.
+    func fetch(promptPolicy: KeychainPromptPolicy = .never) async throws -> ClaudeUsageSnapshot {
         let credential: ClaudeOAuthCredential
         do {
-            credential = try credentialStore.loadCredential()
+            credential = try credentialStore.loadCredential(promptPolicy: promptPolicy)
         } catch {
             throw ClaudeOAuthError.credentialsNotFound
         }
