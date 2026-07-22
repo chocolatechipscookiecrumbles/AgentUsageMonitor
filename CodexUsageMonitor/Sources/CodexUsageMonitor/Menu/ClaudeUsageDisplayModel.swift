@@ -41,7 +41,7 @@ struct ClaudeUsageDisplayModel {
         fiveHour = Self.window(snapshot.fiveHour, now: now)
         sevenDay = Self.window(snapshot.sevenDay, now: now)
         sourceLabel = Self.sourceLabel(delivery: presentation.delivery, source: snapshot.source)
-        capturedAtText = Self.relativeText(from: snapshot.capturedAt, to: now)
+        capturedAtText = RelativeTimeText.text(from: snapshot.capturedAt, to: now)
         isLive = presentation.delivery == .live
         creditsUsedText = Self.creditsUsed(snapshot.extraUsage)
         stalenessNotice = presentation.delivery == .live
@@ -97,14 +97,4 @@ struct ClaudeUsageDisplayModel {
         }
     }
 
-    private static func relativeText(from date: Date, to now: Date) -> String {
-        let seconds = max(0, now.timeIntervalSince(date))
-        if seconds < 60 { return "just now" }
-        let minutes = Int(seconds / 60)
-        if minutes < 60 { return "\(minutes) minute\(minutes == 1 ? "" : "s") ago" }
-        let hours = minutes / 60
-        if hours < 24 { return "\(hours) hour\(hours == 1 ? "" : "s") ago" }
-        let days = hours / 24
-        return "\(days) day\(days == 1 ? "" : "s") ago"
-    }
 }

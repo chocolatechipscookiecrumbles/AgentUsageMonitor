@@ -1,74 +1,54 @@
 import SwiftUI
 
+/// One status block per active provider, stacked in the context rail — an
+/// at-a-glance comparison rather than a description of the selected page.
+/// GitHub Copilot is absent until its capability gate passes.
 struct AgentConnectionsContextView: View {
-    let provider: AgentProvider
-    let connectionState: AgentConnectionState
-    let status: SettingsStatus
+    let summaries: [ProviderContextSummary]
 
     var body: some View {
-        switch provider {
-        case .codex:
-            codexCard
-        case .claudeCode:
-            claudeCodePreviewCard
-        case .githubCopilot:
-            EmptyView()
+        ForEach(summaries) { summary in
+            ProviderContextCard(summary: summary)
         }
     }
+}
 
-    private var codexCard: some View {
-        SettingsContextCard("Agent Status") {
+/// Renders one provider's block using the existing context primitives.
+struct ProviderContextCard: View {
+    let summary: ProviderContextSummary
+
+    var body: some View {
+        SettingsContextCard(summary.provider.tabTitle) {
             HStack(spacing: SettingsLayoutMetrics.agentHeaderItemSpacing) {
                 AgentSettingsIcon(
-                    provider: provider,
+                    provider: summary.provider,
                     slotSize: SettingsLayoutMetrics.agentContextIconSlotSize,
                     artworkMaxSize: SettingsLayoutMetrics.agentContextIconArtworkMaxSize
                 )
-                Text(connectionState.displayName)
+                // The provider is named here, not just drawn — an icon alone
+                // does not identify the block once several are stacked.
+                Text(summary.provider.tabTitle)
+                    .fontWeight(.semibold)
             }
-            .foregroundStyle(provider.settingsPresentationTint)
+            .foregroundStyle(summary.provider.settingsPresentationTint)
 
             SettingsPaletteDivider()
 
             SettingsContextValueRow(
-                value: SettingsContextValue(label: "Current", value: provider.title)
+                value: SettingsContextValue(label: "Plan", value: summary.planText)
             )
             SettingsContextValueRow(
-                value: SettingsContextValue(label: "Plan", value: planValue)
+                value: SettingsContextValue(label: "Five-hour", value: summary.fiveHourText)
             )
             SettingsContextValueRow(
-                value: SettingsContextValue(
-                    label: "Quota status",
-                    value: status.displayMode.displayName
-                )
+                value: SettingsContextValue(label: "Weekly", value: summary.weeklyText)
+            )
+            SettingsContextValueRow(
+                value: SettingsContextValue(label: "Status", value: summary.statusText)
+            )
+            SettingsContextValueRow(
+                value: SettingsContextValue(label: "Last refresh", value: summary.lastRefreshText)
             )
         }
-    }
-
-    private var claudeCodePreviewCard: some View {
-        SettingsContextCard("Agent Status") {
-            Label("Preview", systemImage: provider.systemImage)
-                .foregroundStyle(SettingsTab.agents.navigationTint)
-
-            SettingsPaletteDivider()
-
-            SettingsContextValueRow(
-                value: SettingsContextValue(label: "Status", value: "Preview")
-            )
-            SettingsContextValueRow(
-                value: SettingsContextValue(label: "Availability", value: "Not available yet")
-            )
-
-            SettingsPaletteDivider()
-
-            SettingsDescription(
-                "This preview demonstrates the Agents Settings layout only. Claude Code is not connected, and this app does not read its files, credentials, usage, or account data."
-            )
-        }
-    }
-
-    private var planValue: String {
-        guard case .connected(let account) = connectionState else { return "Unavailable" }
-        return account.planType?.capitalized ?? status.planName ?? "Unavailable"
     }
 }
