@@ -2,6 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **⚠️ SUPERSEDED (2026-07-22) by [the Figma v6 port plan](2026-07-22-menu-bar-popover-figma-port.md).**
+> This plan was drafted before the v6 Figma export was reviewed. The export already specifies a provider tab strip, so the port plan absorbs this one. Its two substantive findings — that `MenuBarExtra`'s `.menu` style cannot host a tab strip, and that one menu bar label for N providers is a real design decision — are carried forward there. Kept for the reasoning, not for execution.
+
 **Goal:** Turn the menu bar surface from a single-provider Codex menu into a **multi-provider popover with a provider tab strip**, so Claude (and later Copilot) are first-class alongside Codex. Today [QuotaMenuView.swift](../../../CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/QuotaMenuView.swift) renders Codex content directly with no notion of a provider, and the menu bar label shows only Codex's number.
 
 ## Where this sits (state as of 2026-07-22)
