@@ -211,3 +211,91 @@ final class ClaudeCollectorPromptPolicyTests: XCTestCase {
         XCTAssertEqual(recorder.recorded, [.userInitiatedOnly])
     }
 }
+
+/// Tier 3 outranks tier 4 only because a statusLine capture is normally
+/// fresher than the cache. When it is not, ranking it higher shows the user
+/// worse data than we already hold.
+final class ClaudeCollectorFreshnessTests: XCTestCase {
+    private var directory: URL!
+
+    override func setUpWithError() throws {
+        directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ClaudeCollectorFreshness-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    /// OAuth is unavailable, a 47h-old statusLine snapshot exists, and the
+    /// cache holds a recent OAuth read — the cache must win.
+    func testStaleStatusLineLosesToFresherCache() async throws {
+        let statusLineURL = directory.appendingPathComponent("rate-limits.json")
+        let cacheURL = directory.appendingPathComponent("cache.json")
+        let old = Date().addingTimeInterval(-47 * 3600)
+        try Data("""
+        {"schemaVersion":1,"capturedAt":\(old.timeIntervalSince1970),"fiveHour":{"usedPercentage":5.0,"resetsAt":\(Date().addingTimeInterval(3600).timeIntervalSince1970)}}
+        """.utf8).write(to: statusLineURL)
+
+        let cache = ClaudeUsageCache(fileURL: cacheURL)
+        cache.save(
+            ClaudeUsageSnapshot(
+                planHint: "pro",
+                fiveHour: ClaudeLimitWindow(usedPercent: 44, resetsAt: nil),
+                sevenDay: ClaudeLimitWindow(usedPercent: 28, resetsAt: nil),
+                scopedWindows: [], extraUsage: nil,
+                source: .oauth, capturedAt: .now, schemaVersion: 1
+            )
+        )
+
+        let collector = ClaudeUsageCollector(
+            oauthSource: ClaudeOAuthUsageSource(
+                credentialStore: FakeCredentialStore(result: .failure(.notFound)),
+                requestExecutor: { _ in throw URLError(.notConnectedToInternet) }
+            ),
+            statusLineReader: ClaudeRateLimitSnapshotReader(fileURL: statusLineURL),
+            cache: cache
+        )
+
+        let result = await collector.refresh(reason: .scheduled)
+
+        XCTAssertEqual(result.delivery, .cached, "the fresher cached OAuth read must win")
+        XCTAssertEqual(result.snapshot.fiveHour?.usedPercent, 44)
+        XCTAssertEqual(cache.load()?.snapshot.fiveHour?.usedPercent, 44, "and must not be clobbered")
+    }
+
+    /// The normal case must be unaffected: a fresh statusLine capture still
+    /// outranks an older cache.
+    func testFreshStatusLineStillWinsOverOlderCache() async throws {
+        let statusLineURL = directory.appendingPathComponent("rate-limits.json")
+        let cacheURL = directory.appendingPathComponent("cache.json")
+        try Data("""
+        {"schemaVersion":1,"capturedAt":\(Date().timeIntervalSince1970),"fiveHour":{"usedPercentage":7.0,"resetsAt":\(Date().addingTimeInterval(3600).timeIntervalSince1970)}}
+        """.utf8).write(to: statusLineURL)
+
+        let cache = ClaudeUsageCache(fileURL: cacheURL)
+        cache.save(
+            ClaudeUsageSnapshot(
+                planHint: "pro",
+                fiveHour: ClaudeLimitWindow(usedPercent: 44, resetsAt: nil),
+                sevenDay: nil, scopedWindows: [], extraUsage: nil,
+                source: .oauth, capturedAt: .now.addingTimeInterval(-10 * 3600), schemaVersion: 1
+            )
+        )
+
+        let collector = ClaudeUsageCollector(
+            oauthSource: ClaudeOAuthUsageSource(
+                credentialStore: FakeCredentialStore(result: .failure(.notFound)),
+                requestExecutor: { _ in throw URLError(.notConnectedToInternet) }
+            ),
+            statusLineReader: ClaudeRateLimitSnapshotReader(fileURL: statusLineURL),
+            cache: cache
+        )
+
+        let result = await collector.refresh(reason: .scheduled)
+
+        XCTAssertEqual(result.delivery, .passiveSnapshot)
+        XCTAssertEqual(result.snapshot.fiveHour?.usedPercent, 7)
+    }
+}

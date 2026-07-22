@@ -55,14 +55,21 @@ actor ClaudeUsageCollector {
             return ClaudeUsagePresentation(snapshot: snapshot, delivery: .live, warnings: [])
         }
 
-        if let statusLineSnapshot = statusLineReader.readSnapshot() {
-            let adapted = adaptStatusLineSnapshot(statusLineSnapshot)
-            cache.save(adapted)
-            return ClaudeUsagePresentation(snapshot: adapted, delivery: .passiveSnapshot, warnings: [])
+        // Tier 3 outranks tier 4 because a statusLine capture is *normally*
+        // fresher than the cache. That assumption fails when Claude Code has
+        // not run for a while: a days-old capture would otherwise be shown in
+        // preference to a recent OAuth read we already hold. Rank the two by
+        // capture time so the user always sees the best reading available.
+        let statusLine = statusLineReader.readSnapshot().map(adaptStatusLineSnapshot)
+        let cached = cache.load()?.snapshot
+
+        if let statusLine, cached.map({ statusLine.capturedAt >= $0.capturedAt }) ?? true {
+            cache.save(statusLine)
+            return ClaudeUsagePresentation(snapshot: statusLine, delivery: .passiveSnapshot, warnings: [])
         }
 
-        if let cached = cache.load() {
-            return ClaudeUsagePresentation(snapshot: cached.snapshot, delivery: .cached, warnings: [])
+        if let cached {
+            return ClaudeUsagePresentation(snapshot: cached, delivery: .cached, warnings: [])
         }
 
         return ClaudeUsagePresentation(

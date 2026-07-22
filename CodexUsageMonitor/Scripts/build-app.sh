@@ -26,14 +26,17 @@ xcrun actool "$root/Resources/Assets.xcassets" \
 #
 # Override with CODESIGN_IDENTITY; falls back to ad-hoc when no identity is
 # available (the grant will not stick in that case).
+# Attempt the real signature directly rather than probing with
+# `security find-identity` first — that call can block on its own Keychain
+# prompt, which would make a present identity look absent.
 identity="${CODESIGN_IDENTITY:-Developer ID Application}"
-if security find-identity -v -p codesigning 2>/dev/null | grep -q "$identity"; then
-  codesign --force --options runtime --sign "$identity" \
-    --identifier com.david.codex-usage-monitor "$app"
+if codesign --force --options runtime --sign "$identity" \
+     --identifier com.david.codex-usage-monitor "$app" 2>/dev/null; then
   echo "Signed with: $identity"
 else
-  echo "WARNING: no '$identity' signing identity found; falling back to ad-hoc." >&2
+  echo "WARNING: could not sign with '$identity'; falling back to ad-hoc." >&2
   echo "         Keychain 'Always Allow' will NOT survive rebuilds." >&2
+  echo "         Set CODESIGN_IDENTITY to a valid identity to fix this." >&2
   codesign --force --sign - --identifier com.david.codex-usage-monitor "$app"
 fi
 
