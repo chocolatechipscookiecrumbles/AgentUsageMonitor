@@ -2,6 +2,28 @@
 
 These instructions apply to the entire repository. More specific instructions in a nested `AGENTS.md` override them for that subtree.
 
+## Skill usage (check before starting work, not after)
+
+This repository expects agents to work through its skills. **Before starting any non-trivial task, look for a relevant skill and use it.** Do not rely on being told; the prompt will usually not name one. Skipping this has already produced rework — a PR set was written freehand and had to be redone against `preparing-evidence-rich-prs` and `.github/pull_request_template.md`.
+
+Skills live in `.agents/skills/`. Most are synced from a global source and are gitignored, so they are present locally but not in a fresh clone; `preparing-evidence-rich-prs` is tracked because this repo's conventions depend on it. If a skill named here is missing locally, say so rather than improvising a substitute.
+
+| When the task is… | Use |
+|---|---|
+| Preparing or updating a PR | `preparing-evidence-rich-prs` (**required** — see Documentation discipline) |
+| Porting a Figma design to SwiftUI | `figma-to-swiftui`, then `swiftui-pro` |
+| Any SwiftUI view or Settings surface work | `swiftui-pro`, `writing-for-interfaces` (copy) |
+| Structuring types, actors, or ownership | `swift-architecture-skill`, `domain-modeling`, `swift-concurrency-pro` |
+| Credential, Keychain, or token handling | `swift-security-expert` |
+| Writing or executing an implementation plan | `writing-plans`, `executing-plans`, `subagent-driven-development` |
+| Chasing a defect | `systematic-debugging`, `diagnosing-bugs` |
+| Adding tests | `test-driven-development`, `test-master` |
+| Cleaning up changed code (reuse, simplification) | `code-simplifier` |
+| Finishing a branch, worktrees, review | `finishing-a-development-branch`, `using-git-worktrees`, `requesting-code-review`, `receiving-code-review` |
+| Claiming something is done | `verification-before-completion` |
+
+**The upcoming menu-bar popover port is the case to get right:** it is a Figma-to-SwiftUI translation of a native macOS surface, so `figma-to-swiftui` and `swiftui-pro` apply from the first task, alongside this file's Settings UI guardrails and required visual acceptance.
+
 ## Documentation discipline
 
 - Update the relevant implementation plan whenever behavior, scope, verification evidence, or a known limitation changes.
