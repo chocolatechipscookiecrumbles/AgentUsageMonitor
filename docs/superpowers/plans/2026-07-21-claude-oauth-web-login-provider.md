@@ -4,11 +4,15 @@
 
 **Goal:** Give Claude the same **two-method sign-in model Codex already has**, and formalize the full source hierarchy beneath it. Tier 1 (OAuth) gains **two co-equal, user-selectable credential methods** — **browser sign-in** (`claude setup-token`) and **Claude Code credentials** (the existing Keychain read) — presented side by side exactly like Codex's "Sign in with browser" / "Sign in with Codex CLI…". Neither is a silent fallback of the other: the user picks, so the Keychain ACL grant becomes an **explicit, informed choice** rather than something that happens to them.
 
+> **⚠️ STATUS UPDATE (2026-07-22) — method (a) SHELVED as unresolved; method (b) is the working default.**
+> `claude setup-token` was implemented (`ClaudeSetupTokenService`, unit-tested) but **never verified end-to-end against a real token**. A live attempt returned `401 Invalid bearer token` from `/api/oauth/usage` — but the free `/v1/models` control **also** 401'd under both auth schemes, so the token was not accepted anywhere and the result proves nothing either way (likely a token truncated by the Safari HTTPS-Only callback detour). See the [spike findings addendum](2026-07-21-claude-oauth-web-login-spike-findings.md#addendum--claude-setup-token-shelved-as-unresolved-2026-07-22) for the decisive re-test.
+> **Consequence:** tier 1 runs on **method (b), Claude Code credentials (Keychain)** — the only path proven live (`5h 26.0% · 7d 20.0% · plan pro`). `ClaudeSetupTokenService` stays in the tree but is **not wired to any UI** and must not be presented as working. Work is proceeding on hardening method (b) instead.
+
 ## Source hierarchy (authoritative order, as of 2026-07-21)
 
 | Tier | Source | Status |
 |---|---|---|
-| **1** | **OAuth** — via **(a) browser sign-in (`setup-token`)** or **(b) Claude Code credentials (Keychain)** | (b) built; (a) this plan |
+| **1** | **OAuth** — via **(b) Claude Code credentials (Keychain)** [working default] or **(a) browser sign-in (`setup-token`)** [SHELVED, unverified] | (b) live; (a) built but unproven |
 | **2** | CLI `/usage` PTY probe | deferred (own plan) |
 | **3** | statusLine passive snapshot | built |
 | **4** | cached last-known-good | built |

@@ -58,3 +58,49 @@ Expected on success: token response with `scope` containing `user:profile`, a `r
 ## Security note
 
 No access token was ever obtained (all exchanges 429'd), so none was persisted. The PKCE verifier/state lived only in a scratchpad temp file that was deleted; the transient `.tok` file was empty and removed. No secret was logged.
+
+---
+
+# Addendum — `claude setup-token` shelved as UNRESOLVED (2026-07-22)
+
+**Status: shelved, not disproven.** Method (a) — browser sign-in via `claude setup-token` — was implemented (`ClaudeSetupTokenService`) but **never verified end-to-end against a real token**. Testing was inconclusive and is parked here rather than left implied by green unit tests.
+
+## What was actually observed
+
+Claude Code CLI `2.1.217` was installed (see install traps below) and `claude setup-token` produced an `sk-ant-oat01-…` token. Against that token:
+
+| Request | Result |
+|---|---|
+| `/api/oauth/usage` — `Authorization: Bearer` + beta header | `401 authentication_error: Invalid bearer token` |
+| `/api/oauth/usage` — `Authorization: Bearer`, no beta header | `401 authentication_error: Invalid bearer token` |
+| `/api/oauth/usage` — `x-api-key` (± beta header) | `429 rate_limit_error` — **void, never evaluated the credential** |
+| `/v1/models` (control) — `x-api-key` | `401 authentication_error: invalid x-api-key` |
+| `/v1/models` (control) — `Authorization: Bearer` | `401 authentication_error: OAuth access token is invalid.` |
+
+## Why this is inconclusive
+
+**The control failed.** `/v1/models` is a free endpoint that only checks authentication; both auth schemes rejected the token there too. So the token was not accepted *anywhere*, which means the `/api/oauth/usage` rows say nothing about whether setup-token can serve usage reads — the credential never proved valid in the first place. The two `429`s are the same IP throttle documented above and never reached credential evaluation.
+
+Most likely cause: **a truncated/malformed token**. That `setup-token` run completed via a `curl`-delivered callback after Safari's HTTPS-Only mode refused the `http://localhost:PORT/callback` redirect, so the printed value may have been partial. A valid token used with the wrong scheme normally yields a distinctive error rather than flat rejection under both.
+
+## The one test that would settle it
+
+Mint a fresh token **without** the Safari detour (make a non-Safari browser default first), then run `scripts/diagnose-setup-token.sh`. The deciding row is **`/v1/models` with `x-api-key`**:
+
+- `200` there → token genuinely valid; the `/api/oauth/usage` rows then become meaningful evidence either way.
+- `401` there on a fresh, full-length (>100 char) token → the token class is inert for our purposes and method (a) genuinely fails.
+
+Note the `x-api-key` usage rows may keep returning `429` until that IP throttle clears, so those two may stay unresolved regardless.
+
+## Consequence while shelved
+
+- **Method (b) — Claude Code credentials (Keychain) — is the only proven path to authoritative usage** and is therefore the default. Verified live: `5h 26.0% · 7d 20.0% · plan pro`.
+- `ClaudeSetupTokenService` remains in the tree and unit-tested, but is **not reachable from any UI** and must not be presented as working. It validates before persisting, so it fails closed: a token that cannot read usage is refused rather than stored.
+- If method (a) is ultimately disproven, the only other prompt-free route to authoritative numbers is **tier 2, the CLI `/usage` probe**, which would rise substantially in priority.
+
+## Install traps recorded while getting here
+
+- **`brew install claude` is the wrong package** — that cask is the Claude **desktop GUI app**. Fails with `Error: It seems there is already an App at '/Applications/Claude.app'`.
+- **`npm install -g @anthropic-ai/claude-code` fails on Apple Silicon running x64 Node under Rosetta.** npm resolves the `darwin-x64` binary, which needs AVX that Rosetta does not emulate; `claude --version` then reports `native binary not installed`. This machine has x86_64 Homebrew at `/usr/local` and x86_64 node on an `arm64` machine. It also leaves a broken `/usr/local/bin/claude` shim that **shadows** a good install.
+- **Working install:** `curl -fsSL https://claude.ai/install.sh | bash` → `~/.local/bin/claude`. That path is now an explicit `ClaudeExecutableLocator` candidate, because a GUI `.app` does not inherit the login shell's `PATH`.
+- **Safari HTTPS-Only mode blocks the loopback callback** (`WebKitErrorDomain:305`). The flow succeeds; only delivery fails. Recover by `curl`-ing the callback URL to the still-listening port while `setup-token` runs.

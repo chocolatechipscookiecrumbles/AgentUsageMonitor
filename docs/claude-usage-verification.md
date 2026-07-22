@@ -8,7 +8,7 @@ All paths are relative to the repo root: `<USER_HOME>/Desktop/agent usage`.
 
 | Tier | Source | Status |
 |---|---|---|
-| 1 | OAuth — method (a) browser `setup-token` **or** (b) Claude Code credentials | (b) live, (a) built |
+| 1 | OAuth — **(b) Claude Code credentials** [working] / (a) `setup-token` [shelved, unverified] | (b) live; (a) unproven |
 | 2 | CLI `/usage` PTY probe | not implemented |
 | 3 | statusLine passive snapshot | live |
 | 4 | cached last-known-good | live |
@@ -120,9 +120,11 @@ If you click **Deny**: `security: SecKeychainSearchCopyNext: User canceled the o
 
 > This is the same dialog the app raises. `security` is a *different binary* from Claude Code, exactly like our app — which is why it prompts too. That's the mechanism, not a bug.
 
-### 3b. Method (a): browser sign-in via `setup-token`
+### 3b. Method (a): browser sign-in via `setup-token` — ⚠️ SHELVED / UNVERIFIED
 
-The sanctioned path — no Keychain prompt, no `/v1/oauth/token` call from our app.
+> **This method is not proven to work.** A real `setup-token` was rejected (`401`) by `/api/oauth/usage`, but the control endpoint also rejected it, so the test was inconclusive — see the [spike findings addendum](superpowers/plans/2026-07-21-claude-oauth-web-login-spike-findings.md#addendum--claude-setup-token-shelved-as-unresolved-2026-07-22). Use **method (b)** for real verification. The steps below are retained for the decisive re-test only; run `scripts/diagnose-setup-token.sh` and check the `/v1/models` + `x-api-key` row first.
+
+The intended path — no Keychain prompt, no `/v1/oauth/token` call from our app.
 
 ```bash
 claude setup-token
