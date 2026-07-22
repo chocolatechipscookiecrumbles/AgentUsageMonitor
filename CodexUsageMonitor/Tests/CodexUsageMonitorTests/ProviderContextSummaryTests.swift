@@ -88,7 +88,7 @@ final class ProviderContextSummaryTests: XCTestCase {
         )
 
         XCTAssertFalse(summary.isConnected)
-        XCTAssertEqual(summary.statusText, "Disconnected")
+        XCTAssertEqual(summary.statusText, ProviderContextSummary.disconnectedStatus)
         XCTAssertEqual(summary.fiveHourText, ProviderContextSummary.placeholder)
         XCTAssertEqual(summary.weeklyText, ProviderContextSummary.placeholder)
         XCTAssertNotEqual(summary.fiveHourText, "0%")
@@ -136,7 +136,7 @@ final class ProviderContextSummaryTests: XCTestCase {
         )
 
         XCTAssertFalse(summary.isConnected)
-        XCTAssertEqual(summary.statusText, "Disconnected")
+        XCTAssertEqual(summary.statusText, ProviderContextSummary.disconnectedStatus)
         XCTAssertEqual(summary.fiveHourText, ProviderContextSummary.placeholder)
         XCTAssertEqual(summary.weeklyText, ProviderContextSummary.placeholder)
         XCTAssertNotEqual(summary.fiveHourText, "0%")
@@ -184,5 +184,36 @@ final class ProviderContextSummaryTests: XCTestCase {
     func testCodexIsAlwaysActiveAndClaudeIsConditional() {
         XCTAssertEqual(ProviderContextSummary.activeProviders(claudeIsUsable: true), [.codex, .claudeCode])
         XCTAssertEqual(ProviderContextSummary.activeProviders(claudeIsUsable: false), [.codex])
+    }
+}
+
+/// "Resets" alone did not answer the question the row is asked — how long do
+/// I have. The left side now carries the remaining duration.
+final class RelativeTimeTextDurationTests: XCTestCase {
+    private let now = Date()
+
+    func testMinutesOnlyUnderAnHour() {
+        XCTAssertEqual(RelativeTimeText.duration(until: now.addingTimeInterval(18 * 60), from: now), "in 18m")
+    }
+
+    func testHoursAndMinutes() {
+        XCTAssertEqual(RelativeTimeText.duration(until: now.addingTimeInterval(2 * 3600 + 18 * 60), from: now), "in 2h 18m")
+    }
+
+    func testDropsZeroMinutes() {
+        XCTAssertEqual(RelativeTimeText.duration(until: now.addingTimeInterval(3 * 3600), from: now), "in 3h")
+    }
+
+    func testDaysAndHours() {
+        XCTAssertEqual(RelativeTimeText.duration(until: now.addingTimeInterval(5 * 86400 + 13 * 3600), from: now), "in 5d 13h")
+    }
+
+    func testUnderAMinuteReadsAsImminent() {
+        XCTAssertEqual(RelativeTimeText.duration(until: now.addingTimeInterval(30), from: now), "in under a minute")
+    }
+
+    /// A window past its reset must not render a negative or absurd duration.
+    func testPastResetReadsAsElapsed() {
+        XCTAssertEqual(RelativeTimeText.duration(until: now.addingTimeInterval(-60), from: now), "now")
     }
 }

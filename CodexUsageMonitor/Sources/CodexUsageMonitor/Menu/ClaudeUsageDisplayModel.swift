@@ -18,6 +18,11 @@ struct ClaudeUsageDisplayModel {
     static let creditsUsedLabel = "Credits used"
     static let creditsUsedDescription = "Amount billed beyond your plan."
 
+    /// Claude's five-hour window is not a fixed clock like Codex's: it starts
+    /// at your first message and runs five hours from there, so the reset time
+    /// moves with your usage rather than landing on the hour.
+    static let fiveHourSessionNote = "Starts at your first message, then runs for five hours."
+
     /// Gate criterion #3: the weekly figure is not Claude Code only, so the
     /// UI must say what it covers rather than letting the user assume.
     static let weeklyScopeCaveat = "Weekly usage is shared with Claude chat, not Claude Code alone."

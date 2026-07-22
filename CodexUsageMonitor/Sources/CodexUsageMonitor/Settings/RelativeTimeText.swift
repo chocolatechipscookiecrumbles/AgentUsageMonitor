@@ -14,3 +14,23 @@ enum RelativeTimeText {
         return "\(days) day\(days == 1 ? "" : "s") ago"
     }
 }
+
+extension RelativeTimeText {
+    /// How long until `date`, for the left side of a reset row — the question
+    /// "Resets" alone left unanswered. The absolute timestamp stays on the
+    /// right, so the row gives both "how long" and "when".
+    static func duration(until date: Date, from now: Date = .now) -> String {
+        let seconds = date.timeIntervalSince(now)
+        guard seconds > 0 else { return "now" }
+        if seconds < 60 { return "in under a minute" }
+
+        let totalMinutes = Int(seconds / 60)
+        let days = totalMinutes / (60 * 24)
+        let hours = (totalMinutes % (60 * 24)) / 60
+        let minutes = totalMinutes % 60
+
+        if days > 0 { return hours > 0 ? "in \(days)d \(hours)h" : "in \(days)d" }
+        if hours > 0 { return minutes > 0 ? "in \(hours)h \(minutes)m" : "in \(hours)h" }
+        return "in \(minutes)m"
+    }
+}

@@ -14,6 +14,15 @@ struct ClaudeSignInPresentation: Equatable {
     static let keychainDisclosure =
         "Reads the OAuth token Claude Code already stored in your Keychain. macOS will ask for permission."
 
+    /// Shown once connected. macOS offers only Allow / Always Allow / Deny, so
+    /// this explains what each actually costs rather than leaving the user to
+    /// guess why the prompt keeps returning.
+    static let keychainPromptExplanation = """
+        macOS asks because this app and Claude Code are different applications,         and the token belongs to Claude Code.
+
+        Choose Always Allow to let background refreshes read it. Allow grants         one read, so the prompt returns each time you refresh by hand —         background refreshes never prompt, they fall back to the passive         capture instead.
+        """
+
     static func make(
         state: ClaudeConnectionState,
         activeMethod: ClaudeSignInMethod? = nil

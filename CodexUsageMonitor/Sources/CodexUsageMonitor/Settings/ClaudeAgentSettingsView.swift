@@ -32,7 +32,7 @@ struct ClaudeAgentSettingsView: View {
     private func content(model: ClaudeUsageDisplayModel?) -> some View {
         SettingsSection("Connection") {
             SettingsSectionRow {
-                SettingsPreferenceControlRow("Status") { Text(connectionState.displayName) }
+                SettingsPreferenceControlRow("Status") { Text(status(model).text) }
             }
             if let plan = planName(model) {
                 SettingsSectionRow {
@@ -56,7 +56,8 @@ struct ClaudeAgentSettingsView: View {
             creditsDescription: ClaudeUsageDisplayModel.creditsUsedDescription,
             creditsValue: model?.creditsUsedText,
             resetCredits: nil,
-            weeklyFootnote: ClaudeUsageDisplayModel.weeklyScopeCaveat
+            weeklyFootnote: ClaudeUsageDisplayModel.weeklyScopeCaveat,
+            fiveHourNote: ClaudeUsageDisplayModel.fiveHourSessionNote
         )
 
         SettingsSection("Source") {
@@ -119,6 +120,13 @@ struct ClaudeAgentSettingsView: View {
         }
     }
 
+    /// The same derivation the context rail uses, so a live read is reported
+    /// as connected on both surfaces even if the sign-in button was never
+    /// pressed.
+    private func status(_ model: ClaudeUsageDisplayModel?) -> ClaudeConnectionStatus {
+        ClaudeConnectionStatus.resolve(signInState: connectionState, usageState: usageState)
+    }
+
     /// Prefers the plan proven by the connection; falls back to the plan hint
     /// carried on the usage snapshot.
     private func planName(_ model: ClaudeUsageDisplayModel?) -> String? {
@@ -166,6 +174,7 @@ struct ClaudeAgentSettingsView: View {
         if case .connected = connectionState {
             Button("Disconnect", action: disconnect)
         }
+        SettingsDescription(ClaudeSignInPresentation.keychainPromptExplanation)
     }
 
     private var showsConnectAction: Bool {

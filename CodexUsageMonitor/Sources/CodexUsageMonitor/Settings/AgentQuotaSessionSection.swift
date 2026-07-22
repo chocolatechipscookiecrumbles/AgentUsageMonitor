@@ -18,6 +18,7 @@ struct AgentQuotaSessionSection: View {
     /// `nil` omits the reset-credits row entirely (providers without them).
     var resetCredits: AgentResetCredits?
     var weeklyFootnote: String?
+    var fiveHourNote: String?
 
     var body: some View {
         SettingsSection("Current quota") {
@@ -30,7 +31,8 @@ struct AgentQuotaSessionSection: View {
                     // An idle window reads as "not active" only when the
                     // provider is otherwise reporting; with nothing at all it
                     // is genuinely unavailable.
-                    unavailableText: weekly == nil ? "Unavailable" : "Not active"
+                    unavailableText: weekly == nil ? "Unavailable" : "Not active",
+                    windowNote: fiveHourNote
                 )
             }
             SettingsSectionRow {
