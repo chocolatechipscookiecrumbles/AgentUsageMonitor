@@ -142,6 +142,17 @@ curl -fsSL https://claude.ai/install.sh | bash
 
 Alternatively, obtain a token on a machine that has the CLI and use the **environment-variable path below**, which works without the CLI present.
 
+**If the browser refuses the callback** (Safari HTTPS-Only — see Troubleshooting), the flow still worked; only delivery failed. While `claude setup-token` is *still running*, hand it the callback manually — copy the whole failed URL from the browser and:
+
+```bash
+# confirm the listener is still up (port is in the failed URL)
+lsof -nP -iTCP:57409 -sTCP:LISTEN
+
+# deliver the callback; HTTP 302 means accepted
+curl -sS "http://localhost:57409/callback?code=PASTE_CODE&state=PASTE_STATE" -w "\n[HTTP %{http_code}]\n"
+```
+The token then prints in the terminal where `setup-token` is running. The authorization code is single-use and short-lived, so it is spent the moment this succeeds.
+
 > 🔐 **Treat this token like a password.** It grants ~1 year of account access. Don't paste it into chats, logs, or issues.
 
 Verify it works against the usage endpoint (substitute your token):
@@ -342,6 +353,7 @@ ls -l ~/.codex/auth.json
 | `PermissionError ... '/tmp'` from the bridge | `--output` parent dir isn't user-owned (bridge chmods it `0700`) | Use a directory you own |
 | `No module named pytest` | System python 3.14 lacks it | Use `/opt/anaconda3/bin/pytest` |
 | `zsh: command not found: claude` | Claude Code CLI not installed | Install it, or use the `CLAUDE_CODE_OAUTH_TOKEN` path (§3b) which needs no CLI |
+| `setup-token` browser shows *"Navigation failed because the request was for an HTTP URL with HTTPS-Only enabled"* (WebKitErrorDomain:305) | Safari's **HTTPS-Only mode** blocks the `http://localhost:PORT/callback` loopback that `setup-token` listens on. The OAuth flow *succeeded* — the code is in the URL — the browser just won't deliver it | Deliver the callback yourself (see below), or turn off Safari → Settings → Privacy → **HTTPS-Only mode**, or make a non-Safari browser the default before running `setup-token` |
 | `command not found: timeout` | macOS has no GNU `timeout` | Drop it, or `brew install coreutils` and use `gtimeout` |
 | Tier 3 hours/days stale | Expected — it's a passive capture, only written after a real Claude Code turn | Use tier 1 for current numbers |
 
