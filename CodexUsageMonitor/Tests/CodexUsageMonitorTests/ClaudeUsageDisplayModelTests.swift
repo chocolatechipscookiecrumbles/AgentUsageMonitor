@@ -172,14 +172,14 @@ final class ClaudeUsageDisplayModelTests: XCTestCase {
         )
     }
 
-    func testExtraUsageIsAbsentWhenTheEndpointOmitsIt() {
+    func testCreditsAreAbsentWhenTheEndpointOmitsThem() {
         let model = ClaudeUsageDisplayModel(presentation: withExtraUsage(nil), now: .now)
-        XCTAssertNil(model.extraUsage)
+        XCTAssertNil(model.creditsUsedText)
     }
 
     /// The live shape on a Pro account: enabled, nothing spent, no cap
     /// returned. "0 spent" must not be presented as "0 remaining".
-    func testSpendIsLabelledAsSpentNotAsBalance() {
+    func testSpendWithNoCapIsJustTheAmount() {
         let model = ClaudeUsageDisplayModel(
             presentation: withExtraUsage(
                 ClaudeExtraUsage(isEnabled: true, monthlyLimit: nil, usedCredits: 0, currencyCode: "USD")
@@ -187,14 +187,10 @@ final class ClaudeUsageDisplayModelTests: XCTestCase {
             now: .now
         )
 
-        let extra = try? XCTUnwrap(model.extraUsage)
-        XCTAssertEqual(extra?.isEnabled, true)
-        // Locale-independent: assert the amount, not a particular symbol.
-        XCTAssertTrue(extra?.spentText.contains("0.00") == true, extra?.spentText ?? "")
-        XCTAssertNil(extra?.limitText, "no cap was returned, so none may be implied")
-        XCTAssertTrue(extra?.summaryText.contains("spent") == true, extra?.summaryText ?? "")
+        let value = model.creditsUsedText ?? ""
+        XCTAssertTrue(value.contains("0.00"), value)
         XCTAssertFalse(
-            extra?.summaryText.lowercased().contains("remaining") == true,
+            value.lowercased().contains("remaining"),
             "spend must never be phrased as a remaining balance"
         )
     }
@@ -207,12 +203,9 @@ final class ClaudeUsageDisplayModelTests: XCTestCase {
             now: .now
         )
 
-        XCTAssertTrue(model.extraUsage?.spentText.contains("12.50") == true, model.extraUsage?.spentText ?? "")
-        XCTAssertTrue(model.extraUsage?.limitText?.contains("50.00") == true, model.extraUsage?.limitText ?? "")
-        let summary = model.extraUsage?.summaryText ?? ""
-        XCTAssertTrue(summary.contains("12.50"), summary)
-        XCTAssertTrue(summary.contains("50.00"), summary)
-        XCTAssertTrue(summary.hasSuffix("spent"), summary)
+        let value = model.creditsUsedText ?? ""
+        XCTAssertTrue(value.contains("12.50"), value)
+        XCTAssertTrue(value.contains("50.00"), value)
     }
 
     func testDisabledExtraUsageIsReportedAsOff() {
@@ -223,8 +216,7 @@ final class ClaudeUsageDisplayModelTests: XCTestCase {
             now: .now
         )
 
-        XCTAssertEqual(model.extraUsage?.isEnabled, false)
-        XCTAssertEqual(model.extraUsage?.summaryText, "Off")
+        XCTAssertEqual(model.creditsUsedText, "Off")
     }
 
     func testNonUSDCurrencyIsHonoured() {
@@ -235,14 +227,25 @@ final class ClaudeUsageDisplayModelTests: XCTestCase {
             now: .now
         )
 
-        XCTAssertTrue(
-            model.extraUsage?.spentText.contains("3") == true,
-            model.extraUsage?.spentText ?? ""
+        let value = model.creditsUsedText ?? ""
+        XCTAssertTrue(value.contains("3"), value)
+        XCTAssertFalse(value.contains("US$"), "must not render a USD symbol for a EUR amount")
+    }
+
+    /// The view passes usedPercent straight through, so it must be the raw
+    /// number rather than something parsed back out of the display string.
+    func testWindowCarriesTheRawPercent() {
+        let model = ClaudeUsageDisplayModel(
+            presentation: makePresentation(fiveHour: (26.4, nil)), now: .now
         )
-        XCTAssertFalse(
-            model.extraUsage?.spentText.contains("US$") == true,
-            "must not render a USD symbol for a EUR amount"
-        )
+        XCTAssertEqual(model.fiveHour?.usedPercent, 26)
+        XCTAssertEqual(model.fiveHour?.usedText, "26%")
+    }
+
+    /// Anthropic reports no remaining balance, so the label must say "used".
+    func testCreditsLabelSaysUsedNotRemaining() {
+        XCTAssertTrue(ClaudeUsageDisplayModel.creditsUsedLabel.lowercased().contains("used"))
+        XCTAssertFalse(ClaudeUsageDisplayModel.creditsUsedLabel.lowercased().contains("remaining"))
     }
 
     /// Gate criterion #3: the weekly number's scope must be stated, because it

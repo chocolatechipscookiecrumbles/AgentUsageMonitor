@@ -32,8 +32,14 @@ struct CodexAgentSettingsView: View {
 
         AgentQuotaSessionSection(
             provider: .codex,
-            presentation: presentation,
-            valueMode: quotaValueMode
+            fiveHour: presentation.fiveHour,
+            weekly: presentation.weekly,
+            valueMode: quotaValueMode,
+            creditsValue: presentation.creditBalance,
+            resetCredits: AgentResetCredits(
+                availableCount: presentation.availableResetCredits,
+                expiries: presentation.resetCreditExpiryDates
+            )
         )
 
         AgentUsageWarningsSection(

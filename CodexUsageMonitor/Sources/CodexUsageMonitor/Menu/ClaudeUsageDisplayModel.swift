@@ -5,24 +5,18 @@ import Foundation
 /// (probe plan §7/§9, capability gate #3/#5) unit-testable.
 struct ClaudeUsageDisplayModel {
     struct Window {
+        let usedPercent: Int
         let usedText: String
         let hasReset: Bool
         let resetNote: String?
         let resetsAt: Date?
     }
 
-    /// Anthropic's pay-as-you-go overage ("extra usage").
-    ///
-    /// Deliberately *not* modelled on Codex's credits. Codex reports a
-    /// balance you hold; this reports money already **spent** against an
-    /// optional monthly cap. Presenting `usedCredits: 0` as a "balance" would
-    /// invert its meaning — it means nothing spent, not nothing left.
-    struct ExtraUsage {
-        let isEnabled: Bool
-        let spentText: String
-        let limitText: String?
-        let summaryText: String
-    }
+    /// Anthropic exposes no remaining-credit figure — only spend, and an
+    /// optional cap. The label must therefore say "used"; Codex's "Credits"
+    /// label would imply a balance that does not exist.
+    static let creditsUsedLabel = "Credits used"
+    static let creditsUsedDescription = "Amount billed beyond your plan."
 
     /// Gate criterion #3: the weekly figure is not Claude Code only, so the
     /// UI must say what it covers rather than letting the user assume.
@@ -34,8 +28,9 @@ struct ClaudeUsageDisplayModel {
     let sourceLabel: String
     let capturedAtText: String
     let isLive: Bool
-    /// Pay-as-you-go overage, when the endpoint reports it.
-    let extraUsage: ExtraUsage?
+    /// Pay-as-you-go overage, already phrased as spend. `nil` when the
+    /// endpoint omits it.
+    let creditsUsedText: String?
     /// Non-nil whenever the data is not a live read, so the UI can never
     /// present a cached or passive result as current.
     let stalenessNotice: String?
@@ -48,30 +43,26 @@ struct ClaudeUsageDisplayModel {
         sourceLabel = Self.sourceLabel(delivery: presentation.delivery, source: snapshot.source)
         capturedAtText = Self.relativeText(from: snapshot.capturedAt, to: now)
         isLive = presentation.delivery == .live
-        extraUsage = Self.extra(snapshot.extraUsage)
+        creditsUsedText = Self.creditsUsed(snapshot.extraUsage)
         stalenessNotice = presentation.delivery == .live
             ? nil
             : "Live usage is temporarily unavailable; showing the last result."
     }
 
-    private static func extra(_ raw: ClaudeExtraUsage?) -> ExtraUsage? {
+    /// Spend, optionally against its cap. Never phrased as remaining.
+    private static func creditsUsed(_ raw: ClaudeExtraUsage?) -> String? {
         guard let raw else { return nil }
-        guard raw.isEnabled else {
-            return ExtraUsage(isEnabled: false, spentText: "—", limitText: nil, summaryText: "Off")
-        }
+        guard raw.isEnabled else { return "Off" }
         let code = raw.currencyCode ?? "USD"
         let spent = currency(raw.usedCredits ?? 0, code: code)
-        let limit = raw.monthlyLimit.map { currency($0, code: code) }
-        // Always phrased as spend. Never "remaining" — that would invert it.
-        let summary = limit.map { "\(spent) of \($0) spent" } ?? "\(spent) spent"
-        return ExtraUsage(isEnabled: true, spentText: spent, limitText: limit, summaryText: summary)
+        guard let limit = raw.monthlyLimit.map({ currency($0, code: code) }) else { return spent }
+        return "\(spent) of \(limit)"
     }
 
+    /// `formatted(.currency:)` rather than a NumberFormatter: same output,
+    /// without allocating a formatter on every render pass.
     private static func currency(_ value: Double, code: String) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = code
-        return formatter.string(from: NSNumber(value: value)) ?? "\(value) \(code)"
+        value.formatted(.currency(code: code))
     }
 
     private static func window(_ limit: ClaudeLimitWindow?, now: Date) -> Window? {
@@ -79,8 +70,10 @@ struct ClaudeUsageDisplayModel {
         // invented quota (gate criterion #5).
         guard let limit else { return nil }
         let hasReset = limit.resetsAt.map { $0 <= now } ?? false
+        let percent = Int(limit.usedPercent.rounded())
         return Window(
-            usedText: "\(Int(limit.usedPercent.rounded()))%",
+            usedPercent: percent,
+            usedText: "\(percent)%",
             hasReset: hasReset,
             resetNote: hasReset ? "This window has since reset." : nil,
             resetsAt: limit.resetsAt

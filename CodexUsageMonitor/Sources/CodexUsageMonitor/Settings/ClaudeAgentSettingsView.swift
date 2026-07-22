@@ -5,9 +5,8 @@ import SwiftUI
 /// actions) followed by the provider-neutral quota rows, so both agents read
 /// as one system.
 ///
-/// Claude has no credit balance or reset credits, so it uses
-/// `AgentQuotaWindowRow` directly rather than `AgentQuotaSessionSection`
-/// (which includes Codex-only credit rows).
+/// It uses the shared `AgentQuotaSessionSection`, passing a "used" credits
+/// label (Anthropic reports spend, not a balance) and no reset credits.
 struct ClaudeAgentSettingsView: View {
     let connectionState: ClaudeConnectionState
     let usageState: ClaudeUsageState
@@ -16,16 +15,19 @@ struct ClaudeAgentSettingsView: View {
     let disconnect: () -> Void
     let refresh: () -> Void
 
-    private var model: ClaudeUsageDisplayModel? {
-        usageState.presentation.map { ClaudeUsageDisplayModel(presentation: $0) }
+    var body: some View {
+        // Built once per render: it does date math and currency formatting,
+        // and a computed property would rebuild it at every reference.
+        content(model: usageState.presentation.map { ClaudeUsageDisplayModel(presentation: $0) })
     }
 
-    var body: some View {
+    @ViewBuilder
+    private func content(model: ClaudeUsageDisplayModel?) -> some View {
         SettingsSection("Connection") {
             SettingsSectionRow {
                 SettingsPreferenceControlRow("Status") { Text(connectionState.displayName) }
             }
-            if let plan = planName {
+            if let plan = planName(model) {
                 SettingsSectionRow {
                     SettingsPreferenceControlRow("Plan") { Text(plan) }
                 }
@@ -38,53 +40,17 @@ struct ClaudeAgentSettingsView: View {
             }
         }
 
-        SettingsSection("Current quota") {
-            SettingsSectionRow {
-                AgentQuotaWindowRow(
-                    kind: .fiveHour,
-                    window: quotaWindow(model?.fiveHour),
-                    provider: .claudeCode,
-                    valueMode: valueMode,
-                    unavailableText: "Unavailable"
-                )
-            }
-            SettingsSectionRow {
-                AgentQuotaWindowRow(
-                    kind: .weekly,
-                    window: quotaWindow(model?.sevenDay),
-                    provider: .claudeCode,
-                    valueMode: valueMode,
-                    unavailableText: "Unavailable"
-                )
-            }
-            SettingsSectionRow(showsDivider: false) {
-                SettingsDescription(ClaudeUsageDisplayModel.weeklyScopeCaveat)
-            }
-        }
-
-        if let extra = model?.extraUsage {
-            SettingsSection("Extra usage") {
-                SettingsSectionRow {
-                    SettingsPreferenceControlRow("Pay-as-you-go") {
-                        Text(extra.isEnabled ? "On" : "Off")
-                    }
-                }
-                if extra.isEnabled {
-                    SettingsSectionRow {
-                        SettingsPreferenceControlRow("Spent this month") {
-                            Text(extra.summaryText).monospacedDigit()
-                        }
-                    }
-                }
-                SettingsSectionRow(showsDivider: false) {
-                    SettingsDescription(
-                        extra.limitText == nil
-                            ? "Amount billed beyond your plan. Anthropic did not report a monthly cap for this account."
-                            : "Amount billed beyond your plan, against your monthly cap."
-                    )
-                }
-            }
-        }
+        AgentQuotaSessionSection(
+            provider: .claudeCode,
+            fiveHour: quotaWindow(model?.fiveHour),
+            weekly: quotaWindow(model?.sevenDay),
+            valueMode: valueMode,
+            creditsLabel: ClaudeUsageDisplayModel.creditsUsedLabel,
+            creditsDescription: ClaudeUsageDisplayModel.creditsUsedDescription,
+            creditsValue: model?.creditsUsedText,
+            resetCredits: nil,
+            weeklyFootnote: ClaudeUsageDisplayModel.weeklyScopeCaveat
+        )
 
         SettingsSection("Source") {
             SettingsSectionRow {
@@ -108,7 +74,7 @@ struct ClaudeAgentSettingsView: View {
 
     /// Prefers the plan proven by the connection; falls back to the plan hint
     /// carried on the usage snapshot.
-    private var planName: String? {
+    private func planName(_ model: ClaudeUsageDisplayModel?) -> String? {
         if case .connected(let account) = connectionState, let plan = account.planType {
             return plan.capitalized
         }
@@ -119,8 +85,7 @@ struct ClaudeAgentSettingsView: View {
     /// has already reset is dropped rather than shown as a current figure.
     private func quotaWindow(_ window: ClaudeUsageDisplayModel.Window?) -> QuotaWindow? {
         guard let window, !window.hasReset else { return nil }
-        let used = Int(window.usedText.replacingOccurrences(of: "%", with: "")) ?? 0
-        return QuotaWindow(usedPercent: used, resetAt: window.resetsAt, durationMinutes: nil)
+        return QuotaWindow(usedPercent: window.usedPercent, resetAt: window.resetsAt, durationMinutes: nil)
     }
 
     @ViewBuilder
