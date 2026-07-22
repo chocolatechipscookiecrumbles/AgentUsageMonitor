@@ -11,6 +11,19 @@ struct ClaudeUsageDisplayModel {
         let resetsAt: Date?
     }
 
+    /// Anthropic's pay-as-you-go overage ("extra usage").
+    ///
+    /// Deliberately *not* modelled on Codex's credits. Codex reports a
+    /// balance you hold; this reports money already **spent** against an
+    /// optional monthly cap. Presenting `usedCredits: 0` as a "balance" would
+    /// invert its meaning — it means nothing spent, not nothing left.
+    struct ExtraUsage {
+        let isEnabled: Bool
+        let spentText: String
+        let limitText: String?
+        let summaryText: String
+    }
+
     /// Gate criterion #3: the weekly figure is not Claude Code only, so the
     /// UI must say what it covers rather than letting the user assume.
     static let weeklyScopeCaveat = "Weekly usage is shared with Claude chat, not Claude Code alone."
@@ -21,6 +34,8 @@ struct ClaudeUsageDisplayModel {
     let sourceLabel: String
     let capturedAtText: String
     let isLive: Bool
+    /// Pay-as-you-go overage, when the endpoint reports it.
+    let extraUsage: ExtraUsage?
     /// Non-nil whenever the data is not a live read, so the UI can never
     /// present a cached or passive result as current.
     let stalenessNotice: String?
@@ -33,9 +48,30 @@ struct ClaudeUsageDisplayModel {
         sourceLabel = Self.sourceLabel(delivery: presentation.delivery, source: snapshot.source)
         capturedAtText = Self.relativeText(from: snapshot.capturedAt, to: now)
         isLive = presentation.delivery == .live
+        extraUsage = Self.extra(snapshot.extraUsage)
         stalenessNotice = presentation.delivery == .live
             ? nil
             : "Live usage is temporarily unavailable; showing the last result."
+    }
+
+    private static func extra(_ raw: ClaudeExtraUsage?) -> ExtraUsage? {
+        guard let raw else { return nil }
+        guard raw.isEnabled else {
+            return ExtraUsage(isEnabled: false, spentText: "—", limitText: nil, summaryText: "Off")
+        }
+        let code = raw.currencyCode ?? "USD"
+        let spent = currency(raw.usedCredits ?? 0, code: code)
+        let limit = raw.monthlyLimit.map { currency($0, code: code) }
+        // Always phrased as spend. Never "remaining" — that would invert it.
+        let summary = limit.map { "\(spent) of \($0) spent" } ?? "\(spent) spent"
+        return ExtraUsage(isEnabled: true, spentText: spent, limitText: limit, summaryText: summary)
+    }
+
+    private static func currency(_ value: Double, code: String) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = code
+        return formatter.string(from: NSNumber(value: value)) ?? "\(value) \(code)"
     }
 
     private static func window(_ limit: ClaudeLimitWindow?, now: Date) -> Window? {

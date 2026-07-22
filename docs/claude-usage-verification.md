@@ -390,3 +390,39 @@ ls -l ~/.codex/auth.json
 - **`--claude-live-read-once` currently hardcodes `selectedMethod: .browser`**, since there's no persisted setting yet — so it always prefers a self-issued token and degrades to Claude Code credentials.
 - **A revoked self-issued token does not auto-degrade to method (b).** `ClaudeCompositeCredentialStore.invalidateSelfIssued()` exists and is tested, but nothing calls it yet — that hook belongs to the not-yet-built Settings wiring. Today a bad tier-1 credential drops to tier 3 instead.
 - **`ClaudeStatusLineInstaller`'s production bridge path doesn't resolve** — `ClaudeUsageBridge/` isn't bundled into a signed `.app`.
+
+---
+
+## 11. Extra usage (Anthropic pay-as-you-go credits)
+
+`GET /api/oauth/usage` **does** return credit data, in an `extra_usage` object. Verified live on a Pro account 2026-07-22:
+
+```json
+"extraUsage": { "isEnabled": true, "usedCredits": 0, "currencyCode": "USD" }
+```
+
+Inspect the live value:
+```bash
+python3 -c "
+import json,os
+p=os.path.expanduser('~/Library/Application Support/CodexUsageMonitor/claude-usage-cache.json')
+print(json.dumps(json.load(open(p))['snapshot'].get('extraUsage'), indent=2))
+"
+```
+
+### ⚠️ It is NOT the same concept as Codex credits
+
+| | Codex | Claude |
+|---|---|---|
+| `creditBalance` | a balance you **hold** | — |
+| `availableResetCredits` + expiries | credits available to spend | — |
+| `usedCredits` | — | money **already spent** on overage |
+| `monthlyLimit` | — | the spend **cap** (absent on this account) |
+
+Claude's figure is **spend against a cap**, not a balance held. Rendering `usedCredits: 0` in a Codex-style "Credit Balance" row would read as *"0 credits left"* when it means *"$0 spent"* — the opposite. The Settings page therefore uses its own **Extra usage** section (`Pay-as-you-go: On`, `Spent this month: $0.00 spent`), and `ClaudeUsageDisplayModel.ExtraUsage` phrases every string as spend, never as remaining. A unit test asserts the word "remaining" never appears.
+
+`monthlyLimit` was **not** returned for this account, so no cap is displayed and none is implied. If it appears on other plans the summary becomes `"$X of $Y spent"` automatically.
+
+### Not surfaced
+
+`scopedWindows` (`session`, `weekly_all`) duplicate the five-hour and weekly figures — `session` tracked 45% against a five-hour 44%, `weekly_all` 28% against a weekly 28%. They add no information and are deliberately not shown.

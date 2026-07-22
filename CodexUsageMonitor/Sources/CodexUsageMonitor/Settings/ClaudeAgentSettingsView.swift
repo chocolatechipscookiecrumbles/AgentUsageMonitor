@@ -62,6 +62,30 @@ struct ClaudeAgentSettingsView: View {
             }
         }
 
+        if let extra = model?.extraUsage {
+            SettingsSection("Extra usage") {
+                SettingsSectionRow {
+                    SettingsPreferenceControlRow("Pay-as-you-go") {
+                        Text(extra.isEnabled ? "On" : "Off")
+                    }
+                }
+                if extra.isEnabled {
+                    SettingsSectionRow {
+                        SettingsPreferenceControlRow("Spent this month") {
+                            Text(extra.summaryText).monospacedDigit()
+                        }
+                    }
+                }
+                SettingsSectionRow(showsDivider: false) {
+                    SettingsDescription(
+                        extra.limitText == nil
+                            ? "Amount billed beyond your plan. Anthropic did not report a monthly cap for this account."
+                            : "Amount billed beyond your plan, against your monthly cap."
+                    )
+                }
+            }
+        }
+
         SettingsSection("Source") {
             SettingsSectionRow {
                 SettingsPreferenceControlRow("Read from") {

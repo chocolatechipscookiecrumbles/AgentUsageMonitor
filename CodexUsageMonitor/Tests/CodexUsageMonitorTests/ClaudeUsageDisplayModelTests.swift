@@ -152,6 +152,99 @@ final class ClaudeUsageDisplayModelTests: XCTestCase {
         XCTAssertEqual(model.planText, "Pro")
     }
 
+    // MARK: extra usage (Anthropic's pay-as-you-go credits)
+
+    private func withExtraUsage(_ extra: ClaudeExtraUsage?) -> ClaudeUsagePresentation {
+        let base = makePresentation()
+        return ClaudeUsagePresentation(
+            snapshot: ClaudeUsageSnapshot(
+                planHint: base.snapshot.planHint,
+                fiveHour: base.snapshot.fiveHour,
+                sevenDay: base.snapshot.sevenDay,
+                scopedWindows: [],
+                extraUsage: extra,
+                source: .oauth,
+                capturedAt: base.snapshot.capturedAt,
+                schemaVersion: 1
+            ),
+            delivery: .live,
+            warnings: []
+        )
+    }
+
+    func testExtraUsageIsAbsentWhenTheEndpointOmitsIt() {
+        let model = ClaudeUsageDisplayModel(presentation: withExtraUsage(nil), now: .now)
+        XCTAssertNil(model.extraUsage)
+    }
+
+    /// The live shape on a Pro account: enabled, nothing spent, no cap
+    /// returned. "0 spent" must not be presented as "0 remaining".
+    func testSpendIsLabelledAsSpentNotAsBalance() {
+        let model = ClaudeUsageDisplayModel(
+            presentation: withExtraUsage(
+                ClaudeExtraUsage(isEnabled: true, monthlyLimit: nil, usedCredits: 0, currencyCode: "USD")
+            ),
+            now: .now
+        )
+
+        let extra = try? XCTUnwrap(model.extraUsage)
+        XCTAssertEqual(extra?.isEnabled, true)
+        // Locale-independent: assert the amount, not a particular symbol.
+        XCTAssertTrue(extra?.spentText.contains("0.00") == true, extra?.spentText ?? "")
+        XCTAssertNil(extra?.limitText, "no cap was returned, so none may be implied")
+        XCTAssertTrue(extra?.summaryText.contains("spent") == true, extra?.summaryText ?? "")
+        XCTAssertFalse(
+            extra?.summaryText.lowercased().contains("remaining") == true,
+            "spend must never be phrased as a remaining balance"
+        )
+    }
+
+    func testSpendAgainstACapShowsBoth() {
+        let model = ClaudeUsageDisplayModel(
+            presentation: withExtraUsage(
+                ClaudeExtraUsage(isEnabled: true, monthlyLimit: 50, usedCredits: 12.5, currencyCode: "USD")
+            ),
+            now: .now
+        )
+
+        XCTAssertTrue(model.extraUsage?.spentText.contains("12.50") == true, model.extraUsage?.spentText ?? "")
+        XCTAssertTrue(model.extraUsage?.limitText?.contains("50.00") == true, model.extraUsage?.limitText ?? "")
+        let summary = model.extraUsage?.summaryText ?? ""
+        XCTAssertTrue(summary.contains("12.50"), summary)
+        XCTAssertTrue(summary.contains("50.00"), summary)
+        XCTAssertTrue(summary.hasSuffix("spent"), summary)
+    }
+
+    func testDisabledExtraUsageIsReportedAsOff() {
+        let model = ClaudeUsageDisplayModel(
+            presentation: withExtraUsage(
+                ClaudeExtraUsage(isEnabled: false, monthlyLimit: nil, usedCredits: nil, currencyCode: nil)
+            ),
+            now: .now
+        )
+
+        XCTAssertEqual(model.extraUsage?.isEnabled, false)
+        XCTAssertEqual(model.extraUsage?.summaryText, "Off")
+    }
+
+    func testNonUSDCurrencyIsHonoured() {
+        let model = ClaudeUsageDisplayModel(
+            presentation: withExtraUsage(
+                ClaudeExtraUsage(isEnabled: true, monthlyLimit: nil, usedCredits: 3, currencyCode: "EUR")
+            ),
+            now: .now
+        )
+
+        XCTAssertTrue(
+            model.extraUsage?.spentText.contains("3") == true,
+            model.extraUsage?.spentText ?? ""
+        )
+        XCTAssertFalse(
+            model.extraUsage?.spentText.contains("US$") == true,
+            "must not render a USD symbol for a EUR amount"
+        )
+    }
+
     /// Gate criterion #3: the weekly number's scope must be stated, because it
     /// is shared with Claude chat rather than being Claude Code only.
     func testWeeklyCarriesTheSharedPoolCaveat() {
