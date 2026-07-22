@@ -75,36 +75,40 @@ One card per **active** provider, stacked in the rail:
 
 ---
 
-## Task 1: Settle the three open decisions
+## Task 1: Settle the three open decisions — DECIDED 2026-07-22
 
-- [ ] **Step 1:** Record answers in this plan for §2 (all providers vs selected-first), §3 (which timestamp is "last refresh"), and the disconnected-state placeholder string.
-- [ ] **Step 2: Commit** the decision record before writing code.
+- [x] **Step 1: Recorded.**
+  1. **All active providers, always** — the rail does not track the selected agent. It is an at-a-glance dashboard across providers.
+  2. **Last successful data timestamp, for all providers** — Codex uses `lastConfirmedAt` (not `lastAttemptAt`), Claude uses `capturedAt`. A provider whose refresh is failing must not read as recently refreshed. Rendered relatively ("8 minutes ago") through one shared formatter so providers cannot drift.
+  3. **Placeholder is "Unavailable"** for absent values, and the status row reads **"Disconnected"** when not connected. Never `0%`.
+  4. **Each block's header shows the provider name** ("Codex", "Claude") beside the icon, not the icon alone.
+- [x] **Step 2: Commit** the decision record before writing code.
 
 ## Task 2: `ProviderContextSummary` + the two adapters
 
-- [ ] **Step 1: Failing tests** (`ProviderContextSummaryTests.swift`):
+- [x] **Step 1: Failing tests** (`ProviderContextSummaryTests.swift`):
   - Codex connected with quota → plan, both limits as `NN%`, `isConnected == true`, last refresh from the **confirmed** timestamp.
   - Codex disconnected → limits are the placeholder, **never `0%`**; `isConnected == false`.
   - Claude available → limits and last-refresh text come from `ClaudeUsageDisplayModel` (assert it is reused, not re-derived).
   - Claude unavailable → placeholders, not zeros.
   - A window past its reset is not reported as a current figure.
   - Missing plan renders the placeholder rather than an empty string.
-- [ ] **Step 2: Run to verify they fail.**
-- [ ] **Step 3: Implement** the summary type and both adapters.
-- [ ] **Step 4: Run to verify they pass. Commit.**
+- [x] **Step 2: Run to verify they fail.**
+- [x] **Step 3: Implement** the summary type and both adapters.
+- [x] **Step 4: Run to verify they pass. Commit.**
 
 ## Task 3: `ProviderContextCard`
 
-- [ ] **Step 1: Implement** the card from a `ProviderContextSummary` using the existing context primitives: header (`AgentSettingsIcon` + status text tinted `provider.settingsPresentationTint`), divider, then Plan / Five-hour / Weekly / Status / Last refresh rows.
-- [ ] **Step 2:** Verify row order and labels match the target above; no `Current` row.
-- [ ] **Step 3: Commit.**
+- [x] **Step 1: Implement** the card from a `ProviderContextSummary` using the existing context primitives: header (`AgentSettingsIcon` + status text tinted `provider.settingsPresentationTint`), divider, then Plan / Five-hour / Weekly / Status / Last refresh rows.
+- [x] **Step 2:** Verify row order and labels match the target above; no `Current` row.
+- [x] **Step 3: Commit.**
 
 ## Task 4: Stack one card per active provider
 
-- [ ] **Step 1: Failing tests** for `activeProviders`: Codex always included; Claude included only when it has a usable state; **Copilot never**; ordering is deterministic.
-- [ ] **Step 2: Run to verify they fail.**
-- [ ] **Step 3: Implement.** Replace `AgentConnectionsContextView`'s `switch` with a `ForEach` over `activeProviders`. **Delete the Claude preview card and its false privacy copy.** Thread Claude's state in from `QuotaViewModel` (it already publishes `claudeState` and `claudeConnectionState`).
-- [ ] **Step 4:** Confirm the rail scrolls correctly with two cards at `contextRailWidth`. **Run the full suite. Commit.**
+- [x] **Step 1: Failing tests** for `activeProviders`: Codex always included; Claude included only when it has a usable state; **Copilot never**; ordering is deterministic.
+- [x] **Step 2: Run to verify they fail.**
+- [x] **Step 3: Implement.** Replace `AgentConnectionsContextView`'s `switch` with a `ForEach` over `activeProviders`. **Delete the Claude preview card and its false privacy copy.** Thread Claude's state in from `QuotaViewModel` (it already publishes `claudeState` and `claudeConnectionState`).
+- [x] **Step 4:** Confirm the rail scrolls correctly with two cards at `contextRailWidth`. **Run the full suite. Commit.**
 
 ## Task 5: Verify and document
 

@@ -1,0 +1,188 @@
+import XCTest
+@testable import CodexUsageMonitor
+
+private func codexPresentation(fiveHour: Int?, weekly: Int?, plan: String? = "pro") -> QuotaPresentation {
+    QuotaPresentation(
+        accountFingerprint: nil,
+        limitID: nil,
+        planType: plan,
+        creditBalance: nil,
+        hasCredits: nil,
+        availableResetCredits: nil,
+        resetCreditExpiryDates: [],
+        fiveHour: fiveHour.map { QuotaWindow(usedPercent: $0, resetAt: nil, durationMinutes: nil) },
+        weekly: weekly.map { QuotaWindow(usedPercent: $0, resetAt: nil, durationMinutes: nil) },
+        confirmation: .confirmed,
+        collectedAt: .now,
+        source: "test",
+        detail: nil
+    )
+}
+
+private func claudePresentation(
+    fiveHour: Double?,
+    sevenDay: Double?,
+    plan: String? = "pro",
+    capturedAt: Date = .now
+) -> ClaudeUsagePresentation {
+    ClaudeUsagePresentation(
+        snapshot: ClaudeUsageSnapshot(
+            planHint: plan,
+            fiveHour: fiveHour.map { ClaudeLimitWindow(usedPercent: $0, resetsAt: nil) },
+            sevenDay: sevenDay.map { ClaudeLimitWindow(usedPercent: $0, resetsAt: nil) },
+            scopedWindows: [],
+            extraUsage: nil,
+            source: .oauth,
+            capturedAt: capturedAt,
+            schemaVersion: 1
+        ),
+        delivery: .live,
+        warnings: []
+    )
+}
+
+final class ProviderContextSummaryTests: XCTestCase {
+    private let now = Date()
+
+    // MARK: Codex
+
+    func testCodexConnectedReportsPlanLimitsAndConfirmedTimestamp() {
+        let summary = ProviderContextSummary.codex(
+            connectionState: .connected(AgentAccountSummary(planType: "pro")),
+            presentation: codexPresentation(fiveHour: 44, weekly: 28),
+            lastConfirmedAt: now.addingTimeInterval(-120),
+            valueMode: .used,
+            now: now
+        )
+
+        XCTAssertEqual(summary.provider, .codex)
+        XCTAssertTrue(summary.isConnected)
+        XCTAssertEqual(summary.statusText, "Connected")
+        XCTAssertEqual(summary.planText, "Pro")
+        XCTAssertEqual(summary.fiveHourText, "44%")
+        XCTAssertEqual(summary.weeklyText, "28%")
+        XCTAssertEqual(summary.lastRefreshText, "2 minutes ago")
+    }
+
+    /// The decision that a failing provider must not read as freshly
+    /// refreshed: only a *confirmed* timestamp counts.
+    func testCodexWithoutAConfirmedRefreshShowsUnavailable() {
+        let summary = ProviderContextSummary.codex(
+            connectionState: .connected(AgentAccountSummary(planType: "pro")),
+            presentation: codexPresentation(fiveHour: 44, weekly: 28),
+            lastConfirmedAt: nil,
+            valueMode: .used,
+            now: now
+        )
+
+        XCTAssertEqual(summary.lastRefreshText, ProviderContextSummary.placeholder)
+    }
+
+    func testCodexDisconnectedNeverShowsZeroPercent() {
+        let summary = ProviderContextSummary.codex(
+            connectionState: .disconnected,
+            presentation: codexPresentation(fiveHour: nil, weekly: nil, plan: nil),
+            lastConfirmedAt: nil,
+            valueMode: .used,
+            now: now
+        )
+
+        XCTAssertFalse(summary.isConnected)
+        XCTAssertEqual(summary.statusText, "Disconnected")
+        XCTAssertEqual(summary.fiveHourText, ProviderContextSummary.placeholder)
+        XCTAssertEqual(summary.weeklyText, ProviderContextSummary.placeholder)
+        XCTAssertNotEqual(summary.fiveHourText, "0%")
+        XCTAssertEqual(summary.planText, ProviderContextSummary.placeholder)
+    }
+
+    func testCodexHonoursRemainingValueMode() {
+        let summary = ProviderContextSummary.codex(
+            connectionState: .connected(AgentAccountSummary(planType: "pro")),
+            presentation: codexPresentation(fiveHour: 44, weekly: 28),
+            lastConfirmedAt: now,
+            valueMode: .remaining,
+            now: now
+        )
+
+        XCTAssertEqual(summary.fiveHourText, "56%")
+        XCTAssertEqual(summary.weeklyText, "72%")
+    }
+
+    // MARK: Claude
+
+    func testClaudeConnectedReportsPlanLimitsAndCaptureTime() {
+        let summary = ProviderContextSummary.claude(
+            connectionState: .connected(ClaudeAccountSummary(planType: "pro")),
+            usageState: .available(
+                claudePresentation(fiveHour: 14, sevenDay: 25, capturedAt: now.addingTimeInterval(-8 * 60))
+            ),
+            now: now
+        )
+
+        XCTAssertEqual(summary.provider, .claudeCode)
+        XCTAssertTrue(summary.isConnected)
+        XCTAssertEqual(summary.statusText, "Connected")
+        XCTAssertEqual(summary.planText, "Pro")
+        XCTAssertEqual(summary.fiveHourText, "14%")
+        XCTAssertEqual(summary.weeklyText, "25%")
+        XCTAssertEqual(summary.lastRefreshText, "8 minutes ago")
+    }
+
+    func testClaudeUnavailableNeverShowsZeroPercent() {
+        let summary = ProviderContextSummary.claude(
+            connectionState: .notConnected,
+            usageState: .unavailable(reason: "nope"),
+            now: now
+        )
+
+        XCTAssertFalse(summary.isConnected)
+        XCTAssertEqual(summary.statusText, "Disconnected")
+        XCTAssertEqual(summary.fiveHourText, ProviderContextSummary.placeholder)
+        XCTAssertEqual(summary.weeklyText, ProviderContextSummary.placeholder)
+        XCTAssertNotEqual(summary.fiveHourText, "0%")
+        XCTAssertEqual(summary.lastRefreshText, ProviderContextSummary.placeholder)
+    }
+
+    func testClaudeMissingWindowIsPlaceholderNotZero() {
+        let summary = ProviderContextSummary.claude(
+            connectionState: .connected(ClaudeAccountSummary(planType: "pro")),
+            usageState: .available(claudePresentation(fiveHour: nil, sevenDay: 25)),
+            now: now
+        )
+
+        XCTAssertEqual(summary.fiveHourText, ProviderContextSummary.placeholder)
+        XCTAssertEqual(summary.weeklyText, "25%")
+    }
+
+    /// Both providers must render "last refresh" identically.
+    func testBothProvidersShareTheSameRelativeWording() {
+        let stamp = now.addingTimeInterval(-3 * 3600)
+        let codex = ProviderContextSummary.codex(
+            connectionState: .connected(AgentAccountSummary(planType: "pro")),
+            presentation: codexPresentation(fiveHour: 1, weekly: 1),
+            lastConfirmedAt: stamp,
+            valueMode: .used,
+            now: now
+        )
+        let claude = ProviderContextSummary.claude(
+            connectionState: .connected(ClaudeAccountSummary(planType: "pro")),
+            usageState: .available(claudePresentation(fiveHour: 1, sevenDay: 1, capturedAt: stamp)),
+            now: now
+        )
+
+        XCTAssertEqual(codex.lastRefreshText, "3 hours ago")
+        XCTAssertEqual(codex.lastRefreshText, claude.lastRefreshText)
+    }
+
+    // MARK: active providers
+
+    func testActiveProvidersNeverIncludeCopilot() {
+        let providers = ProviderContextSummary.activeProviders(claudeIsUsable: true)
+        XCTAssertFalse(providers.contains(.githubCopilot), "Copilot's capability gate has not passed")
+    }
+
+    func testCodexIsAlwaysActiveAndClaudeIsConditional() {
+        XCTAssertEqual(ProviderContextSummary.activeProviders(claudeIsUsable: true), [.codex, .claudeCode])
+        XCTAssertEqual(ProviderContextSummary.activeProviders(claudeIsUsable: false), [.codex])
+    }
+}

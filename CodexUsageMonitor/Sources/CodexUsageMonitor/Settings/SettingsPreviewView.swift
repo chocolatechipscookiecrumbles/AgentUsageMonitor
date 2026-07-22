@@ -7,6 +7,30 @@ struct SettingsPreviewView: View {
     let connectionState: AgentConnectionState
     let settingsStatus: SettingsStatus
 
+    /// Built for every active provider, not just the selected one, so the
+    /// rail compares providers instead of restating the current page.
+    private var providerSummaries: [ProviderContextSummary] {
+        ProviderContextSummary.activeProviders(claudeIsUsable: viewModel.claudeState.isAvailable)
+            .compactMap { provider in
+                switch provider {
+                case .codex:
+                    .codex(
+                        connectionState: connectionState,
+                        presentation: viewModel.presentation,
+                        lastConfirmedAt: viewModel.displayState.lastConfirmedAt,
+                        valueMode: viewModel.settings.quotaValueMode
+                    )
+                case .claudeCode:
+                    .claude(
+                        connectionState: viewModel.claudeConnectionState,
+                        usageState: viewModel.claudeState
+                    )
+                case .githubCopilot:
+                    nil
+                }
+            }
+    }
+
     var body: some View {
         switch selection {
         case .general:
@@ -20,11 +44,7 @@ struct SettingsPreviewView: View {
         case .refresh:
             RefreshSettingsContextView(viewModel: viewModel)
         case .agents:
-            AgentConnectionsContextView(
-                provider: selectedAgent,
-                connectionState: connectionState,
-                status: settingsStatus
-            )
+            AgentConnectionsContextView(summaries: providerSummaries)
         case .dataPrivacy:
             StatusSettingsContextView(
                 title: "Local and Private",
