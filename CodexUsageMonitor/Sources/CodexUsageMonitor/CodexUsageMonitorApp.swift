@@ -7,6 +7,13 @@ struct CodexUsageMonitorApp: App {
     @StateObject private var viewModel = QuotaViewModel()
 
     init() {
+        if CommandLine.arguments.contains(ClaudeUsageProbeCommand.flag) {
+            Task {
+                await ClaudeUsageProbeCommand.run()
+                exit(0)
+            }
+            return
+        }
         guard CommandLine.arguments.contains("--live-read-once") else { return }
         Task {
             let record = await QuotaRepository().refresh()

@@ -127,6 +127,60 @@ final class ClaudeSelfIssuedCredentialStoreTests: XCTestCase {
         XCTAssertNil(query[kSecAttrSynchronizable as String], "the item must never be iCloud-synchronizable")
     }
 
+    func testEnvironmentTokenTakesPrecedenceOverStoredItem() throws {
+        let box = DataBox()
+        let store = ClaudeSelfIssuedCredentialStore(
+            rawDataReader: { box.data.map { .success($0) } ?? .failure(.notFound) },
+            rawDataWriter: { data in box.data = data; return true },
+            rawDeleter: { box.data = nil },
+            environmentReader: { $0 == "CLAUDE_CODE_OAUTH_TOKEN" ? "sk-ant-oat01-from-env" : nil }
+        )
+        try store.save(
+            ClaudeOAuthCredential(accessToken: "stored", refreshToken: nil, expiresAt: nil, scopes: [], subscriptionType: nil)
+        )
+
+        XCTAssertEqual(try store.loadCredential().accessToken, "sk-ant-oat01-from-env")
+    }
+
+    func testEnvironmentTokenIsUsedWhenNoItemStored() throws {
+        let store = ClaudeSelfIssuedCredentialStore(
+            rawDataReader: { .failure(.notFound) },
+            rawDataWriter: { _ in true },
+            rawDeleter: {},
+            environmentReader: { _ in "  sk-ant-oat01-padded\n" }
+        )
+
+        let credential = try store.loadCredential()
+
+        XCTAssertEqual(credential.accessToken, "sk-ant-oat01-padded", "whitespace must be trimmed")
+        XCTAssertTrue(credential.scopes.contains("user:profile"), "must pass the usage source's scope guard")
+    }
+
+    func testEmptyEnvironmentTokenIsIgnored() {
+        let store = ClaudeSelfIssuedCredentialStore(
+            rawDataReader: { .failure(.notFound) },
+            rawDataWriter: { _ in true },
+            rawDeleter: {},
+            environmentReader: { _ in "   " }
+        )
+
+        XCTAssertThrowsError(try store.loadCredential()) { error in
+            XCTAssertEqual(error as? ClaudeCredentialError, .notFound)
+        }
+    }
+
+    /// The injected initializer must stay hermetic — a real environment
+    /// variable on the test machine must never change a test's outcome.
+    func testInjectedInitializerDoesNotReadTheRealEnvironment() {
+        let store = ClaudeSelfIssuedCredentialStore(
+            rawDataReader: { .failure(.notFound) },
+            rawDataWriter: { _ in true },
+            rawDeleter: {}
+        )
+
+        XCTAssertThrowsError(try store.loadCredential())
+    }
+
     /// Guards the secret-hygiene rule: the token must not leak through the
     /// service name or any other non-data attribute.
     func testAddQueryDoesNotPlaceTokenOutsideValueData() {

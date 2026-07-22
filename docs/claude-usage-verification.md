@@ -37,12 +37,12 @@ Run these first — if they fail, don't bother with the live checks.
 ```bash
 cd CodexUsageMonitor && swift test
 ```
-**Expected:** `Executed 101 tests, with 0 failures`
+**Expected:** `Executed 105 tests, with 0 failures`
 
 ```bash
 cd CodexUsageMonitor && swift test --filter Claude
 ```
-**Expected:** `Executed 93 tests, with 0 failures`
+**Expected:** `Executed 97 tests, with 0 failures`
 
 ```bash
 cd ClaudeUsageBridge && /opt/anaconda3/bin/pytest -q
@@ -129,6 +129,10 @@ claude setup-token
 ```
 **Expected:** a browser opens for Anthropic's own consent screen; on approval the terminal prints a token beginning `sk-ant-oat01-…`.
 
+**If you get `zsh: command not found: claude`** the Claude Code CLI isn't installed on this machine. That's expected on a box that only ever used Claude via other surfaces. Two options:
+- Install Claude Code, then re-run; or
+- Obtain a token on a machine that has the CLI and use the **environment-variable path below** — which works without the CLI present.
+
 > 🔐 **Treat this token like a password.** It grants ~1 year of account access. Don't paste it into chats, logs, or issues.
 
 Verify it works against the usage endpoint (substitute your token):
@@ -144,7 +148,9 @@ Feed it to the app without spawning the CLI (the env-var path):
 cd CodexUsageMonitor && CLAUDE_CODE_OAUTH_TOKEN='sk-ant-oat01-REPLACE_ME' \
   .build/debug/CodexUsageMonitor --claude-live-read-once | grep tier1Method
 ```
-**Expected:** `"tier1Method" : "browser"` — and **no Keychain dialog**.
+**Expected with a valid token:** `"tier1Method" : "browser"` — and **no Keychain dialog**, because the environment token is resolved before our Keychain item is ever consulted.
+
+`CLAUDE_CODE_OAUTH_TOKEN` is honoured at **read** time, not only during sign-in (`ClaudeSelfIssuedCredentialStore` resolves env → own Keychain item). This is the only way to exercise method (a) on a machine without the `claude` CLI.
 
 ### 3c. Inspect / clear our own Keychain item
 
@@ -268,11 +274,24 @@ grep -o 'sk-ant-[a-zA-Z0-9-]*' ~/Library/Application\ Support/CodexUsageMonitor/
 Force tier 1 to fail and confirm the coordinator falls through rather than inventing a number.
 
 ```bash
-# Break tier 1 by pointing at a bogus token (env path short-circuits the CLI)
+# A bogus env token is resolved as the tier-1 credential, then rejected by the
+# server — so tier 1 fails and the coordinator must fall through.
 cd CodexUsageMonitor && CLAUDE_CODE_OAUTH_TOKEN='sk-ant-oat01-invalid' \
-  .build/debug/CodexUsageMonitor --claude-live-read-once | head -30
+  .build/debug/CodexUsageMonitor --claude-live-read-once \
+  | python3 -c "import sys,json; r=json.load(sys.stdin); print('tier1Method:', r.get('tier1Method')); print('coordinator ->', r['coordinatorResult']['delivery'], '/', r['coordinatorResult']['source']); [print(f\"  tier {l['tier']} {'OK' if l['available'] else '--'}  {l['detail'][:75]}\") for l in r['layers']]"
 ```
-**Expected:** tier 1 `"available": false`, and `coordinatorResult.delivery` becomes `passiveSnapshot` (tier 3) or `cached` (tier 4) — **never** a zeroed tier-1 result.
+**Verified output:**
+```
+tier1Method: None
+coordinator -> passiveSnapshot / statusLine
+  tier 1 --  unavailable: unauthorized
+  tier 2 --  deferred — not implemented in the coordinator
+  tier 3 OK  5h 5.0% · 7d — · captured 2026-07-20 15:42:57 +0000
+  tier 4 OK  source oauth · saved 2026-07-22 04:31:23 +0000
+```
+Tier 1 is `unavailable: unauthorized`, `tier1Method` is null (nothing served it), and delivery degrades to `passiveSnapshot` — **never** a zeroed or invented tier-1 result.
+
+> Note: a bogus token makes the *credential load* succeed and the *server call* fail. The composite's method-to-method degrade only fires when `loadCredential` itself throws, so this scenario drops to tier 3 rather than to method (b). Auto-degrading a **revoked** self-issued token back to Claude Code credentials requires `invalidateSelfIssued()`, which nothing calls yet — see Known gaps.
 
 Force everything to fail (temporarily move the local files aside):
 ```bash
@@ -313,6 +332,8 @@ ls -l ~/.codex/auth.json
 | `tier1Method` is `claudeCodeCredentials` when you expected `browser` | No self-issued token stored, so it degraded | Run `claude setup-token`, or check §3c that the item exists |
 | `PermissionError ... '/tmp'` from the bridge | `--output` parent dir isn't user-owned (bridge chmods it `0700`) | Use a directory you own |
 | `No module named pytest` | System python 3.14 lacks it | Use `/opt/anaconda3/bin/pytest` |
+| `zsh: command not found: claude` | Claude Code CLI not installed | Install it, or use the `CLAUDE_CODE_OAUTH_TOKEN` path (§3b) which needs no CLI |
+| `command not found: timeout` | macOS has no GNU `timeout` | Drop it, or `brew install coreutils` and use `gtimeout` |
 | Tier 3 hours/days stale | Expected — it's a passive capture, only written after a real Claude Code turn | Use tier 1 for current numbers |
 
 ---
@@ -322,4 +343,5 @@ ls -l ~/.codex/auth.json
 - **Tier 2 (CLI `/usage`) is not implemented** — deferred to its own plan.
 - **The sign-in UI is not reachable in the app yet.** `ClaudeConnectionController` / `ClaudeSignInView` are built and tested but not wired into `AgentsSettingsView`; that's the [wiring plan](superpowers/plans/2026-07-21-claude-usage-provider-wiring.md). Until then, method selection is only exercisable via the probe and `CLAUDE_CODE_OAUTH_TOKEN`.
 - **`--claude-live-read-once` currently hardcodes `selectedMethod: .browser`**, since there's no persisted setting yet — so it always prefers a self-issued token and degrades to Claude Code credentials.
+- **A revoked self-issued token does not auto-degrade to method (b).** `ClaudeCompositeCredentialStore.invalidateSelfIssued()` exists and is tested, but nothing calls it yet — that hook belongs to the not-yet-built Settings wiring. Today a bad tier-1 credential drops to tier 3 instead.
 - **`ClaudeStatusLineInstaller`'s production bridge path doesn't resolve** — `ClaudeUsageBridge/` isn't bundled into a signed `.app`.

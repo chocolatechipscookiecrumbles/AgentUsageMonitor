@@ -73,7 +73,8 @@ final class QuotaViewModel: ObservableObject {
         connectionController.$state.removeDuplicates().sink { [weak self] state in
             self?.connectionState = state
         }.store(in: &subscriptions)
-        if !CommandLine.arguments.contains("--live-read-once") {
+        if !CommandLine.arguments.contains("--live-read-once")
+            && !CommandLine.arguments.contains(ClaudeUsageProbeCommand.flag) {
             start()
         }
     }
