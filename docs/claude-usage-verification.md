@@ -129,9 +129,18 @@ claude setup-token
 ```
 **Expected:** a browser opens for Anthropic's own consent screen; on approval the terminal prints a token beginning `sk-ant-oat01-…`.
 
-**If you get `zsh: command not found: claude`** the Claude Code CLI isn't installed on this machine. That's expected on a box that only ever used Claude via other surfaces. Two options:
-- Install Claude Code, then re-run; or
-- Obtain a token on a machine that has the CLI and use the **environment-variable path below** — which works without the CLI present.
+**If you get `zsh: command not found: claude`** the Claude Code CLI isn't installed. Install it with the **official installer**, which detects the machine's real architecture:
+
+```bash
+curl -fsSL https://claude.ai/install.sh | bash
+```
+**Expected:** `✔ Claude Code successfully installed!` · `Location: ~/.local/bin/claude`
+
+> ⚠️ **Do not use `brew install claude`** — that cask is the Claude **desktop GUI app**, a different product. If `/Applications/Claude.app` exists it fails with `Error: It seems there is already an App at '/Applications/Claude.app'`.
+>
+> ⚠️ **`npm install -g @anthropic-ai/claude-code` fails on an Apple Silicon Mac running x64 Node under Rosetta.** npm resolves the `darwin-x64` binary, which needs AVX that Rosetta doesn't emulate, and `claude --version` then reports `native binary not installed`. Check with `file $(which node)` and `uname -m`; if they disagree (`x86_64` vs `arm64`), use the installer script above. Remove any broken shim first — `npm uninstall -g @anthropic-ai/claude-code` — because a non-working `/usr/local/bin/claude` shadows a good install in the locator's search order.
+
+Alternatively, obtain a token on a machine that has the CLI and use the **environment-variable path below**, which works without the CLI present.
 
 > 🔐 **Treat this token like a password.** It grants ~1 year of account access. Don't paste it into chats, logs, or issues.
 

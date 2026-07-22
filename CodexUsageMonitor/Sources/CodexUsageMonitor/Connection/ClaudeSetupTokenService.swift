@@ -28,7 +28,11 @@ struct ClaudeExecutableLocator {
         if let explicit = environment["CLAUDE_EXECUTABLE"], !explicit.isEmpty {
             candidates.append(explicit)
         }
+        // Explicit candidates matter because a GUI .app does not inherit the
+        // login shell's PATH — it gets a minimal /usr/bin:/bin:/usr/sbin:/sbin.
+        // ~/.local/bin is where the official claude.ai/install.sh lands.
         candidates.append(contentsOf: [
+            NSHomeDirectory() + "/.local/bin/claude",
             "/opt/homebrew/bin/claude",
             "/usr/local/bin/claude",
             "/usr/bin/claude",

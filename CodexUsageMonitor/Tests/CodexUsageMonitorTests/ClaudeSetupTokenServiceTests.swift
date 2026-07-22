@@ -38,6 +38,19 @@ final class ClaudeExecutableLocatorTests: XCTestCase {
         XCTAssertEqual(try locator.locate().path, "/opt/tools/claude")
     }
 
+    /// The official `claude.ai/install.sh` installs to ~/.local/bin. A GUI
+    /// .app does not inherit the login shell's PATH, so this location must be
+    /// an explicit candidate rather than relying on a PATH scan.
+    func testFindsOfficialInstallerLocationWithoutPath() throws {
+        let expected = NSHomeDirectory() + "/.local/bin/claude"
+        let locator = ClaudeExecutableLocator(
+            environment: [:],
+            isExecutable: { $0 == expected }
+        )
+
+        XCTAssertEqual(try locator.locate().path, expected)
+    }
+
     func testThrowsMissingCLIWhenNothingExecutable() {
         let locator = ClaudeExecutableLocator(environment: [:], isExecutable: { _ in false })
 
