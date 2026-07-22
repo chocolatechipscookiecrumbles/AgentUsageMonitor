@@ -29,6 +29,13 @@ struct ClaudeUsageCache {
     }
 
     func save(_ snapshot: ClaudeUsageSnapshot) {
+        // Last-known-*good* means most recent good. A degraded refresh falling
+        // back to an old statusLine capture must not overwrite a fresher
+        // result — otherwise the cache decays instead of preserving the best
+        // reading we have.
+        if let existing = load(), existing.snapshot.capturedAt > snapshot.capturedAt {
+            return
+        }
         let cached = ClaudeCachedUsage(snapshot: snapshot, savedAt: .now)
         let directory = fileURL.deletingLastPathComponent()
         do {

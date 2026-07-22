@@ -51,14 +51,14 @@
 **Interfaces:**
 - Produces: `RateLimitWindow(used_percentage: float, resets_at: int)`, `RateLimitSnapshot(captured_at: int, five_hour: RateLimitWindow | None, seven_day: RateLimitWindow | None)` with `.to_dict()` on both; `extract_snapshot(payload: dict, captured_at: int) -> RateLimitSnapshot | None`.
 
-- [ ] **Step 1: Create empty package files**
+- [x] **Step 1: Create empty package files**
 
 ```bash
 mkdir -p "ClaudeUsageBridge/claude_usage_bridge" "ClaudeUsageBridge/tests"
 touch "ClaudeUsageBridge/claude_usage_bridge/__init__.py" "ClaudeUsageBridge/tests/__init__.py"
 ```
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 Create `ClaudeUsageBridge/tests/test_models.py`:
 
@@ -126,12 +126,12 @@ def test_extract_snapshot_ignores_every_non_rate_limit_field():
     }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cd ClaudeUsageBridge && python3 -m pytest tests/test_models.py -v`
 Expected: FAIL with `ModuleNotFoundError: No module named 'claude_usage_bridge.models'`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `ClaudeUsageBridge/claude_usage_bridge/models.py`:
 
@@ -202,7 +202,7 @@ def _window_from_dict(value: object) -> RateLimitWindow | None:
 Run: `cd ClaudeUsageBridge && python3 -m pytest tests/test_models.py -v`
 Expected: PASS (6 tests)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add ClaudeUsageBridge/claude_usage_bridge/__init__.py ClaudeUsageBridge/claude_usage_bridge/models.py \
@@ -222,7 +222,7 @@ git commit -m "Add field-scoped rate_limits extraction for the Claude statusLine
 - Consumes: `RateLimitSnapshot` from Task 1 (`.to_dict()`).
 - Produces: `default_output_path() -> Path`, `write_snapshot(snapshot: RateLimitSnapshot, output_path: Path) -> None`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `ClaudeUsageBridge/tests/test_writer.py`:
 
@@ -273,12 +273,12 @@ def test_write_snapshot_leaves_no_temp_file_behind(tmp_path):
     assert remaining == [output_path]
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cd ClaudeUsageBridge && python3 -m pytest tests/test_writer.py -v`
 Expected: FAIL with `ModuleNotFoundError: No module named 'claude_usage_bridge.writer'`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `ClaudeUsageBridge/claude_usage_bridge/writer.py`:
 
@@ -319,7 +319,7 @@ def write_snapshot(snapshot: RateLimitSnapshot, output_path: Path) -> None:
 Run: `cd ClaudeUsageBridge && python3 -m pytest tests/test_writer.py -v`
 Expected: PASS (3 tests)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add ClaudeUsageBridge/claude_usage_bridge/writer.py ClaudeUsageBridge/tests/test_writer.py
@@ -339,7 +339,7 @@ git commit -m "Add atomic, owner-only writer for the Claude statusLine bridge sn
 - Consumes: `extract_snapshot` (Task 1), `default_output_path`/`write_snapshot` (Task 2).
 - Produces: `parse_args(arguments: Sequence[str] | None) -> argparse.Namespace`, `main(arguments: Sequence[str] | None = None) -> int`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `ClaudeUsageBridge/tests/test_cli.py`:
 
@@ -400,12 +400,12 @@ def test_main_handles_malformed_stdin_without_crashing(tmp_path, monkeypatch, ca
     assert "unavailable" in capsys.readouterr().out
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cd ClaudeUsageBridge && python3 -m pytest tests/test_cli.py -v`
 Expected: FAIL with `ModuleNotFoundError: No module named 'claude_usage_bridge.cli'`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `ClaudeUsageBridge/claude_usage_bridge/cli.py`:
 
@@ -480,7 +480,7 @@ Expected: PASS (4 tests)
 Run: `cd ClaudeUsageBridge && python3 -m pytest tests/ -v`
 Expected: PASS (13 tests total across Tasks 1–3)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add ClaudeUsageBridge/claude_usage_bridge/cli.py ClaudeUsageBridge/claude_usage_bridge/__main__.py \
@@ -497,7 +497,7 @@ git commit -m "Add CLI entry point for the Claude statusLine bridge"
 
 **Interfaces:** None (documentation only).
 
-- [ ] **Step 1: Write the README**
+- [x] **Step 1: Write the README**
 
 Create `ClaudeUsageBridge/README.md`:
 
@@ -574,7 +574,7 @@ wired into any Settings UI, connection controller, or refresh cycle. See the
 for what still has to be true before a visible Claude usage UI ships.
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit**
 
 ```bash
 git add ClaudeUsageBridge/README.md
@@ -592,7 +592,7 @@ git commit -m "Document the Claude statusLine bridge safety boundary and setup"
 **Interfaces:**
 - Produces: `ClaudeRateLimitWindow(usedPercentage: Double, resetsAt: Date)`, `ClaudeRateLimitSnapshot(schemaVersion: Int, capturedAt: Date, fiveHour: ClaudeRateLimitWindow?, sevenDay: ClaudeRateLimitWindow?)`, both `Codable, Equatable`. JSON keys match the bridge's `to_dict()` output exactly (`schemaVersion`, `capturedAt`, `fiveHour`, `sevenDay`, `usedPercentage`, `resetsAt`), with epoch-seconds encoding for the two date fields (not ISO 8601, since the bridge writes plain Unix timestamps).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `CodexUsageMonitor/Tests/CodexUsageMonitorTests/ClaudeRateLimitSnapshotTests.swift`:
 
@@ -642,12 +642,12 @@ final class ClaudeRateLimitSnapshotTests: XCTestCase {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `cd CodexUsageMonitor && swift test --filter ClaudeRateLimitSnapshotTests`
 Expected: FAIL to build — `cannot find 'ClaudeRateLimitSnapshot' in scope`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeRateLimitSnapshot.swift`:
 
@@ -726,7 +726,7 @@ struct ClaudeRateLimitSnapshot: Codable, Equatable {
 Run: `cd CodexUsageMonitor && swift test --filter ClaudeRateLimitSnapshotTests`
 Expected: PASS (3 tests)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeRateLimitSnapshot.swift \
@@ -746,7 +746,7 @@ git commit -m "Add Codable Claude rate-limit snapshot model"
 - Consumes: `ClaudeRateLimitSnapshot` (Task 5).
 - Produces: `ClaudeRateLimitSnapshotReader.init(fileManager: FileManager = .default)` (production), `ClaudeRateLimitSnapshotReader.init(fileURL: URL)` (test-injectable), `func readSnapshot() -> ClaudeRateLimitSnapshot?`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `CodexUsageMonitor/Tests/CodexUsageMonitorTests/ClaudeRateLimitSnapshotReaderTests.swift`:
 
@@ -826,12 +826,12 @@ final class ClaudeRateLimitSnapshotReaderTests: XCTestCase {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cd CodexUsageMonitor && swift test --filter ClaudeRateLimitSnapshotReaderTests`
 Expected: FAIL to build — `cannot find 'ClaudeRateLimitSnapshotReader' in scope`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeRateLimitSnapshotReader.swift`:
 
@@ -878,7 +878,7 @@ Expected: PASS (5 tests)
 Run: `cd CodexUsageMonitor && swift test`
 Expected: PASS (all existing tests plus the 8 new ones from Tasks 5–6)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeRateLimitSnapshotReader.swift \
@@ -896,7 +896,7 @@ git commit -m "Add isolated reader for the Claude statusLine rate-limit snapshot
 
 **Interfaces:** None (documentation only).
 
-- [ ] **Step 1: Update the capability research doc**
+- [x] **Step 1: Update the capability research doc**
 
 In `docs/superpowers/plans/2026-07-20-claude-code-capability-research.md`, under "Gate before implementation," append a dated note under criterion 1 confirming the bridge/reader exist as prototyped evidence, e.g.:
 
@@ -904,11 +904,11 @@ In `docs/superpowers/plans/2026-07-20-claude-code-capability-research.md`, under
 - **2026-07-20 implementation note:** the `ClaudeUsageBridge` script and `ClaudeRateLimitSnapshotReader` (see [statusLine usage bridge plan](2026-07-20-claude-statusline-usage-bridge.md)) implement and test Signal A end-to-end as an isolated component. No Settings UI, connection controller, or refresh cycle exists yet — criteria 3–5 remain open.
 ```
 
-- [ ] **Step 2: Update the planning board**
+- [x] **Step 2: Update the planning board**
 
 In `docs/product/planning-board.md`, update the Claude local analytics/provider research row's "Next action" to reference the new plan and note the reader is implemented-but-unwired, and add the new plan to the "Active or decision-gated" list in the plan coverage index.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/superpowers/plans/2026-07-20-claude-code-capability-research.md docs/product/planning-board.md

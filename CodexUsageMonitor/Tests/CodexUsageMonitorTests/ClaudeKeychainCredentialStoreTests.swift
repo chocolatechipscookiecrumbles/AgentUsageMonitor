@@ -1,5 +1,55 @@
 import XCTest
+import Security
 @testable import CodexUsageMonitor
+
+final class ClaudeKeychainPromptPolicyTests: XCTestCase {
+    /// The whole point: a scheduled/menu-open refresh must be structurally
+    /// incapable of raising the Keychain dialog.
+    func testBackgroundPolicyForbidsInteraction() {
+        let query = ClaudeKeychainCredentialStore.searchQuery(
+            serviceName: "Claude Code-credentials", promptPolicy: .never
+        )
+
+        XCTAssertEqual(
+            query[kSecUseAuthenticationUI as String] as! CFString,
+            kSecUseAuthenticationUIFail
+        )
+    }
+
+    func testUserInitiatedPolicyAllowsInteraction() {
+        let query = ClaudeKeychainCredentialStore.searchQuery(
+            serviceName: "Claude Code-credentials", promptPolicy: .userInitiatedOnly
+        )
+
+        XCTAssertNil(
+            query[kSecUseAuthenticationUI as String],
+            "a user-initiated read must be allowed to prompt"
+        )
+    }
+
+    /// A denied read must degrade, never hard-fail: the collector needs to
+    /// fall through to the next tier rather than surface an error.
+    func testInteractionNotAllowedMapsToAccessDenied() {
+        XCTAssertEqual(ClaudeKeychainCredentialStore.error(for: errSecInteractionNotAllowed), .accessDenied)
+    }
+
+    func testMissingItemMapsToNotFound() {
+        XCTAssertEqual(ClaudeKeychainCredentialStore.error(for: errSecItemNotFound), .notFound)
+    }
+
+    func testOtherFailuresMapToAccessDenied() {
+        XCTAssertEqual(ClaudeKeychainCredentialStore.error(for: errSecAuthFailed), .accessDenied)
+    }
+
+    /// Default resolution must be the safe one — a caller that forgets to pass
+    /// a policy must not be able to trigger a prompt.
+    func testDefaultPolicyIsNever() {
+        XCTAssertEqual(ClaudeRefreshReason.scheduled.keychainPromptPolicy, .never)
+        XCTAssertEqual(ClaudeRefreshReason.appLaunch.keychainPromptPolicy, .never)
+        XCTAssertEqual(ClaudeRefreshReason.menuOpened.keychainPromptPolicy, .never)
+        XCTAssertEqual(ClaudeRefreshReason.userInitiated.keychainPromptPolicy, .userInitiatedOnly)
+    }
+}
 
 final class ClaudeKeychainCredentialStoreTests: XCTestCase {
     /// Shape verified against a real Keychain "Claude Code-credentials" item

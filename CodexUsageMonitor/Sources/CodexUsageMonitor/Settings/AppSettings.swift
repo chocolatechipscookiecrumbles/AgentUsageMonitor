@@ -18,6 +18,7 @@ final class AppSettings: ObservableObject {
         static let quotaValueMode = "menuBar.valueMode"
         static let appearancePreference = "general.appearance"
         static let keyboardShortcutsEnabled = "general.keyboardShortcutsEnabled"
+        static let claudeCLIProbeConsented = "claude.cliProbeConsented"
     }
 
     private let defaults: UserDefaults
@@ -44,10 +45,16 @@ final class AppSettings: ObservableObject {
     @Published var quotaValueMode: QuotaValueMode { didSet { defaults.set(quotaValueMode.rawValue, forKey: Key.quotaValueMode) } }
     @Published var appearancePreference: AppearancePreference { didSet { defaults.set(appearancePreference.rawValue, forKey: Key.appearancePreference) } }
     @Published var keyboardShortcutsEnabled: Bool { didSet { defaults.set(keyboardShortcutsEnabled, forKey: Key.keyboardShortcutsEnabled) } }
+    /// Whether the user has acknowledged that the CLI usage probe costs
+    /// tokens. Gates the confirmation prompt so it appears on first use, not
+    /// on every press.
+    @Published var claudeCLIProbeConsented: Bool { didSet { defaults.set(claudeCLIProbeConsented, forKey: Key.claudeCLIProbeConsented) } }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         alertsEnabled = defaults.bool(forKey: Key.alertsEnabled)
+        // Defaults false: the user must opt in before the CLI is ever run.
+        claudeCLIProbeConsented = defaults.bool(forKey: Key.claudeCLIProbeConsented)
         enabledQuotaThresholds = Self.quotaThresholds(defaults: defaults)
         forecastWarningsEnabled = Self.value(for: Key.forecastWarnings, defaults: defaults, defaultValue: true)
         resetCreditWarningsEnabled = Self.value(for: Key.resetCreditWarnings, defaults: defaults, defaultValue: true)

@@ -58,6 +58,13 @@ Create a Claude adapter with real connection, refresh, or usage behavior — rep
 
 Criteria 1, 2, and 4 are now satisfied by the statusLine bridge and `ClaudeUsageMonitor`; criteria 3 and 5 (product-copy accuracy, a visible "not available" fallback) remain UI-layer work with no Settings surface built yet. Until all five are met, Claude Code remains a static preview: no connection controller wired to product UI, no refresh cycle driving a view, no notifications, no usage read reachable by an end user.
 
+**Credential-method update — 2026-07-21.** Criterion 2's OAuth-reuse concession is no longer the *only* option. Tier 1 now has **two co-equal, user-selectable credential methods**, mirroring Codex's browser/CLI sign-in pair (see [credential methods plan](2026-07-21-claude-oauth-web-login-provider.md)):
+
+- **(a) Browser sign-in** via Anthropic's own `claude setup-token`, which issues a long-lived token *to this app*. This is officially sanctioned, needs no reading of Claude Code's credential, raises **no Keychain ACL prompt**, and never calls `/v1/oauth/token` from this app.
+- **(b) Claude Code credentials** — the existing Keychain read, retained as the zero-setup option, now reachable only by an explicit user action carrying a disclosure of what it grants.
+
+This materially narrows criterion 2's ToS exposure: method (a) involves no credential reuse at all, so the personal-build concession is now a fallback posture rather than the design's foundation. A self-run PKCE flow was proven feasible but **deliberately not shipped** — it would reuse Claude Code's `client_id` (misleading consent screen); see [spike findings](2026-07-21-claude-oauth-web-login-spike-findings.md). `ClaudeConnectionController` and `ClaudeSignInView` exist and are tested (93 Claude tests), but are **not yet wired into `AgentsSettingsView`**, so criterion 3/5 UI work and end-user reachability still stand open.
+
 ## Authoritative-signal probe: statusLine vs. OAuth endpoint — 2026-07-20
 
 User direction: verify the `/usage` token-cost claim, model its cost at a 2-minute refresh cadence against Pro/Max pricing, and probe two candidate authoritative (non-estimate) signals surfaced during that research — Claude Code's own `statusLine` JSON and the `api.anthropic.com/api/oauth/usage` endpoint CodexBar uses — for accuracy and user-experience impact, including whether the OAuth path is "just a browser sign-in" or something harder.

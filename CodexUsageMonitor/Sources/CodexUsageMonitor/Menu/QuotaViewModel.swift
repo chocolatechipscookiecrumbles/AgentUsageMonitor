@@ -18,9 +18,18 @@ final class QuotaViewModel: ObservableObject {
     @Published private(set) var refreshScheduleReason: RefreshScheduleReason?
     @Published private(set) var connectionState: AgentConnectionState = .checking
     @Published private(set) var refreshTimingPresentation: MenuRefreshTimingPresentation
+    /// Claude's read cycle, owned here the same way Codex's QuotaMonitor is.
+    @Published private(set) var claudeState: ClaudeUsageState = .unavailable(reason: ClaudeUsageState.notConnectedReason)
+    @Published private(set) var claudeConnectionState: ClaudeConnectionState = .notConnected
+    /// Result of the last manual CLI probe, so the page can report a failure
+    /// the user paid tokens for.
+    @Published private(set) var claudeCLIProbeError: String?
+    @Published private(set) var isRunningClaudeCLIProbe = false
 
     let settings: AppSettings
     private let monitor: QuotaMonitor
+    private let claudeMonitor: ClaudeUsageMonitor
+    private let claudeConnectionController: ClaudeConnectionController
     private let connectionController: CodexConnectionController
     private var subscriptions: Set<AnyCancellable> = []
 
@@ -33,6 +42,24 @@ final class QuotaViewModel: ObservableObject {
             monitor.refresh(reason: .authentication)
         }
         self.connectionController = connectionController
+        let claudeMonitor = ClaudeUsageMonitor()
+        self.claudeMonitor = claudeMonitor
+        self.claudeConnectionController = ClaudeConnectionController(
+            browserSignIn: {
+                // Browser sign-in (claude setup-token) is shelved as unverified;
+                // it must not be presented as working. See the spike findings.
+                throw ClaudeSetupTokenError.missingCLI
+            },
+            credentialsSignIn: {
+                // Proof of connection is a real usage read. User-initiated, so
+                // this is the one path allowed to raise the Keychain prompt.
+                let source = ClaudeOAuthUsageSource(credentialStore: ClaudeCompositeCredentialStore())
+                let snapshot = try await source.fetch(
+                    promptPolicy: ClaudeRefreshReason.userInitiated.keychainPromptPolicy
+                )
+                return ClaudeAccountSummary(planType: snapshot.planHint)
+            }
+        )
         displayState = monitor.displayState
         refreshTimingPresentation = MenuRefreshTimingPresentation(
             lastRefreshAt: monitor.displayState.lastAttemptAt,
@@ -73,7 +100,17 @@ final class QuotaViewModel: ObservableObject {
         connectionController.$state.removeDuplicates().sink { [weak self] state in
             self?.connectionState = state
         }.store(in: &subscriptions)
-        if !CommandLine.arguments.contains("--live-read-once") {
+        claudeMonitor.$state.sink { [weak self] state in
+            self?.claudeState = state
+        }.store(in: &subscriptions)
+        claudeConnectionController.$state.removeDuplicates().sink { [weak self] state in
+            self?.claudeConnectionState = state
+            // A successful connect proves the credential works; pull usage now
+            // rather than waiting for the next scheduled refresh.
+            if state.isConnected { self?.refreshClaude() }
+        }.store(in: &subscriptions)
+        if !CommandLine.arguments.contains("--live-read-once")
+            && !CommandLine.arguments.contains(ClaudeUsageProbeCommand.flag) {
             start()
         }
     }
@@ -89,6 +126,7 @@ final class QuotaViewModel: ObservableObject {
     func start() {
         connectionController.start()
         monitor.start()
+        claudeMonitor.start()
         Task { [weak self] in
             guard let self else { return }
             _ = await monitor.refreshNotificationAuthorization()
@@ -135,5 +173,68 @@ final class QuotaViewModel: ObservableObject {
         if newPresentation != refreshTimingPresentation {
             refreshTimingPresentation = newPresentation
         }
+    }
+
+    /// User-initiated: this is the only path allowed to raise a Keychain
+    /// prompt, so it must never be called from a background trigger.
+    func refreshClaude() {
+        Task { [claudeMonitor] in
+            await claudeMonitor.refreshNow(reason: .userInitiated)
+        }
+    }
+
+    /// Menu-open refresh — reads with interaction forbidden.
+    func refreshClaudeOnMenuOpen() {
+        Task { [claudeMonitor] in
+            await claudeMonitor.refreshNow(reason: .menuOpened)
+        }
+    }
+
+    /// Explicit user action — the only path that may raise the Keychain
+    /// prompt for Claude Code's credential.
+    func connectClaudeWithCredentials() {
+        claudeConnectionController.useClaudeCodeCredentials()
+    }
+
+    func disconnectClaude() {
+        claudeConnectionController.signOut()
+    }
+
+    /// Tier 2. Manual only, and only after the user has consented to the
+    /// token cost — never called from a scheduled refresh.
+    func runClaudeCLIProbe() {
+        guard !isRunningClaudeCLIProbe else { return }
+        isRunningClaudeCLIProbe = true
+        claudeCLIProbeError = nil
+        Task { [weak self] in
+            defer { Task { @MainActor [weak self] in self?.isRunningClaudeCLIProbe = false } }
+            do {
+                let snapshot = try await ClaudeCLIUsageProbe().run()
+                await MainActor.run { [weak self] in
+                    self?.claudeMonitor.applyManualSnapshot(snapshot)
+                }
+            } catch {
+                await MainActor.run { [weak self] in
+                    self?.claudeCLIProbeError = Self.cliProbeMessage(for: error)
+                }
+            }
+        }
+    }
+
+    private static func cliProbeMessage(for error: Error) -> String {
+        switch error as? ClaudeCLIProbeError {
+        case .missingCLI:
+            "The Claude Code CLI could not be found. Install it, then try again."
+        case .commandFailed:
+            "The Claude Code CLI could not complete the check. Make sure you are signed in to it."
+        case .couldNotParseOutput:
+            "The CLI ran but its usage output could not be read. This build may need updating for a newer CLI."
+        case nil:
+            "The usage check could not be completed."
+        }
+    }
+
+    func stopClaude() {
+        claudeMonitor.stop()
     }
 }

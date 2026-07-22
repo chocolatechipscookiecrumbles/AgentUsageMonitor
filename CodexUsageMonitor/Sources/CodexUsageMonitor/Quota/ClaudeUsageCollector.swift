@@ -5,6 +5,16 @@ enum ClaudeRefreshReason: Sendable {
     case scheduled
     case menuOpened
     case userInitiated
+
+    /// Only an explicit user action may raise the Keychain dialog. Every
+    /// automatic refresh reads with interaction forbidden, so a scheduled
+    /// poll can never interrupt the user with a permission prompt.
+    var keychainPromptPolicy: KeychainPromptPolicy {
+        switch self {
+        case .userInitiated: .userInitiatedOnly
+        case .appLaunch, .scheduled, .menuOpened: .never
+        }
+    }
 }
 
 /// Maps the existing, already-shipped statusLine bridge's snapshot type into
@@ -23,9 +33,11 @@ func adaptStatusLineSnapshot(_ snapshot: ClaudeRateLimitSnapshot) -> ClaudeUsage
     )
 }
 
-/// Single entry point implementing the OAuth -> statusLine -> cache order
-/// from claude_probe_plan (tier 3, the user-authorized CLI /usage probe, is
-/// deliberately not implemented here — see a separate, dedicated plan).
+/// Single entry point implementing the four-tier fallback order:
+/// OAuth (1) -> CLI /usage probe (2) -> statusLine (3) -> cache (4).
+/// Tier 2 is not implemented here (its own dedicated plan), so the runtime
+/// order is currently OAuth -> statusLine -> cache. statusLine ranks below a
+/// live CLI probe because it is passive and can be stale.
 actor ClaudeUsageCollector {
     private let oauthSource: ClaudeOAuthUsageSource
     private let statusLineReader: ClaudeRateLimitSnapshotReader
@@ -38,19 +50,26 @@ actor ClaudeUsageCollector {
     }
 
     func refresh(reason: ClaudeRefreshReason) async -> ClaudeUsagePresentation {
-        if let snapshot = try? await oauthSource.fetch() {
+        if let snapshot = try? await oauthSource.fetch(promptPolicy: reason.keychainPromptPolicy) {
             cache.save(snapshot)
             return ClaudeUsagePresentation(snapshot: snapshot, delivery: .live, warnings: [])
         }
 
-        if let statusLineSnapshot = statusLineReader.readSnapshot() {
-            let adapted = adaptStatusLineSnapshot(statusLineSnapshot)
-            cache.save(adapted)
-            return ClaudeUsagePresentation(snapshot: adapted, delivery: .passiveSnapshot, warnings: [])
+        // Tier 3 outranks tier 4 because a statusLine capture is *normally*
+        // fresher than the cache. That assumption fails when Claude Code has
+        // not run for a while: a days-old capture would otherwise be shown in
+        // preference to a recent OAuth read we already hold. Rank the two by
+        // capture time so the user always sees the best reading available.
+        let statusLine = statusLineReader.readSnapshot().map(adaptStatusLineSnapshot)
+        let cached = cache.load()?.snapshot
+
+        if let statusLine, cached.map({ statusLine.capturedAt >= $0.capturedAt }) ?? true {
+            cache.save(statusLine)
+            return ClaudeUsagePresentation(snapshot: statusLine, delivery: .passiveSnapshot, warnings: [])
         }
 
-        if let cached = cache.load() {
-            return ClaudeUsagePresentation(snapshot: cached.snapshot, delivery: .cached, warnings: [])
+        if let cached {
+            return ClaudeUsagePresentation(snapshot: cached, delivery: .cached, warnings: [])
         }
 
         return ClaudeUsagePresentation(

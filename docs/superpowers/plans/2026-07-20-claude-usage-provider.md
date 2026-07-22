@@ -80,7 +80,7 @@ Key differences from `claude_probe_plan`: the window field is `utilization` (not
 **Interfaces:**
 - Produces: `ClaudeLimitWindow`, `ClaudeScopedLimitWindow`, `ClaudeExtraUsage`, `ClaudeUsageSource` (`.oauth`, `.statusLine`, `.cache`), `ClaudeUsageSnapshot`, `ClaudeUsageDelivery` (`.live`, `.passiveSnapshot`, `.cached`), `ClaudeUsagePresentation` — all `Codable, Sendable, Equatable` except `ClaudeUsagePresentation`, which is `Sendable` only (it wraps a delivery classification, not raw stored data).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `CodexUsageMonitor/Tests/CodexUsageMonitorTests/ClaudeUsageSnapshotTests.swift`:
 
@@ -144,12 +144,12 @@ final class ClaudeUsageSnapshotTests: XCTestCase {
 }
 ```
 
-- [ ] **Step 2: Run the test to verify it fails**
+- [x] **Step 2: Run the test to verify it fails**
 
 Run: `cd CodexUsageMonitor && swift test --filter ClaudeUsageSnapshotTests`
 Expected: FAIL to build — `cannot find 'ClaudeUsageSnapshot' in scope`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeUsageSnapshot.swift`:
 
@@ -216,7 +216,7 @@ struct ClaudeUsagePresentation: Sendable {
 Run: `cd CodexUsageMonitor && swift test --filter ClaudeUsageSnapshotTests`
 Expected: PASS (3 tests)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeUsageSnapshot.swift \
@@ -235,7 +235,7 @@ git commit -m "Add shared Claude usage domain model"
 **Interfaces:**
 - Produces: `struct ClaudeOAuthCredential` (NOT Codable/CustomStringConvertible) with `accessToken: String`, `refreshToken: String?`, `expiresAt: Date?`, `scopes: Set<String>`, `subscriptionType: String?`; `enum ClaudeCredentialError: Error, Equatable { case notFound; case malformedData; case accessDenied }`; `protocol ClaudeCredentialProviding: Sendable { func loadCredential() throws -> ClaudeOAuthCredential }`; `struct ClaudeKeychainCredentialStore: ClaudeCredentialProviding` with a production `init(serviceName:)` and a test-only `init(rawDataReader:)`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `CodexUsageMonitor/Tests/CodexUsageMonitorTests/ClaudeKeychainCredentialStoreTests.swift`:
 
@@ -307,12 +307,12 @@ final class ClaudeKeychainCredentialStoreTests: XCTestCase {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cd CodexUsageMonitor && swift test --filter ClaudeKeychainCredentialStoreTests`
 Expected: FAIL to build — `cannot find 'ClaudeKeychainCredentialStore' in scope`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Connection/ClaudeOAuthCredential.swift`:
 
@@ -416,7 +416,7 @@ struct ClaudeKeychainCredentialStore: ClaudeCredentialProviding {
 Run: `cd CodexUsageMonitor && swift test --filter ClaudeKeychainCredentialStoreTests`
 Expected: PASS (5 tests)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add CodexUsageMonitor/Sources/CodexUsageMonitor/Connection/ClaudeOAuthCredential.swift \
@@ -436,7 +436,7 @@ git commit -m "Add Keychain credential discovery for Claude Code's own OAuth tok
 - Consumes: `ClaudeCredentialProviding`/`ClaudeOAuthCredential` (Task 2), `ClaudeUsageSnapshot`/`ClaudeLimitWindow` (Task 1).
 - Produces: `enum ClaudeOAuthError: Error, Equatable { case credentialsNotFound; case insufficientScope; case unauthorized; case malformedResponse; case serverFailure(statusCode: Int); case transportError }`; `struct ClaudeOAuthUsageSource` with `init(credentialStore:requestExecutor:)` and `func fetch() async throws -> ClaudeUsageSnapshot`; `enum ClaudeOAuthDateParsing { static func parse(_ string: String) -> Date? }`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `CodexUsageMonitor/Tests/CodexUsageMonitorTests/ClaudeOAuthUsageSourceTests.swift`:
 
@@ -606,12 +606,12 @@ private struct FakeCredentialStore: ClaudeCredentialProviding {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cd CodexUsageMonitor && swift test --filter ClaudeOAuthUsageSourceTests`
 Expected: FAIL to build — `cannot find 'ClaudeOAuthUsageSource' in scope`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeOAuthUsageSource.swift`:
 
@@ -793,7 +793,7 @@ struct ClaudeOAuthUsageSource {
 Run: `cd CodexUsageMonitor && swift test --filter ClaudeOAuthUsageSourceTests`
 Expected: PASS (7 tests)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeOAuthUsageSource.swift \
@@ -813,7 +813,7 @@ git commit -m "Add live OAuth usage fetch source with verified real response map
 - Consumes: `ClaudeUsageSnapshot` (Task 1).
 - Produces: `struct ClaudeCachedUsage: Codable, Equatable { let snapshot: ClaudeUsageSnapshot; let savedAt: Date }`; `struct ClaudeUsageCache` with `init(fileURL:)`, `func save(_ snapshot: ClaudeUsageSnapshot)`, `func load() -> ClaudeCachedUsage?`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `CodexUsageMonitor/Tests/CodexUsageMonitorTests/ClaudeUsageCacheTests.swift`:
 
@@ -884,12 +884,12 @@ final class ClaudeUsageCacheTests: XCTestCase {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cd CodexUsageMonitor && swift test --filter ClaudeUsageCacheTests`
 Expected: FAIL to build — `cannot find 'ClaudeUsageCache' in scope`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeUsageCache.swift`:
 
@@ -945,7 +945,7 @@ struct ClaudeUsageCache {
 Run: `cd CodexUsageMonitor && swift test --filter ClaudeUsageCacheTests`
 Expected: PASS (5 tests)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeUsageCache.swift \
@@ -965,7 +965,7 @@ git commit -m "Add last-known-good cache for normalized Claude usage snapshots"
 - Consumes: `ClaudeOAuthUsageSource` (Task 3), `ClaudeRateLimitSnapshotReader`/`ClaudeRateLimitSnapshot` (existing, from the statusLine bridge plan — unmodified), `ClaudeUsageCache` (Task 4).
 - Produces: `enum ClaudeRefreshReason: Sendable { case appLaunch; case scheduled; case menuOpened; case userInitiated }`; `func adaptStatusLineSnapshot(_ snapshot: ClaudeRateLimitSnapshot) -> ClaudeUsageSnapshot`; `actor ClaudeUsageCollector` with `init(oauthSource:statusLineReader:cache:)` and `func refresh(reason: ClaudeRefreshReason) async -> ClaudeUsagePresentation`.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `CodexUsageMonitor/Tests/CodexUsageMonitorTests/ClaudeUsageCollectorTests.swift`:
 
@@ -1118,12 +1118,12 @@ private struct FakeCredentialStore: ClaudeCredentialProviding {
 }
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [x] **Step 2: Run the tests to verify they fail**
 
 Run: `cd CodexUsageMonitor && swift test --filter ClaudeUsageCollectorTests`
 Expected: FAIL to build — `cannot find 'ClaudeUsageCollector' in scope`
 
-- [ ] **Step 3: Write the implementation**
+- [x] **Step 3: Write the implementation**
 
 Create `CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeUsageCollector.swift`:
 
@@ -1205,7 +1205,7 @@ Expected: PASS (5 tests)
 Run: `cd CodexUsageMonitor && swift test`
 Expected: PASS (all existing tests plus the 25 new ones from Tasks 1–5)
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeUsageCollector.swift \
@@ -1221,15 +1221,15 @@ git commit -m "Add OAuth -> statusLine -> cache coordinator for Claude usage"
 - Modify: `docs/superpowers/plans/2026-07-20-claude-code-capability-research.md`
 - Modify: `docs/product/planning-board.md`
 
-- [ ] **Step 1: Update the capability research doc**
+- [x] **Step 1: Update the capability research doc**
 
 Under "Personal, non-commercial OAuth reuse decision," append an implementation note confirming `ClaudeUsageCollector` implements the OAuth → statusLine → cache order end-to-end, tested, with the OAuth response shape verified against a real call.
 
-- [ ] **Step 2: Update the planning board**
+- [x] **Step 2: Update the planning board**
 
 Update the Claude local analytics/provider research row and plan coverage index to reference this plan.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add docs/superpowers/plans/2026-07-20-claude-code-capability-research.md docs/product/planning-board.md
