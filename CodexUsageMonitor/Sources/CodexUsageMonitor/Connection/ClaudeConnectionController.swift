@@ -90,6 +90,16 @@ final class ClaudeConnectionController: ObservableObject {
                 return .failed(.credentialsNotFound)
             }
         }
+        // The credentials path fetches usage as its proof of connection, so
+        // OAuth-layer failures surface here too.
+        if let oauthError = error as? ClaudeOAuthError {
+            switch oauthError {
+            case .credentialsNotFound, .unauthorized, .insufficientScope:
+                return .failed(.credentialsNotFound)
+            case .malformedResponse, .serverFailure, .transportError:
+                return .failed(.usageUnavailable)
+            }
+        }
         return .failed(.usageUnavailable)
     }
 }

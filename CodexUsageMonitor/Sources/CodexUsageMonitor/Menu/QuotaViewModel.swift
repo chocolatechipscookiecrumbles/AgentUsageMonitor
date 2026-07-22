@@ -20,10 +20,12 @@ final class QuotaViewModel: ObservableObject {
     @Published private(set) var refreshTimingPresentation: MenuRefreshTimingPresentation
     /// Claude's read cycle, owned here the same way Codex's QuotaMonitor is.
     @Published private(set) var claudeState: ClaudeUsageState = .unavailable(reason: ClaudeUsageState.notConnectedReason)
+    @Published private(set) var claudeConnectionState: ClaudeConnectionState = .notConnected
 
     let settings: AppSettings
     private let monitor: QuotaMonitor
     private let claudeMonitor: ClaudeUsageMonitor
+    private let claudeConnectionController: ClaudeConnectionController
     private let connectionController: CodexConnectionController
     private var subscriptions: Set<AnyCancellable> = []
 
@@ -38,6 +40,22 @@ final class QuotaViewModel: ObservableObject {
         self.connectionController = connectionController
         let claudeMonitor = ClaudeUsageMonitor()
         self.claudeMonitor = claudeMonitor
+        self.claudeConnectionController = ClaudeConnectionController(
+            browserSignIn: {
+                // Browser sign-in (claude setup-token) is shelved as unverified;
+                // it must not be presented as working. See the spike findings.
+                throw ClaudeSetupTokenError.missingCLI
+            },
+            credentialsSignIn: {
+                // Proof of connection is a real usage read. User-initiated, so
+                // this is the one path allowed to raise the Keychain prompt.
+                let source = ClaudeOAuthUsageSource(credentialStore: ClaudeCompositeCredentialStore())
+                let snapshot = try await source.fetch(
+                    promptPolicy: ClaudeRefreshReason.userInitiated.keychainPromptPolicy
+                )
+                return ClaudeAccountSummary(planType: snapshot.planHint)
+            }
+        )
         displayState = monitor.displayState
         refreshTimingPresentation = MenuRefreshTimingPresentation(
             lastRefreshAt: monitor.displayState.lastAttemptAt,
@@ -80,6 +98,12 @@ final class QuotaViewModel: ObservableObject {
         }.store(in: &subscriptions)
         claudeMonitor.$state.sink { [weak self] state in
             self?.claudeState = state
+        }.store(in: &subscriptions)
+        claudeConnectionController.$state.removeDuplicates().sink { [weak self] state in
+            self?.claudeConnectionState = state
+            // A successful connect proves the credential works; pull usage now
+            // rather than waiting for the next scheduled refresh.
+            if state.isConnected { self?.refreshClaude() }
         }.store(in: &subscriptions)
         if !CommandLine.arguments.contains("--live-read-once")
             && !CommandLine.arguments.contains(ClaudeUsageProbeCommand.flag) {
@@ -160,6 +184,16 @@ final class QuotaViewModel: ObservableObject {
         Task { [claudeMonitor] in
             await claudeMonitor.refreshNow(reason: .menuOpened)
         }
+    }
+
+    /// Explicit user action — the only path that may raise the Keychain
+    /// prompt for Claude Code's credential.
+    func connectClaudeWithCredentials() {
+        claudeConnectionController.useClaudeCodeCredentials()
+    }
+
+    func disconnectClaude() {
+        claudeConnectionController.signOut()
     }
 
     func stopClaude() {

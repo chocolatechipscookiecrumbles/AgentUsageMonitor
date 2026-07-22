@@ -106,6 +106,41 @@ final class ClaudeConnectionControllerTests: XCTestCase {
         await waitForState(.failed(.credentialsNotFound), in: controller)
     }
 
+    /// The credentials path fetches usage, so it surfaces ClaudeOAuthError,
+    /// not just credential-store errors.
+    func testOAuthCredentialsNotFoundMapsToCredentialsNotFound() async {
+        let controller = ClaudeConnectionController(
+            browserSignIn: { ClaudeAccountSummary(planType: nil) },
+            credentialsSignIn: { throw ClaudeOAuthError.credentialsNotFound }
+        )
+
+        controller.useClaudeCodeCredentials()
+
+        await waitForState(.failed(.credentialsNotFound), in: controller)
+    }
+
+    func testOAuthUnauthorizedMapsToCredentialsNotFound() async {
+        let controller = ClaudeConnectionController(
+            browserSignIn: { ClaudeAccountSummary(planType: nil) },
+            credentialsSignIn: { throw ClaudeOAuthError.unauthorized }
+        )
+
+        controller.useClaudeCodeCredentials()
+
+        await waitForState(.failed(.credentialsNotFound), in: controller)
+    }
+
+    func testOAuthTransportErrorMapsToUsageUnavailable() async {
+        let controller = ClaudeConnectionController(
+            browserSignIn: { ClaudeAccountSummary(planType: nil) },
+            credentialsSignIn: { throw ClaudeOAuthError.transportError }
+        )
+
+        controller.useClaudeCodeCredentials()
+
+        await waitForState(.failed(.usageUnavailable), in: controller)
+    }
+
     func testSecondSignInIsIgnoredWhileOneIsInFlight() async {
         let gate = Gate()
         let counter = Counter()
