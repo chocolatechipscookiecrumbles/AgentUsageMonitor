@@ -1,0 +1,1132 @@
+Claude Usage Provider Implementation Plan
+
+Goal
+
+Add Claude Code subscription usage monitoring to the macOS Agent Usage app with a source hierarchy that prioritizes fresh account-level data while avoiding unnecessary CLI activity:
+
+1. Fetch live usage through Claude’s OAuth usage endpoint.
+2. Use a recent passive Claude Code status-line snapshot when OAuth is unavailable.
+3. Offer a user-authorized Claude CLI /usage probe when no sufficiently fresh result is available.
+4. Fall back to the last-known-good cached result when every live source fails.
+
+The provider should expose five-hour and seven-day quota windows, reset times, plan and account hints when available, source metadata, freshness, and actionable recovery guidance.
+
+The implementation is local-only and intended for personal use. Claude credentials must remain on the device and must never be logged, copied into application caches, or transmitted anywhere except directly to Anthropic.
+
+⸻
+
+1. Provider behavior
+
+Automatic refresh order
+
+For background and normal application refreshes:
+
+OAuth live fetch
+    ↓ failure
+Recent status-line snapshot
+    ↓ unavailable or stale
+Cached last-known-good
+
+The app must not automatically invoke Claude /usage during background refreshes.
+
+User-initiated refresh order
+
+When the user explicitly selects Refresh Claude Usage:
+
+OAuth live fetch
+    ↓ failure
+Recent status-line snapshot
+    ↓ unavailable or stale
+Ask for or apply existing permission to run /usage
+    ↓ failure or declined
+Cached last-known-good
+
+When the user has previously enabled automatic CLI fallback for manual refreshes, the permission prompt does not need to appear on every refresh. The /usage probe must still run only in response to a user action.
+
+Source precedence rules
+
+A result from a higher-priority source replaces a lower-priority result when it is valid.
+
+Priority:
+
+OAuth live result
+> recent status-line result
+> successful /usage result
+> cached last-known-good
+
+A recent status-line result can be shown instead of invoking /usage, but the user should still be able to select Force CLI Refresh… when they explicitly want a newer reading.
+
+⸻
+
+2. Shared domain model
+
+Create one normalized representation so that OAuth, status line, CLI output, and cache all feed the same UI.
+
+struct ClaudeUsageSnapshot: Codable, Sendable, Equatable {
+    let account: ClaudeAccountIdentity?
+    let plan: ClaudePlan?
+    let fiveHour: ClaudeLimitWindow?
+    let sevenDay: ClaudeLimitWindow?
+    let scopedWindows: [ClaudeScopedLimitWindow]
+    let extraUsage: ClaudeExtraUsage?
+    let source: ClaudeUsageSource
+    let capturedAt: Date
+    let credentialFingerprint: String?
+    let schemaVersion: Int
+}
+struct ClaudeLimitWindow: Codable, Sendable, Equatable {
+    let usedPercent: Double
+    let resetsAt: Date?
+}
+struct ClaudeScopedLimitWindow: Codable, Sendable, Equatable {
+    let identifier: String
+    let displayName: String
+    let usedPercent: Double
+    let resetsAt: Date?
+}
+struct ClaudeAccountIdentity: Codable, Sendable, Equatable {
+    let email: String?
+    let organizationName: String?
+}
+struct ClaudeExtraUsage: Codable, Sendable, Equatable {
+    let amountUsed: Decimal?
+    let spendingLimit: Decimal?
+    let currencyCode: String?
+}
+enum ClaudeUsageSource: String, Codable, Sendable {
+    case oauth
+    case statusLine
+    case cliUsage
+    case cache
+}
+
+The cache should preserve the original successful source separately from the fact that the result is currently being displayed from cache.
+
+A better representation is:
+
+struct ClaudeUsagePresentation: Sendable {
+    let snapshot: ClaudeUsageSnapshot
+    let delivery: ClaudeUsageDelivery
+    let freshness: ClaudeUsageFreshness
+    let warnings: [ClaudeUsageWarning]
+}
+enum ClaudeUsageDelivery: Sendable {
+    case live
+    case passiveSnapshot
+    case cached
+}
+
+This prevents changing source: .oauth into source: .cache and losing information about where the data originally came from.
+
+⸻
+
+3. Provider coordinator
+
+Create a single entry point comparable to the existing Codex quota collector.
+
+protocol ClaudeUsageSourceProtocol: Sendable {
+    func fetch() async throws -> ClaudeUsageSnapshot
+}
+actor ClaudeUsageCollector {
+    private let oauthSource: ClaudeOAuthUsageSource
+    private let statusLineSource: ClaudeStatusLineUsageSource
+    private let cliSource: ClaudeCLIUsageSource
+    private let cache: ClaudeUsageCache
+    private let settings: ClaudeProviderSettingsStore
+    func refresh(
+        reason: ClaudeRefreshReason
+    ) async -> ClaudeUsagePresentation
+}
+
+Refresh reasons:
+
+enum ClaudeRefreshReason: Sendable {
+    case appLaunch
+    case scheduled
+    case menuOpened
+    case networkRecovered
+    case userInitiated
+    case forcedCLI
+}
+
+The refresh reason controls whether CLI probing is eligible.
+
+Decision algorithm
+
+func refresh(
+    reason: ClaudeRefreshReason
+) async -> ClaudeUsagePresentation {
+    do {
+        let result = try await oauthSource.fetch()
+        try await cache.save(result)
+        return .live(result)
+    } catch {
+        recordSourceFailure(.oauth, error)
+    }
+    if let passive = try? await statusLineSource.readLatest(),
+       freshnessPolicy.canUseStatusLine(passive, for: reason) {
+        try? await cache.save(passive)
+        return .passive(passive)
+    }
+    if reason.allowsCLIProbe,
+       await settings.isCLIProbeAuthorized {
+        do {
+            let result = try await cliSource.fetch()
+            try await cache.save(result)
+            return .live(result)
+        } catch {
+            recordSourceFailure(.cliUsage, error)
+        }
+    }
+    if let cached = try? await cache.load() {
+        return .cached(cached)
+    }
+    throw ClaudeUsageError.noUsableSource
+}
+
+Do not simply swallow all errors. Preserve source-specific failures so the settings screen can explain why OAuth, status-line capture, or CLI fallback did not work.
+
+⸻
+
+4. Phase 1: OAuth live usage source
+
+Objective
+
+Read an existing Claude Code OAuth credential and call the account-level usage endpoint directly.
+
+Credential discovery
+
+Support credentials in this order:
+
+1. Claude Code credential entry in macOS Keychain
+2. ~/.claude/.credentials.json
+3. Any already-supported Claude credential location discovered during implementation
+
+Do not introduce a separate “Sign in with Claude” flow initially. Reuse credentials created by Claude Code.
+
+Create:
+
+protocol ClaudeCredentialStore: Sendable {
+    func loadCredential(
+        promptPolicy: KeychainPromptPolicy
+    ) async throws -> ClaudeOAuthCredential
+}
+
+Credential representation:
+
+struct ClaudeOAuthCredential: Sendable {
+    let accessToken: String
+    let refreshToken: String?
+    let expiresAt: Date?
+    let scopes: Set<String>
+    let subscriptionType: String?
+}
+
+The credential object must never conform to Codable, CustomStringConvertible, or anything that could accidentally persist or print the token.
+
+Keychain prompt policy
+
+Use the same distinction as CodexBar:
+
+enum KeychainPromptPolicy {
+    case never
+    case userInitiatedOnly
+    case always
+}
+
+Recommended defaults:
+
+* Background refresh: never show a Keychain prompt.
+* Menu-open refresh: never show a Keychain prompt.
+* User-initiated refresh: allow a prompt.
+* Repair flow: allow a prompt.
+
+A denied or unavailable Keychain prompt must fall through to the next source rather than blocking the entire Claude provider.
+
+OAuth request
+
+Request:
+
+GET https://api.anthropic.com/api/oauth/usage
+Authorization: Bearer <access-token>
+anthropic-beta: oauth-2025-04-20
+
+Requirements:
+
+* Use an ephemeral URLSession or a session that does not persist credentials.
+* Disable verbose request logging for this endpoint.
+* Never include request headers in error reports.
+* Apply a bounded timeout.
+* Validate status code and response content type.
+* Decode unknown fields permissively.
+* Clamp percentages to a safe display range while retaining raw values for diagnostics when appropriate.
+
+Mapping
+
+Map:
+
+five_hour         → five-hour quota window
+seven_day         → main weekly quota window
+seven_day_sonnet  → Sonnet weekly window
+seven_day_opus    → Opus weekly window
+limits[]          → additional scoped windows
+extra_usage       → extra usage spend and limit
+subscriptionType  → preferred plan hint
+rate_limit_tier   → fallback plan hint
+
+Keep endpoint response types private to the OAuth adapter. Only expose the normalized ClaudeUsageSnapshot.
+
+Credential refresh
+
+When a refresh token is available and the access token is close to expiry:
+
+1. Refresh the token only when necessary.
+2. Write the updated credential back only through the same secure credential mechanism.
+3. Serialize refresh attempts.
+4. Avoid multiple refresh operations from simultaneous menu, timer, and network events.
+5. Never treat a refresh-token failure as permission to delete the existing credential.
+
+If credential refresh is too uncertain for the first version, surface an authentication-expired state and direct the user to run claude and sign in again.
+
+OAuth error classification
+
+Create structured errors:
+
+enum ClaudeOAuthError: Error {
+    case credentialsNotFound
+    case oauthFieldsMissing
+    case insufficientScope
+    case tokenExpired
+    case unauthorized
+    case forbidden
+    case rateLimited(retryAfter: Date?)
+    case networkUnavailable
+    case timeout
+    case malformedResponse
+    case serverFailure(statusCode: Int)
+}
+
+Classify which errors make the status-line source or CLI source eligible.
+
+For example:
+
+OAuth result	Continue to status line?	CLI eligible later?
+No credentials	Yes	Yes
+Missing usage scope	Yes	Yes
+Unauthorized	Yes	Yes
+Network unavailable	Yes	Usually no immediate CLI advantage
+Timeout	Yes	Optional
+Malformed response	Yes	Yes
+Rate limited	Yes	Avoid adding another automatic probe
+Server failure	Yes	User-authorized CLI may be allowed
+
+⸻
+
+5. Phase 2: Status-line snapshot source
+
+Objective
+
+Passively receive Claude Code’s structured status-line data and save the latest account quota snapshot for the app.
+
+Bridge installation
+
+Create a small bridge executable or script owned by the app.
+
+Preferred implementation:
+
+AgentUsageClaudeBridge
+
+Responsibilities:
+
+1. Read one status-line JSON payload from standard input.
+2. Decode only required fields.
+3. Normalize five-hour and seven-day limits.
+4. Write a private snapshot file atomically.
+5. Exit immediately.
+6. Never make a network request.
+7. Never launch the main app.
+8. Never write raw payloads to logs.
+
+Install it under an application-controlled support directory, for example:
+
+~/Library/Application Support/Agent Usage/ClaudeBridge/
+
+Do not rely on a temporary application bundle path that may change after updates.
+
+Claude configuration integration
+
+The setup flow should:
+
+1. Detect the Claude Code settings file.
+2. Read and preserve existing settings.
+3. Detect an existing user-defined status line.
+4. Never silently overwrite another status-line command.
+5. Offer one of these options:
+    * Install the Agent Usage bridge when no status line exists.
+    * Wrap or chain an existing status-line command safely.
+    * Show manual setup instructions when automatic integration is unsafe.
+
+The first release may support only the no-conflict case and provide manual instructions for existing custom status lines.
+
+Snapshot location
+
+Store the passive file at a predictable private location:
+
+~/Library/Application Support/Agent Usage/Claude/status-line-snapshot.json
+
+File requirements:
+
+* Directory permissions: user-only where practical.
+* Temporary write followed by atomic rename.
+* Schema version.
+* Capture timestamp.
+* No access token.
+* No complete raw status-line payload.
+* No full transcript content.
+
+Example:
+
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-07-20T12:30:00Z",
+  "sessionId": "hashed-or-omitted",
+  "model": "claude-sonnet",
+  "fiveHour": {
+    "usedPercent": 32.5,
+    "resetsAt": "2026-07-20T15:00:00Z"
+  },
+  "sevenDay": {
+    "usedPercent": 48.0,
+    "resetsAt": "2026-07-24T08:00:00Z"
+  }
+}
+
+Freshness policy
+
+Make status-line freshness configurable internally even if the first UI uses a fixed default.
+
+Recommended initial thresholds:
+
+* Fresh: captured within 15 minutes
+* Recent: captured within 60 minutes
+* Stale: older than 60 minutes
+
+Behavior:
+
+OAuth failure + snapshot ≤15 minutes
+→ use snapshot immediately
+OAuth failure + snapshot 15–60 minutes
+→ use snapshot with a freshness note
+OAuth failure + snapshot >60 minutes
+→ do not treat as a recent source;
+   proceed toward user-authorized CLI or cache
+
+For scheduled background refreshes, a snapshot up to 60 minutes old may still be preferable to an older cache, but it must be visibly marked stale.
+
+Account-change protection
+
+A status-line snapshot may belong to a different Claude account than the currently discovered OAuth credential.
+
+Where possible, derive a non-secret fingerprint from stable identity fields:
+
+normalized email or account identifier
+→ SHA-256
+→ truncated fingerprint
+
+Rules:
+
+* Never hash the access token as the primary account identity.
+* Do not merge snapshots when known account fingerprints conflict.
+* If identity is unavailable, mark the snapshot as unverified rather than pretending it matches.
+* Clear or quarantine the status-line snapshot after an explicit account switch.
+
+⸻
+
+6. Phase 3: User-authorized /usage fallback
+
+Objective
+
+Provide a fresh quota read when OAuth is unavailable and passive status-line data is missing or too old.
+
+This source must not run during automatic refresh.
+
+Authorization UX
+
+Add a setting:
+
+Allow Claude CLI usage checks
+
+Recommended options:
+
+* Ask each time
+* Allow on manual refresh
+* Never
+
+Default:
+
+Ask each time
+
+First-use explanation:
+
+Agent Usage can open an isolated Claude Code terminal session and run
+the built-in /usage command to retrieve current quota information.
+This may cause a small Claude status request. It will not send a user
+prompt, invoke tools, or access files in your projects.
+
+Actions:
+
+Run Once
+Always Allow for Manual Refresh
+Cancel
+
+Probe isolation
+
+Use a dedicated working directory:
+
+~/Library/Application Support/Agent Usage/ClaudeProbe/
+
+Create Claude-specific local settings that:
+
+* Disable tools.
+* Avoid project trust side effects where possible.
+* Avoid deep-link registration.
+* Avoid modifying real project histories.
+* Avoid loading repository instructions.
+* Prevent access to user project files.
+
+Launch Claude with fixed arguments and no shell interpolation:
+
+claude --allowed-tools ""
+
+Do not invoke through:
+
+/bin/zsh -c "..."
+
+Use Process directly with a controlled executable path and argument array.
+
+PTY session
+
+A PTY is required on macOS because Claude is interactive.
+
+Probe flow:
+
+1. Locate the trusted claude executable.
+2. Start it in a PTY using the dedicated probe directory.
+3. Detect startup and authentication errors.
+4. Respond only to an allowlisted set of known first-run prompts.
+5. Send /usage.
+6. Wait for recognizable usage panel markers.
+7. Send Enter retries only when required.
+8. Capture bounded output.
+9. Strip ANSI/control sequences.
+10. Parse five-hour, weekly, scoped-window, reset, account, and plan fields.
+11. Terminate the process.
+12. Remove probe-generated session artifacts.
+13. Save a normalized successful result to cache.
+
+Probe safety limits
+
+Implement:
+
+* One active probe at a time.
+* Hard timeout, such as 20–30 seconds.
+* Maximum output size.
+* Maximum number of prompt responses.
+* Exact allowlist of automated responses.
+* Cancellation support.
+* No command execution based on terminal output.
+* No automatic retries beyond a small bounded number.
+* Cooldown between probes, initially 5 minutes.
+* Cleanup in defer, including cancellation and timeout paths.
+
+CLI parser
+
+Create a parser independent of the PTY controller:
+
+struct ClaudeUsageTextParser {
+    func parse(_ normalizedOutput: String) throws -> ClaudeUsageSnapshot
+}
+
+Test it against fixtures for:
+
+* Percent used
+* Percent remaining
+* Reset in relative time
+* Reset at a concrete time
+* Session and weekly sections
+* Model-specific weekly sections
+* Extra usage
+* Authentication expired
+* Education or organization plan with no numeric limits
+* Unknown future formatting
+* ANSI-heavy output
+* Narrow and wide terminal layouts
+
+The parser should fail safely rather than returning invented zero values.
+
+Interaction with status-line capture
+
+Running /usage may itself cause the configured status-line bridge to update.
+
+After a successful CLI probe:
+
+1. Prefer the directly parsed CLI result for the immediate response.
+2. Allow the status-line file to update independently.
+3. Do not produce duplicate history entries when both represent the same refresh.
+4. Cache the most complete of the two snapshots.
+
+⸻
+
+7. Phase 4: Last-known-good cache
+
+Objective
+
+Ensure the Claude card remains useful during transient authentication, network, endpoint, or CLI failures.
+
+Storage
+
+Store:
+
+~/Library/Application Support/Agent Usage/Claude/last-known-good.json
+
+Cache only normalized usage data.
+
+Never cache:
+
+* OAuth access tokens
+* Refresh tokens
+* Raw browser cookies
+* Complete Keychain records
+* Raw CLI terminal output
+* Raw status-line payloads
+* Full user prompts or transcripts
+
+Cache metadata
+
+struct ClaudeCachedUsage: Codable {
+    let snapshot: ClaudeUsageSnapshot
+    let savedAt: Date
+    let originalSource: ClaudeUsageSource
+}
+
+Cache update rules
+
+Save only when:
+
+* At least one valid quota window exists, or
+* A valid provider response explicitly establishes that numeric quota fields are unavailable for this account type.
+
+Do not replace a valid cache with:
+
+* Empty malformed responses
+* Authentication errors
+* Partial parser failures
+* Zero values inferred from missing fields
+* Results belonging to a conflicting account fingerprint
+
+Cache expiry
+
+The cache should not disappear merely because it is old.
+
+Presentation categories:
+
+Age	Presentation
+Under 15 minutes	Recent
+15–60 minutes	Aging
+1–24 hours	Stale
+Over 24 hours	Very stale
+Reset time already passed	Expired window
+
+When a cached window’s reset time has passed, do not continue presenting its percentage as current without a prominent expired state.
+
+Example:
+
+Last known weekly usage: 62%
+Captured yesterday through Claude OAuth
+The recorded quota window has since reset.
+
+⸻
+
+8. Refresh and network coordination
+
+Refresh triggers
+
+Support:
+
+* App launch
+* Menu opening
+* Scheduled refresh
+* Manual refresh
+* Network recovery
+* Claude credential repair
+* Provider settings change
+
+Debouncing
+
+Multiple refresh triggers can arrive together. Use an actor to coalesce them:
+
+app launch
++ menu opened
++ network became available
+→ one OAuth request
+
+Rate control
+
+Recommended defaults:
+
+* OAuth automatic refresh: every 10–15 minutes
+* Menu-open refresh: only when existing result exceeds freshness threshold
+* Network recovery refresh: immediate if the previous failure was network-related
+* /usage: user-triggered only, with cooldown
+* Status-line file: read cheaply whenever it changes or when OAuth fails
+
+Use filesystem event observation for the status-line snapshot when practical. Do not poll the file every few seconds.
+
+⸻
+
+9. UI behavior
+
+Main Claude card
+
+Display:
+
+Claude Pro
+5-hour usage                 34%
+Resets in 2h 18m
+Weekly usage                 51%
+Resets Friday at 4:00 PM
+Updated just now
+Claude OAuth
+
+Source labels
+
+Use clear source names:
+
+Claude OAuth
+Claude Code capture
+Claude CLI /usage
+Cached Claude OAuth result
+Cached Claude CLI result
+
+Avoid vague labels such as only Automatic.
+
+Freshness states
+
+OAuth success
+
+Updated just now through Claude OAuth
+
+Status-line fallback
+
+Captured 8 minutes ago through Claude Code
+
+Status-line stale but shown
+
+Captured 48 minutes ago through Claude Code
+May not include recent activity from other Claude surfaces
+
+Cached fallback
+
+Last updated 3 hours ago
+Live Claude usage is temporarily unavailable
+
+No source available
+
+Claude usage unavailable
+Sign in through Claude Code, enable passive capture, or run a
+manual CLI usage check.
+
+Refresh menu
+
+Normal action:
+
+Refresh Claude Usage
+
+Behavior:
+
+* Try OAuth.
+* Use recent status-line data.
+* If permission exists, run /usage.
+* Otherwise offer the authorization dialog.
+* Fall back to cache.
+
+Secondary action:
+
+Force CLI Usage Check…
+
+This explicitly skips ambiguity and communicates that Claude Code will be opened in an isolated probe session.
+
+Provider settings
+
+Add:
+
+Usage source
+Automatic
+OAuth credential
+Connected through Claude Code
+Passive Claude Code capture
+Enabled / Needs setup / Conflict detected
+CLI fallback
+Ask each time / Manual refresh only / Never
+Last successful source
+Claude OAuth
+Last successful update
+Today at 9:42 PM
+
+Include diagnostics without secrets:
+
+OAuth: unavailable — required usage scope missing
+Status line: available — captured 12 minutes ago
+CLI: installed — authorization required
+Cache: available — saved 2 hours ago
+
+⸻
+
+10. Error and fallback behavior
+
+OAuth unavailable, recent status line exists
+
+Return status-line snapshot.
+Show a non-blocking OAuth warning in provider settings.
+Do not invoke /usage.
+
+OAuth unavailable, status line stale, manual refresh
+
+Offer or run authorized /usage.
+If declined, show cached data.
+
+OAuth unavailable during background refresh
+
+Use recent status line.
+Otherwise use cache.
+Never open Claude CLI.
+
+/usage fails but status-line snapshot appeared during probe
+
+Read the newly written status-line snapshot.
+Use it if valid and newer than the prior snapshot.
+
+Account changed
+
+Do not show the old account’s result as current.
+Quarantine incompatible snapshots and cache entries.
+Prompt the user to refresh.
+
+Network lost
+
+Do not run /usage merely because OAuth has a network error.
+Show recent passive or cached data.
+Retry after network recovery.
+
+⸻
+
+11. Security requirements
+
+* Keep OAuth tokens in Keychain or Claude-owned credential storage.
+* Never copy tokens into the app’s usage cache.
+* Never log authorization headers.
+* Redact token-like values from all error descriptions.
+* Use fixed executable paths and fixed CLI arguments.
+* Do not launch the Claude probe through a shell.
+* Disable tools in probe sessions.
+* Use an isolated non-project working directory.
+* Keep bridge and cache files private to the current user.
+* Validate ownership and permissions before reading credential files.
+* Reject symlink-based credential and snapshot paths where appropriate.
+* Use atomic writes.
+* Bound subprocess execution time and output.
+* Clear sensitive in-memory buffers where practical.
+* Never upload Claude usage or identity data.
+
+⸻
+
+12. Testing plan
+
+OAuth unit tests
+
+Test:
+
+* Valid five-hour and weekly response
+* Missing five-hour response
+* Model-scoped weekly windows
+* Extra usage
+* Max 5x and Max 20x plan inference
+* Unknown response fields
+* Expired credential
+* Missing scope
+* Unauthorized response
+* Rate limiting
+* Malformed JSON
+* Network timeout
+* Token redaction in errors
+
+Use fixtures only. Never commit real credentials or raw personal responses.
+
+Status-line tests
+
+Test:
+
+* Valid structured rate limits
+* Missing rate-limit fields before first API response
+* Only one window present
+* Invalid percentages
+* Unknown schema additions
+* Atomic write behavior
+* Existing custom status-line conflict
+* Snapshot age classification
+* Account fingerprint mismatch
+
+CLI parser tests
+
+Test fixtures across Claude versions and terminal layouts:
+
+* Current session and current week
+* Percent used
+* Percent remaining
+* Different reset formats
+* Model-specific limits
+* Extra usage
+* Education subscription without numeric quotas
+* Expired token
+* Login required
+* Narrow terminal wrapping
+* ANSI and control characters
+* Partial output
+* Timeout
+
+Coordinator tests
+
+Verify exact fallback order:
+
+OAuth success
+→ no status-line read needed
+→ no CLI launch
+→ cache updated
+OAuth failure + recent status line
+→ status line returned
+→ no CLI launch
+OAuth failure + stale status line + manual authorization
+→ CLI launched
+OAuth failure + stale status line + background refresh
+→ CLI not launched
+→ cache returned
+All sources unavailable
+→ explicit unavailable state
+
+Also test:
+
+* Concurrent refresh coalescing
+* Cancellation
+* Network recovery
+* Account switching
+* Cache not overwritten by bad data
+* Source metadata retained through cache
+
+Integration tests
+
+Use synthetic helpers:
+
+* Fake Claude credential store
+* Local mock HTTP server
+* Fake status-line bridge payloads
+* Fake PTY executable
+* Deterministic CLI transcripts
+* Temporary cache directory
+
+Do not require a real Claude account in the normal test suite.
+
+Manual verification
+
+Perform a one-use local verification with a real account:
+
+1. Confirm Claude Code is authenticated.
+2. Run OAuth fetch.
+3. Compare five-hour and weekly values against Claude’s visible /usage screen.
+4. Disable or invalidate OAuth temporarily.
+5. Confirm recent status-line fallback.
+6. Age or remove the status-line snapshot.
+7. Trigger manual /usage.
+8. Confirm parsing and cleanup.
+9. Disconnect networking.
+10. Confirm cache fallback and stale labeling.
+11. Switch Claude accounts if available.
+12. Confirm old account data is not presented as current.
+
+Document exact observations without recording tokens or personally identifying account data.
+
+⸻
+
+13. Implementation sequence
+
+Task 1: Add normalized Claude usage models
+
+* Create quota, identity, scoped-window, source, freshness, and presentation models.
+* Add validation for percentages and reset times.
+* Add schema versioning.
+* Add unit tests.
+
+Deliverable: all future sources can return the same normalized snapshot.
+
+Task 2: Implement secure credential discovery
+
+* Read Claude Code credentials from Keychain and file fallback.
+* Add non-interactive and user-initiated prompt policies.
+* Detect missing OAuth fields and insufficient scopes.
+* Add token-safe error handling.
+* Add credential fixtures and tests.
+
+Deliverable: the app can identify whether a usable Claude OAuth credential exists.
+
+Task 3: Implement OAuth usage fetching
+
+* Add request and response types.
+* Call the OAuth usage endpoint.
+* Map all supported windows.
+* Infer plan hints.
+* Classify errors.
+* Add mock HTTP tests.
+
+Deliverable: manual and background refresh can obtain fresh account-level Claude quotas.
+
+Task 4: Implement last-known-good cache
+
+* Add secure normalized cache storage.
+* Use atomic writes.
+* Preserve original source metadata.
+* Add freshness and expiry calculation.
+* Prevent incompatible account data from merging.
+* Add corruption and migration tests.
+
+Deliverable: OAuth success persists safely and can survive later failures.
+
+Task 5: Implement status-line bridge
+
+* Build the minimal bridge executable.
+* Parse status-line JSON from stdin.
+* Write normalized snapshots atomically.
+* Add installation and detection logic.
+* Handle existing custom status-line configurations conservatively.
+* Add synthetic payload tests.
+
+Deliverable: Claude Code activity produces passive zero-token quota snapshots.
+
+Task 6: Implement the status-line source
+
+* Read and validate the latest bridge snapshot.
+* Calculate freshness.
+* Compare account fingerprints.
+* Add file-change observation.
+* Add stale and malformed snapshot tests.
+
+Deliverable: OAuth failures can immediately fall back to recent passive data.
+
+Task 7: Implement /usage PTY probing
+
+* Locate Claude CLI.
+* Add user authorization preference.
+* Create isolated probe directory.
+* Spawn through PTY with fixed arguments.
+* Automate only allowlisted startup prompts.
+* Send /usage.
+* Parse output.
+* Add timeout, cancellation, output bounds, cooldown, and cleanup.
+* Add fake-CLI integration tests.
+
+Deliverable: a user can obtain a fresh fallback reading without usable OAuth.
+
+Task 8: Implement the source coordinator
+
+* Encode the four-step source hierarchy.
+* Respect refresh reasons.
+* Prevent automatic CLI execution.
+* Coalesce simultaneous refreshes.
+* Preserve source-specific diagnostics.
+* Add full decision-tree tests.
+
+Deliverable: one ClaudeUsageCollector.refresh() entry point behaves predictably.
+
+Task 9: Add Claude provider UI
+
+* Add Claude card and provider selector entry.
+* Display quota windows and scoped limits.
+* Show source and freshness.
+* Add manual refresh and force-CLI actions.
+* Add onboarding, authorization, stale, and unavailable states.
+* Match the existing Codex presentation conventions.
+
+Deliverable: Claude usage is visible and understandable without exposing implementation complexity.
+
+Task 10: Add provider settings and diagnostics
+
+* Add OAuth connection status.
+* Add status-line setup state.
+* Add CLI fallback authorization.
+* Add last source and update time.
+* Add repair and reconfigure actions.
+* Redact all secrets.
+
+Deliverable: users can understand and repair each source independently.
+
+Task 11: Run real-account parity verification
+
+* Compare OAuth, status-line, and /usage outputs.
+* Record tolerated differences.
+* Confirm status-line data updates after usage on another Claude surface.
+* Validate cache behavior through network and authentication failures.
+* Adjust parser fixtures and freshness thresholds.
+
+Deliverable: evidence that the provider reports accurate values under realistic conditions.
+
+Task 12: Documentation and handoff
+
+Document:
+
+* Source hierarchy
+* Credential locations
+* Status-line setup
+* CLI probe behavior and possible small usage request
+* Freshness semantics
+* Cache semantics
+* Account-switch handling
+* Known endpoint and formatting risks
+* Manual verification procedure
+* Removal procedure for the status-line bridge
+
+Deliverable: the feature can be maintained without rediscovering its architecture.
+
+⸻
+
+14. Completion criteria
+
+The Claude provider is complete when:
+
+* OAuth provides fresh five-hour and weekly usage on a valid Claude Code account.
+* OAuth failures fall back to a recent status-line snapshot.
+* /usage never runs automatically in the background.
+* A user can authorize and run /usage from a manual refresh.
+* A failed live refresh preserves and clearly labels cached data.
+* Every displayed result identifies its source and capture time.
+* Stale and expired windows are not presented as live.
+* Account changes do not leak or merge prior account data.
+* No credential appears in logs, cache files, diagnostics, test fixtures, or crash output.
+* The implementation passes source-specific and coordinator fallback tests.
+* Real-account verification shows acceptable parity between OAuth and Claude’s own /usage display.
+
+⸻
+
+15. Deferred work
+
+Keep these outside the initial Claude quota implementation:
+
+* Browser-cookie usage scraping
+* Anthropic Admin API organization analytics
+* Multi-account switching
+* claude-swap integration
+* Automatic OAuth login initiated by the app
+* Hosted credential storage
+* Remote synchronization of Claude identity or usage
+* Detailed JSONL token and cost history
+* OpenTelemetry ingestion
+* Automatic background /usage polling
+
+Local transcript analytics can be added later as a separate feature. It should not be mixed into the authoritative account-quota collector.

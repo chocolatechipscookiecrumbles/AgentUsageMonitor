@@ -33,3 +33,19 @@ UsageProbe/Outputs/*
 
 # Local logs
 *.log
+
+# Agent skills synced in from global/third-party sources — tooling for whoever
+# is working here, not project assets. The repo's *own* skills stay tracked:
+# preparing-evidence-rich-prs is referenced by docs/development/ and .github/.
+.agents/skills/*
+!.agents/skills/preparing-evidence-rich-prs/
+
+# Per-machine agent harness config and the skill manifest that regenerates.
+.claude/
+skills-lock.json
+
+# Raw Figma exports and screen recordings: large, regenerated, and the v6
+# design is preserved as tracked spec + source in docs/design/menu-bar-popover/.
+High-fidelity macOS menu UI*/
+High-fidelity macOS menu UI*.zip
+*.mov
