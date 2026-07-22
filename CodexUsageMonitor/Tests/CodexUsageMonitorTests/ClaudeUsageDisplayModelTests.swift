@@ -255,3 +255,30 @@ final class ClaudeUsageDisplayModelTests: XCTestCase {
         XCTAssertFalse(ClaudeUsageDisplayModel.weeklyScopeCaveat.isEmpty)
     }
 }
+
+/// The note costs a line, so it may only appear where it is actually true.
+final class ClaudeFiveHourSessionNoteTests: XCTestCase {
+    func testShownWhenConnectedWithNoWindowRunning() {
+        XCTAssertTrue(
+            ClaudeUsageDisplayModel.showsFiveHourSessionNote(isConnected: true, hasFiveHourWindow: false)
+        )
+    }
+
+    func testHiddenOnceAWindowIsRunning() {
+        XCTAssertFalse(
+            ClaudeUsageDisplayModel.showsFiveHourSessionNote(isConnected: true, hasFiveHourWindow: true),
+            "the reset row already says everything needed"
+        )
+    }
+
+    /// With no connection, a missing window means "we could not read", not
+    /// "your session has not started".
+    func testHiddenWhenDisconnected() {
+        XCTAssertFalse(
+            ClaudeUsageDisplayModel.showsFiveHourSessionNote(isConnected: false, hasFiveHourWindow: false)
+        )
+        XCTAssertFalse(
+            ClaudeUsageDisplayModel.showsFiveHourSessionNote(isConnected: false, hasFiveHourWindow: true)
+        )
+    }
+}

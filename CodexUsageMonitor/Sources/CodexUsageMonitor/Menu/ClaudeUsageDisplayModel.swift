@@ -23,6 +23,19 @@ struct ClaudeUsageDisplayModel {
     /// moves with your usage rather than landing on the hour.
     static let fiveHourSessionNote = "Starts at your first message, then runs for five hours."
 
+    /// The note explains a window that has not begun yet, so it is only
+    /// correct in that one state.
+    ///
+    /// `fiveHour == nil` conflates three things: no session started, the
+    /// window already reset, and the provider being unavailable. The payload
+    /// cannot tell them apart, so the safe rule is to require a working
+    /// connection: with live data and no five-hour window, "not started" is
+    /// the only remaining explanation. When nothing is available at all the
+    /// note would be noise on top of an error.
+    static func showsFiveHourSessionNote(isConnected: Bool, hasFiveHourWindow: Bool) -> Bool {
+        isConnected && !hasFiveHourWindow
+    }
+
     /// Gate criterion #3: the weekly figure is not Claude Code only, so the
     /// UI must say what it covers rather than letting the user assume.
     static let weeklyScopeCaveat = "Weekly usage is shared with Claude chat, not Claude Code alone."

@@ -47,6 +47,21 @@ enum SettingsLayoutMetrics {
     static let regularSectionSpacing: CGFloat = 20
     static let compactSectionSpacing: CGFloat = 20
 
+    /// Width left for a row's trailing control after the page inset, the card
+    /// inset, the leading text minimum, and the inter-column spacing.
+    ///
+    /// A trailing control wider than this widens the row and pushes the card
+    /// past the page's trailing edge — the defect recorded in AGENTS.md's
+    /// Settings card geometry guardrails. A child `.frame(maxWidth: .infinity)`
+    /// does not prevent it, because the overflow is intrinsic-width driven.
+    /// Consult this before giving any row a fixed-size trailing control.
+    static func trailingControlBudget(pageWidth: CGFloat, layout: SettingsLayoutMode) -> CGFloat {
+        let insets = pageHorizontalPadding(for: layout) * 2 + sectionContentHorizontalPadding * 2
+        // Two HStack gaps plus the Spacer's minLength, all rowSpacing.
+        let spacing = rowSpacing * 3
+        return max(0, pageWidth - insets - preferenceControlMinimumTextWidth - spacing)
+    }
+
     static func valueColumnInset(for layout: SettingsLayoutMode) -> CGFloat {
         layout == .compact ? 0 : labelWidth + rowSpacing
     }
