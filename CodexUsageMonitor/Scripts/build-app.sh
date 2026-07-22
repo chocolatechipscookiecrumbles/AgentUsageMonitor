@@ -15,6 +15,26 @@ xcrun actool "$root/Resources/Assets.xcassets" \
   --platform macosx \
   --minimum-deployment-target 14.0 \
   --output-partial-info-plist "$app/Contents/Resources/AssetCatalogInfo.plist"
-codesign --force --sign - --identifier com.david.codex-usage-monitor "$app"
+# Sign with a stable identity, not ad-hoc.
+#
+# An ad-hoc signature (`--sign -`) has no certificate, so its designated
+# requirement is pinned to the binary's cdhash — which changes on every build.
+# Keychain ACL grants are keyed to that requirement, so "Always Allow" was
+# silently invalidated by the next rebuild and the prompt returned every time.
+# A Developer ID signature's requirement is identity-based and stable across
+# rebuilds, so the grant persists.
+#
+# Override with CODESIGN_IDENTITY; falls back to ad-hoc when no identity is
+# available (the grant will not stick in that case).
+identity="${CODESIGN_IDENTITY:-Developer ID Application}"
+if security find-identity -v -p codesigning 2>/dev/null | grep -q "$identity"; then
+  codesign --force --options runtime --sign "$identity" \
+    --identifier com.david.codex-usage-monitor "$app"
+  echo "Signed with: $identity"
+else
+  echo "WARNING: no '$identity' signing identity found; falling back to ad-hoc." >&2
+  echo "         Keychain 'Always Allow' will NOT survive rebuilds." >&2
+  codesign --force --sign - --identifier com.david.codex-usage-monitor "$app"
+fi
 
 echo "Built $app"
