@@ -217,3 +217,72 @@ final class RelativeTimeTextDurationTests: XCTestCase {
         XCTAssertEqual(RelativeTimeText.duration(until: now.addingTimeInterval(-60), from: now), "now")
     }
 }
+
+/// The used/remaining setting is one control for the whole app. Providers
+/// must not disagree about which one they are showing.
+final class ProviderValueModeConsistencyTests: XCTestCase {
+    private let now = Date()
+
+    private func summaries(_ mode: QuotaValueMode) -> (codex: ProviderContextSummary, claude: ProviderContextSummary) {
+        (
+            .codex(
+                connectionState: .connected(AgentAccountSummary(planType: "pro")),
+                presentation: codexPresentationForMode(fiveHour: 44, weekly: 28),
+                lastConfirmedAt: now,
+                valueMode: mode,
+                now: now
+            ),
+            .claude(
+                connectionState: .connected(ClaudeAccountSummary(planType: "pro")),
+                usageState: .available(claudePresentationForMode(fiveHour: 44, sevenDay: 28)),
+                valueMode: mode,
+                now: now
+            )
+        )
+    }
+
+    func testBothProvidersShowUsedWhenTheSettingIsUsed() {
+        let (codex, claude) = summaries(.used)
+        XCTAssertEqual(codex.fiveHourText, "44%")
+        XCTAssertEqual(claude.fiveHourText, "44%", "Claude must follow the same setting as Codex")
+        XCTAssertEqual(codex.weeklyText, claude.weeklyText)
+    }
+
+    func testBothProvidersShowRemainingWhenTheSettingIsRemaining() {
+        let (codex, claude) = summaries(.remaining)
+        XCTAssertEqual(codex.fiveHourText, "56%")
+        XCTAssertEqual(claude.fiveHourText, "56%", "Claude previously hardcoded used and disagreed with Codex")
+        XCTAssertEqual(codex.weeklyText, claude.weeklyText)
+    }
+
+    func testTheTwoProvidersNeverDisagreeForEitherSetting() {
+        for mode in QuotaValueMode.allCases {
+            let (codex, claude) = summaries(mode)
+            XCTAssertEqual(codex.fiveHourText, claude.fiveHourText, "\(mode) five-hour")
+            XCTAssertEqual(codex.weeklyText, claude.weeklyText, "\(mode) weekly")
+        }
+    }
+}
+
+private func codexPresentationForMode(fiveHour: Int, weekly: Int) -> QuotaPresentation {
+    QuotaPresentation(
+        accountFingerprint: nil, limitID: nil, planType: "pro", creditBalance: nil,
+        hasCredits: nil, availableResetCredits: nil, resetCreditExpiryDates: [],
+        fiveHour: QuotaWindow(usedPercent: fiveHour, resetAt: nil, durationMinutes: nil),
+        weekly: QuotaWindow(usedPercent: weekly, resetAt: nil, durationMinutes: nil),
+        confirmation: .confirmed, collectedAt: .now, source: "test", detail: nil
+    )
+}
+
+private func claudePresentationForMode(fiveHour: Double, sevenDay: Double) -> ClaudeUsagePresentation {
+    ClaudeUsagePresentation(
+        snapshot: ClaudeUsageSnapshot(
+            planHint: "pro",
+            fiveHour: ClaudeLimitWindow(usedPercent: fiveHour, resetsAt: nil),
+            sevenDay: ClaudeLimitWindow(usedPercent: sevenDay, resetsAt: nil),
+            scopedWindows: [], extraUsage: nil,
+            source: .oauth, capturedAt: .now, schemaVersion: 1
+        ),
+        delivery: .live, warnings: []
+    )
+}
