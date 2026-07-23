@@ -16,6 +16,8 @@ The exported layout was revised before porting — see [SPEC §6](../../design/m
 
 Net effect: a shorter popover that is tabs → header (icon, title, pill) → window cards → credits (Codex only) → action menu. Port against SPEC §3, not against `reference/MenuBarDropdown.tsx`.
 
+**Visual target update (2026-07-23):** the user-supplied updated screenshot is the visual acceptance target for the port. SPEC §3 remains the durable written contract and should be reconciled to that screenshot if a later implementation detail is ambiguous.
+
 ## Where this sits (state as of 2026-07-22)
 
 - **Current menu is 168 lines of plain rows** across [QuotaMenuView.swift](../../../CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/QuotaMenuView.swift) (31), [ConnectedQuotaMenuView.swift](../../../CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/ConnectedQuotaMenuView.swift) (66) and [CodexDisconnectedMenuView.swift](../../../CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/CodexDisconnectedMenuView.swift) (71). It is Codex-only and has no provider concept.
@@ -49,7 +51,7 @@ From [SPEC.md §5](../../design/menu-bar-popover/SPEC.md):
 - **`MenuActionFooter`** — Refresh Now / Notification Settings / Preferences… / Quit.
 - **Presentation stays in testable structs** (`MenuBarLabelPresentation`, `ClaudeUsageDisplayModel`, a new `CodexMenuPresentation`), never in view bodies.
 
-**Tech Stack:** SwiftUI, Combine, XCTest. No new dependencies. SVG provider marks in `docs/design/menu-bar-popover/reference/` may be converted to asset catalog entries or redrawn as `Path`s.
+**Tech Stack:** SwiftUI, Combine, XCTest for the preserved existing suite. No new dependencies. SVG provider marks in `docs/design/menu-bar-popover/reference/` may be converted to asset catalog entries; do not redraw or substitute those Figma-owned marks.
 
 ## Global constraints
 
@@ -58,7 +60,9 @@ From [SPEC.md §5](../../design/menu-bar-popover/SPEC.md):
 - **Never render a missing value as `0%`** — absent data shows as unavailable, per gate criterion #5.
 - **Cached/stale/expired must stay visibly labelled** (probe plan §7/§9) — the design's amber "Showing Last Confirmed Snapshot" strip satisfies this for Codex; Claude's equivalent comes from `stalenessNotice`.
 - **No behavior regressions in the Codex menu.** Sign-in, alerts toggle, refresh, notification-settings link, forecasts all keep working.
-- **TDD for all presentation logic**; full suite green each task.
+- **Current regression-test policy overrides the test-first language in later tasks (2026-07-23).** Preserve and run the existing suite. Do not add feature-presence, routing, happy-path, implementation-detail, or broad general tests. Add only the smallest deterministic regression test when an actual defect has first been reproduced; otherwise record the manual regression boundary and why it remains manual.
+- **Opening the popover is not a refresh trigger.** Refresh continues to follow the existing scheduler and explicit Refresh Now action.
+- **Build acceptance for this port uses `Scripts/build-app.sh`.** A local/ad-hoc signature is sufficient during implementation; do not require a Developer ID signature.
 
 ---
 
@@ -66,10 +70,16 @@ From [SPEC.md §5](../../design/menu-bar-popover/SPEC.md):
 
 **Why first:** if popover dismissal can't be made to work acceptably, the whole port is in question and it is far cheaper to learn that now.
 
-- [ ] **Step 1:** Switch `MenuBarExtra` to `.menuBarExtraStyle(.window)` with a placeholder 340pt card behind a temporary flag.
+- [x] **Step 1:** Switch `MenuBarExtra` to `.menuBarExtraStyle(.window)` with a placeholder 340pt card behind a temporary flag.
 - [ ] **Step 2:** Manually verify and **write down** the result for: clicking an action dismisses the popover; clicking outside dismisses; Escape dismisses; the menu bar icon toggles; VoiceOver/keyboard focus is not trapped.
 - [ ] **Step 3:** If dismissal does not work by default, implement it explicitly (e.g. an environment-injected dismiss handler each action calls) and re-verify.
-- [ ] **Step 4: Record the finding** in this plan. If unresolvable, stop and reconsider — a popover that will not close is worse than a plain menu. **Commit.**
+- [x] **Step 4: Record the finding** in this plan. If unresolvable, stop and reconsider — a popover that will not close is worse than a plain menu. **Commit.**
+
+### Task 1 gate implementation and pending acceptance (2026-07-23)
+
+Launch the locally built app with `--window-popover-gate` to install a dedicated `.window` `MenuBarExtra`; SwiftUI requires the scene declarations to remain static, so mutually exclusive `isInserted` bindings keep only the selected item in the menu bar. Launching without the argument installs the shipping `.menu` surface instead. The gate renders a 340-point placeholder with native, labelled buttons and no open-triggered task or refresh call. Both actions call SwiftUI's presentation-scoped `DismissAction`; Escape is also bound to the Close Popover action. Open Settings dismisses before changing application activation.
+
+Build and source inspection can establish that the gate is reachable, scoped, and does not refresh on open. They cannot establish native interaction behavior. The controller must still directly inspect the locally built app and record: action dismissal, outside-click dismissal, Escape dismissal, menu bar icon toggle, keyboard traversal, and VoiceOver focus escape. Step 2 and the re-verification portion of Step 3 remain unchecked until that direct GUI evidence exists; no unobserved interaction state is claimed here.
 
 ## Task 2: Settle the multi-provider label rule
 
