@@ -81,6 +81,16 @@ Launch the locally built app with `--window-popover-gate` to install a dedicated
 
 Build and source inspection can establish that the gate is reachable, scoped, and does not refresh on open. They cannot establish native interaction behavior. The controller must still directly inspect the locally built app and record: action dismissal, outside-click dismissal, Escape dismissal, menu bar icon toggle, keyboard traversal, and VoiceOver focus escape. Step 2 and the re-verification portion of Step 3 remain unchecked until that direct GUI evidence exists; no unobserved interaction state is claimed here.
 
+#### Task 1 audit-launch startup defect and fix (2026-07-23)
+
+The first unlocked GUI launch with `--window-popover-gate` reproduced a real defect before the placeholder could be audited: `QuotaViewModel.init()` still called its normal `start()` fan-out, which starts the Codex connection check, Codex quota monitor, Claude usage monitor, and notification-authorization refresh. The Claude launch read raised a Claude Code Keychain permission dialog. The controller terminated only the audit app without responding; the remaining system dialog must be dismissed by the user.
+
+The audit argument now participates in `QuotaViewModel.shouldStartProviderMonitoring(arguments:)`. That policy returns false for the window-popover gate, so the audit launch constructs the state needed by the scene but starts no provider monitors, connection checks, refreshes, notification authorization, or credential reads. Normal launches retain the existing startup path.
+
+This reproduced defect qualifies for the repository's narrow regression exception. `QuotaViewModelLaunchPolicyTests.testWindowPopoverGateDoesNotStartProviderMonitoring` protects only the startup decision: its red run failed because the policy boundary did not exist; its green run passed after the gate exclusion. The post-fix full suite passed 223 tests with zero failures before the fix commit.
+
+Native Task 1 acceptance remains pending a clean controller relaunch after the system prompt is dismissed. No action-dismissal, outside-click, Escape, icon-toggle, keyboard, or VoiceOver result is inferred from the startup-policy regression.
+
 ## Task 2: Settle the multi-provider label rule
 
 - [ ] **Step 1: Failing tests** (`MenuProviderSummaryTests.swift`): summary carries provider + percent + availability; "most at risk" picks highest utilization; providers with no data are excluded, not treated as 0%; ties resolve deterministically.

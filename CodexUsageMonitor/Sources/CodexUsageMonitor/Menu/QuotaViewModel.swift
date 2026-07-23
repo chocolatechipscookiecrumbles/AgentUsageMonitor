@@ -123,10 +123,15 @@ final class QuotaViewModel: ObservableObject {
             // rather than waiting for the next scheduled refresh.
             if state.isConnected { self?.refreshClaude() }
         }.store(in: &subscriptions)
-        if !CommandLine.arguments.contains("--live-read-once")
-            && !CommandLine.arguments.contains(ClaudeUsageProbeCommand.flag) {
+        if Self.shouldStartProviderMonitoring(arguments: CommandLine.arguments) {
             start()
         }
+    }
+
+    static func shouldStartProviderMonitoring(arguments: [String]) -> Bool {
+        !arguments.contains("--live-read-once")
+            && !arguments.contains(ClaudeUsageProbeCommand.flag)
+            && !arguments.contains(MenuPopoverViabilityGate.launchArgument)
     }
 
     var settingsStatus: SettingsStatus {
