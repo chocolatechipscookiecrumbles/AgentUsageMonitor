@@ -207,9 +207,9 @@ The revision removed three pieces of information from the popover. Settled below
 
 ## Task 6: Claude content
 
-- [ ] **Step 1: Implement** `ClaudeMenuContent` from `ClaudeUsageDisplayModel`: plan, five-hour and weekly window cards, source label + relative capture time, the shared-pool caveat, `stalenessNotice` surfaced like the Codex cached strip, and the explicit unavailable state with the credential affordance.
-- [ ] **Step 2:** Hide Codex-only furniture (credits card, `Collector: Codex App Server`) on this tab; the header must name the active provider.
-- [ ] **Step 3:** Manual verification against the live account. **Commit.**
+- [x] **Step 1: Implemented** `ClaudeMenuContent` from `ClaudeUsageDisplayModel`: five-hour and weekly window cards (used% right, remaining% + reset footer), the shared-pool caveat under the weekly figure, the five-hour session note when the window has not started (live data only), `stalenessNotice` surfaced as `ClaudeStalenessStrip` (the Claude counterpart of the Codex cached strip), and the explicit unavailable card carrying the single user-initiated credential affordance (`ClaudeCredentialActions` → `connectClaudeWithCredentials`). Per the **Task 5a** decision, **plan tier is not re-added** (the older draft of this step listed "plan"; Task 5a supersedes it — tier lives in Settings), and **source label + capture time ride in the header subtitle** (`"<sourceLabel> · <capturedAtText>"`), not duplicated in the content. A `ClaudeConnectionRecoveryCard` appears alongside the last result only when the connection has **actively failed** — a merely-not-connected account is normal because passive capture needs no connection.
+- [x] **Step 2:** No Codex-only furniture on this tab — no credits card, no collector line. The header names the active provider ("Claude Usage Monitor"). The core mapping (`showsFiveHourSessionNote`, window/staleness/source logic) is already covered by `ClaudeUsageDisplayModelTests`; the views compose those tested helpers, so no new tests were added (branch policy).
+- [x] **Step 3:** Live-account manual verification is **waived and unobserved** for this branch. Verified: `swift build`, the full 223-test suite, and `git diff --check` pass. **Committed.**
 
 ## Task 7: Persist the selected tab
 

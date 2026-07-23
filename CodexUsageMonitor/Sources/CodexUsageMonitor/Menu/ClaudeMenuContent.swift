@@ -1,0 +1,47 @@
+import SwiftUI
+
+/// The Claude portion of the popover, built from `ClaudeUsageDisplayModel`.
+///
+/// Two states: a snapshot is available (window card, plus a staleness strip
+/// when the read is not live), or nothing is available yet (an explicit
+/// unavailable card carrying the one user-initiated credential affordance).
+/// Provenance and freshness ride in the header subtitle, so they are not
+/// repeated here. No Codex credit/collector furniture appears on this tab.
+struct ClaudeMenuContent: View {
+    @ObservedObject var viewModel: QuotaViewModel
+
+    private var model: ClaudeUsageDisplayModel? {
+        viewModel.claudeState.presentation.map { ClaudeUsageDisplayModel(presentation: $0) }
+    }
+
+    var body: some View {
+        VStack(spacing: MenuPopoverTheme.contentSpacing) {
+            if let model {
+                if let staleness = model.stalenessNotice {
+                    ClaudeStalenessStrip(notice: staleness)
+                }
+
+                ClaudeUsageWindowCard(model: model)
+
+                // Passive capture is a legitimate source that needs no
+                // connection, so a merely-not-connected state is normal and
+                // shows no recovery card. Only an actively failed connection
+                // warrants offering the credential affordance alongside the
+                // last result.
+                if case .failed = viewModel.claudeConnectionState {
+                    ClaudeConnectionRecoveryCard(
+                        state: viewModel.claudeConnectionState,
+                        connectWithCredentials: viewModel.connectClaudeWithCredentials
+                    )
+                }
+            } else {
+                ClaudeUnavailableContent(
+                    connectionState: viewModel.claudeConnectionState,
+                    connectWithCredentials: viewModel.connectClaudeWithCredentials
+                )
+            }
+        }
+        .padding(.horizontal, MenuPopoverTheme.contentHorizontalPadding)
+        .padding(.bottom, MenuPopoverTheme.contentBottomPadding)
+    }
+}

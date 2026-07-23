@@ -52,9 +52,14 @@ struct MenuProviderHeaderPresentation {
             )
         }
 
+        // Claude's data can come from OAuth, a statusLine capture, or cache —
+        // materially different in authority — so the source rides in the
+        // subtitle next to the capture time, matching the Settings "Read from"
+        // row. The pill still signals confirmed vs cached.
+        let model = ClaudeUsageDisplayModel(presentation: presentation)
         return Self(
             title: "Claude Usage Monitor",
-            subtitle: updatedText(for: presentation.snapshot.capturedAt),
+            subtitle: "\(model.sourceLabel) · \(model.capturedAtText)",
             status: presentation.delivery == .live ? .confirmed : .cached
         )
     }
