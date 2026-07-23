@@ -198,12 +198,12 @@ unobserved under the user waiver above.
 
 ## Task 5a: Decide where the removed information goes (DESIGN GATE)
 
-The revision removed three pieces of information from the popover. Settle each **before** building Claude's tab, since two of them affect it directly.
+The revision removed three pieces of information from the popover. Settled below (decisions recorded 2026-07-23) before building Claude's tab, since two of them affect it directly.
 
-- [ ] **Plan name** ("Pro") — had no home outside the removed card. Decide: header subtitle, a window-card header, or accept that plan tier lives only in Settings.
-- [ ] **"Lowest remaining %"** — the at-a-glance figure and ring are gone. Decide whether per-window numbers suffice, or whether the menu bar label now carries that role (it overlaps with Task 2's rule).
-- [ ] **Provenance** (`Source` / `Collector`) — **the consequential one.** Claude's data can come from OAuth, a statusLine capture, or cache, and these differ materially in freshness and authority; `claude_probe_plan` §9 asks for source labelling. Options: fold the source into the status pill text, put it in the header subtitle, or accept the loss on the menu given `ClaudeUsageStatusView` in Settings already shows "Read from: <source> · <relative time>". **Record the choice here.**
-- [ ] **Commit the decision** as an edit to this plan before Task 6.
+- [x] **Plan name** ("Pro") — **Decision: plan tier lives only in Settings.** It has no home in the revised popover and is not re-added on either tab. The header title names the provider ("Codex Usage Monitor" / "Claude Usage Monitor"); tier is not identity and Settings already presents it. No Codex plan-name furniture, and Claude's tab does not add a plan card either.
+- [x] **"Lowest remaining %"** — **Decision: per-window values plus the menu-bar label carry this role.** Each window row shows real `used%` (right) and `remaining%` (footer); the at-a-glance at-risk signal is the menu-bar label's Task 2 rule (highest used% across available windows, provider-identified). No ring or single lowest-remaining figure returns to the popover.
+- [x] **Provenance** (`Source` / `Collector`) — **Decision: Claude provenance goes in the header subtitle alongside freshness time (source + updated time); the status pill/strip keeps freshness state.** Because Claude's data can come from OAuth, a statusLine capture, or cache — materially different in authority — the source label must stay visible on the menu, not only in Settings. It rides in the header subtitle (e.g. "OAuth · Updated HH:MM:SS"), while the status pill continues to signal confirmed/cached and the staleness strip continues to flag stale reads. Codex keeps its plainer "Updated HH:MM:SS" subtitle (single collector, no provenance ambiguity) and shows no "Collector: …" furniture.
+- [x] **Committed** as this plan edit before Task 6.
 
 ## Task 6: Claude content
 
