@@ -213,8 +213,8 @@ The revision removed three pieces of information from the popover. Settled below
 
 ## Task 7: Persist the selected tab
 
-- [ ] **Step 1: Failing tests**: selection round-trips through `AppSettings`; an unavailable persisted provider falls back rather than showing an empty tab.
-- [ ] **Step 2: Implement. Run the full suite. Commit.**
+- [x] **Step 1: Tests added** (persistence/resolution logic, not feature-presence — permitted, and this step was designated test-first): `MenuProviderSelectionPersistenceTests` covers the `AppSettings.selectedMenuProvider` round-trip and Codex default; `MenuPopoverProviderResolutionTests` pins the rule that a *supported* provider (Claude) stays selected while an *unsupported* one (Copilot) and a nil request fall back to Codex, and that resolution always yields a supported provider.
+- [x] **Step 2: Implemented.** `AppSettings.selectedMenuProvider` persists the raw last-viewed tab; the popover reads it at init (an explicit caller `initialProvider` still wins) through `MenuPopoverProviderCatalog.resolvedSelection`, so an unsupported persisted provider falls back to Codex while a supported-but-currently-unavailable one (e.g. Claude with no snapshot) stays selected. An `onChange` writes the resolved tab back on every switch. Full suite (229 tests) and `git diff --check` pass. **Committed.**
 
 ## Task 8: Retire the old menu and document
 

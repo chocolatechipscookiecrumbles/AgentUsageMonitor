@@ -12,8 +12,12 @@ struct MenuBarPopoverView: View {
         initialProvider: AgentProvider? = nil
     ) {
         self.viewModel = viewModel
+        // An explicit caller request wins; otherwise restore the last-viewed
+        // tab. Either is resolved against the supported catalog so an
+        // unsupported persisted provider falls back to Codex.
+        let requested = initialProvider ?? viewModel.settings.selectedMenuProvider
         _selectedProvider = State(
-            initialValue: MenuPopoverProviderCatalog.resolvedSelection(initialProvider)
+            initialValue: MenuPopoverProviderCatalog.resolvedSelection(requested)
         )
     }
 
@@ -39,6 +43,12 @@ struct MenuBarPopoverView: View {
                     openPreferences: showPreferences,
                     quit: quit
                 )
+            }
+            .onChange(of: selectedProvider) { _, newValue in
+                // Persist the resolved (always-supported) tab so it is restored
+                // on the next launch.
+                viewModel.settings.selectedMenuProvider =
+                    MenuPopoverProviderCatalog.resolvedSelection(newValue)
             }
         }
     }
