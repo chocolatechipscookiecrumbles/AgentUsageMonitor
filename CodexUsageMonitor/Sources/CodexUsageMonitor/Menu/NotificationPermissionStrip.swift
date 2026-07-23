@@ -15,6 +15,7 @@ struct NotificationPermissionStrip: View {
             Text("Notifications are disabled in System Settings.")
                 .font(.caption)
                 .foregroundStyle(theme.warning)
+                .lineLimit(MenuPopoverTheme.maximumSupportingLines)
                 .fixedSize(horizontal: false, vertical: true)
 
             Button("Open System Notification Settings", action: openNotificationSettings)

@@ -23,7 +23,9 @@ struct CodexCreditsCard: View {
                     .foregroundStyle(credits.balance == nil ? theme.neutral : theme.primaryText)
             }
 
-            if credits.availableResetCredits != nil || !credits.resetCreditExpiryDates.isEmpty {
+            if credits.availableResetCredits != nil
+                || !credits.visibleResetCreditExpiryDates.isEmpty
+                || credits.hiddenResetCreditExpiryCount > 0 {
                 Rectangle()
                     .fill(theme.divider)
                     .frame(height: MenuPopoverTheme.dividerHeight)
@@ -40,13 +42,13 @@ struct CodexCreditsCard: View {
                         .foregroundStyle(credits.availableResetCredits == nil ? theme.neutral : theme.accent)
                 }
 
-                if credits.resetCreditExpiryDates.isEmpty {
+                if credits.visibleResetCreditExpiryDates.isEmpty {
                     Text("No earned reset-credit expiry is available.")
                         .font(.caption)
                         .foregroundStyle(theme.secondaryText)
                 } else {
                     VStack(alignment: .leading, spacing: MenuPopoverTheme.creditExpirySpacing) {
-                        ForEach(credits.resetCreditExpiryDates, id: \.self) { date in
+                        ForEach(credits.visibleResetCreditExpiryDates, id: \.self) { date in
                             Label {
                                 Text(date.formatted(date: .abbreviated, time: .shortened))
                             } icon: {
@@ -54,6 +56,12 @@ struct CodexCreditsCard: View {
                             }
                             .font(.caption)
                             .foregroundStyle(theme.secondaryText)
+                        }
+
+                        if credits.hiddenResetCreditExpiryCount > 0 {
+                            Text("+\(credits.hiddenResetCreditExpiryCount) more in Settings")
+                                .font(.caption)
+                                .foregroundStyle(theme.secondaryText)
                         }
                     }
                 }

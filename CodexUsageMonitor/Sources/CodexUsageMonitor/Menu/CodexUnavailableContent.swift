@@ -26,6 +26,8 @@ struct CodexUnavailableContent: View {
                 .font(.caption)
                 .foregroundStyle(detailTint)
                 .multilineTextAlignment(.center)
+                .lineLimit(MenuPopoverTheme.maximumDetailLines)
+                .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: MenuPopoverTheme.unavailableTextWidth)
 
             if showsSignInActions {

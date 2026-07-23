@@ -47,6 +47,9 @@ struct MenuPopoverTheme {
     static let creditIconSize: CGFloat = 14
     static let creditValueSpacing: CGFloat = 8
     static let creditExpirySpacing: CGFloat = 5
+    static let maximumVisibleResetCreditExpiries = 2
+    static let maximumDetailLines = 3
+    static let maximumSupportingLines = 2
     static let compactControlSpacing: CGFloat = 10
     static let compactControlTextSpacing: CGFloat = 3
     static let compactButtonHorizontalPadding: CGFloat = 10

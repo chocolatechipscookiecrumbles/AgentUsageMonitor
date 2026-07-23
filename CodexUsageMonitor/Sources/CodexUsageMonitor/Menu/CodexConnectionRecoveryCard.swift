@@ -16,6 +16,8 @@ struct CodexConnectionRecoveryCard: View {
             Text(detail)
                 .font(.caption)
                 .foregroundStyle(detailTint)
+                .lineLimit(MenuPopoverTheme.maximumDetailLines)
+                .fixedSize(horizontal: false, vertical: true)
 
             CodexSignInActions(
                 state: state,

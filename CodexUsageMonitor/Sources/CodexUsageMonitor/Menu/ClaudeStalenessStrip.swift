@@ -15,6 +15,7 @@ struct ClaudeStalenessStrip: View {
 
             Text(notice)
                 .font(.caption.weight(.medium))
+                .lineLimit(MenuPopoverTheme.maximumSupportingLines)
                 .fixedSize(horizontal: false, vertical: true)
 
             Spacer(minLength: 0)

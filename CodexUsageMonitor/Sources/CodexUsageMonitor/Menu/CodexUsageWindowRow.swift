@@ -43,6 +43,7 @@ struct CodexUsageWindowRow: View {
                     Text(CodexForecastPresentation(forecast: forecast).text)
                         .font(.caption)
                         .foregroundStyle(theme.secondaryText)
+                        .lineLimit(MenuPopoverTheme.maximumSupportingLines)
                         .padding(.top, MenuPopoverTheme.forecastTopSpacing)
                 }
             }

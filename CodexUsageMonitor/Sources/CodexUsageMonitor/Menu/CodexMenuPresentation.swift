@@ -20,7 +20,8 @@ struct CodexMenuPresentation {
     struct Credits {
         let balance: String?
         let availableResetCredits: Int?
-        let resetCreditExpiryDates: [Date]
+        let visibleResetCreditExpiryDates: [Date]
+        let hiddenResetCreditExpiryCount: Int
     }
 
     let windows: [Window]
@@ -60,10 +61,15 @@ struct CodexMenuPresentation {
         if presentation.creditBalance != nil
             || presentation.availableResetCredits != nil
             || !presentation.resetCreditExpiryDates.isEmpty {
+            let sortedExpiries = presentation.resetCreditExpiryDates.sorted()
+            let visibleExpiries = Array(
+                sortedExpiries.prefix(MenuPopoverTheme.maximumVisibleResetCreditExpiries)
+            )
             credits = Credits(
                 balance: Self.roundedBalance(presentation.creditBalance),
                 availableResetCredits: presentation.availableResetCredits,
-                resetCreditExpiryDates: presentation.resetCreditExpiryDates
+                visibleResetCreditExpiryDates: visibleExpiries,
+                hiddenResetCreditExpiryCount: sortedExpiries.count - visibleExpiries.count
             )
         } else {
             credits = nil

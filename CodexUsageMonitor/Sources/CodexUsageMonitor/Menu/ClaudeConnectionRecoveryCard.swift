@@ -19,6 +19,7 @@ struct ClaudeConnectionRecoveryCard: View {
             Text(detail)
                 .font(.caption)
                 .foregroundStyle(theme.warning)
+                .lineLimit(MenuPopoverTheme.maximumDetailLines)
                 .fixedSize(horizontal: false, vertical: true)
 
             ClaudeCredentialActions(

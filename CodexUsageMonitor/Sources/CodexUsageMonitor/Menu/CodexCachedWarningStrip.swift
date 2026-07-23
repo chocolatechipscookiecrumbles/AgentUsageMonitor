@@ -10,6 +10,7 @@ struct CodexCachedWarningStrip: View {
 
             Text("Showing Last Confirmed Snapshot")
                 .font(.caption.weight(.medium))
+                .lineLimit(MenuPopoverTheme.maximumSupportingLines)
 
             Spacer(minLength: 0)
         }

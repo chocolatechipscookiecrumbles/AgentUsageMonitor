@@ -53,6 +53,7 @@ struct ClaudeUsageWindowRow: View {
                     Text(footnote)
                         .font(.caption)
                         .foregroundStyle(theme.secondaryText)
+                        .lineLimit(MenuPopoverTheme.maximumSupportingLines)
                         .fixedSize(horizontal: false, vertical: true)
                         .padding(.top, MenuPopoverTheme.forecastTopSpacing)
                 }
@@ -72,6 +73,7 @@ struct ClaudeUsageWindowRow: View {
                     Text(footnote)
                         .font(.caption)
                         .foregroundStyle(theme.secondaryText)
+                        .lineLimit(MenuPopoverTheme.maximumSupportingLines)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
