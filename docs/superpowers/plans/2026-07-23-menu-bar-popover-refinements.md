@@ -73,3 +73,30 @@ never passed.
 feature-presence tests (branch policy); the credit-formatting helper is the one
 piece of pure logic and may take a narrow test if it is extracted testably.
 Visual states remain waived/unobserved.
+
+## Round 2 — visual fixes (2026-07-23, confirmed)
+
+From direct screenshot feedback. Decisions confirmed: usage-color change applies
+to the **popover only** (Settings keeps its accepted provider tint); the shell
+stays **rounded but one piece** (transparent host window), with squaring as the
+fallback.
+
+1. **Single rounded piece (corner artifacts).** `MenuPopoverWindowConfigurator`
+   (new) makes the `MenuBarExtra(.window)` host window transparent
+   (`isOpaque = false`, clear background, `hasShadow = true`) so only the rounded
+   `MenuPopoverChrome` shows and the window server draws a matching rounded
+   shadow. The chrome's own SwiftUI `.shadow` is removed to avoid a mismatched
+   double shadow. Fallback if it regresses: square the shell.
+2. **Timestamp drops seconds** — `updatedText` uses `time: .shortened`.
+3. **Tab hit target** — the full equal-width column was already clickable; raised
+   `tabStripHeight` `36 → 44` and added a full-column hover fill.
+4. **Footer flush** — removed the action rows' vertical padding so Refresh Now
+   and Quit sit at the edges.
+5. **Usage color threshold** — `MenuPopoverTheme.quotaLevel` boundary is now
+   `remaining < 10` → danger (i.e. `used > 90`), matching used `< 75` / `75…90` /
+   `> 90` → green / yellow / red. Popover bars + numerals only; the color already
+   tracks usage, so reversed used/remaining wording is unaffected.
+
+These are GUI changes under the branch's waiver — build/tests confirm they
+compile and don't regress the suite; the rendered look (especially the corner
+fix and shadow) is unobserved and for a human to confirm.

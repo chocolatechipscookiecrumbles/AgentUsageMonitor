@@ -65,6 +65,8 @@ struct MenuProviderHeaderPresentation {
     /// the relative "how long ago", computed once at render (the popover owns no
     /// timer, so it does not tick while open).
     private static func updatedText(for date: Date) -> String {
-        "Updated: \(date.formatted(date: .omitted, time: .standard)) · \(RelativeTimeText.text(from: date))"
+        // `.shortened` drops the seconds — the relative half already conveys
+        // recency, so second-level precision on the absolute time is noise.
+        "Updated: \(date.formatted(date: .omitted, time: .shortened)) · \(RelativeTimeText.text(from: date))"
     }
 }

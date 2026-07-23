@@ -22,7 +22,7 @@ struct MenuPopoverTheme {
     static let providerIconTileSize: CGFloat = 28
     static let providerIconTileCornerRadius: CGFloat = 8
     static let providerIconArtworkSize: CGFloat = 18
-    static let tabStripHeight: CGFloat = 36
+    static let tabStripHeight: CGFloat = 44
     static let tabIndicatorHeight: CGFloat = 1.5
     static let dividerHeight: CGFloat = 1
     static let headerHorizontalPadding: CGFloat = 16
@@ -132,9 +132,15 @@ struct MenuPopoverTheme {
         )
     }
 
+    /// One usage-severity scale for every popover bar and numeral, expressed in
+    /// *used* terms: `used < 75` → success, `75…90` → warning, `> 90` → danger.
+    /// The color always tracks usage, never the displayed value, so it is
+    /// correct whether a surface shows "% used" or "% remaining". Callers pass
+    /// remaining (`100 − used`), so the equivalent boundaries are
+    /// `remaining < 10` → danger and `remaining ≤ 25` → warning.
     static func quotaLevel(forRemainingPercent remainingPercent: Int?) -> MenuPopoverQuotaLevel {
         guard let remainingPercent else { return .unavailable }
-        if remainingPercent <= 10 { return .danger }
+        if remainingPercent < 10 { return .danger }
         if remainingPercent <= 25 { return .warning }
         return .success
     }

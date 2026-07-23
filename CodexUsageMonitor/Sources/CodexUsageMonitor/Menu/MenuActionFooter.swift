@@ -41,7 +41,6 @@ struct MenuActionFooter: View {
                     action: quit
                 )
             }
-            .padding(.vertical, MenuPopoverTheme.footerVerticalPadding)
         }
     }
 

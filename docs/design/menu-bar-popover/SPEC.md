@@ -32,8 +32,10 @@ Design intent noted in the source: cards should *"almost blend into the window."
 | Primary text | light `#1c1c1e`, dark `#ffffff` | |
 | Secondary text | light `black/38%`, dark `white/40%` | |
 
-**Threshold rule** (drives bar, ring, and numerals):
-`remaining ≤ 10` → danger · `remaining ≤ 25` → warning · else success.
+**Threshold rule** (drives bar and numerals), stated in *used* terms and
+tracking usage regardless of whether a surface shows used or remaining
+(see §7): `used > 90` → danger · `used 75…90` → warning · `used < 75` → success.
+Equivalent in remaining terms: `remaining < 10` → danger · `remaining ≤ 25` → warning.
 
 ## 3. Structure (top to bottom) — REVISED 2026-07-22
 
@@ -122,3 +124,11 @@ Directed refinements after the first shipped port. Where these disagree with §3
 ### Deferred (documented, not yet implemented)
 
 - **Refresh Now should keep the popover open.** Unlike the other footer commands (which dismiss first), the footer **Refresh Now** should *not* dismiss — it should stay open and show the in-place `Refreshing…` header/footer state so the user sees the result without reopening. Implementation deferred.
+
+## 8. Visual fixes — 2026-07-23 (round 2)
+
+- **Single rounded piece.** The `MenuBarExtra(.window)` host window is made transparent (`isOpaque = false`, clear background) so only the rounded `MenuPopoverChrome` shell shows; the window server draws the matching rounded shadow, so the chrome no longer carries its own SwiftUI shadow. Fixes the four corner artifacts where the squarer opaque window showed behind the shell. *(Fallback if this ever regresses: square the shell to match the window.)*
+- **Header timestamp drops seconds** — `Updated: 22:13 · just now` (was `22:13:10`). The relative half already carries recency.
+- **Tab hit target is the full column** (already true) **and taller** — strip height `36 → 44px`, with a full-column hover fill so the target reads as large as it is.
+- **Footer is flush** — the action rows have no vertical padding, so **Refresh Now** sits against the divider and **Quit** against the bottom edge.
+- **Usage color threshold** standardized to the §2 used-based rule (`< 75` green, `75…90` yellow, `> 90` red), applied to the popover bars and numerals only. Settings' provider-tinted bars are intentionally left as-is (accepted 2026-07-23).

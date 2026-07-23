@@ -18,11 +18,10 @@ struct MenuPopoverChrome<Content: View>: View {
                 RoundedRectangle(cornerRadius: MenuPopoverTheme.shellCornerRadius)
                     .stroke(theme.shellOutline, lineWidth: MenuPopoverTheme.shellOutlineWidth)
             }
-            .shadow(
-                color: theme.shellShadow,
-                radius: MenuPopoverTheme.shellShadowRadius,
-                y: MenuPopoverTheme.shellShadowY
-            )
+            // Clears the host window so this rounded shell is the only visible
+            // piece; the window server supplies a matching rounded shadow, so
+            // the chrome carries no separate SwiftUI shadow of its own.
+            .background(MenuPopoverWindowConfigurator())
     }
 
     private var theme: MenuPopoverTheme {

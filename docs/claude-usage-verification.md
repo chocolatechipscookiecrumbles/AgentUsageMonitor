@@ -445,9 +445,12 @@ open CodexUsageMonitor/.build/CodexUsageMonitor.app
 - Switch to **Claude**, close and reopen the popover — it reopens on **Claude** (`AppSettings.selectedMenuProvider` round-trips; covered by `MenuProviderSelectionPersistenceTests`).
 - A *supported* provider with no current snapshot keeps its tab selected (Claude stays Claude); only an *unsupported* persisted provider falls back to Codex (`MenuPopoverProviderResolutionTests`).
 
-**Header freshness (both tabs)**
+**Shell, tabs, and header (both tabs)**
+- The popover is a **single rounded piece** — no square background or stray artifacts peeking at the four corners.
+- The **Codex** / **Claude** tabs are easy to hit: the whole equal-width column (not just the text) switches tabs, and hovering fills the column.
 - The header title is just the provider name — **Codex** / **Claude**, not "… Usage Monitor".
-- The subtitle is the standard `Updated: <time> · <relative>` (e.g. `Updated: 3:42:05 PM · 3 minutes ago`) on both tabs, plus the **Confirmed / Cached / Refreshing / Unavailable** status pill.
+- The subtitle is the standard `Updated: <time> · <relative>` with **no seconds** (e.g. `Updated: 3:42 PM · 3 minutes ago`) on both tabs, plus the **Confirmed / Cached / Refreshing / Unavailable** status pill.
+- Usage bars and the `% used` numerals are **green below 75%, yellow 75–90%, red above 90%** — the same on both tabs, and the color follows usage regardless of used/remaining wording. (Settings' bars keep their provider tint by design.)
 
 **Codex tab**
 - Two window cards (Five Hour, Weekly): `N% used` at right, `Remaining M%` and reset timing in the footer, and a forecast line when one is available.
@@ -471,5 +474,5 @@ open CodexUsageMonitor/.build/CodexUsageMonitor.app
 - When macOS notification permission is **denied**, a slim strip with "Notifications are disabled in System Settings." + **Open System Notification Settings** appears on both tabs; it is absent otherwise.
 
 **Footer and passivity**
-- The bottom action row runs **Refresh Now**, **Notification Settings**, **Preferences…**, and **Quit Codex Usage Monitor**. Each currently dismisses the popover first, and **Refresh Now** targets the active tab's provider. *(Deferred: Refresh Now is intended to keep the popover open and show the in-place `Refreshing…` state — see SPEC §7; not yet implemented.)*
+- The bottom action row runs **Refresh Now**, **Notification Settings**, **Preferences…**, and **Quit Codex Usage Monitor**, flush to the edges: **Refresh Now** sits against the divider and **Quit** against the bottom edge, no extra padding. Each currently dismisses the popover first, and **Refresh Now** targets the active tab's provider. *(Deferred: Refresh Now is intended to keep the popover open and show the in-place `Refreshing…` state — see SPEC §7; not yet implemented.)*
 - Opening the popover triggers no refresh, timer, `TimelineView`, or per-second invalidation.
