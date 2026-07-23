@@ -123,6 +123,7 @@ final class QuotaViewModel: ObservableObject {
         !arguments.contains("--live-read-once")
             && !arguments.contains(ClaudeUsageProbeCommand.flag)
             && !arguments.contains(MenuPopoverViabilityGate.launchArgument)
+            && !arguments.contains(ProviderSwitchTrace.launchArgument)
     }
 
     var settingsStatus: SettingsStatus {

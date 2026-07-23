@@ -25,6 +25,11 @@ struct AgentSettingsTabStrip: View {
         HStack(spacing: 0) {
             ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
                 Button {
+                    ProviderSwitchTrace.record(
+                        surface: .settingsAgents,
+                        phase: .buttonAction,
+                        provider: entry.provider
+                    )
                     selection = entry.provider
                 } label: {
                     HStack(spacing: SettingsLayoutMetrics.agentHeaderItemSpacing) {

@@ -45,10 +45,19 @@ struct MenuBarPopoverView: View {
                 )
             }
             .onChange(of: selectedProvider) { _, newValue in
+                ProviderSwitchTrace.record(
+                    surface: .menuPopover,
+                    phase: .selectionChanged,
+                    provider: newValue
+                )
                 // Persist the resolved (always-supported) tab so it is restored
                 // on the next launch.
                 viewModel.settings.selectedMenuProvider =
                     MenuPopoverProviderCatalog.resolvedSelection(newValue)
+            }
+            .background {
+                ProviderSwitchWindowProbe(provider: activeProvider)
+                    .frame(width: 0, height: 0)
             }
             .onExitCommand {
                 dismiss()

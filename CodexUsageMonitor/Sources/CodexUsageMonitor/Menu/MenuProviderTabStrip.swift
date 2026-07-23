@@ -10,8 +10,15 @@ struct MenuProviderTabStrip: View {
     var body: some View {
         HStack(spacing: 0) {
             ForEach(providers) { provider in
-                Button(provider.tabTitle) {
+                Button {
+                    ProviderSwitchTrace.record(
+                        surface: .menuPopover,
+                        phase: .buttonAction,
+                        provider: provider
+                    )
                     selection = provider
+                } label: {
+                    Text(provider.tabTitle)
                 }
                 .buttonStyle(.plain)
                 .font(.caption.weight(.medium))
