@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The two co-equal Claude credential methods presented side by side, the
-/// direct counterpart of CodexDisconnectedMenuView's browser/CLI pair.
+/// direct counterpart of Codex's browser/CLI sign-in pair.
 ///
 /// Neither method is a default: the user chooses, so the Keychain ACL grant
 /// in "Use Claude Code credentials…" is always an explicit, disclosed action.

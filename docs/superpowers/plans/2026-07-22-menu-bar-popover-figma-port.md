@@ -218,9 +218,9 @@ The revision removed three pieces of information from the popover. Settled below
 
 ## Task 8: Retire the old menu and document
 
-- [ ] **Step 1:** Remove `QuotaMenuView`/`ConnectedQuotaMenuView`/`CodexDisconnectedMenuView` once their affordances are confirmed ported. Keep `CodexDisconnectedMenuView`'s sign-in copy if reused.
-- [ ] **Step 2:** Update the planning board and extend [the verification guide](../../claude-usage-verification.md) with menu-level manual checks.
-- [ ] **Step 3: Commit.**
+- [x] **Step 1:** Removed `QuotaMenuView`, `ConnectedQuotaMenuView`, and `CodexDisconnectedMenuView` (affordances confirmed ported in Tasks 5–6). Also removed the view helpers they solely fed — `QuotaWindowRow`, `MenuRefreshTimingView` — and the now-dead `MenuRefreshTimingPresentation` plus its `QuotaViewModel` plumbing (`refreshTimingPresentation`/`nextRefreshAt` and `updateRefreshTimingPresentation()`); the revised design dropped the next-refresh row, and `RefreshNowButton`/`effectiveRefreshInterval`/`refreshScheduleReason` stay because Settings still uses them. The `CodexDisconnectedMenuView` sign-in copy was already reproduced in `CodexUnavailableContent`. **Not touched (out of scope):** the base-inherited, unwired `ClaudeSignInView` (old-menu-style, references the shelved browser sign-in); the popover uses the themed `ClaudeCredentialActions` instead.
+- [x] **Step 2:** Updated the [planning board](../../product/planning-board.md) (new popover entry; fixed board links that pointed at the deleted files) and extended [the verification guide](../../claude-usage-verification.md) with a menu-level manual-check section (§12) plus corrected suite counts and the stale Claude sign-in gap note. Also refreshed the menu descriptions in [how-to.md](../../../how-to.md) and [UsageProbe/README.md](../../../UsageProbe/README.md). Historical plan files that reference the deleted views are left intact as provenance.
+- [x] **Step 3:** `swift build`, the full 229-test suite, and `git diff --check` pass. **Committed.**
 
 ---
 

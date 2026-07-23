@@ -37,12 +37,12 @@ Run these first — if they fail, don't bother with the live checks.
 ```bash
 cd CodexUsageMonitor && swift test
 ```
-**Expected:** `Executed 119 tests, with 0 failures`
+**Expected:** `Executed 229 tests, with 0 failures`
 
 ```bash
 cd CodexUsageMonitor && swift test --filter Claude
 ```
-**Expected:** `Executed 111 tests, with 0 failures`
+**Expected:** `Executed 193 tests, with 0 failures`
 
 ```bash
 cd ClaudeUsageBridge && /opt/anaconda3/bin/pytest -q
@@ -386,7 +386,7 @@ ls -l ~/.codex/auth.json
 ## 10. Known gaps (do not report as bugs)
 
 - **Tier 2 (CLI `/usage`) is not implemented** — deferred to its own plan.
-- **The sign-in UI is not reachable in the app yet.** `ClaudeConnectionController` / `ClaudeSignInView` are built and tested but not wired into `AgentsSettingsView`; that's the [wiring plan](superpowers/plans/2026-07-21-claude-usage-provider-wiring.md). Until then, method selection is only exercisable via the probe and `CLAUDE_CODE_OAUTH_TOKEN`.
+- **Claude credential sign-in is now reachable in the app** — Settings ▸ Agents ▸ Claude Code and the menu-bar popover's Claude tab both offer **Use Claude Code credentials…** (tier-1 method (b)). Browser/`setup-token` sign-in (method (a)) stays shelved and is deliberately not offered in the UI, so only method (b) is exercisable there; the probe and `CLAUDE_CODE_OAUTH_TOKEN` still exercise method (a).
 - **`--claude-live-read-once` currently hardcodes `selectedMethod: .browser`**, since there's no persisted setting yet — so it always prefers a self-issued token and degrades to Claude Code credentials.
 - **A revoked self-issued token does not auto-degrade to method (b).** `ClaudeCompositeCredentialStore.invalidateSelfIssued()` exists and is tested, but nothing calls it yet — that hook belongs to the not-yet-built Settings wiring. Today a bad tier-1 credential drops to tier 3 instead.
 - **`ClaudeStatusLineInstaller`'s production bridge path doesn't resolve** — `ClaudeUsageBridge/` isn't bundled into a signed `.app`.
@@ -426,3 +426,41 @@ Claude's figure is **spend against a cap**, not a balance held. Rendering `usedC
 ### Not surfaced
 
 `scopedWindows` (`session`, `weekly_all`) duplicate the five-hour and weekly figures — `session` tracked 45% against a five-hour 44%, `weekly_all` 28% against a weekly 28%. They add no information and are deliberately not shown.
+
+---
+
+## 12. Menu-bar popover (menu-level manual checks)
+
+These verify the multi-provider popover that replaced the old inline menu (`QuotaMenuView` / `ConnectedQuotaMenuView` / `CodexDisconnectedMenuView`, now removed). Build and launch the app first:
+
+```bash
+CODESIGN_IDENTITY=- zsh CodexUsageMonitor/Scripts/build-app.sh
+open CodexUsageMonitor/.build/CodexUsageMonitor.app
+```
+
+> ⚠️ This branch **waives** visual/keyboard/VoiceOver/Light-Dark acceptance. The steps below are the menu-level script to run against the real app — record them as **unobserved** until a human performs them, never as passed.
+
+**Tabs and persistence (Task 7)**
+- The popover opens with **Codex** and **Claude** tabs; **Copilot is absent** (unsupported).
+- Switch to **Claude**, close and reopen the popover — it reopens on **Claude** (`AppSettings.selectedMenuProvider` round-trips; covered by `MenuProviderSelectionPersistenceTests`).
+- A *supported* provider with no current snapshot keeps its tab selected (Claude stays Claude); only an *unsupported* persisted provider falls back to Codex (`MenuPopoverProviderResolutionTests`).
+
+**Codex tab**
+- Header names Codex, shows **Updated HH:MM:SS**, and a **Confirmed / Cached / Refreshing / Unavailable** status pill.
+- Two window cards (Five Hour, Weekly): `N% used` at right, `Remaining M%` and reset timing in the footer, and a forecast line when one is available.
+- The credit-balance card appears only when Codex reports a balance or earned reset credits.
+- A **cached** read shows the "Showing Last Confirmed Snapshot" strip above the cards.
+- Disconnected: the tab shows a connection card with **Sign in with browser** and **Sign in with Codex CLI…**. Connected-but-no-snapshot shows "Unable to Read Usage" with **no** sign-in buttons — recovery is the footer's **Refresh Now**.
+- The quota-alerts toggle works; when notifications are denied, the recovery link appears in that card.
+
+**Claude tab**
+- Header names Claude and shows **`<source> · <capture time>`** (e.g. `Claude OAuth · 3 hours ago`) plus the status pill — this is where Claude provenance lives.
+- Two window cards (Five Hour, Weekly). The weekly card carries the shared-pool caveat; when the five-hour window has not started (live data only), it shows the session note.
+- A non-live read shows the staleness strip above the cards.
+- **No** credit card and **no** collector line appear (Codex-only furniture is absent here).
+- With no reading: an unavailable card offers **Use Claude Code credentials…** only (browser sign-in is shelved). macOS raises the Keychain prompt **only** on that explicit click — never on open.
+- An *actively failed* connection shows a recovery card alongside the last result; a *merely-not-connected* passive read does not (passive capture needs no connection).
+
+**Footer and passivity**
+- The bottom action row runs **Refresh Now**, **Notification Settings**, **Preferences…**, and **Quit Codex Usage Monitor**; each dismisses the popover first, and **Refresh Now** targets the active tab's provider.
+- Opening the popover triggers no refresh, timer, `TimelineView`, or per-second invalidation.
