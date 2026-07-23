@@ -121,7 +121,7 @@ This plan's checkboxes were never ticked while the page was built across the wir
 1. **Task 3 Step 4 — Usage Warnings section.** Not on the Claude page at all. The plan permits either an inert disabled section or deferring it; the layout-fix pass (2026-07-23) compacted this page specifically to stop spending vertical space on non-actionable blocks, so **which** of the two applies is now a product decision, not a mechanical port step. Decide before building.
 2. **Task 3 Step 2 — the unavailable/onboarding variant.** The Connection section degrades to plain "Not available" text; the centered icon-badge hero with "sign in through Claude Code / enable passive capture" guidance was never built.
 3. **Task 3 Step 5 — routing test.** `.claudeCode` routes to `ClaudeAgentSettingsView` and `ClaudeCodePreviewSettingsView` is deleted, but the deterministic routing test is not written: the route is a `switch` inside a SwiftUI `body` with no testable seam. `testCatalogMarksClaudeSupported` covers "Claude is not a preview entry"; a real routing test needs the view refactored to expose its input.
-4. **Task 5 Steps 2–4 — bookkeeping and acceptance.** Capability gate criteria #3/#5, the planning board rows, and signed-app visual acceptance are all outstanding. Acceptance is the blocker: no state on this page has been inspected in the signed app since the layout fixes landed.
+4. **Task 5 Step 4 — signed-app visual acceptance.** The blocker. No state on this page has been inspected in the signed app since the 2026-07-23 layout fixes; the verification matrix in that plan still reads "Not run" for gutters, both appearances, and the five-hour note. Steps 2–3 (gate and board) are reconciled, with one open evidence item: gate criterion #3 needs direct Pro/Max evidence for the weekly-scope wording rather than the Team/Enterprise documentation it currently rests on.
 
 ## Task 1: Make `AgentQuotaSessionSection` composable for providers without credits
 
@@ -159,8 +159,8 @@ Compose the page from the shared primitives, matching the **shipped Codex page's
 ## Task 5: Data & Privacy entry, docs, and bookkeeping
 
 - [x] **Step 1: Document Claude's new provider data in Data & Privacy.** In `DataPrivacySettingsView` / `LocalDataInventory`, record the OAuth Keychain *read* (never stored by this app), the statusLine snapshot file, and the usage cache — since the contract makes Data & Privacy the single home for this and requires new provider data to be documented before exposure. Include the "never reads conversation content" and "weekly number may be shared with Claude chat/Cowork" facts here.
-- [ ] **Step 2:** Update the [capability research gate](2026-07-20-claude-code-capability-research.md): the Settings surface now renders real data (ties off gate #3/#5 alongside the wiring plan).
-- [ ] **Step 3:** Update the [planning board](../../product/planning-board.md) Claude row and the "Codex and Claude Preview Agents Settings UI integration" row — Claude is now a **supported** page, not a preview.
+- [x] **Step 2:** Update the [capability research gate](2026-07-20-claude-code-capability-research.md). Gate #5 is satisfied; **gate #3 is not fully** — the weekly-scope sentence is shown everywhere the number is, but its evidence is Anthropic's Team/Enterprise documentation, and this plan's own research says not to assume Pro/Max matches. Recorded there as the one open evidence item.
+- [x] **Step 3:** Update the [planning board](../../product/planning-board.md) Claude row and the Agents Settings UI row — both moved to **Verification**, with visual acceptance named as the blocker.
 - [ ] **Step 4: Signed-app visual acceptance** (see Completion criteria); record observed and unobserved states. **Commit.**
 
 ---
