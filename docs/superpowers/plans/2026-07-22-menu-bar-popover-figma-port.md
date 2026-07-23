@@ -72,24 +72,49 @@ From [SPEC.md §5](../../design/menu-bar-popover/SPEC.md):
 
 - [x] **Step 1:** Switch `MenuBarExtra` to `.menuBarExtraStyle(.window)` with a placeholder 340pt card behind a temporary flag.
 - [ ] **Step 2:** Manually verify and **write down** the result for: clicking an action dismisses the popover; clicking outside dismisses; Escape dismisses; the menu bar icon toggles; VoiceOver/keyboard focus is not trapped.
-- [ ] **Step 3:** If dismissal does not work by default, implement it explicitly (e.g. an environment-injected dismiss handler each action calls) and re-verify.
+- [x] **Step 3:** If dismissal does not work by default, implement it explicitly (e.g. an environment-injected dismiss handler each action calls) and re-verify.
 - [x] **Step 4: Record the finding** in this plan. If unresolvable, stop and reconsider — a popover that will not close is worse than a plain menu. **Commit.**
 
 ### Task 1 gate implementation and pending acceptance (2026-07-23)
 
 Launch the locally built app with `--window-popover-gate` to install a dedicated `.window` `MenuBarExtra`; SwiftUI requires the scene declarations to remain static, so mutually exclusive `isInserted` bindings keep only the selected item in the menu bar. Launching without the argument installs the shipping `.menu` surface instead. The gate renders a 340-point placeholder with native, labelled buttons and no open-triggered task or refresh call. Both actions call SwiftUI's presentation-scoped `DismissAction`; Escape is also bound to the Close Popover action. Open Settings dismisses before changing application activation.
 
-Build and source inspection can establish that the gate is reachable, scoped, and does not refresh on open. They cannot establish native interaction behavior. The controller must still directly inspect the locally built app and record: action dismissal, outside-click dismissal, Escape dismissal, menu bar icon toggle, keyboard traversal, and VoiceOver focus escape. Step 2 and the re-verification portion of Step 3 remain unchecked until that direct GUI evidence exists; no unobserved interaction state is claimed here.
+Build and source inspection established that the gate is reachable, scoped, and does not refresh on open. Controller inspection after the startup fix established the directly observed native behavior recorded below. Step 2 remains unchecked because keyboard activation and VoiceOver focus escape could not be observed; no result is inferred for those blocked states.
 
 #### Task 1 audit-launch startup defect and fix (2026-07-23)
 
-The first unlocked GUI launch with `--window-popover-gate` reproduced a real defect before the placeholder could be audited: `QuotaViewModel.init()` still called its normal `start()` fan-out, which starts the Codex connection check, Codex quota monitor, Claude usage monitor, and notification-authorization refresh. The Claude launch read raised a Claude Code Keychain permission dialog. The controller terminated only the audit app without responding; the remaining system dialog must be dismissed by the user.
+The first unlocked GUI launch with `--window-popover-gate` reproduced a real defect before the placeholder could be audited: `QuotaViewModel.init()` still called its normal `start()` fan-out, which starts the Codex connection check, Codex quota monitor, Claude usage monitor, and notification-authorization refresh. The Claude launch read raised a Claude Code Keychain permission dialog. The controller terminated only the audit app without responding. Later inspection established that the stale dialog survives process termination, predates the fixed audit launch, and was not answered.
 
 The audit argument now participates in `QuotaViewModel.shouldStartProviderMonitoring(arguments:)`. That policy returns false for the window-popover gate, so the audit launch constructs the state needed by the scene but starts no provider monitors, connection checks, refreshes, notification authorization, or credential reads. Normal launches retain the existing startup path.
 
 This reproduced defect qualifies for the repository's narrow regression exception. `QuotaViewModelLaunchPolicyTests.testWindowPopoverGateDoesNotStartProviderMonitoring` protects only the startup decision: its red run failed because the policy boundary did not exist; its green run passed after the gate exclusion. The post-fix full suite passed 223 tests with zero failures before the fix commit.
 
-Native Task 1 acceptance remains pending a clean controller relaunch after the system prompt is dismissed. No action-dismissal, outside-click, Escape, icon-toggle, keyboard, or VoiceOver result is inferred from the startup-policy regression.
+#### Task 1 controller GUI evidence after `1604595` (2026-07-23)
+
+The controller launched the rebuilt audit app with `--window-popover-gate` and directly observed:
+
+- [x] the 340-point window-style popover rendered;
+- [x] the fixed audit launch started no new provider monitoring;
+- [x] **Close Popover** dismissed on the first action;
+- [x] **Open Settings…** dismissed the popover and opened Settings;
+- [x] clicking outside dismissed;
+- [x] Escape dismissed;
+- [x] clicking the menu bar item reopened the popover after dismissal;
+- [x] repeated manual open/close cycles left no stuck state;
+- [ ] Tab/Shift-Tab focus traversal;
+- [ ] Return/Space activation of the focused action;
+- [ ] VoiceOver focus entry and escape.
+
+The last three states remain unobserved because an outstanding SecurityAgent Claude credential prompt owns keyboard and accessibility focus. That stale prompt survives even after the audit process is terminated, demonstrating that it predates and is independent of the fixed audit launch; it was not answered during this audit.
+
+Screenshot evidence:
+
+- outside-open state: `/private/tmp/gate-outside-open.png`;
+- outside-dismissed state: `/private/tmp/gate-outside-closed.png`;
+- Escape-dismissed state: `/private/tmp/gate-escape-closed.png`;
+- Open Settings result: `/private/tmp/gate-open-settings-result.png`.
+
+The observed mouse dismissal, Escape, reopen, and repeated-cycle behavior make the `.window` presentation viable for continued implementation. Task 1 remains partially open only for the keyboard and VoiceOver checks blocked by SecurityAgent focus.
 
 ## Task 2: Settle the multi-provider label rule
 
