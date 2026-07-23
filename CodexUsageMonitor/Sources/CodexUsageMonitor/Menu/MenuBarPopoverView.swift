@@ -30,9 +30,7 @@ struct MenuBarPopoverView: View {
                     presentation: headerPresentation
                 )
 
-                MenuProviderContentPlaceholder()
-                    .padding(.horizontal, MenuPopoverTheme.contentHorizontalPadding)
-                    .padding(.bottom, MenuPopoverTheme.contentBottomPadding)
+                providerContent
 
                 MenuActionFooter(
                     isRefreshing: isRefreshing,
@@ -77,6 +75,18 @@ struct MenuBarPopoverView: View {
             viewModel.isRefreshingClaude
         case .githubCopilot:
             false
+        }
+    }
+
+    @ViewBuilder
+    private var providerContent: some View {
+        switch activeProvider {
+        case .codex:
+            CodexMenuContent(viewModel: viewModel)
+        case .claudeCode, .githubCopilot:
+            MenuProviderContentPlaceholder()
+                .padding(.horizontal, MenuPopoverTheme.contentHorizontalPadding)
+                .padding(.bottom, MenuPopoverTheme.contentBottomPadding)
         }
     }
 
