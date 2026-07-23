@@ -4,6 +4,7 @@ struct MenuBarLabelPresentation: Equatable, Sendable {
     let text: String
     let showsGauge: Bool
     let showsPauseMarker: Bool
+    let providerAssetName: String?
     let accessibilityLabel: String
 
     init(
@@ -18,6 +19,7 @@ struct MenuBarLabelPresentation: Equatable, Sendable {
 
         showsGauge = style == .gaugeAndLowest
         showsPauseMarker = displayState.mode == .cachedPaused
+        providerAssetName = nil
 
         switch style {
         case .gaugeAndLowest:
@@ -39,6 +41,50 @@ struct MenuBarLabelPresentation: Equatable, Sendable {
                 freshness,
             ].joined(separator: "; ")
         }
+    }
+
+    init(
+        displayState: QuotaDisplayState,
+        providerSummaries: [MenuProviderSummary],
+        style: MenuBarDisplayStyle,
+        valueMode: QuotaValueMode
+    ) {
+        let availableSummaries = providerSummaries.filter { $0.usedPercent != nil }
+
+        if availableSummaries.isEmpty
+            || (availableSummaries.count == 1 && availableSummaries[0].provider == .codex) {
+            self.init(displayState: displayState, style: style, valueMode: valueMode)
+            return
+        }
+
+        guard let summary = MenuProviderSummary.mostAtRisk(in: availableSummaries),
+              let value = summary.visiblePercent(for: valueMode) else {
+            self.init(displayState: displayState, style: style, valueMode: valueMode)
+            return
+        }
+
+        self.init(
+            text: "\(value)%",
+            showsGauge: false,
+            showsPauseMarker: summary.provider == .codex && displayState.mode == .cachedPaused,
+            providerAssetName: summary.provider.settingsAssetName,
+            accessibilityLabel:
+                "\(summary.provider.title) quota, \(value) percent \(valueMode.accessibilityName)"
+        )
+    }
+
+    private init(
+        text: String,
+        showsGauge: Bool,
+        showsPauseMarker: Bool,
+        providerAssetName: String?,
+        accessibilityLabel: String
+    ) {
+        self.text = text
+        self.showsGauge = showsGauge
+        self.showsPauseMarker = showsPauseMarker
+        self.providerAssetName = providerAssetName
+        self.accessibilityLabel = accessibilityLabel
     }
 
     private static func gaugeValue(

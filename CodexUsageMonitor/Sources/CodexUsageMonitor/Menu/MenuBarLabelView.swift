@@ -5,6 +5,13 @@ struct MenuBarLabelView: View {
 
     var body: some View {
         HStack(spacing: 4) {
+            if let providerAssetName = presentation.providerAssetName {
+                Image(providerAssetName, bundle: .main)
+                    .resizable()
+                    .renderingMode(.template)
+                    .scaledToFit()
+                    .frame(width: 13, height: 13)
+            }
             if presentation.showsGauge {
                 Image(systemName: "gauge.with.dots.needle.33percent")
             }

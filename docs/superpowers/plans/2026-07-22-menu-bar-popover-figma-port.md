@@ -64,6 +64,10 @@ From [SPEC.md §5](../../design/menu-bar-popover/SPEC.md):
 - **Opening the popover is not a refresh trigger.** Refresh continues to follow the existing scheduler and explicit Refresh Now action.
 - **Build acceptance for this port uses `Scripts/build-app.sh`.** A local/ad-hoc signature is sufficient during implementation; do not require a Developer ID signature.
 
+### Visual-verification waiver (2026-07-23)
+
+The user explicitly waived the remaining GUI, keyboard, VoiceOver, and Light/Dark visual-verification steps for this branch and directed implementation to continue. Those states remain **unobserved**, not passed. Source review, compilation, and the preserved automated regression suite remain required; later manual acceptance can resume from the unchecked visual states without inferring coverage.
+
 ---
 
 ## Task 1: Prove `.window` style is viable (SPIKE — gate)
@@ -118,10 +122,16 @@ The observed mouse dismissal, Escape, reopen, and repeated-cycle behavior make t
 
 ## Task 2: Settle the multi-provider label rule
 
-- [ ] **Step 1: Failing tests** (`MenuProviderSummaryTests.swift`): summary carries provider + percent + availability; "most at risk" picks highest utilization; providers with no data are excluded, not treated as 0%; ties resolve deterministically.
-- [ ] **Step 2: Run to verify they fail.**
-- [ ] **Step 3:** Record the chosen rule in this plan, then implement `MenuProviderSummary` + selection.
-- [ ] **Step 4:** Extend `MenuBarLabelPresentation`: one provider → unchanged from today (no regression); two → at-risk provider **with glyph**; none → existing unavailable label. **Run the full suite. Commit.**
+- [x] **Step 1: Skipped by repository policy.** No reproducible defect preceded this new feature, so no feature-presence tests were added. `MenuProviderSummary` still keeps availability explicit rather than representing a missing read as zero.
+- [x] **Step 2: Skipped with Step 1.** The existing suite was preserved and run after implementation.
+- [x] **Step 3:** Record the chosen rule in this plan, then implement `MenuProviderSummary` + selection.
+- [x] **Step 4:** Extend `MenuBarLabelPresentation`: one provider → unchanged from today (no regression); two → at-risk provider **with glyph**; none → existing unavailable label. **Run the full suite. Commit.**
+
+### Task 2 label decision and implementation (2026-07-23)
+
+The menu-bar label selects the provider with the **highest used percentage across its available windows**. Missing windows and providers with no usage read are excluded; they never participate as `0%`. Equal utilization resolves in stable provider order: Codex, Claude, then any future capable provider. The selected provider does not change when the user's display mode changes: **Used** shows its utilization, while **Remaining** shows the complement for that same at-risk provider.
+
+With only Codex data available, `MenuBarLabelPresentation` delegates to the original Codex-only initializer byte-for-byte, preserving both existing display styles, gauge behavior, cached pause marker, accessibility copy, and unavailable fallback. When Claude is the only available read or both providers have data, the compact label shows the selected value with that provider's bundled mark; its accessibility label names the provider. `MenuBarStatusLabel` derives Codex and Claude summaries from their existing display models and performs no refresh. The full existing suite passed 223 tests with zero failures. The provider-glyph rendering itself remains visually unobserved under the user waiver above.
 
 ## Task 3: Theme and primitives
 

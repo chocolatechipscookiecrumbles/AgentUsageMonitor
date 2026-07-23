@@ -13,6 +13,10 @@ struct MenuBarStatusLabel: View {
         MenuBarLabelView(
             presentation: MenuBarLabelPresentation(
                 displayState: viewModel.displayState,
+                providerSummaries: [
+                    .codex(displayState: viewModel.displayState),
+                    .claude(usageState: viewModel.claudeState),
+                ],
                 style: settings.menuBarDisplayStyle,
                 valueMode: settings.quotaValueMode
             )
