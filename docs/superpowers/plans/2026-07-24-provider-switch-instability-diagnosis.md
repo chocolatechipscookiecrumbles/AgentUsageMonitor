@@ -98,7 +98,7 @@ Only the evidence-selected candidate is modified:
 - Produces: `ProviderSwitchWindowProbe(provider:)`
 - Consumes: launch argument `--provider-switch-diagnostic`
 
-- [ ] **Step 1: Add the shared trace vocabulary.**
+- [x] **Step 1: Add the shared trace vocabulary.**
 
 Create:
 
@@ -145,7 +145,7 @@ enum ProviderSwitchTrace {
 }
 ```
 
-- [ ] **Step 2: Add a popover host resize probe.**
+- [x] **Step 2: Add a popover host resize probe.**
 
 Create:
 
@@ -215,7 +215,7 @@ struct ProviderSwitchWindowProbe: NSViewRepresentable {
 }
 ```
 
-- [ ] **Step 3: Instrument both selector actions before writing the binding.**
+- [x] **Step 3: Instrument both selector actions before writing the binding.**
 
 Use this exact action shape in `AgentSettingsTabStrip`:
 
@@ -245,7 +245,7 @@ Button {
 }
 ```
 
-- [ ] **Step 4: Instrument the two selection owners.**
+- [x] **Step 4: Instrument the two selection owners.**
 
 Add to `SettingsView`:
 
@@ -282,7 +282,7 @@ Add the resize probe to the popover root without affecting layout:
 }
 ```
 
-- [ ] **Step 5: Instrument provider content appearance.**
+- [x] **Step 5: Instrument provider content appearance.**
 
 Attach the matching trace to the outermost view in each Codex/Claude Settings and menu content body:
 
@@ -298,7 +298,7 @@ Attach the matching trace to the outermost view in each Codex/Claude Settings an
 
 Use `.menuPopover`/`.settingsAgents` and `.codex`/`.claudeCode` for the four exact call sites.
 
-- [ ] **Step 6: Keep the diagnostic launch passive.**
+- [x] **Step 6: Keep the diagnostic launch passive.**
 
 Extend `QuotaViewModel.shouldStartProviderMonitoring(arguments:)`:
 
@@ -308,7 +308,7 @@ Extend `QuotaViewModel.shouldStartProviderMonitoring(arguments:)`:
 
 This prevents diagnostic startup from triggering provider reads or Keychain prompts. The tab switching bug must be diagnosed independently from live refresh work first.
 
-- [ ] **Step 7: Verify diagnostic source and commit it separately.**
+- [x] **Step 7: Verify diagnostic source and commit it separately.**
 
 Run:
 
@@ -347,7 +347,7 @@ git commit -m "Add provider switch diagnostic tracing"
 - Consumes: `[DEBUG-provider-switch]` unified log events.
 - Produces: timestamp-aligned trace/frame tables for Settings and menu loops.
 
-- [ ] **Step 1: Build and launch an audit-owned signed app.**
+- [x] **Step 1: Build and launch an audit-owned signed app.**
 
 Run:
 
@@ -435,6 +435,14 @@ If Accessibility blocks safe control, preserve:
 
 Do not continue to prototype selection containers until the exact user symptom is captured with a matching trace.
 
+Progress on 2026-07-24: the Settings loop is red and minimized to the fitting
+tab-strip branch with passive provider state. Pointer and keyboard delivery also
+passed with the Context Rail visible. The menu action/selection/content/resize
+loop is deterministic, but the automated display recording did not reliably
+retain the transient `MenuBarExtra` panel, so menu frame alignment and the
+remaining one-second/rail/keyboard recording matrix stay open. See
+`docs/development/provider-switch-diagnostic-results.md`.
+
 - [ ] **Step 6: Commit only the evidence document.**
 
 The results document must contain:
@@ -477,7 +485,7 @@ git commit -m "Record provider switch reproduction evidence"
 - Consumes: minimized red loops from Task 2.
 - Produces: one confirmed cause per affected surface, or an explicit split diagnosis.
 
-- [ ] **Step 1: Rank hypotheses from the first divergent boundary.**
+- [x] **Step 1: Rank hypotheses from the first divergent boundary.**
 
 Use this evidence mapping:
 
