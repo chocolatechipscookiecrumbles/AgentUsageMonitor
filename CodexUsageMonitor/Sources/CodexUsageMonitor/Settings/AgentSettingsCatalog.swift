@@ -13,6 +13,6 @@ struct AgentSettingsCatalogEntry: Identifiable, Equatable {
 enum AgentSettingsCatalog {
     static let entries: [AgentSettingsCatalogEntry] = [
         .init(provider: .codex, availability: .supported),
-        .init(provider: .claudeCode, availability: .preview),
+        .init(provider: .claudeCode, availability: .supported),
     ]
 }

@@ -33,5 +33,19 @@ enum LocalDataInventory {
             retention: "30 days, up to 1,000 outcomes",
             contents: "Timestamps, reasons, classified outcomes, and stable failure kinds"
         ),
+        LocalDataStoreDescriptor(
+            id: "claude-usage-cache",
+            title: "Last confirmed Claude quota",
+            fileName: "claude-usage-cache.json",
+            retention: "Replaced by the next fresher reading",
+            contents: "Normalized Claude quota percentages, reset times, plan type, and any extra-usage amount"
+        ),
+        LocalDataStoreDescriptor(
+            id: "claude-rate-limits",
+            title: "Claude statusLine snapshot",
+            fileName: "claude-rate-limits.json",
+            retention: "Overwritten each time Claude Code renders its status line",
+            contents: "Rate-limit percentages and reset times, written by the Claude usage bridge and only read here"
+        ),
     ]
 }

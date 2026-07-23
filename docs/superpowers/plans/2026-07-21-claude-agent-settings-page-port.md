@@ -108,6 +108,21 @@ The tab strip, page shell, section cards, progress bars, and warning chips trans
 
 ---
 
+## Status as of 2026-07-23
+
+This plan's checkboxes were never ticked while the page was built across the wiring, connection-state, and layout-fix branches. Reconciled below against the shipped code; the boxes now reflect the source, not the plan's original sequence.
+
+**Done:** Task 1 (in a different shape — see below), Task 2, Task 3 Steps 1/2/3/6, Task 3 Step 5 except its routing test, Task 4, Task 5 Step 1.
+
+**Task 1 shipped differently and deliberately.** `AgentQuotaSessionSection` took `creditsLabel` / `creditsValue` / optional `resetCredits` / `weeklyFootnote` / `fiveHourNote` rather than `showsCredits` / `showsResetCredits` booleans, because Claude *does* have a credits figure — Anthropic reports spend beyond the plan where Codex reports a balance held. Parameterizing the label keeps a spend figure from ever appearing under a balance label, which a boolean flag would not have done. No dedicated `AgentQuotaSessionSectionTests` exists; the composition is covered only through `ClaudeUsageDisplayModelTests` and the Codex call site compiling unchanged.
+
+**Still open — carried into whatever branch picks this up next:**
+
+1. **Task 3 Step 4 — Usage Warnings section.** Not on the Claude page at all. The plan permits either an inert disabled section or deferring it; the layout-fix pass (2026-07-23) compacted this page specifically to stop spending vertical space on non-actionable blocks, so **which** of the two applies is now a product decision, not a mechanical port step. Decide before building.
+2. **Task 3 Step 2 — the unavailable/onboarding variant.** The Connection section degrades to plain "Not available" text; the centered icon-badge hero with "sign in through Claude Code / enable passive capture" guidance was never built.
+3. **Task 3 Step 5 — routing test.** `.claudeCode` routes to `ClaudeAgentSettingsView` and `ClaudeCodePreviewSettingsView` is deleted, but the deterministic routing test is not written: the route is a `switch` inside a SwiftUI `body` with no testable seam. `testCatalogMarksClaudeSupported` covers "Claude is not a preview entry"; a real routing test needs the view refactored to expose its input.
+4. **Task 5 Steps 2–4 — bookkeeping and acceptance.** Capability gate criteria #3/#5, the planning board rows, and signed-app visual acceptance are all outstanding. Acceptance is the blocker: no state on this page has been inspected in the signed app since the layout fixes landed.
+
 ## Task 1: Make `AgentQuotaSessionSection` composable for providers without credits
 
 - [ ] **Step 1: Write failing tests** (`AgentQuotaSessionSectionTests.swift` or a snapshot-of-inputs test): the section can be built with `showsCredits: false` and `showsResetCredits: false` and an optional `weeklyFootnote`, and that Codex's existing call site (defaults `true`) is unchanged.
@@ -117,33 +132,33 @@ The tab strip, page shell, section cards, progress bars, and warning chips trans
 
 ## Task 2: Adapt Claude windows into the shared quota row
 
-- [ ] **Step 0: Set Claude's one provider tint.** Change `AgentProvider.claudeCode.settingsPresentationTint` from `.orange` to the exact brand `Color(red: 217/255, green: 119/255, blue: 87/255)` (`#D97757`), mirroring Codex's `#576DFF` literal. Add a test asserting the value. This one change gives the tab underline, both quota bars, warning chips, and rail treatment the correct color via the shared components (section D) — verify nothing else hard-codes a Claude color.
-- [ ] **Step 1: Write failing tests** for a `QuotaWindow`-adapter that maps `ClaudeLimitWindow(usedPercent:resetsAt:)` into the exact `QuotaWindow` shape `AgentQuotaWindowRow` consumes (confirm `QuotaWindow`'s initializer/fields first), including the value-mode semantics (Claude reports **used %**; ensure "% used" vs "% remaining" renders correctly for the chosen `QuotaValueMode`).
-- [ ] **Step 2: Run to verify they fail.**
-- [ ] **Step 3: Implement** the adapter (a small pure function or `ClaudeUsageDisplayModel` computed property). Map five-hour + weekly; expose scoped windows (`ClaudeScopedLimitWindow`) and `ClaudeExtraUsage` as optional display rows.
-- [ ] **Step 4: Run to verify they pass. Commit.**
+- [x] **Step 0: Set Claude's one provider tint.** Change `AgentProvider.claudeCode.settingsPresentationTint` from `.orange` to the exact brand `Color(red: 217/255, green: 119/255, blue: 87/255)` (`#D97757`), mirroring Codex's `#576DFF` literal. Add a test asserting the value. This one change gives the tab underline, both quota bars, warning chips, and rail treatment the correct color via the shared components (section D) — verify nothing else hard-codes a Claude color.
+- [x] **Step 1: Write failing tests** for a `QuotaWindow`-adapter that maps `ClaudeLimitWindow(usedPercent:resetsAt:)` into the exact `QuotaWindow` shape `AgentQuotaWindowRow` consumes (confirm `QuotaWindow`'s initializer/fields first), including the value-mode semantics (Claude reports **used %**; ensure "% used" vs "% remaining" renders correctly for the chosen `QuotaValueMode`).
+- [x] **Step 2: Run to verify they fail.**
+- [x] **Step 3: Implement** the adapter (a small pure function or `ClaudeUsageDisplayModel` computed property). Map five-hour + weekly; expose scoped windows (`ClaudeScopedLimitWindow`) and `ClaudeExtraUsage` as optional display rows.
+- [x] **Step 4: Run to verify they pass. Commit.**
 
 ## Task 3: Build `ClaudeAgentSettingsView`
 
 Compose the page from the shared primitives, matching the **shipped Codex page's** section set — Source (Connection-equivalent) + Current quota + Usage Warnings. **No Privacy card** (section E).
 
-- [ ] **Step 1: Promote Claude from preview to supported.** In `AgentSettingsCatalog`, change the `.claudeCode` entry's availability from `.preview` to `.supported`, and remove any "Preview" / "Not available yet" labeling that keyed off preview availability for Claude (page and Context Rail). This is how a provider "enters the selector" per the contract — via the catalog, not a custom header. Add a narrow test asserting the catalog marks `.claudeCode` supported.
-- [ ] **Step 2: "Source" section** (`SettingsSection("Source")`): factual rows via **`SettingsPreferenceControlRow`** — active source label, plan hint (`subscriptionType`), relative capture time + delivery/freshness note — plus a `Refresh Claude Usage` button (monitor's user-initiated refresh). Unavailable variant: centered icon badge (Claude tint at low opacity, ~44 pt, rounded) + guidance worded for the real "sign in through Claude Code / enable passive capture" path (not "planned"), reusing the Figma Claude hero styling.
-- [ ] **Step 3: "Current quota" section**: `AgentQuotaSessionSection(provider: .claudeCode, presentation: <adapted>, valueMode:, showsCredits: false, showsResetCredits: false, weeklyFootnote: <shared-pool caveat>)`. Append scoped/extra-usage rows when present. **No Plan row here** — Plan lives in Source.
+- [x] **Step 1: Promote Claude from preview to supported.** In `AgentSettingsCatalog`, change the `.claudeCode` entry's availability from `.preview` to `.supported`, and remove any "Preview" / "Not available yet" labeling that keyed off preview availability for Claude (page and Context Rail). This is how a provider "enters the selector" per the contract — via the catalog, not a custom header. Add a narrow test asserting the catalog marks `.claudeCode` supported.
+- [x] **Step 2: "Source" section** (`SettingsSection("Source")`): factual rows via **`SettingsPreferenceControlRow`** — active source label, plan hint (`subscriptionType`), relative capture time + delivery/freshness note — plus a `Refresh Claude Usage` button (monitor's user-initiated refresh). Unavailable variant: centered icon badge (Claude tint at low opacity, ~44 pt, rounded) + guidance worded for the real "sign in through Claude Code / enable passive capture" path (not "planned"), reusing the Figma Claude hero styling.
+- [x] **Step 3: "Current quota" section**: `AgentQuotaSessionSection(provider: .claudeCode, presentation: <adapted>, valueMode:, showsCredits: false, showsResetCredits: false, weeklyFootnote: <shared-pool caveat>)`. Append scoped/extra-usage rows when present. **No Plan row here** — Plan lives in Source.
 - [ ] **Step 4: "Usage Warnings" section**: `AgentUsageWarningsSection(provider: .claudeCode, …)`. Until a per-provider/window threshold store exists ([followups Task 3](2026-07-14-settings-provider-followups.md)), pass no-op closures and render `.disabled(true)` with a "Claude alerts are planned" `SettingsDescription`, matching how the contract keeps a non-interactive provider's chips inert.
 - [ ] **Step 5:** Route `.claudeCode` in [AgentsSettingsView.swift:23](../../../CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AgentsSettingsView.swift#L23) to `ClaudeAgentSettingsView(...)`, driven by `QuotaViewModel`'s Claude state (wiring plan Task 5); delete `ClaudeCodePreviewSettingsView` once unused. Add a **narrow deterministic routing test** that `.claudeCode` resolves to the real view, not the preview.
-- [ ] **Step 6:** Run the full Swift suite. **Commit.**
+- [x] **Step 6:** Run the full Swift suite. **Commit.**
 
 ## Task 4: Claude Context Rail card (catalog icon, real source)
 
 `AgentConnectionsContextView` currently renders Claude as a static preview card; replace it with a factual card mirroring the Codex rail card and the Figma `AgentsContextPanel` "paired" card.
 
-- [ ] **Step 1:** Render the Claude card with `AgentSettingsIcon` (the catalog asset in the shared smaller slot — **never** `provider.systemImage`, per the contract), name/subtitle, and a source/freshness value ("Live · OAuth", "Capture · 8m ago", "Cached · 3h ago"). When no source exists, show the unavailable treatment — not a "Preview" label (Claude is no longer a preview entry).
-- [ ] **Step 2:** Narrow deterministic test for the rail's Claude state→value mapping. **Commit.**
+- [x] **Step 1:** Render the Claude card with `AgentSettingsIcon` (the catalog asset in the shared smaller slot — **never** `provider.systemImage`, per the contract), name/subtitle, and a source/freshness value ("Live · OAuth", "Capture · 8m ago", "Cached · 3h ago"). When no source exists, show the unavailable treatment — not a "Preview" label (Claude is no longer a preview entry).
+- [x] **Step 2:** Narrow deterministic test for the rail's Claude state→value mapping. **Commit.**
 
 ## Task 5: Data & Privacy entry, docs, and bookkeeping
 
-- [ ] **Step 1: Document Claude's new provider data in Data & Privacy.** In `DataPrivacySettingsView` / `LocalDataInventory`, record the OAuth Keychain *read* (never stored by this app), the statusLine snapshot file, and the usage cache — since the contract makes Data & Privacy the single home for this and requires new provider data to be documented before exposure. Include the "never reads conversation content" and "weekly number may be shared with Claude chat/Cowork" facts here.
+- [x] **Step 1: Document Claude's new provider data in Data & Privacy.** In `DataPrivacySettingsView` / `LocalDataInventory`, record the OAuth Keychain *read* (never stored by this app), the statusLine snapshot file, and the usage cache — since the contract makes Data & Privacy the single home for this and requires new provider data to be documented before exposure. Include the "never reads conversation content" and "weekly number may be shared with Claude chat/Cowork" facts here.
 - [ ] **Step 2:** Update the [capability research gate](2026-07-20-claude-code-capability-research.md): the Settings surface now renders real data (ties off gate #3/#5 alongside the wiring plan).
 - [ ] **Step 3:** Update the [planning board](../../product/planning-board.md) Claude row and the "Codex and Claude Preview Agents Settings UI integration" row — Claude is now a **supported** page, not a preview.
 - [ ] **Step 4: Signed-app visual acceptance** (see Completion criteria); record observed and unobserved states. **Commit.**
