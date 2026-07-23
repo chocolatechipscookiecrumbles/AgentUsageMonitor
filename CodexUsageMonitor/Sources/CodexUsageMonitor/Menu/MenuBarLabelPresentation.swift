@@ -58,7 +58,8 @@ struct MenuBarLabelPresentation: Equatable, Sendable {
         }
 
         guard let summary = MenuProviderSummary.mostAtRisk(in: availableSummaries),
-              let value = summary.visiblePercent(for: valueMode) else {
+              let value = summary.visiblePercent(for: valueMode),
+              let freshness = summary.freshness else {
             self.init(displayState: displayState, style: style, valueMode: valueMode)
             return
         }
@@ -66,10 +67,10 @@ struct MenuBarLabelPresentation: Equatable, Sendable {
         self.init(
             text: "\(value)%",
             showsGauge: false,
-            showsPauseMarker: summary.provider == .codex && displayState.mode == .cachedPaused,
+            showsPauseMarker: !freshness.isConfirmed,
             providerAssetName: summary.provider.settingsAssetName,
             accessibilityLabel:
-                "\(summary.provider.title) quota, \(value) percent \(valueMode.accessibilityName)"
+                "\(summary.provider.title) quota, \(value) percent \(valueMode.accessibilityName), \(freshness.accessibilityName)"
         )
     }
 
