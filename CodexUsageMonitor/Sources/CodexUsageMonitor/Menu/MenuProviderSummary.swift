@@ -64,16 +64,19 @@ struct MenuProviderSummary: Equatable {
         )
     }
 
-    static func claude(usageState: ClaudeUsageState) -> Self {
+    static func claude(
+        usageState: ClaudeUsageState,
+        now: Date = .now
+    ) -> Self {
         guard let presentation = usageState.presentation else {
             return Self(provider: .claudeCode, usedPercent: nil, freshness: nil)
         }
-        let model = ClaudeUsageDisplayModel(presentation: presentation)
+        let model = ClaudeUsageDisplayModel(presentation: presentation, now: now)
         return Self(
             provider: .claudeCode,
             usedPercent: highestUtilization(
-                model.fiveHour?.usedPercent,
-                model.sevenDay?.usedPercent
+                eligibleUsedPercent(model.fiveHour),
+                eligibleUsedPercent(model.sevenDay)
             ),
             freshness: freshness(for: presentation.delivery)
         )
@@ -106,6 +109,13 @@ struct MenuProviderSummary: Equatable {
 
     private static func highestUtilization(_ values: Int?...) -> Int? {
         values.compactMap { $0 }.max()
+    }
+
+    private static func eligibleUsedPercent(
+        _ window: ClaudeUsageDisplayModel.Window?
+    ) -> Int? {
+        guard let window, !window.hasReset else { return nil }
+        return window.usedPercent
     }
 
     private static func freshness(for delivery: ClaudeUsageDelivery) -> Freshness {
