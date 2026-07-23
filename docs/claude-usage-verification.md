@@ -474,5 +474,6 @@ open CodexUsageMonitor/.build/CodexUsageMonitor.app
 - When macOS notification permission is **denied**, a slim strip with "Notifications are disabled in System Settings." + **Open System Notification Settings** appears on both tabs; it is absent otherwise.
 
 **Footer and passivity**
-- The bottom action row runs **Refresh Now**, **Notification Settings**, **Preferences…**, and **Quit Codex Usage Monitor**, flush to the edges: **Refresh Now** sits against the divider and **Quit** against the bottom edge, no extra padding. Each currently dismisses the popover first, and **Refresh Now** targets the active tab's provider. *(Deferred: Refresh Now is intended to keep the popover open and show the in-place `Refreshing…` state — see SPEC §7; not yet implemented.)*
+- The bottom action row runs **Refresh Now**, **Notification Settings**, **Preferences…**, and **Quit Codex Usage Monitor**, flush to the edges: **Refresh Now** sits against the divider and **Quit** against the bottom edge, no extra padding. **Refresh Now** keeps the popover open, targets the active tab's provider, and exposes the in-place `Refreshing…` state. The other footer commands dismiss first.
+- [ ] With the production signed app, press **Escape** while the popover is open and confirm it dismisses without activating a footer command.
 - Opening the popover triggers no refresh, timer, `TimelineView`, or per-second invalidation.

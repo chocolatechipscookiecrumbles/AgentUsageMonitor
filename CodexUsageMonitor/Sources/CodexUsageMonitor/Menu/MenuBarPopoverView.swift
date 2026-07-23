@@ -50,6 +50,9 @@ struct MenuBarPopoverView: View {
                 viewModel.settings.selectedMenuProvider =
                     MenuPopoverProviderCatalog.resolvedSelection(newValue)
             }
+            .onExitCommand {
+                dismiss()
+            }
         }
     }
 
@@ -103,7 +106,6 @@ struct MenuBarPopoverView: View {
     }
 
     private func refresh() {
-        dismiss()
         switch activeProvider {
         case .codex:
             viewModel.refresh()

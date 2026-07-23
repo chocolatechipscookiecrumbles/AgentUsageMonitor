@@ -121,9 +121,10 @@ Directed refinements after the first shipped port. Where these disagree with §3
 - **Quota-alerts toggle removed from the popover** (it lives in Settings). The denied-notification recovery it used to host is kept as a **slim strip shown on both tabs** whenever `notificationAuthorizationState == .denied` — warning text + **Open System Notification Settings**. The footer **Notification Settings** row (app Settings) is unchanged.
 - **Credits card balance is rounded to 4 significant figures** in the popover; Settings keeps full precision. Refines §3.5.
 
-### Deferred (documented, not yet implemented)
+### Refresh interaction
 
-- **Refresh Now should keep the popover open.** Unlike the other footer commands (which dismiss first), the footer **Refresh Now** should *not* dismiss — it should stay open and show the in-place `Refreshing…` header/footer state so the user sees the result without reopening. Implementation deferred.
+- **Refresh Now keeps the popover open.** Unlike the other footer commands (which dismiss first), the footer **Refresh Now** stays open and shows the in-place `Refreshing…` header/footer state so the user sees the result without reopening. Implemented in source; signed-app visual and keyboard observation remain open.
+- **Escape dismisses the popover.** The production popover root handles the exit command without adding a visible Close row. Signed-app keyboard observation remains open.
 
 ## 8. Visual fixes — 2026-07-23 (round 2)
 
