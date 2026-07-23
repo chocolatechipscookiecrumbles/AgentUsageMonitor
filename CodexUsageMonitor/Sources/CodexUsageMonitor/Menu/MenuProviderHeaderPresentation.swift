@@ -32,7 +32,18 @@ struct MenuProviderHeaderPresentation {
         )
     }
 
-    static func claude(usageState: ClaudeUsageState) -> Self {
+    static func claude(
+        usageState: ClaudeUsageState,
+        isRefreshing: Bool
+    ) -> Self {
+        if isRefreshing {
+            return Self(
+                title: "Claude Usage Monitor",
+                subtitle: "Refreshing…",
+                status: .refreshing
+            )
+        }
+
         guard let presentation = usageState.presentation else {
             return Self(
                 title: "Claude Usage Monitor",

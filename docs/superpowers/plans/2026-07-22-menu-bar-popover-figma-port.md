@@ -173,6 +173,18 @@ opens General, and each command dismisses the popover before continuing.
 The existing menu-bar status label is unchanged and the old native-menu views
 remain until Task 8 confirms that their affordances have all been ported.
 
+#### Task 4 refresh-state review fix (2026-07-23)
+
+Review found that Claude refreshes had no in-flight owner: each footer action
+could create another untracked task, while the Claude header and footer stayed
+enabled. `QuotaViewModel` now owns one Claude refresh task and publishes
+`isRefreshingClaude`; a second explicit refresh is ignored until the first
+read completes. The Claude header now presents **Refreshing…** and the shared
+footer disables the active provider's Refresh Now action for both providers.
+The explicit Claude action retains its user-initiated Keychain prompt policy.
+This was identified by source tracing; no new test was added under the
+repository's regression-only policy, and the existing full suite passed.
+
 Visual, keyboard, VoiceOver, and Light/Dark verification for this task remain
 unobserved under the user waiver above.
 

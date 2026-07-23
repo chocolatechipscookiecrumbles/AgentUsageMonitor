@@ -57,7 +57,10 @@ struct MenuBarPopoverView: View {
                 isRefreshing: viewModel.isRefreshing
             )
         case .claudeCode:
-            .claude(usageState: viewModel.claudeState)
+            .claude(
+                usageState: viewModel.claudeState,
+                isRefreshing: viewModel.isRefreshingClaude
+            )
         case .githubCopilot:
             .codex(
                 displayState: viewModel.displayState,
@@ -67,7 +70,14 @@ struct MenuBarPopoverView: View {
     }
 
     private var isRefreshing: Bool {
-        activeProvider == .codex && viewModel.isRefreshing
+        switch activeProvider {
+        case .codex:
+            viewModel.isRefreshing
+        case .claudeCode:
+            viewModel.isRefreshingClaude
+        case .githubCopilot:
+            false
+        }
     }
 
     private func refresh() {
