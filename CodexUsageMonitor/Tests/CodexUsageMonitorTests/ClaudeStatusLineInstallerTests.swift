@@ -30,6 +30,51 @@ final class ClaudeStatusLineInstallerTests: XCTestCase {
         XCTAssertEqual(statusLine["command"] as? String, "cd '\(bridgeDirectory.path)' && python3 -m claude_usage_bridge --quiet")
     }
 
+    func testPrepareBridgeCopiesBundledModuleToDeterministicApplicationSupportPath() throws {
+        let bundledBridge = tempDirectory.appendingPathComponent("BundledClaudeUsageBridge")
+        let bundledModule = bundledBridge.appendingPathComponent("claude_usage_bridge")
+        try FileManager.default.createDirectory(at: bundledModule, withIntermediateDirectories: true)
+        try Data("# bridge entry point".utf8).write(
+            to: bundledModule.appendingPathComponent("__main__.py")
+        )
+        let applicationSupport = tempDirectory.appendingPathComponent("Application Support")
+
+        let resolved = try ClaudeStatusLineInstaller.prepareBridgeDirectory(
+            bundledBridgeDirectory: bundledBridge,
+            applicationSupportDirectory: applicationSupport
+        )
+
+        let expected = applicationSupport
+            .appendingPathComponent("CodexUsageMonitor/ClaudeBridge")
+        XCTAssertEqual(resolved, expected)
+        XCTAssertEqual(
+            try Data(contentsOf: expected.appendingPathComponent("claude_usage_bridge/__main__.py")),
+            Data("# bridge entry point".utf8)
+        )
+
+        try Data("# updated bridge entry point".utf8).write(
+            to: bundledModule.appendingPathComponent("__main__.py")
+        )
+
+        XCTAssertEqual(
+            try ClaudeStatusLineInstaller.prepareBridgeDirectory(
+                bundledBridgeDirectory: bundledBridge,
+                applicationSupportDirectory: applicationSupport
+            ),
+            expected
+        )
+        XCTAssertEqual(
+            try Data(contentsOf: expected.appendingPathComponent("claude_usage_bridge/__main__.py")),
+            Data("# updated bridge entry point".utf8)
+        )
+        XCTAssertFalse(
+            try FileManager.default.contentsOfDirectory(
+                at: expected.deletingLastPathComponent(),
+                includingPropertiesForKeys: nil
+            ).contains { $0.lastPathComponent.hasPrefix(".ClaudeBridge-") }
+        )
+    }
+
     /// Regression test: an earlier version left `bridgeDirectory.path`
     /// unquoted, so a directory literally named "agent usage" (a space in
     /// the path) split into two shell words and `cd` failed with

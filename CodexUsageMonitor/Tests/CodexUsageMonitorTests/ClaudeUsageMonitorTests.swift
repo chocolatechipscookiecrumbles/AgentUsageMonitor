@@ -52,6 +52,7 @@ final class ClaudeUsageMonitorTests: XCTestCase {
 
         await monitor.refreshNow(reason: .userInitiated)
 
+        XCTAssertTrue(monitor.hasCompletedInitialRefresh)
         guard case .available(let published) = monitor.state else {
             return XCTFail("expected .available")
         }

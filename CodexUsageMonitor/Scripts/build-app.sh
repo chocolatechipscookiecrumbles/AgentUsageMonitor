@@ -15,6 +15,19 @@ xcrun actool "$root/Resources/Assets.xcassets" \
   --platform macosx \
   --minimum-deployment-target 14.0 \
   --output-partial-info-plist "$app/Contents/Resources/AssetCatalogInfo.plist"
+
+# Bundle the existing Python bridge as an app resource. The installer copies
+# this read-only signed resource into Application Support before using it, so
+# Python can create bytecode caches without modifying the app signature.
+bridge_source="$root/../ClaudeUsageBridge/claude_usage_bridge"
+bridge_resource="$app/Contents/Resources/ClaudeUsageBridge/claude_usage_bridge"
+test -f "$bridge_source/__main__.py"
+rm -rf "$app/Contents/Resources/ClaudeUsageBridge"
+mkdir -p "$bridge_resource"
+for bridge_file in __init__.py __main__.py cli.py models.py writer.py; do
+  install -m 644 "$bridge_source/$bridge_file" "$bridge_resource/$bridge_file"
+done
+
 # Sign with a stable identity, not ad-hoc.
 #
 # An ad-hoc signature (`--sign -`) has no certificate, so its designated

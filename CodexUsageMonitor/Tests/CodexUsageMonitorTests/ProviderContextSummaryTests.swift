@@ -88,7 +88,7 @@ final class ProviderContextSummaryTests: XCTestCase {
         )
 
         XCTAssertFalse(summary.isConnected)
-        XCTAssertEqual(summary.statusText, "Disconnected")
+        XCTAssertEqual(summary.statusText, ProviderContextSummary.disconnectedStatus)
         XCTAssertEqual(summary.fiveHourText, ProviderContextSummary.placeholder)
         XCTAssertEqual(summary.weeklyText, ProviderContextSummary.placeholder)
         XCTAssertNotEqual(summary.fiveHourText, "0%")
@@ -136,7 +136,7 @@ final class ProviderContextSummaryTests: XCTestCase {
         )
 
         XCTAssertFalse(summary.isConnected)
-        XCTAssertEqual(summary.statusText, "Disconnected")
+        XCTAssertEqual(summary.statusText, ProviderContextSummary.disconnectedStatus)
         XCTAssertEqual(summary.fiveHourText, ProviderContextSummary.placeholder)
         XCTAssertEqual(summary.weeklyText, ProviderContextSummary.placeholder)
         XCTAssertNotEqual(summary.fiveHourText, "0%")
@@ -185,4 +185,104 @@ final class ProviderContextSummaryTests: XCTestCase {
         XCTAssertEqual(ProviderContextSummary.activeProviders(claudeIsUsable: true), [.codex, .claudeCode])
         XCTAssertEqual(ProviderContextSummary.activeProviders(claudeIsUsable: false), [.codex])
     }
+}
+
+/// "Resets" alone did not answer the question the row is asked — how long do
+/// I have. The left side now carries the remaining duration.
+final class RelativeTimeTextDurationTests: XCTestCase {
+    private let now = Date()
+
+    func testMinutesOnlyUnderAnHour() {
+        XCTAssertEqual(RelativeTimeText.duration(until: now.addingTimeInterval(18 * 60), from: now), "in 18m")
+    }
+
+    func testHoursAndMinutes() {
+        XCTAssertEqual(RelativeTimeText.duration(until: now.addingTimeInterval(2 * 3600 + 18 * 60), from: now), "in 2h 18m")
+    }
+
+    func testDropsZeroMinutes() {
+        XCTAssertEqual(RelativeTimeText.duration(until: now.addingTimeInterval(3 * 3600), from: now), "in 3h")
+    }
+
+    func testDaysAndHours() {
+        XCTAssertEqual(RelativeTimeText.duration(until: now.addingTimeInterval(5 * 86400 + 13 * 3600), from: now), "in 5d 13h")
+    }
+
+    func testUnderAMinuteReadsAsImminent() {
+        XCTAssertEqual(RelativeTimeText.duration(until: now.addingTimeInterval(30), from: now), "in under a minute")
+    }
+
+    /// A window past its reset must not render a negative or absurd duration.
+    func testPastResetReadsAsElapsed() {
+        XCTAssertEqual(RelativeTimeText.duration(until: now.addingTimeInterval(-60), from: now), "now")
+    }
+}
+
+/// The used/remaining setting is one control for the whole app. Providers
+/// must not disagree about which one they are showing.
+final class ProviderValueModeConsistencyTests: XCTestCase {
+    private let now = Date()
+
+    private func summaries(_ mode: QuotaValueMode) -> (codex: ProviderContextSummary, claude: ProviderContextSummary) {
+        (
+            .codex(
+                connectionState: .connected(AgentAccountSummary(planType: "pro")),
+                presentation: codexPresentationForMode(fiveHour: 44, weekly: 28),
+                lastConfirmedAt: now,
+                valueMode: mode,
+                now: now
+            ),
+            .claude(
+                connectionState: .connected(ClaudeAccountSummary(planType: "pro")),
+                usageState: .available(claudePresentationForMode(fiveHour: 44, sevenDay: 28)),
+                valueMode: mode,
+                now: now
+            )
+        )
+    }
+
+    func testBothProvidersShowUsedWhenTheSettingIsUsed() {
+        let (codex, claude) = summaries(.used)
+        XCTAssertEqual(codex.fiveHourText, "44%")
+        XCTAssertEqual(claude.fiveHourText, "44%", "Claude must follow the same setting as Codex")
+        XCTAssertEqual(codex.weeklyText, claude.weeklyText)
+    }
+
+    func testBothProvidersShowRemainingWhenTheSettingIsRemaining() {
+        let (codex, claude) = summaries(.remaining)
+        XCTAssertEqual(codex.fiveHourText, "56%")
+        XCTAssertEqual(claude.fiveHourText, "56%", "Claude previously hardcoded used and disagreed with Codex")
+        XCTAssertEqual(codex.weeklyText, claude.weeklyText)
+    }
+
+    func testTheTwoProvidersNeverDisagreeForEitherSetting() {
+        for mode in QuotaValueMode.allCases {
+            let (codex, claude) = summaries(mode)
+            XCTAssertEqual(codex.fiveHourText, claude.fiveHourText, "\(mode) five-hour")
+            XCTAssertEqual(codex.weeklyText, claude.weeklyText, "\(mode) weekly")
+        }
+    }
+}
+
+private func codexPresentationForMode(fiveHour: Int, weekly: Int) -> QuotaPresentation {
+    QuotaPresentation(
+        accountFingerprint: nil, limitID: nil, planType: "pro", creditBalance: nil,
+        hasCredits: nil, availableResetCredits: nil, resetCreditExpiryDates: [],
+        fiveHour: QuotaWindow(usedPercent: fiveHour, resetAt: nil, durationMinutes: nil),
+        weekly: QuotaWindow(usedPercent: weekly, resetAt: nil, durationMinutes: nil),
+        confirmation: .confirmed, collectedAt: .now, source: "test", detail: nil
+    )
+}
+
+private func claudePresentationForMode(fiveHour: Double, sevenDay: Double) -> ClaudeUsagePresentation {
+    ClaudeUsagePresentation(
+        snapshot: ClaudeUsageSnapshot(
+            planHint: "pro",
+            fiveHour: ClaudeLimitWindow(usedPercent: fiveHour, resetsAt: nil),
+            sevenDay: ClaudeLimitWindow(usedPercent: sevenDay, resetsAt: nil),
+            scopedWindows: [], extraUsage: nil,
+            source: .oauth, capturedAt: .now, schemaVersion: 1
+        ),
+        delivery: .live, warnings: []
+    )
 }

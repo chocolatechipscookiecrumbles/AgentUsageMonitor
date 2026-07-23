@@ -27,6 +27,14 @@ enum SettingsLayoutMetrics {
     static let agentWarningChipWidth: CGFloat = 46
     static let agentWarningDisabledChipOpacity: CGFloat = 0.55
     static let agentResetCreditsAnnotationSpacing: CGFloat = 8
+    static let agentOnboardingContentSpacing: CGFloat = 12
+    static let agentOnboardingTextSpacing: CGFloat = 4
+    static let agentOnboardingVerticalPadding: CGFloat = 20
+    static let agentOnboardingHorizontalPadding: CGFloat = 20
+    static let agentOnboardingIconSlotSize: CGFloat = 44
+    static let agentOnboardingIconArtworkMaxSize: CGFloat = 22
+    static let agentOnboardingIconCornerRadius: CGFloat = 16
+    static let agentOnboardingTextMaxWidth: CGFloat = 280
     static let compactWidthBreakpoint: CGFloat = 500
     static let labelWidth: CGFloat = 148
     static let controlWidth: CGFloat = 190
@@ -46,6 +54,21 @@ enum SettingsLayoutMetrics {
     static let compactPageVerticalPadding: CGFloat = 16
     static let regularSectionSpacing: CGFloat = 20
     static let compactSectionSpacing: CGFloat = 20
+
+    /// Width left for a row's trailing control after the page inset, the card
+    /// inset, the leading text minimum, and the inter-column spacing.
+    ///
+    /// A trailing control wider than this widens the row and pushes the card
+    /// past the page's trailing edge — the defect recorded in AGENTS.md's
+    /// Settings card geometry guardrails. A child `.frame(maxWidth: .infinity)`
+    /// does not prevent it, because the overflow is intrinsic-width driven.
+    /// Consult this before giving any row a fixed-size trailing control.
+    static func trailingControlBudget(pageWidth: CGFloat, layout: SettingsLayoutMode) -> CGFloat {
+        let insets = pageHorizontalPadding(for: layout) * 2 + sectionContentHorizontalPadding * 2
+        // Two HStack gaps plus the Spacer's minLength, all rowSpacing.
+        let spacing = rowSpacing * 3
+        return max(0, pageWidth - insets - preferenceControlMinimumTextWidth - spacing)
+    }
 
     static func valueColumnInset(for layout: SettingsLayoutMode) -> CGFloat {
         layout == .compact ? 0 : labelWidth + rowSpacing

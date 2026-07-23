@@ -66,3 +66,14 @@ final class ClaudeSignInPresentationTests: XCTestCase {
         XCTAssertFalse(ClaudeSignInPresentation.keychainDisclosure.isEmpty)
     }
 }
+
+extension ClaudeSignInPresentationTests {
+    /// The prompt recurs unless the user picks Always Allow, so the copy has
+    /// to name both options and say what each costs.
+    func testKeychainExplanationCoversBothPromptChoices() {
+        let copy = ClaudeSignInPresentation.keychainPromptExplanation
+        XCTAssertTrue(copy.contains("Always Allow"), copy)
+        XCTAssertTrue(copy.contains("Allow"), copy)
+        XCTAssertTrue(copy.lowercased().contains("background"), "must say background refreshes never prompt")
+    }
+}

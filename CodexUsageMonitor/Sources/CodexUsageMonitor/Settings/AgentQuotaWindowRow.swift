@@ -9,6 +9,9 @@ struct AgentQuotaWindowRow: View {
     let provider: AgentProvider
     let valueMode: QuotaValueMode
     let unavailableText: String
+    /// Provider-specific note under the window, e.g. that Claude's five-hour
+    /// session is measured from the first message rather than a fixed clock.
+    var windowNote: String?
 
     var body: some View {
         if let window {
@@ -35,7 +38,9 @@ struct AgentQuotaWindowRow: View {
 
                 if let resetAt = window.resetAt {
                     HStack(alignment: .firstTextBaseline) {
-                        Text("Resets")
+                        // "Resets" alone did not answer the question the row is
+                        // asked. Left says how long is left, right says when.
+                        Text("Resets \(RelativeTimeText.duration(until: resetAt))")
                             .font(.caption)
                             .foregroundStyle(.secondary)
 
@@ -45,6 +50,12 @@ struct AgentQuotaWindowRow: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                }
+
+                if let windowNote {
+                    Text(windowNote)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
         } else {

@@ -42,15 +42,8 @@ enum AgentProvider: String, CaseIterable, Identifiable {
     var settingsPresentationTint: Color {
         switch self {
         case .codex: Color(red: 87 / 255, green: 109 / 255, blue: 1)
-        case .claudeCode: .orange
+        case .claudeCode: Color(red: 217 / 255, green: 119 / 255, blue: 87 / 255)
         case .githubCopilot: .secondary
-        }
-    }
-
-    func sidebarStatus(connectionState: AgentConnectionState) -> String {
-        switch self {
-        case .codex: connectionState.displayName
-        case .claudeCode, .githubCopilot: "Planned"
         }
     }
 }

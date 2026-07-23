@@ -18,7 +18,9 @@ struct ProviderContextSummary: Identifiable, Equatable {
     /// figure is not a zero one (capability gate criterion #5).
     static let placeholder = "Unavailable"
     static let connectedStatus = "Connected"
-    static let disconnectedStatus = "Disconnected"
+    /// Matches AgentConnectionState.disconnected.displayName, so Codex and
+    /// Claude use one phrase for one state.
+    static let disconnectedStatus = "Not connected"
 
     /// Providers with a real read. GitHub Copilot is excluded until its
     /// capability gate passes — no block for a provider we cannot actually
@@ -51,19 +53,31 @@ struct ProviderContextSummary: Identifiable, Equatable {
     static func claude(
         connectionState: ClaudeConnectionState,
         usageState: ClaudeUsageState,
+        valueMode: QuotaValueMode = .used,
         now: Date = .now
     ) -> ProviderContextSummary {
         let model = usageState.presentation.map { ClaudeUsageDisplayModel(presentation: $0, now: now) }
-        let connected = connectionState.isConnected || usageState.isAvailable
+        // Shared with the agent page so the two surfaces cannot disagree.
+        // Holding cached data is not the same as being connected.
+        let status = ClaudeConnectionStatus.resolve(signInState: connectionState, usageState: usageState)
         return ProviderContextSummary(
             provider: .claudeCode,
-            isConnected: connected,
-            statusText: connected ? connectedStatus : disconnectedStatus,
+            isConnected: status.isConnected,
+            statusText: status.text,
             planText: claudePlanText(connectionState: connectionState, model: model),
-            fiveHourText: model?.fiveHour?.usedText ?? placeholder,
-            weeklyText: model?.sevenDay?.usedText ?? placeholder,
+            // Routed through the same helper Codex uses, so one setting
+            // governs both providers rather than Claude hardcoding "used".
+            fiveHourText: percentText(quotaWindow(model?.fiveHour), valueMode: valueMode),
+            weeklyText: percentText(quotaWindow(model?.sevenDay), valueMode: valueMode),
             lastRefreshText: model?.capturedAtText ?? placeholder
         )
+    }
+
+    /// Adapts Claude's window into the shared type so both providers share
+    /// one percentage path.
+    private static func quotaWindow(_ window: ClaudeUsageDisplayModel.Window?) -> QuotaWindow? {
+        guard let window, !window.hasReset else { return nil }
+        return QuotaWindow(usedPercent: window.usedPercent, resetAt: window.resetsAt, durationMinutes: nil)
     }
 
     private static func percentText(_ window: QuotaWindow?, valueMode: QuotaValueMode) -> String {

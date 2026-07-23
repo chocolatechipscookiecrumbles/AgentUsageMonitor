@@ -8,6 +8,7 @@ import SwiftUI
 /// It uses the shared `AgentQuotaSessionSection`, passing a "used" credits
 /// label (Anthropic reports spend, not a balance) and no reset credits.
 struct ClaudeAgentSettingsView: View {
+    let setupState: ClaudeSetupState
     let connectionState: ClaudeConnectionState
     let usageState: ClaudeUsageState
     let valueMode: QuotaValueMode
@@ -23,27 +24,30 @@ struct ClaudeAgentSettingsView: View {
     @State private var showCLIConsent = false
 
     var body: some View {
-        // Built once per render: it does date math and currency formatting,
-        // and a computed property would rebuild it at every reference.
-        content(model: usageState.presentation.map { ClaudeUsageDisplayModel(presentation: $0) })
+        if setupState == .notSetUp {
+            ClaudeSetupOnboardingView(connect: connectWithCredentials)
+        } else {
+            // Built once per render: it does date math and currency formatting,
+            // and a computed property would rebuild it at every reference.
+            content(model: usageState.presentation.map { ClaudeUsageDisplayModel(presentation: $0) })
+        }
     }
 
     @ViewBuilder
     private func content(model: ClaudeUsageDisplayModel?) -> some View {
         SettingsSection("Connection") {
             SettingsSectionRow {
-                SettingsPreferenceControlRow("Status") { Text(connectionState.displayName) }
+                // Status text is variable-length ("Signing in with Claude Code
+                // credentials…"), so it wraps rather than widening the card.
+                SettingsValueRow("Status", value: status(model).text, description: status(model).detail)
             }
             if let plan = planName(model) {
                 SettingsSectionRow {
-                    SettingsPreferenceControlRow("Plan") { Text(plan) }
+                    SettingsValueRow("Plan", value: plan)
                 }
             }
             SettingsSectionRow(showsDivider: false) {
-                VStack(alignment: .leading, spacing: 8) {
-                    connectionGuidance
-                    connectionActions
-                }
+                connectionActions
             }
         }
 
@@ -56,29 +60,43 @@ struct ClaudeAgentSettingsView: View {
             creditsDescription: ClaudeUsageDisplayModel.creditsUsedDescription,
             creditsValue: model?.creditsUsedText,
             resetCredits: nil,
-            weeklyFootnote: ClaudeUsageDisplayModel.weeklyScopeCaveat
+            weeklyFootnote: ClaudeUsageDisplayModel.weeklyScopeCaveat,
+            fiveHourNote: ClaudeUsageDisplayModel.showsFiveHourSessionNote(
+                isConnected: status(model).isConnected,
+                hasFiveHourWindow: model?.fiveHour != nil
+            ) ? ClaudeUsageDisplayModel.fiveHourSessionNote : nil
         )
 
         SettingsSection("Source") {
             SettingsSectionRow {
-                SettingsPreferenceControlRow("Read from") {
-                    Text(model.map { "\($0.sourceLabel) · \($0.capturedAtText)" } ?? "Not available")
-                }
-            }
-            if let notice = model?.stalenessNotice {
-                SettingsSectionRow {
-                    Text(notice)
-                        .font(.callout)
-                        .foregroundStyle(.orange)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                // The longest value on the page ("Cached Claude OAuth result ·
+                // 3 hours ago"), and the staleness note explains this row, so
+                // it rides as its description instead of a block of its own.
+                SettingsValueRow(
+                    "Read from",
+                    value: model.map { "\($0.sourceLabel) · \($0.capturedAtText)" } ?? "Not available",
+                    description: model?.stalenessNotice
+                )
             }
             SettingsSectionRow(showsDivider: false) {
-                Button("Refresh Claude usage", action: refresh)
+                SettingsPreferenceControlRow(
+                    "Refresh now",
+                    description: "Uses the free sources. Never prompts."
+                ) {
+                    Button("Refresh", action: refresh)
+                }
             }
         }
 
         forceCLISection
+
+        // No Usage Warnings section here, deliberately (decided 2026-07-23).
+        // Codex's chips write to a real threshold store and feed a notifier;
+        // Claude has neither yet, so the section could only render inert —
+        // vertical space on a page just compacted, in exchange for nothing the
+        // user can act on. Claude's chips arrive with the general
+        // notification-settings port, which brings the per-provider store with
+        // it, rather than as a Claude-specific stub now.
     }
 
     /// Tier 2 — deliberately separated from the free refresh above, with the
@@ -86,18 +104,21 @@ struct ClaudeAgentSettingsView: View {
     @ViewBuilder
     private var forceCLISection: some View {
         SettingsSection("Force a reading") {
-            SettingsSectionRow {
-                Button(isRunningCLIProbe ? "Reading usage…" : "Force refresh with Claude CLI…") {
-                    if hasConsentedToCLIProbe {
-                        runCLIProbe()
-                    } else {
-                        showCLIConsent = true
-                    }
-                }
-                .disabled(isRunningCLIProbe)
-            }
             SettingsSectionRow(showsDivider: cliProbeError != nil) {
-                SettingsDescription(ClaudeCLIUsageProbe.buttonFootnote)
+                // Title, cost footnote and button in one row rather than three.
+                SettingsPreferenceControlRow(
+                    "Claude CLI check",
+                    description: ClaudeCLIUsageProbe.buttonFootnote
+                ) {
+                    Button(isRunningCLIProbe ? "Reading…" : "Run check") {
+                        if hasConsentedToCLIProbe {
+                            runCLIProbe()
+                        } else {
+                            showCLIConsent = true
+                        }
+                    }
+                    .disabled(isRunningCLIProbe)
+                }
             }
             if let cliProbeError {
                 SettingsSectionRow(showsDivider: false) {
@@ -119,6 +140,13 @@ struct ClaudeAgentSettingsView: View {
         }
     }
 
+    /// The same derivation the context rail uses, so a live read is reported
+    /// as connected on both surfaces even if the sign-in button was never
+    /// pressed.
+    private func status(_ model: ClaudeUsageDisplayModel?) -> ClaudeConnectionStatus {
+        ClaudeConnectionStatus.resolve(signInState: connectionState, usageState: usageState)
+    }
+
     /// Prefers the plan proven by the connection; falls back to the plan hint
     /// carried on the usage snapshot.
     private func planName(_ model: ClaudeUsageDisplayModel?) -> String? {
@@ -135,36 +163,27 @@ struct ClaudeAgentSettingsView: View {
         return QuotaWindow(usedPercent: window.usedPercent, resetAt: window.resetsAt, durationMinutes: nil)
     }
 
-    @ViewBuilder
-    private var connectionGuidance: some View {
-        switch connectionState {
-        case .checking:
-            SettingsDescription("Checking the Claude connection…")
-        case .missingCLI:
-            SettingsDescription("Browser sign-in needs the Claude CLI. Use Claude Code credentials instead.")
-        case .notConnected:
-            SettingsDescription("Connect Claude to show current five-hour and weekly usage.")
-        case .signingIn(let method):
-            SettingsDescription("Signing in with \(method.displayName)…")
-        case .connected:
-            SettingsDescription("Claude is connected. Usage is read on a background schedule and never prompts.")
-        case .failed(let failure):
-            Text(failure.displayMessage)
-                .font(.callout)
-                .foregroundStyle(.orange)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
 
     @ViewBuilder
     private var connectionActions: some View {
         if showsConnectAction {
-            Button("Use Claude Code credentials…", action: connectWithCredentials)
-                .disabled(isSigningIn)
-            SettingsDescription(ClaudeSignInPresentation.keychainDisclosure)
+            // Disclosure sits with the button that triggers the prompt, rather
+            // than as a separate full-width block.
+            SettingsPreferenceControlRow(
+                "Claude Code credentials",
+                description: ClaudeSignInPresentation.keychainDisclosure
+            ) {
+                Button("Connect", action: connectWithCredentials)
+                    .disabled(isSigningIn)
+            }
         }
         if case .connected = connectionState {
-            Button("Disconnect", action: disconnect)
+            SettingsPreferenceControlRow(
+                "Connected account",
+                description: ClaudeSignInPresentation.keychainPromptExplanation
+            ) {
+                Button("Disconnect", action: disconnect)
+            }
         }
     }
 

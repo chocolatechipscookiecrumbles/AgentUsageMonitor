@@ -23,7 +23,8 @@ struct SettingsPreviewView: View {
                 case .claudeCode:
                     .claude(
                         connectionState: viewModel.claudeConnectionState,
-                        usageState: viewModel.claudeState
+                        usageState: viewModel.claudeState,
+                        valueMode: viewModel.settings.quotaValueMode
                     )
                 case .githubCopilot:
                     nil

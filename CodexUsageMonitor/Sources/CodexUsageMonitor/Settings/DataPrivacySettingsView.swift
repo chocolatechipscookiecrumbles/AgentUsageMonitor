@@ -36,6 +36,29 @@ struct DataPrivacySettingsView: View {
                 }
             }
 
+            // Claude reads data this app does not own — a Keychain item and a
+            // file another program writes — so what is read, and what is
+            // deliberately not, is stated here rather than on the Agents page.
+            SettingsSection("Claude Code") {
+                SettingsSectionRow {
+                    SettingsValueRow(
+                        "Credentials",
+                        value: "Read, never stored",
+                        description: "Claude Code's own Keychain item is read at refresh time. This app keeps no copy of it and never requests a token of its own."
+                    )
+                }
+                SettingsSectionRow {
+                    SettingsValueRow(
+                        "Conversations",
+                        value: "Never read",
+                        description: "Only quota percentages, reset times, and plan type are collected."
+                    )
+                }
+                SettingsSectionRow(showsDivider: false) {
+                    SettingsDescription(ClaudeUsageDisplayModel.weeklyScopeCaveat)
+                }
+            }
+
             SettingsSection("Excluded data") {
                 SettingsSectionRow {
                     SettingsDescription("The app does not store passwords, OAuth tokens, email addresses, prompts, source code, raw provider responses, or raw provider errors.")
