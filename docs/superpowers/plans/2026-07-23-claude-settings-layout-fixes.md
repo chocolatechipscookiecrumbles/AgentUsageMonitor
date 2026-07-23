@@ -90,17 +90,19 @@ This matches the existing guardrail in `AGENTS.md`: *"Keep a control's explanato
 - **All geometry values live in `SettingsLayoutMetrics`** — no literals in views.
 - **Required visual acceptance:** per `AGENTS.md`, Settings changes need signed-app acceptance. Inspect the Claude page beside Codex at the default size, rail hidden and visible, both appearances, checking equal gutters on both edges.
 
-## Verification matrix (fill during implementation)
+## Verification matrix
 
 | Check | State | Result |
 |---|---|---|
-| `swift test` | Run | 204 passed, 0 failures |
-| Claude page gutters equal at 499pt, rail hidden | Not run | |
-| Claude page gutters equal, rail visible | Not run | |
+| `swift test` | Run | 208 passed, 0 failures (204 at the time of the fixes; +4 from the provider-promotion tests) |
+| Claude page gutters equal at 499pt, rail hidden | Run | **Accepted** — user visual acceptance, 2026-07-23 |
+| Claude page gutters equal, rail visible | Run | **Accepted** — user visual acceptance, 2026-07-23 |
 | Codex page unchanged side by side | Run | No diff in CodexAgentSettingsView, AgentQuotaSessionSection, SettingsPreferenceControlRow |
-| Five-hour note appears only pre-session | Not run | |
+| Five-hour note appears only pre-session | Partial | Logic covered by `ClaudeUsageDisplayModelTests`; the pre-session state was not separately driven in the app — the observed account had a window running |
 | Long source string (`Cached … · 3 hours ago`) does not overflow | Run (unit) | Value now wraps via SettingsValueRow; budget asserted at 235pt |
-| Both appearances (light/dark) | Not run | |
+| Both appearances (light/dark) | Run | **Accepted** — user visual acceptance, 2026-07-23 |
+
+**Acceptance recorded 2026-07-23.** The user inspected the running app and accepted the page. Two qualifications for whoever picks this up: the pre-session five-hour state was not separately driven (it needs an account with no active window, or an injected fixture), and acceptance predates nothing — the tint change to `#D97757` landed *after* this inspection, so the Claude page's bars, tab underline, and rail card now render in the brand color rather than system orange. That is a color change on an accepted page; it is small and derives from one constant, but it has not itself been looked at.
 
 ## Completion criteria
 
@@ -109,3 +111,7 @@ This matches the existing guardrail in `AGENTS.md`: *"Keep a control's explanato
 - The five-hour session note appears only before a session has started.
 - "Force a reading" is compact, still states its token cost, and still confirms on first use.
 - Codex renders unchanged; full suite green; signed-app visual acceptance recorded above.
+
+## Outcome
+
+**All four defects closed and accepted 2026-07-23.** This plan is done. Its two lasting artifacts are `SettingsValueRow` (the wrapping text-value row) and `SettingsLayoutMetrics.trailingControlBudget`, which `AGENTS.md` now points at so the overflow defect is prevented rather than diagnosed a third time. Remaining Claude Settings work lives in the [settings page port plan](2026-07-21-claude-agent-settings-page-port.md), not here.
