@@ -31,7 +31,6 @@ final class QuotaViewModel: ObservableObject {
     private let claudeMonitor: ClaudeUsageMonitor
     private let claudeConnectionController: ClaudeConnectionController
     private let connectionController: CodexConnectionController
-    private var claudeRefreshTask: Task<Void, Never>?
     private var subscriptions: Set<AnyCancellable> = []
 
     init() {
@@ -105,6 +104,9 @@ final class QuotaViewModel: ObservableObject {
         claudeMonitor.$hasCompletedInitialRefresh.removeDuplicates().sink { [weak self] _ in
             self?.updateClaudeSetupState()
         }.store(in: &subscriptions)
+        claudeMonitor.$isRefreshing.removeDuplicates().sink { [weak self] isRefreshing in
+            self?.isRefreshingClaude = isRefreshing
+        }.store(in: &subscriptions)
         claudeConnectionController.$state.removeDuplicates().sink { [weak self] state in
             self?.claudeConnectionState = state
             self?.updateClaudeSetupState()
@@ -175,20 +177,8 @@ final class QuotaViewModel: ObservableObject {
     /// User-initiated: this is the only path allowed to raise a Keychain
     /// prompt, so it must never be called from a background trigger.
     func refreshClaude() {
-        guard claudeRefreshTask == nil else { return }
-        isRefreshingClaude = true
-        claudeRefreshTask = Task { [weak self, claudeMonitor] in
-            await claudeMonitor.refreshNow(reason: .userInitiated)
-            guard let self else { return }
-            isRefreshingClaude = false
-            claudeRefreshTask = nil
-        }
-    }
-
-    /// Menu-open refresh — reads with interaction forbidden.
-    func refreshClaudeOnMenuOpen() {
         Task { [claudeMonitor] in
-            await claudeMonitor.refreshNow(reason: .menuOpened)
+            await claudeMonitor.refreshNow(reason: .userInitiated)
         }
     }
 
