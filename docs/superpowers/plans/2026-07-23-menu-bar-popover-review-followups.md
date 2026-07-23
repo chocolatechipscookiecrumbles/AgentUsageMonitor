@@ -842,6 +842,8 @@ Until this gate is completed, planning-board status remains **Verification**.
 
 **Status:** Explicitly deferred. Do not execute during Tasks 1–5. Resume only when signed-app launch and frame capture are authorized.
 
+**Executable follow-on plan:** [Provider-Switch Instability Diagnosis and Fix](2026-07-24-provider-switch-instability-diagnosis.md). That plan supersedes this section for execution detail while preserving the same prohibitions and acceptance boundary.
+
 **Files to inspect or prototype later:**
 
 - `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AgentSettingsTabStrip.swift`
@@ -989,6 +991,8 @@ If different causes are proven, split the fixes: do not force one shared tab abs
 ## Deferred Task 7: Diagnose and replace the incomplete corner-artifact fix
 
 **Status:** Explicitly deferred. The user reports that the corner artifact remains visible after commit `575ae0e`; therefore the transparent-window change is not accepted as a fix. Do not execute this task during the source-only pass.
+
+**Executable follow-on plan:** [Menu Popover Corner Artifact Diagnosis and Fix](2026-07-24-menu-popover-corner-artifact-diagnosis.md). That plan supersedes this section for execution detail and requires first-frame host instrumentation before any replacement fix.
 
 **Current source state:**
 
