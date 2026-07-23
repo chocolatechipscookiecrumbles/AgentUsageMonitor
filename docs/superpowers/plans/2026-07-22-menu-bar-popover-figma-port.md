@@ -135,16 +135,20 @@ With only Codex data available, `MenuBarLabelPresentation` delegates to the orig
 
 ## Task 3: Theme and primitives
 
-- [ ] **Step 1: Failing tests** (`MenuPopoverThemeTests.swift`): the threshold rule returns danger ≤10, warning ≤25, success above; boundary values (exactly 10, exactly 25) resolve as specified; light and dark both return a surface for every token.
-- [ ] **Step 2: Run to verify they fail.**
-- [ ] **Step 3: Implement** `MenuPopoverTheme`, `UsageProgressBar`, `UsageProgressRing`, `StatusPill`, `MetadataRow` per SPEC §1–2.
-- [ ] **Step 4: Run to verify they pass. Commit.**
+- [x] **Step 1: Skipped by repository policy.** Theme and primitive presence is new-feature coverage, not a reproducible defect regression, so no new tests were added.
+- [x] **Step 2: Skipped with Step 1.** The existing suite is preserved and run after implementation.
+- [x] **Step 3: Implement** `MenuPopoverTheme`, `UsageProgressBar`, `StatusPill`, and `ProviderIconTile` per SPEC §1–2 and the 2026-07-22 revision. The removed `UsageProgressRing` and `MetadataRow` are intentionally not implemented.
+- [x] **Step 4:** `swift build --disable-sandbox` succeeded and the unchanged full suite passed 223 tests with zero failures. Commit.
+
+Visual acceptance of the Task 3 primitives is unobserved under the user's
+explicit waiver. Light and Dark appearances, provider marks, threshold colors,
+and status-pill states were not directly inspected.
 
 ## Task 4: Shell + provider tab strip
 
 - [ ] **Step 1: Failing tests**: `availableProviders` includes Codex always, Claude only when its state is usable, **never Copilot**; the persisted selection falls back to the default when the persisted provider is unavailable.
 - [ ] **Step 2: Run to verify they fail.**
-- [ ] **Step 3: Implement** `MenuPopoverChrome` + `MenuProviderTabStrip` + `ProviderIconTile` + the header row (provider icon, title/subtitle, status pill) + the root `MenuBarPopoverView` (strip, header, content, footer). The provider marks are full-color SVGs, so pick the tile background deliberately rather than reusing the old blue-violet gradient.
+- [ ] **Step 3: Implement** `MenuPopoverChrome` + `MenuProviderTabStrip` + the header row (using the Task 3 `ProviderIconTile`, title/subtitle, and status pill) + the root `MenuBarPopoverView` (strip, header, content, footer). The provider marks are full-color SVGs; Task 3 deliberately placed them on a low-emphasis provider-tinted surface rather than reusing the old blue-violet gradient.
 - [ ] **Step 4: Run the full suite. Commit.**
 
 ## Task 5: Codex content — behavior-preserving port
