@@ -22,6 +22,7 @@ struct AgentsSettingsView: View {
                 )
             case .claudeCode:
                 ClaudeAgentSettingsView(
+                    setupState: viewModel.claudeSetupState,
                     connectionState: viewModel.claudeConnectionState,
                     usageState: viewModel.claudeState,
                     valueMode: viewModel.settings.quotaValueMode,

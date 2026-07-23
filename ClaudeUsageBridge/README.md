@@ -65,8 +65,9 @@ python3 -m claude_usage_bridge --quiet
 ## Native app companion
 
 The snapshot this bridge writes is read by `ClaudeRateLimitSnapshotReader` in
-the native app (`CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/`). As of
-this plan, that reader is an isolated, tested component only — it is not yet
-wired into any Settings UI, connection controller, or refresh cycle. See the
-[capability research's gate](../docs/superpowers/plans/2026-07-20-claude-code-capability-research.md#gate-before-implementation)
-for what still has to be true before a visible Claude usage UI ships.
+the native app (`CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/`). The app
+bundles this module as a signed resource, copies it to
+`~/Library/Application Support/CodexUsageMonitor/ClaudeBridge/`, and uses it as
+the passive fallback behind the supported Claude Settings page. Interactive
+one-click installation and conflict merging for an existing custom
+`statusLine` remain deferred; manual setup must preserve an existing command.

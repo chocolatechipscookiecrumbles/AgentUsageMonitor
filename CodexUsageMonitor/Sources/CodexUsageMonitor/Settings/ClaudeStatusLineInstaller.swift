@@ -14,9 +14,77 @@ struct ClaudeStatusLineInstaller {
     private let settingsURL: URL
     private let bridgeCommand: String
 
+    /// Production path: copy the signed bundle's read-only Python resource to
+    /// app-owned Application Support before pointing Claude Code at it.
+    ///
+    /// Running Python from inside the app bundle could create `__pycache__`
+    /// beside the module and invalidate the app signature. The copied
+    /// directory is also stable across app-bundle replacement.
+    init?(
+        settingsURL: URL = URL(fileURLWithPath: NSHomeDirectory())
+            .appendingPathComponent(".claude/settings.json"),
+        bundledBridgeDirectory: URL? = Bundle.main.resourceURL?
+            .appendingPathComponent("ClaudeUsageBridge"),
+        applicationSupportDirectory: URL? = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first,
+        fileManager: FileManager = .default
+    ) {
+        guard let bundledBridgeDirectory,
+              let applicationSupportDirectory,
+              fileManager.fileExists(
+                  atPath: bundledBridgeDirectory
+                      .appendingPathComponent("claude_usage_bridge/__main__.py")
+                      .path
+              ),
+              let bridgeDirectory = try? Self.prepareBridgeDirectory(
+                  bundledBridgeDirectory: bundledBridgeDirectory,
+                  applicationSupportDirectory: applicationSupportDirectory,
+                  fileManager: fileManager
+              )
+        else { return nil }
+        self.init(settingsURL: settingsURL, bridgeDirectory: bridgeDirectory)
+    }
+
     init(settingsURL: URL, bridgeDirectory: URL) {
         self.settingsURL = settingsURL
         self.bridgeCommand = "cd \(Self.shellQuoted(bridgeDirectory.path)) && python3 -m claude_usage_bridge --quiet"
+    }
+
+    static func prepareBridgeDirectory(
+        bundledBridgeDirectory: URL,
+        applicationSupportDirectory: URL,
+        fileManager: FileManager = .default
+    ) throws -> URL {
+        let parentDirectory = applicationSupportDirectory
+            .appendingPathComponent("CodexUsageMonitor", isDirectory: true)
+        let destination = parentDirectory
+            .appendingPathComponent("ClaudeBridge", isDirectory: true)
+        let staging = parentDirectory
+            .appendingPathComponent(".ClaudeBridge-\(UUID().uuidString)", isDirectory: true)
+
+        try fileManager.createDirectory(
+            at: parentDirectory,
+            withIntermediateDirectories: true
+        )
+        try fileManager.setAttributes(
+            [.posixPermissions: 0o700],
+            ofItemAtPath: parentDirectory.path
+        )
+        try fileManager.copyItem(at: bundledBridgeDirectory, to: staging)
+        defer { try? fileManager.removeItem(at: staging) }
+
+        if fileManager.fileExists(atPath: destination.path) {
+            _ = try fileManager.replaceItemAt(
+                destination,
+                withItemAt: staging,
+                backupItemName: nil
+            )
+        } else {
+            try fileManager.moveItem(at: staging, to: destination)
+        }
+        return destination
     }
 
     /// Single-quotes a path for safe use inside the shell command Claude

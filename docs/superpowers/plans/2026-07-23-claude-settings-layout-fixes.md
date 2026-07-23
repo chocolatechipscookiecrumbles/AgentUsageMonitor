@@ -100,9 +100,10 @@ This matches the existing guardrail in `AGENTS.md`: *"Keep a control's explanato
 | Codex page unchanged side by side | Run | No diff in CodexAgentSettingsView, AgentQuotaSessionSection, SettingsPreferenceControlRow |
 | Five-hour note appears only pre-session | Partial | Logic covered by `ClaudeUsageDisplayModelTests`; the pre-session state was not separately driven in the app — the observed account had a window running |
 | Long source string (`Cached … · 3 hours ago`) does not overflow | Run (unit) | Value now wraps via SettingsValueRow; budget asserted at 235pt |
-| Both appearances (light/dark) | Run | **Accepted** — user visual acceptance, 2026-07-23 |
+| Both appearances (light/dark) | Observed | **Accepted** — user visual acceptance, 2026-07-23 |
+| Claude `#D97757` tint across five-hour and weekly quota bars | Observed | **Accepted** — user visual acceptance, 2026-07-23 |
 
-**Acceptance recorded 2026-07-23.** The user inspected the running app and accepted the page. Two qualifications for whoever picks this up: the pre-session five-hour state was not separately driven (it needs an account with no active window, or an injected fixture), and acceptance predates nothing — the tint change to `#D97757` landed *after* this inspection, so the Claude page's bars, tab underline, and rail card now render in the brand color rather than system orange. That is a color change on an accepted page; it is small and derives from one constant, but it has not itself been looked at.
+**Acceptance recorded 2026-07-23.** The user inspected the running app and accepted the page in both appearances and rail states. The user subsequently inspected the `#D97757` treatment across the five-hour and weekly quota bars and accepted that update. One qualification remains: the pre-session five-hour state was not separately driven because the observed account had a window running.
 
 ## Completion criteria
 

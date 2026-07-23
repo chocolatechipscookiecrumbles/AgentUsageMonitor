@@ -25,6 +25,7 @@ final class QuotaViewModel: ObservableObject {
     /// the user paid tokens for.
     @Published private(set) var claudeCLIProbeError: String?
     @Published private(set) var isRunningClaudeCLIProbe = false
+    @Published private(set) var claudeSetupState: ClaudeSetupState
 
     let settings: AppSettings
     private let monitor: QuotaMonitor
@@ -34,8 +35,16 @@ final class QuotaViewModel: ObservableObject {
     private var subscriptions: Set<AnyCancellable> = []
 
     init() {
-        let settings = AppSettings()
+        let settings = AppSettings(
+            legacyClaudeSetupEvidence: AppSettings.hasLegacyClaudeSetupEvidence()
+        )
         self.settings = settings
+        claudeSetupState = ClaudeSetupState.resolve(
+            connectionState: .notConnected,
+            usageState: .unavailable(reason: ClaudeUsageState.notConnectedReason),
+            hasSetupHistory: settings.hasClaudeSetupHistory,
+            hasCompletedSourceDiscovery: false
+        )
         let monitor = QuotaMonitor(settings: settings)
         self.monitor = monitor
         let connectionController = CodexConnectionController {
@@ -102,9 +111,14 @@ final class QuotaViewModel: ObservableObject {
         }.store(in: &subscriptions)
         claudeMonitor.$state.sink { [weak self] state in
             self?.claudeState = state
+            self?.updateClaudeSetupState()
+        }.store(in: &subscriptions)
+        claudeMonitor.$hasCompletedInitialRefresh.removeDuplicates().sink { [weak self] _ in
+            self?.updateClaudeSetupState()
         }.store(in: &subscriptions)
         claudeConnectionController.$state.removeDuplicates().sink { [weak self] state in
             self?.claudeConnectionState = state
+            self?.updateClaudeSetupState()
             // A successful connect proves the credential works; pull usage now
             // rather than waiting for the next scheduled refresh.
             if state.isConnected { self?.refreshClaude() }
@@ -232,6 +246,21 @@ final class QuotaViewModel: ObservableObject {
         case nil:
             "The usage check could not be completed."
         }
+    }
+
+    private func updateClaudeSetupState() {
+        if ClaudeSetupState.hasCurrentEvidence(
+            connectionState: claudeConnectionState,
+            usageState: claudeState
+        ) {
+            settings.recordClaudeSetupHistory()
+        }
+        claudeSetupState = ClaudeSetupState.resolve(
+            connectionState: claudeConnectionState,
+            usageState: claudeState,
+            hasSetupHistory: settings.hasClaudeSetupHistory,
+            hasCompletedSourceDiscovery: claudeMonitor.hasCompletedInitialRefresh
+        )
     }
 
     func stopClaude() {

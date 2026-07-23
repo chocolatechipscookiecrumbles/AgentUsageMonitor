@@ -27,6 +27,14 @@ enum SettingsLayoutMetrics {
     static let agentWarningChipWidth: CGFloat = 46
     static let agentWarningDisabledChipOpacity: CGFloat = 0.55
     static let agentResetCreditsAnnotationSpacing: CGFloat = 8
+    static let agentOnboardingContentSpacing: CGFloat = 12
+    static let agentOnboardingTextSpacing: CGFloat = 4
+    static let agentOnboardingVerticalPadding: CGFloat = 20
+    static let agentOnboardingHorizontalPadding: CGFloat = 20
+    static let agentOnboardingIconSlotSize: CGFloat = 44
+    static let agentOnboardingIconArtworkMaxSize: CGFloat = 22
+    static let agentOnboardingIconCornerRadius: CGFloat = 16
+    static let agentOnboardingTextMaxWidth: CGFloat = 280
     static let compactWidthBreakpoint: CGFloat = 500
     static let labelWidth: CGFloat = 148
     static let controlWidth: CGFloat = 190

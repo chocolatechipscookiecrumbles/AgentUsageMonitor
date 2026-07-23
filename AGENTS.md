@@ -17,7 +17,7 @@ Skills live in `.agents/skills/`. Most are synced from a global source and are g
 | Credential, Keychain, or token handling | `swift-security-expert` |
 | Writing or executing an implementation plan | `writing-plans`, `executing-plans`, `subagent-driven-development` |
 | Chasing a defect | `systematic-debugging`, `diagnosing-bugs` |
-| Adding tests | `test-driven-development`, `test-master` |
+| Adding a defect regression test | `systematic-debugging`, `test-master` |
 | Cleaning up changed code (reuse, simplification) | `code-simplifier` |
 | Finishing a branch, worktrees, review | `finishing-a-development-branch`, `using-git-worktrees`, `requesting-code-review`, `receiving-code-review` |
 | Claiming something is done | `verification-before-completion` |
@@ -30,7 +30,7 @@ Skills live in `.agents/skills/`. Most are synced from a global source and are g
 - Update `UsageProbe/README.md` and `how-to.md` when a native-app change affects user-visible behavior or operating instructions.
 - Use `.agents/skills/preparing-evidence-rich-prs` and `docs/development/evidence-rich-pull-requests.md` when preparing or updating a pull request.
 - The user creates every GitHub pull request manually. For every approved push or planned-PR request, push only the approved scope and generate a filled draft from `.github/pull_request_template.md` (including the compare URL) for the user to submit. Never create a GitHub pull request.
-- Keep automated test changes narrow: do not add broad test suites or general test cases by default. For a reproducible defect, add the smallest deterministic regression test that demonstrates the old failure and protects the fix; if a regression test is not feasible, record the manual regression boundary and why.
+- For future implementation work, do not add feature-presence, routing, happy-path, implementation-detail, or broad general test cases. Add automated coverage only for a reproducible defect: the smallest deterministic regression test that demonstrates the old failure and protects the fix. If a regression test is not feasible, record the manual regression boundary and why. Preserve existing tests unless the task explicitly changes or removes them.
 - Preserve existing user changes and keep unrelated edits out of the current task.
 
 ## macOS Settings UI guardrails

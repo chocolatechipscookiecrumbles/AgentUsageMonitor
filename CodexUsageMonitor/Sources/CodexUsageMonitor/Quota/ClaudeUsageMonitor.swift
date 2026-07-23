@@ -17,6 +17,7 @@ final class ClaudeUsageMonitor: ObservableObject {
     static let defaultPollInterval: Duration = .seconds(12 * 60)
 
     @Published private(set) var state: ClaudeUsageState = .unavailable(reason: ClaudeUsageState.notConnectedReason)
+    @Published private(set) var hasCompletedInitialRefresh = false
 
     private let collector: ClaudeUsageCollecting
     private let pollInterval: Duration
@@ -66,6 +67,7 @@ final class ClaudeUsageMonitor: ObservableObject {
     func refreshNow(reason: ClaudeRefreshReason) async {
         let presentation = await collector.refresh(reason: reason)
         state = Self.mapState(presentation)
+        hasCompletedInitialRefresh = true
     }
 
     /// Publishes a snapshot obtained outside the automatic hierarchy — the

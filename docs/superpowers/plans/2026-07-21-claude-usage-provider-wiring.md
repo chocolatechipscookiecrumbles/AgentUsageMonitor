@@ -19,7 +19,7 @@ Two concrete gaps this plan closes, beyond "no UI":
 - `ClaudeKeychainCredentialStore` gains a `KeychainPromptPolicy` (`.never` / `.userInitiatedOnly`), threaded from `ClaudeRefreshReason`, so background and menu-open reads pass `kSecUseAuthenticationUI` = *fail* (never prompt) and only `.userInitiated` reads allow interaction. A denied/unavailable read falls through to statusLine, never a hard failure (probe plan §4, §11).
 - A new read-only SwiftUI view, `ClaudeUsageStatusView`, replaces `ClaudeCodePreviewSettingsView` in `AgentsSettingsView`. It renders the reconciled monitor's published state: five-hour + weekly windows with source label and relative capture time when data exists, and an explicit unavailable/onboarding state otherwise. Product copy carries the shared-pool caveat (probe plan §9, gate #3).
 - `QuotaViewModel` gains ownership of the `ClaudeUsageMonitor` (mirroring how it owns Codex's `QuotaMonitor`/`CodexConnectionController`), started/stopped on the same app-launch/menu lifecycle, and exposes its state to `AgentsSettingsView`.
-- `ClaudeUsageBridge/` is bundled as an app resource so `ClaudeStatusLineInstaller.bridgeDirectory`'s production path resolves (currently unresolvable — the script isn't in the signed `.app`).
+- `ClaudeUsageBridge/` is bundled by `Scripts/build-app.sh` as an app resource. `ClaudeStatusLineInstaller` copies that signed, read-only resource to the deterministic `~/Library/Application Support/CodexUsageMonitor/ClaudeBridge/` path before use so Python bytecode cannot modify the app bundle.
 
 **Tech Stack:** Swift 6.2, Foundation, `Security` (Keychain), Combine (`ObservableObject`), SwiftUI, XCTest — no new dependencies. Reuses the existing, tested `ClaudeUsageCollector`, `ClaudeOAuthUsageSource`, `ClaudeUsageCache`, and `ClaudeRateLimitSnapshotReader` unchanged where possible.
 
@@ -97,15 +97,15 @@ Two concrete gaps this plan closes, beyond "no UI":
 
 ## Task 6: Bundle `ClaudeUsageBridge/` so the installer's production path resolves
 
-- [ ] **Step 1: Write a failing test** asserting `ClaudeStatusLineInstaller.bridgeDirectory` resolves to an existing bundled resource path in a test build (or a documented, deterministic Application Support install path the installer copies to on first run).
-- [ ] **Step 2: Implement.** Add `ClaudeUsageBridge/` as a package/app resource (SwiftPM `resources:` copy or an Xcode "Copy Files" phase), and have `ClaudeStatusLineInstaller` resolve `bridgeDirectory` from `Bundle.module`/`Bundle.main`, copying into `~/Library/Application Support/CodexUsageMonitor/ClaudeBridge/` if the app-bundle path is read-only. Do **not** yet surface a one-click "Set up passive capture" button — that's the menu/onboarding follow-up; this task only makes the path *reachable*.
-- [ ] **Step 3: Run to verify it passes. Commit.**
+- [x] **Step 1: Write a failing test** asserting `ClaudeStatusLineInstaller.bridgeDirectory` resolves to an existing bundled resource path in a test build (or a documented, deterministic Application Support install path the installer copies to on first run).
+- [x] **Step 2: Implement.** Add `ClaudeUsageBridge/` as a package/app resource (SwiftPM `resources:` copy or an Xcode "Copy Files" phase), and have `ClaudeStatusLineInstaller` resolve `bridgeDirectory` from `Bundle.module`/`Bundle.main`, copying into `~/Library/Application Support/CodexUsageMonitor/ClaudeBridge/` if the app-bundle path is read-only. Do **not** yet surface a one-click "Set up passive capture" button — that's the menu/onboarding follow-up; this task only makes the path *reachable*.
+- [x] **Step 3: Run to verify it passes.** `ClaudeStatusLineInstallerTests` passes 7 tests, the full Swift suite passes 222 tests, and the bridge's 13 Python tests pass. The built app contains exactly the five tracked bridge modules; `__main__.py` is byte-for-byte identical to the repository source and no ignored bytecode cache is bundled. The local Developer ID identity is currently duplicated/corrupt; re-signing the unchanged bundle ad hoc verified bundle integrity. By user direction, proper Developer ID and permission acceptance are deferred until per-agent notifications and the menu-bar popover are complete. Commit remains a user-controlled branch-finishing action.
 
 ## Task 7: Documentation and bookkeeping
 
-- [ ] **Step 1: Update the [capability research gate](2026-07-20-claude-code-capability-research.md#gate-before-implementation)** — mark criteria #3 and #5 satisfied by this plan (with the same "Implementation note" style used for #1 and #4), and note that Claude is no longer a static preview.
-- [ ] **Step 2: Update [the planning board](../../product/planning-board.md)** — move the Claude provider row from **Deferred** toward **In progress / Shipped (gated)** as appropriate, linking this plan; note the still-deferred menu card and tier-3 CLI.
-- [ ] **Step 3: Check the boxes** on the three 2026-07-20 Claude plans (their code is merged but their checkboxes were never ticked), so the plan record matches reality.
+- [x] **Step 1: Update the [capability research gate](2026-07-20-claude-code-capability-research.md#gate-before-implementation)** — criteria #3 and #5 are now satisfied with direct implementation evidence. Criterion #3 was closed on 2026-07-23 by Anthropic's Pro/Max-specific documentation that both plans share usage limits across Claude and Claude Code.
+- [x] **Step 2: Update [the planning board](../../product/planning-board.md)** — both Claude verification rows now record the implemented and visually accepted first-run/tint states, bundled bridge, closed capability gate, and still-deferred automatic CLI tier/interactive statusLine setup.
+- [~] **Step 3: Historical checkbox backfill waived 2026-07-23.** The reconciled status blocks and current planning board are authoritative; rewriting every task checkbox in the three superseded 2026-07-20 execution plans would not change behavior or prevent a reproduced defect.
 - [ ] **Step 4: Commit.**
 
 ---
@@ -115,6 +115,7 @@ Two concrete gaps this plan closes, beyond "no UI":
 - **Menu-bar Claude card** — a Claude quota card in `MenuBarExtra`/`QuotaMenuView` alongside Codex, with a "Refresh Claude Usage" action. This plan surfaces Claude only in Settings; the menu card is `claude_probe_plan` Task 9's remainder.
 - **Tier 3 — user-authorized CLI `/usage` PTY probe** (`claude_probe_plan` §6 / Task 7). Highest risk surface; its own plan.
 - **One-click `statusLine` setup + conflict-merge UX** (`claude_probe_plan` §5 "Claude configuration integration") — Task 6 here only makes the bridge path resolvable; the interactive installer UI is deferred.
+- **Proper Developer ID signing and permission acceptance** — deferred by user direction until per-agent notifications and the proper menu-bar popover are complete. Functional work may continue using the locally assembled/ad-hoc-verified app; final release acceptance still requires a valid stable signature.
 - **Account-change fingerprinting / quarantine** (`claude_probe_plan` §5 "Account-change protection") — the current snapshot model has no `credentialFingerprint`; add when multi-account handling is in scope.
 - **OAuth token refresh** (`claude_probe_plan` §4 "Credential refresh") — for now an expired access token surfaces as "unavailable, sign in through Claude Code," per the probe plan's own fallback allowance.
 - **Real-account parity verification** (`claude_probe_plan` Task 11) — run once the live surface exists.

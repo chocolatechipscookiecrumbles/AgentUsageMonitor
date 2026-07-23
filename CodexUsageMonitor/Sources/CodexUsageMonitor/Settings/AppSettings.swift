@@ -19,6 +19,7 @@ final class AppSettings: ObservableObject {
         static let appearancePreference = "general.appearance"
         static let keyboardShortcutsEnabled = "general.keyboardShortcutsEnabled"
         static let claudeCLIProbeConsented = "claude.cliProbeConsented"
+        static let claudeSetupHistory = "claude.hasSetupHistory"
     }
 
     private let defaults: UserDefaults
@@ -49,12 +50,23 @@ final class AppSettings: ObservableObject {
     /// tokens. Gates the confirmation prompt so it appears on first use, not
     /// on every press.
     @Published var claudeCLIProbeConsented: Bool { didSet { defaults.set(claudeCLIProbeConsented, forKey: Key.claudeCLIProbeConsented) } }
+    @Published private(set) var hasClaudeSetupHistory: Bool {
+        didSet { defaults.set(hasClaudeSetupHistory, forKey: Key.claudeSetupHistory) }
+    }
 
-    init(defaults: UserDefaults = .standard) {
+    init(
+        defaults: UserDefaults = .standard,
+        legacyClaudeSetupEvidence: Bool = false
+    ) {
         self.defaults = defaults
         alertsEnabled = defaults.bool(forKey: Key.alertsEnabled)
         // Defaults false: the user must opt in before the CLI is ever run.
         claudeCLIProbeConsented = defaults.bool(forKey: Key.claudeCLIProbeConsented)
+        hasClaudeSetupHistory = defaults.bool(forKey: Key.claudeSetupHistory)
+            || legacyClaudeSetupEvidence
+        if legacyClaudeSetupEvidence {
+            defaults.set(true, forKey: Key.claudeSetupHistory)
+        }
         enabledQuotaThresholds = Self.quotaThresholds(defaults: defaults)
         forecastWarningsEnabled = Self.value(for: Key.forecastWarnings, defaults: defaults, defaultValue: true)
         resetCreditWarningsEnabled = Self.value(for: Key.resetCreditWarnings, defaults: defaults, defaultValue: true)
@@ -111,6 +123,34 @@ final class AppSettings: ObservableObject {
         notificationAuthorizationState = state
         if state == .denied || state == .unavailable {
             alertsEnabled = false
+        }
+    }
+
+    /// Monotonic by design: losing a credential or deleting cached usage
+    /// makes Claude lapsed, not first-run again.
+    func recordClaudeSetupHistory() {
+        guard !hasClaudeSetupHistory else { return }
+        hasClaudeSetupHistory = true
+    }
+
+    /// Migrates builds that predate `claude.hasSetupHistory` using only
+    /// app-owned, non-secret files. Claude Code's Keychain item is deliberately
+    /// not probed in the background because that could raise an ACL prompt.
+    static func hasLegacyClaudeSetupEvidence(
+        applicationSupportDirectory: URL? = FileManager.default.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first,
+        fileManager: FileManager = .default
+    ) -> Bool {
+        guard let directory = applicationSupportDirectory?
+            .appendingPathComponent("CodexUsageMonitor", isDirectory: true)
+        else { return false }
+        return [
+            "claude-usage-cache.json",
+            "claude-rate-limits.json",
+        ].contains {
+            fileManager.fileExists(atPath: directory.appendingPathComponent($0).path)
         }
     }
 }

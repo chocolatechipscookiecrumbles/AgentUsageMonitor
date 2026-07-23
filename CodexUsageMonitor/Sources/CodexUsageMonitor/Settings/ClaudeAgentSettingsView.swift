@@ -8,6 +8,7 @@ import SwiftUI
 /// It uses the shared `AgentQuotaSessionSection`, passing a "used" credits
 /// label (Anthropic reports spend, not a balance) and no reset credits.
 struct ClaudeAgentSettingsView: View {
+    let setupState: ClaudeSetupState
     let connectionState: ClaudeConnectionState
     let usageState: ClaudeUsageState
     let valueMode: QuotaValueMode
@@ -23,9 +24,13 @@ struct ClaudeAgentSettingsView: View {
     @State private var showCLIConsent = false
 
     var body: some View {
-        // Built once per render: it does date math and currency formatting,
-        // and a computed property would rebuild it at every reference.
-        content(model: usageState.presentation.map { ClaudeUsageDisplayModel(presentation: $0) })
+        if setupState == .notSetUp {
+            ClaudeSetupOnboardingView(connect: connectWithCredentials)
+        } else {
+            // Built once per render: it does date math and currency formatting,
+            // and a computed property would rebuild it at every reference.
+            content(model: usageState.presentation.map { ClaudeUsageDisplayModel(presentation: $0) })
+        }
     }
 
     @ViewBuilder

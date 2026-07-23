@@ -112,16 +112,17 @@ The tab strip, page shell, section cards, progress bars, and warning chips trans
 
 This plan's checkboxes were never ticked while the page was built across the wiring, connection-state, and layout-fix branches. Reconciled below against the shipped code; the boxes now reflect the source, not the plan's original sequence.
 
-**Done:** Task 1 (in a different shape — see below), Task 2, Task 3 Steps 1/2/3/6, Task 3 Step 5 except its routing test, Task 4, Task 5 Step 1.
+**Done:** Task 1 (in a different shape — see below), Task 2, Task 3 Steps 1/2/2b/3/5/6, Task 4, and Task 5. The first-run state and Claude tint passed user visual acceptance on 2026-07-23. The proposed routing-presence test was explicitly waived because repository policy now permits only defect-driven regression tests.
 
 **Task 1 shipped differently and deliberately.** `AgentQuotaSessionSection` took `creditsLabel` / `creditsValue` / optional `resetCredits` / `weeklyFootnote` / `fiveHourNote` rather than `showsCredits` / `showsResetCredits` booleans, because Claude *does* have a credits figure — Anthropic reports spend beyond the plan where Codex reports a balance held. Parameterizing the label keeps a spend figure from ever appearing under a balance label, which a boolean flag would not have done. No dedicated `AgentQuotaSessionSectionTests` exists; the composition is covered only through `ClaudeUsageDisplayModelTests` and the Codex call site compiling unchanged.
 
-**Still open — carried into whatever branch picks this up next:**
+**Disposition of the previously open items:**
 
-1. **Task 3 Step 2b — the first-run "not set up" state.** The one piece of designed UI still missing, and confirmed wanted 2026-07-23. See that step for the state distinction and the derivation problem it depends on.
+1. **Task 3 Step 2b visual acceptance: PASSED 2026-07-23.** The user inspected the first-run card in Light and Dark with the Context Rail hidden and visible and accepted it.
 2. ~~**Task 3 Step 4 — Usage Warnings section.**~~ **Deferred by decision 2026-07-23** — it ships with the general notification-settings port, not as a Claude-specific stub. See that step.
-3. **Task 3 Step 5 — routing test.** `.claudeCode` routes to `ClaudeAgentSettingsView` and `ClaudeCodePreviewSettingsView` is deleted, but the deterministic routing test is not written: the route is a `switch` inside a SwiftUI `body` with no testable seam. `testCatalogMarksClaudeSupported` covers "Claude is not a preview entry"; a real routing test needs the view refactored to expose its input.
-4. **Task 5 Step 4 — signed-app visual acceptance: PASSED 2026-07-23** (user inspection; recorded in the [layout-fixes matrix](2026-07-23-claude-settings-layout-fixes.md#verification-matrix)). Two qualifications carried there: the pre-session five-hour state was not separately driven, and the `#D97757` tint landed *after* the inspection, so the brand color itself has not been looked at. Steps 2–3 (gate and board) are reconciled, with one open evidence item: gate criterion #3 needs direct Pro/Max evidence for the weekly-scope wording rather than the Team/Enterprise documentation it currently rests on.
+3. **Task 3 Step 5 — routing implementation complete; routing test waived 2026-07-23.** `.claudeCode` routes directly to `ClaudeAgentSettingsView` and `ClaudeCodePreviewSettingsView` is deleted. The user directed that future automated coverage be limited to reproducible defect regressions, so a feature-presence routing test will not be added.
+4. **Task 5 Step 4 — factual page and Claude tint visual acceptance: PASSED 2026-07-23** (user inspection; layout evidence recorded in the [layout-fixes matrix](2026-07-23-claude-settings-layout-fixes.md#verification-matrix)). The user subsequently inspected the `#D97757` treatment across the five-hour and weekly quota bars and accepted the update. Gate criterion #3 is closed by Anthropic's direct Pro/Max shared-limit documentation.
+5. **Developer ID signing: explicitly deferred 2026-07-23.** Functional and visual acceptance may continue on the locally assembled/ad-hoc-verified app. Repairing the local Developer ID identity is deferred until per-agent notifications and the proper menu-bar popover are implemented, before final release signing and permission acceptance.
 
 ## Task 1: Make `AgentQuotaSessionSection` composable for providers without credits
 
@@ -143,17 +144,17 @@ This plan's checkboxes were never ticked while the page was built across the wir
 Compose the page from the shared primitives, matching the **shipped Codex page's** section set — Source (Connection-equivalent) + Current quota + Usage Warnings. **No Privacy card** (section E).
 
 - [x] **Step 1: Promote Claude from preview to supported.** In `AgentSettingsCatalog`, change the `.claudeCode` entry's availability from `.preview` to `.supported`, and remove any "Preview" / "Not available yet" labeling that keyed off preview availability for Claude (page and Context Rail). This is how a provider "enters the selector" per the contract — via the catalog, not a custom header. Add a narrow test asserting the catalog marks `.claudeCode` supported.
-- [ ] **Step 2b: First-run "not set up" state — CONFIRMED WANTED 2026-07-23, not yet built.** The user confirmed this is a real, distinct state, not a nicety. Today every unconfigured case collapses into the same plain "Not available" / "Not connected" text rows, which is right for a user who *had* a connection and lost it, and wrong for a user who has never set anything up — they are shown an empty factual page instead of a way in.
+- [x] **Step 2b: First-run "not set up" state — implemented and visually accepted 2026-07-23.** The user confirmed this is a real, distinct state, not a nicety. Previously every unconfigured case collapsed into the same plain "Not available" / "Not connected" text rows, which was right for a user who *had* a connection and lost it, and wrong for a user who had never set anything up.
 
   **The distinction to build:**
-  - **Never set up** (no credential of either method, no cached reading, no statusLine snapshot) → the centered treatment: Claude icon badge at low tint opacity (~44pt, rounded), a sentence naming the two ways in — connect with Claude Code's own credentials, or sign in through the browser — and a primary button. This is the Figma Claude hero styling, reused for onboarding rather than for "planned".
+  - **Never set up** (no app-owned setup history, cached reading, or statusLine snapshot) → the centered treatment: Claude icon badge at low tint opacity (~44pt, rounded), a sentence naming the two working ways in — connect with Claude Code's own credentials, or use passive status-line capture — and a primary credentials button. Browser sign-in was superseded by the later shelved/unverified decision and must not be presented as working.
   - **Set up but not currently connected** (a credential existed, or a cached/stale reading exists) → today's factual rows, unchanged. This user does not need to be re-onboarded; they need the status and a Refresh.
 
-  **The signal has to be derived, and no single field carries it.** `ClaudeConnectionState.notConnected` covers both cases above. Distinguishing them needs "has this app ever had a reading or a credential" — candidates are a cached snapshot on disk, a stored self-issued credential, or a persisted first-run flag. Decide this the way `ClaudeConnectionStatus.resolve` was decided: a pure function over the states that already exist, tested, not a view-body `if`.
+  **Implemented signal:** `ClaudeSetupState.resolve` is the pure, tested decision boundary. Onboarding requires completed initial source discovery, `.notConnected`, unavailable usage, and no persisted setup history. Existing app-owned cache/statusLine files migrate older builds to durable history; any new reading or successful connection records the monotonic `claude.hasSetupHistory` preference. Later disconnect, cache loss, or refresh failure does not erase it. In-progress and failed connection states stay on the factual page so their guidance remains visible. The first-run view names the two working paths—Claude Code credentials and passive status-line capture—and repeats the Keychain disclosure before its primary credentials action. Browser sign-in remains shelved and is not presented as working.
 - [x] **Step 2: "Source" section** (`SettingsSection("Source")`): factual rows via **`SettingsPreferenceControlRow`** — active source label, plan hint (`subscriptionType`), relative capture time + delivery/freshness note — plus a `Refresh Claude Usage` button (monitor's user-initiated refresh). Unavailable variant: centered icon badge (Claude tint at low opacity, ~44 pt, rounded) + guidance worded for the real "sign in through Claude Code / enable passive capture" path (not "planned"), reusing the Figma Claude hero styling.
 - [x] **Step 3: "Current quota" section**: `AgentQuotaSessionSection(provider: .claudeCode, presentation: <adapted>, valueMode:, showsCredits: false, showsResetCredits: false, weeklyFootnote: <shared-pool caveat>)`. Append scoped/extra-usage rows when present. **No Plan row here** — Plan lives in Source.
 - [~] **Step 4: "Usage Warnings" section — DEFERRED BY DECISION 2026-07-23, do not build.** The plan offered two options (inert disabled section, or defer); the user chose defer. **Reason:** an inert section costs vertical space on a page the 2026-07-23 layout pass had just compacted, and tells the user nothing they can act on. **What happens instead:** Claude's warning chips arrive when the *general* notification/threshold settings are ported over, as part of that work rather than as a Claude-specific stub. Whoever does that port owns three things this step would otherwise have covered: the per-provider/window threshold store ([followups Task 3](2026-07-14-settings-provider-followups.md)), wiring Claude thresholds to a real notifier, and adding `AgentUsageWarningsSection(provider: .claudeCode, …)` to the page. Until then the Claude page has no Usage Warnings card at all, and the capability gate correctly records that there are no Claude notifications.
-- [ ] **Step 5:** Route `.claudeCode` in [AgentsSettingsView.swift:23](../../../CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AgentsSettingsView.swift#L23) to `ClaudeAgentSettingsView(...)`, driven by `QuotaViewModel`'s Claude state (wiring plan Task 5); delete `ClaudeCodePreviewSettingsView` once unused. Add a **narrow deterministic routing test** that `.claudeCode` resolves to the real view, not the preview.
+- [x] **Step 5:** Route `.claudeCode` in [AgentsSettingsView.swift:23](../../../CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AgentsSettingsView.swift#L23) to `ClaudeAgentSettingsView(...)`, driven by `QuotaViewModel`'s Claude state, and delete `ClaudeCodePreviewSettingsView`. **Test disposition:** the proposed feature-presence routing test was waived by user direction on 2026-07-23; future automated additions are limited to reproducible defect regressions.
 - [x] **Step 6:** Run the full Swift suite. **Commit.**
 
 ## Task 4: Claude Context Rail card (catalog icon, real source)
@@ -166,7 +167,7 @@ Compose the page from the shared primitives, matching the **shipped Codex page's
 ## Task 5: Data & Privacy entry, docs, and bookkeeping
 
 - [x] **Step 1: Document Claude's new provider data in Data & Privacy.** In `DataPrivacySettingsView` / `LocalDataInventory`, record the OAuth Keychain *read* (never stored by this app), the statusLine snapshot file, and the usage cache — since the contract makes Data & Privacy the single home for this and requires new provider data to be documented before exposure. Include the "never reads conversation content" and "weekly number may be shared with Claude chat/Cowork" facts here.
-- [x] **Step 2:** Update the [capability research gate](2026-07-20-claude-code-capability-research.md). Gate #5 is satisfied; **gate #3 is not fully** — the weekly-scope sentence is shown everywhere the number is, but its evidence is Anthropic's Team/Enterprise documentation, and this plan's own research says not to assume Pro/Max matches. Recorded there as the one open evidence item.
+- [x] **Step 2:** Update the [capability research gate](2026-07-20-claude-code-capability-research.md). Gates #3 and #5 are satisfied. Anthropic's Pro/Max-specific help article now directly supports the shared Claude/Claude Code weekly-scope copy.
 - [x] **Step 3:** Update the [planning board](../../product/planning-board.md) Claude row and the Agents Settings UI row — both moved to **Verification**, with visual acceptance named as the blocker.
 - [x] **Step 4: Signed-app visual acceptance** — **passed 2026-07-23** (user inspection). Observed and unobserved states recorded in the [layout-fixes verification matrix](2026-07-23-claude-settings-layout-fixes.md#verification-matrix).
 
@@ -182,18 +183,27 @@ Compose the page from the shared primitives, matching the **shipped Codex page's
 ## Completion criteria
 
 - Selecting the **Claude** tab shows a real, data-driven page using the same shared components and dimensions as the Codex page — **no provider-page Privacy card**; Claude is a `.supported` catalog entry, not a preview.
-- Claude-specific differences (no sign-in, no credits/reset-credits, weekly shared-pool footnote) render correctly; Claude's privacy data appears in **Data & Privacy**, not the Agents page.
+- Claude-specific differences (credential connection instead of browser sign-in, no credits/reset-credits, weekly shared-pool footnote) render correctly; Claude's privacy data appears in **Data & Privacy**, not the Agents page.
 - Codex's page and Context Rail render identically to before (shared-component edits are additive; no Codex behavioral change).
 - Unavailable/onboarding, cached/stale, and live states render distinctly; stale is never shown as live.
 - The Context Rail Claude card uses the catalog icon and a real source/freshness value.
-- **Signed-app visual acceptance** (per `AGENTS.md` + the 7/19 matrix): build via `build-app.sh`, `codesign --verify --deep --strict`, then inspect Agents at 680 × 560 pt in Light and Dark, both Context Rail states, with scrolling, keyboard navigation, VoiceOver, and focus preservation; record any unobserved state rather than inferring it.
-- Pure-logic unit tests green on `swift test --filter Claude`; docs, Data & Privacy, and planning board reconciled.
+- **App visual acceptance:** inspect Agents at 680 × 560 pt in Light and Dark, both Context Rail states, with scrolling, keyboard navigation, VoiceOver, and focus preservation; record any unobserved state rather than inferring it. The first-run and tint checks passed on 2026-07-23. Proper Developer ID verification is temporarily deferred until per-agent notifications and the menu-bar popover are complete.
+- Existing automated suites remain green; future coverage additions follow the repository's defect-regression-only policy. Docs, Data & Privacy, and the planning board are reconciled.
+
+---
+
+## First-run implementation verification — 2026-07-23
+
+- `swift test` passed **222 tests, 0 failures** after the setup-state, legacy-evidence migration, preference, view-model, and onboarding changes.
+- `Scripts/build-app.sh` compiled and assembled the app. This machine's Keychain returned the same Developer ID identity hash hundreds of times; `codesign` returned success but produced an immediately invalid Developer ID signature. Re-signing the unchanged bundle ad hoc passed `codesign --verify --deep --strict`, isolating the failure to local identity state rather than the bundle contents. By user direction, repairing Developer ID signing and verifying permission persistence are deferred until per-agent notifications and the menu-bar popover are complete.
+- One separate audit instance was launched without touching the pre-existing user-owned instance. The Settings window opened at the expected **680 × 560-point content size**. macOS Accessibility did not expose the SwiftUI sidebar long enough to navigate to Agents, so automation was stopped per `AGENTS.md`.
+- **Observed and accepted by the user, 2026-07-23:** the first-run card in Light and Dark with the Context Rail hidden and visible, plus the `#D97757` differentiation across the five-hour and weekly quota bars.
 
 ---
 
 ## Handoff — 2026-07-23
 
-**Branch:** `feature/claude-connection-state-and-window-copy`. Full suite green at 208 tests. Working tree committed. Not pushed, no PR — the user opens every PR themselves.
+**Historical incoming handoff (superseded by the verification block above).** Branch: `feature/claude-connection-state-and-window-copy`. At handoff, the full suite was green at 208 tests and the prior work was committed. The continuation described above remains uncommitted and unpushed; the user opens every PR themselves.
 
 ### Where the Claude page stands
 
@@ -201,20 +211,20 @@ It is a real, supported, data-driven page. Selecting the Claude tab shows Connec
 
 ### What changed most recently, and why it matters to you
 
-1. **Claude's tint is now `#D97757`, set once in `AgentProvider.settingsPresentationTint`.** It was system `.orange`. Everything that reads a provider tint — tab underline, both quota bars, warning chips, rail card — changed at once. `AgentProviderPresentationTests` pins it. **This landed after the user's visual acceptance, so the brand color has not itself been looked at.** If you build the app for any reason, glance at the Claude tab first and say what you saw.
+1. **Claude's tint is now `#D97757`, set once in `AgentProvider.settingsPresentationTint`.** It was system `.orange`. Everything that reads a provider tint — tab underline, both quota bars, warning chips, rail card — changed at once. The user inspected the five-hour and weekly quota-bar treatment on 2026-07-23 and accepted the update.
 2. **Claude is `.supported` in `AgentSettingsCatalog`, not `.preview`.** That entry is how a provider "enters the selector" per the 7/19 contract. `ClaudeCodePreviewSettingsView` and the dead `AgentProvider.sidebarStatus` are deleted — the view was unreachable and claimed the app reads no Claude credentials or usage, which is false now.
 3. **Data & Privacy documents Claude's data**: the usage cache and statusLine snapshot in `LocalDataInventory`, plus rows stating the Keychain credential is read but never stored and conversations are never read. The 7/19 contract keeps provider privacy facts in that one destination — do not add a Privacy card to the Agents page.
 4. **The plan record was reconciled with the source.** Checkboxes here were stale in both directions; the "Status as of 2026-07-23" block near the top is now the accurate summary. Trust it over the individual boxes if they ever disagree again.
 
 ### Do this next, in this order
 
-**1. The first-run "not set up" state (Task 3 Step 2b). The only designed UI still missing, and the user confirmed they want it.**
+**1. The first-run "not set up" state (Task 3 Step 2b) — implemented 2026-07-23.**
 
-The problem is not the view, it is the signal. Every unconfigured case currently collapses into the same plain "Not connected" / "Not available" rows. That is right for someone whose connection lapsed and wrong for someone who has never set anything up — they get an empty factual page instead of a way in. `ClaudeConnectionState.notConnected` covers both, so you have to derive the distinction from whether this app has *ever* had a credential or a reading (candidates: the cached snapshot on disk, a stored self-issued credential, a first-run flag). Settle that as a pure, tested function the way `ClaudeConnectionStatus.resolve` was settled — not as an `if` inside a view body. Then render the never-set-up case as the centered icon badge (Claude tint at low opacity, ~44pt) with a sentence naming both ways in and a primary button, and leave the lapsed case exactly as it renders today.
+`ClaudeSetupState.resolve` now distinguishes a genuine first run from a lapsed connection using current connection/usage evidence plus a durable monotonic setup-history flag. The centered setup card uses the shared provider tint and names credentials and passive status-line capture; later lapses retain the factual recovery page. The user accepted the first-run card in Light and Dark with the Context Rail hidden and visible on 2026-07-23.
 
-**2. Bundle `ClaudeUsageBridge/` (wiring plan Task 6).** `Package.swift` has no `resources:` and `ClaudeStatusLineInstaller` has no default `bridgeDirectory`, so the statusLine tier only works for a user who installs the bridge by hand. This is the last thing keeping a documented fallback tier out of reach of a real user.
+**2. Bundle `ClaudeUsageBridge/` (wiring plan Task 6) — implemented 2026-07-23.** The app build copies the existing bridge into its Resources directory, and `ClaudeStatusLineInstaller` copies that signed, read-only resource into the deterministic app-owned Application Support path before use. The one-click statusLine configuration/merge UX remains separately deferred.
 
-**3. Close gate criterion #3, or record why you cannot.** The weekly-scope copy rests on Anthropic's Team/Enterprise documentation while the account in use is Pro/Max, which this repo's own research says not to assume. It over-scopes rather than under-scopes, so nobody is misled today, but the evidence the criterion asks for does not exist. Either find Anthropic's Pro/Max wording or drive usage in Claude chat alone and watch whether the weekly figure moves.
+**3. Capability gate criterion #3 — closed 2026-07-23.** Anthropic's Pro/Max-specific help article now states directly that both individual plans share usage limits across Claude and Claude Code. That supports the existing weekly-scope copy without relying on Team/Enterprise behavior.
 
 **Explicitly not your job:** the Usage Warnings section. Deferred by decision — Claude's chips ship with the general notification-settings port, which brings the per-provider threshold store with it. A stub now would be an inert card on a page that was just compacted. There is a comment in `ClaudeAgentSettingsView` saying so; leave it there.
 
