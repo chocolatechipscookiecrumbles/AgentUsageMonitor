@@ -57,10 +57,11 @@ never passed.
    fall back to the raw string if non-numeric). Settings keeps full precision
    via `presentation.creditBalance`.
 
-7. **Refresh Now keeps the popover open — DOCUMENTED, DEFERRED.** The footer
-   **Refresh Now** should *not* dismiss (unlike the other footer commands); it
-   should show the in-place `Refreshing…` header/footer state. Recorded in the
-   SPEC and here; **not implemented** in this pass.
+7. **Refresh Now keeps the popover open — IMPLEMENTED IN SOURCE 2026-07-24.**
+   The footer **Refresh Now** no longer dismisses (unlike the other footer
+   commands) and shows the in-place `Refreshing…` header/footer state. The
+   production root also handles Escape dismissal. Signed-app visual and
+   keyboard observation remain open.
 
 8. **Add-a-provider-tab template.** New doc
    `docs/design/menu-bar-popover/ADDING-A-PROVIDER-TAB.md` derived from the
@@ -81,12 +82,15 @@ to the **popover only** (Settings keeps its accepted provider tint); the shell
 stays **rounded but one piece** (transparent host window), with squaring as the
 fallback.
 
-1. **Single rounded piece (corner artifacts).** `MenuPopoverWindowConfigurator`
+1. **Single rounded piece (corner artifacts; not accepted).** `MenuPopoverWindowConfigurator`
    (new) makes the `MenuBarExtra(.window)` host window transparent
    (`isOpaque = false`, clear background, `hasShadow = true`) so only the rounded
    `MenuPopoverChrome` shows and the window server draws a matching rounded
    shadow. The chrome's own SwiftUI `.shadow` is removed to avoid a mismatched
-   double shadow. Fallback if it regresses: square the shell.
+   double shadow. The user reports that the artifact remains, so this is not a
+   completed fix. Further production changes are deferred until signed-app
+   first-frame/window-layer instrumentation and prototype comparison can identify
+   the real corner owner.
 2. **Timestamp drops seconds** — `updatedText` uses `time: .shortened`.
 3. **Tab hit target** — the full equal-width column was already clickable; raised
    `tabStripHeight` `36 → 44` and added a full-column hover fill.
@@ -98,5 +102,6 @@ fallback.
    tracks usage, so reversed used/remaining wording is unaffected.
 
 These are GUI changes under the branch's waiver — build/tests confirm they
-compile and don't regress the suite; the rendered look (especially the corner
-fix and shadow) is unobserved and for a human to confirm.
+compile and don't regress the suite. Corner/shadow, Light/Dark, keyboard,
+VoiceOver, and rendered-height checks remain unobserved; the corner artifact is
+still user-observed and explicitly deferred rather than claimed fixed.

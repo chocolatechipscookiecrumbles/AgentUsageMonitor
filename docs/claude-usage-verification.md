@@ -477,3 +477,13 @@ open CodexUsageMonitor/.build/CodexUsageMonitor.app
 - The bottom action row runs **Refresh Now**, **Notification Settings**, **Preferences…**, and **Quit Codex Usage Monitor**, flush to the edges: **Refresh Now** sits against the divider and **Quit** against the bottom edge, no extra padding. **Refresh Now** keeps the popover open, targets the active tab's provider, and exposes the in-place `Refreshing…` state. The other footer commands dismiss first.
 - [ ] With the production signed app, press **Escape** while the popover is open and confirm it dismisses without activating a footer command.
 - Opening the popover triggers no refresh, timer, `TimelineView`, or per-second invalidation.
+
+**Unobserved signed-app regression matrix**
+- [ ] Manufacture an expired Claude five-hour window beside an active weekly window; confirm the tab and compact menu-bar summary use only the active weekly value.
+- [ ] Overlap a launch or scheduled Claude refresh with a manual **Refresh Now** click; confirm only one read runs, the button remains disabled for that read, and the state clears on completion.
+- [ ] Run **Refresh Now** for both providers; confirm the popover remains open through completion and updates the header/footer state in place.
+- [ ] Manufacture the maximum-height Codex combination: cached warning, both forecasts, credits, disconnected recovery, and denied-notification strip. Confirm every footer action remains visible without scrolling or clipping.
+- [ ] Supply more than two reset-credit expiries; confirm exactly two dates and the “+N more in Settings” caption appear, while Settings retains the complete list.
+- [ ] Repeat the maximum-height, refresh, tab-switch, and Escape checks in Light and Dark appearance with keyboard focus and VoiceOver. Confirm focus order, activation, announcements, and escape from the popover.
+- [ ] Alternate Codex and Claude tabs repeatedly on both the Settings Agents page and popover; record any jumping, delayed click, or stuck selection before attempting a fix.
+- [ ] Inspect native-pixel crops of all four popover corners on first open, repeated open, and provider switches; the currently reported artifact remains unresolved.

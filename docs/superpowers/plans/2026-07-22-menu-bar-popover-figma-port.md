@@ -232,6 +232,17 @@ The revision removed three pieces of information from the popover. Settled below
 - **Desktop widget / watch complication** — the export also contains `DesktopWidget.tsx` and `WatchComplication.tsx`; out of scope here.
 - **Tab reordering / pinned primary provider** — depends on Task 2's outcome.
 
+## Review follow-ups — 2026-07-24
+
+The source-only review follow-up pass corrected four boundaries:
+
+- expired Claude windows no longer participate in menu-bar provider selection;
+- `ClaudeUsageMonitor` now serializes launch, scheduled, connection, and user-initiated refresh reasons and publishes the single in-flight state mirrored by `QuotaViewModel`;
+- **Refresh Now** keeps the popover open, and the production root handles Escape dismissal;
+- the popover remains non-scrolling by capping reset-credit expiries at two visible rows, handing additional rows off to Settings, and bounding variable recovery/supporting copy.
+
+Automated regression coverage was added only for the three reproduced defects: expired-window selection, cross-reason refresh overlap, and unbounded reset-credit expiry mapping. The signed `.app` was not built or launched in this pass. Rendered height, corner/shadow behavior, Light/Dark appearance, keyboard behavior, VoiceOver, and live-provider interaction remain unobserved. Provider-tab jumping/delayed selection and the still-visible corner artifact are preserved as separate deferred diagnostic tasks in the [review follow-up plan](2026-07-23-menu-bar-popover-review-followups.md).
+
 ## Completion criteria
 
 - The menu bar shows the revised v6 popover: 340pt card, provider tabs (Codex + Claude only), header with the active provider's icon and the status pill, window cards, credits (Codex only), action footer — light and dark.
