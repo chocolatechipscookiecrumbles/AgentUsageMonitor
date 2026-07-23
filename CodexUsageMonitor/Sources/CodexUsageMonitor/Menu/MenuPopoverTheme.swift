@@ -22,6 +22,22 @@ struct MenuPopoverTheme {
     static let providerIconTileSize: CGFloat = 28
     static let providerIconTileCornerRadius: CGFloat = 8
     static let providerIconArtworkSize: CGFloat = 18
+    static let tabStripHeight: CGFloat = 36
+    static let tabIndicatorHeight: CGFloat = 1.5
+    static let dividerHeight: CGFloat = 1
+    static let headerHorizontalPadding: CGFloat = 16
+    static let headerVerticalPadding: CGFloat = 14
+    static let headerSpacing: CGFloat = 10
+    static let headerTextSpacing: CGFloat = 2
+    static let contentHorizontalPadding: CGFloat = 16
+    static let contentBottomPadding: CGFloat = 12
+    static let contentPlaceholderHeight: CGFloat = 72
+    static let footerVerticalPadding: CGFloat = 10
+    static let actionRowHeight: CGFloat = 34
+    static let actionRowHorizontalPadding: CGFloat = 16
+    static let actionRowIconSize: CGFloat = 13
+    static let actionRowIconWidth: CGFloat = 16
+    static let actionRowSpacing: CGFloat = 10
 
     let windowBackground: Color
     let tabStripBackground: Color

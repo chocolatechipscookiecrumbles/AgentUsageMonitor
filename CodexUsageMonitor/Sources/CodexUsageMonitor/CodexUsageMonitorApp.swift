@@ -37,10 +37,11 @@ struct CodexUsageMonitorApp: App {
         .menuBarExtraStyle(.window)
 
         MenuBarExtra(isInserted: .constant(!MenuPopoverViabilityGate.isEnabled)) {
-            QuotaMenuView(viewModel: viewModel)
+            MenuBarPopoverView(viewModel: viewModel)
         } label: {
             MenuBarStatusLabel(viewModel: viewModel)
         }
+        .menuBarExtraStyle(.window)
 
         Settings {
             SettingsView(viewModel: viewModel)

@@ -138,7 +138,9 @@ With only Codex data available, `MenuBarLabelPresentation` delegates to the orig
 - [x] **Step 1: Skipped by repository policy.** Theme and primitive presence is new-feature coverage, not a reproducible defect regression, so no new tests were added.
 - [x] **Step 2: Skipped with Step 1.** The existing suite is preserved and run after implementation.
 - [x] **Step 3: Implement** `MenuPopoverTheme`, `UsageProgressBar`, `StatusPill`, and `ProviderIconTile` per SPEC §1–2 and the 2026-07-22 revision. The removed `UsageProgressRing` and `MetadataRow` are intentionally not implemented.
-- [x] **Step 4:** `swift build --disable-sandbox` succeeded and the unchanged full suite passed 223 tests with zero failures. Commit.
+- [x] **Step 4:** `swift build --disable-sandbox` succeeded, the ad-hoc
+  `Scripts/build-app.sh` bundle build succeeded, and the unchanged full suite
+  passed 223 tests with zero failures. Commit.
 
 Visual acceptance of the Task 3 primitives is unobserved under the user's
 explicit waiver. Light and Dark appearances, provider marks, threshold colors,
@@ -146,10 +148,33 @@ and status-pill states were not directly inspected.
 
 ## Task 4: Shell + provider tab strip
 
-- [ ] **Step 1: Failing tests**: `availableProviders` includes Codex always, Claude only when its state is usable, **never Copilot**; the persisted selection falls back to the default when the persisted provider is unavailable.
-- [ ] **Step 2: Run to verify they fail.**
-- [ ] **Step 3: Implement** `MenuPopoverChrome` + `MenuProviderTabStrip` + the header row (using the Task 3 `ProviderIconTile`, title/subtitle, and status pill) + the root `MenuBarPopoverView` (strip, header, content, footer). The provider marks are full-color SVGs; Task 3 deliberately placed them on a low-emphasis provider-tinted surface rather than reusing the old blue-violet gradient.
-- [ ] **Step 4: Run the full suite. Commit.**
+- [x] **Step 1: Skipped by repository policy.** Provider routing and selection fallback are new-feature coverage, not a reproduced defect, so no tests were added.
+- [x] **Step 2: Skipped with Step 1.**
+- [x] **Step 3: Implement** `MenuPopoverChrome` + `MenuProviderTabStrip` + the header row (using the Task 3 `ProviderIconTile`, title/subtitle, and status pill) + the root `MenuBarPopoverView` (strip, header, content, footer). The provider marks are full-color SVGs; Task 3 deliberately placed them on a low-emphasis provider-tinted surface rather than reusing the old blue-violet gradient.
+- [x] **Step 4:** `swift build --disable-sandbox` succeeded and the unchanged full suite passed 223 tests with zero failures. Commit.
+
+### Task 4 provider-availability reconciliation (2026-07-23)
+
+“Provider with a real read” is a capability/support gate, not a requirement
+that a usable snapshot exist at the instant the popover opens. Claude passed
+that gate and is marked `.supported` in `AgentSettingsCatalog`, so the
+production strip consistently contains Codex and Claude. This is required for
+Task 6's Claude unavailable/setup state to remain reachable. Copilot is absent
+because it has no supported catalog entry. A requested unsupported selection
+(including a future persisted Copilot value) resolves to the first supported
+provider instead of presenting empty content.
+
+The shipping `MenuBarExtra` now uses `.window` presentation and hosts the
+340-point shell, provider tabs, provider-specific header, temporary content
+slots for Tasks 5 and 6, and the action footer. Refresh dispatches explicitly
+to the selected provider and opening the popover performs no refresh.
+Notification Settings opens the app's Notifications destination, Preferences
+opens General, and each command dismisses the popover before continuing.
+The existing menu-bar status label is unchanged and the old native-menu views
+remain until Task 8 confirms that their affordances have all been ported.
+
+Visual, keyboard, VoiceOver, and Light/Dark verification for this task remain
+unobserved under the user waiver above.
 
 ## Task 5: Codex content — behavior-preserving port
 
