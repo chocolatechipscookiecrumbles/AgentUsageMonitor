@@ -445,22 +445,31 @@ open CodexUsageMonitor/.build/CodexUsageMonitor.app
 - Switch to **Claude**, close and reopen the popover — it reopens on **Claude** (`AppSettings.selectedMenuProvider` round-trips; covered by `MenuProviderSelectionPersistenceTests`).
 - A *supported* provider with no current snapshot keeps its tab selected (Claude stays Claude); only an *unsupported* persisted provider falls back to Codex (`MenuPopoverProviderResolutionTests`).
 
+**Header freshness (both tabs)**
+- The header title is just the provider name — **Codex** / **Claude**, not "… Usage Monitor".
+- The subtitle is the standard `Updated: <time> · <relative>` (e.g. `Updated: 3:42:05 PM · 3 minutes ago`) on both tabs, plus the **Confirmed / Cached / Refreshing / Unavailable** status pill.
+
 **Codex tab**
-- Header names Codex, shows **Updated HH:MM:SS**, and a **Confirmed / Cached / Refreshing / Unavailable** status pill.
 - Two window cards (Five Hour, Weekly): `N% used` at right, `Remaining M%` and reset timing in the footer, and a forecast line when one is available.
-- The credit-balance card appears only when Codex reports a balance or earned reset credits.
+- The credit-balance card appears only when Codex reports a balance or earned reset credits; the popover balance is rounded to **4 significant figures** (Settings ▸ Agents ▸ Codex shows it in full).
 - A **cached** read shows the "Showing Last Confirmed Snapshot" strip above the cards.
 - Disconnected: the tab shows a connection card with **Sign in with browser** and **Sign in with Codex CLI…**. Connected-but-no-snapshot shows "Unable to Read Usage" with **no** sign-in buttons — recovery is the footer's **Refresh Now**.
-- The quota-alerts toggle works; when notifications are denied, the recovery link appears in that card.
+- There is **no** quota-alerts toggle in the popover (it lives in Settings).
+
+**Codex icon**
+- On the Codex tab the header tile is filled edge-to-edge by the Codex mark (it carries its own square background); the Claude tile keeps padding around its glyph.
 
 **Claude tab**
-- Header names Claude and shows **`<source> · <capture time>`** (e.g. `Claude OAuth · 3 hours ago`) plus the status pill — this is where Claude provenance lives.
+- A `Read from: <source>` caption (e.g. `Read from: Claude OAuth`) sits beneath the window card — this is where Claude provenance lives now (the capture time is the header's freshness line).
 - Two window cards (Five Hour, Weekly). The weekly card carries the shared-pool caveat; when the five-hour window has not started (live data only), it shows the session note.
 - A non-live read shows the staleness strip above the cards.
 - **No** credit card and **no** collector line appear (Codex-only furniture is absent here).
 - With no reading: an unavailable card offers **Use Claude Code credentials…** only (browser sign-in is shelved). macOS raises the Keychain prompt **only** on that explicit click — never on open.
 - An *actively failed* connection shows a recovery card alongside the last result; a *merely-not-connected* passive read does not (passive capture needs no connection).
 
+**Notifications (both tabs)**
+- When macOS notification permission is **denied**, a slim strip with "Notifications are disabled in System Settings." + **Open System Notification Settings** appears on both tabs; it is absent otherwise.
+
 **Footer and passivity**
-- The bottom action row runs **Refresh Now**, **Notification Settings**, **Preferences…**, and **Quit Codex Usage Monitor**; each dismisses the popover first, and **Refresh Now** targets the active tab's provider.
+- The bottom action row runs **Refresh Now**, **Notification Settings**, **Preferences…**, and **Quit Codex Usage Monitor**. Each currently dismisses the popover first, and **Refresh Now** targets the active tab's provider. *(Deferred: Refresh Now is intended to keep the popover open and show the in-place `Refreshing…` state — see SPEC §7; not yet implemented.)*
 - Opening the popover triggers no refresh, timer, `TimelineView`, or per-second invalidation.

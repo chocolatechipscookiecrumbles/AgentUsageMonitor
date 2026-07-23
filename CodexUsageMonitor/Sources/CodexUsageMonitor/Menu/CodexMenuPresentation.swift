@@ -61,7 +61,7 @@ struct CodexMenuPresentation {
             || presentation.availableResetCredits != nil
             || !presentation.resetCreditExpiryDates.isEmpty {
             credits = Credits(
-                balance: presentation.creditBalance,
+                balance: Self.roundedBalance(presentation.creditBalance),
                 availableResetCredits: presentation.availableResetCredits,
                 resetCreditExpiryDates: presentation.resetCreditExpiryDates
             )
@@ -70,6 +70,16 @@ struct CodexMenuPresentation {
         }
 
         isCached = displayState.mode == .cachedPaused
+    }
+
+    /// The popover shows a compact balance rounded to 4 significant figures;
+    /// Settings keeps the full-precision string. A non-numeric balance (an
+    /// unexpected currency-formatted string) is passed through untouched rather
+    /// than dropped.
+    private static func roundedBalance(_ raw: String?) -> String? {
+        guard let raw else { return nil }
+        guard let value = Double(raw) else { return raw }
+        return value.formatted(.number.precision(.significantDigits(1...4)))
     }
 
     private static func windowValue(

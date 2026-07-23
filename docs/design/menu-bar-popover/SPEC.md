@@ -104,3 +104,21 @@ These follow mechanically from the three removals and are **not yet resolved**:
 ### Unresolved defect carried over
 
 The **"% used" figure is still wrong** in the revised design. Both images show "39% used" beside "Remaining 39%" (and "28% used" beside "Remaining 28%") — the same number labelled two contradictory ways, while the progress bar fills to the *other* value. This was not addressed by the revision and still must be fixed rather than ported. See §5.1.
+
+---
+
+## 7. Refinements — 2026-07-23 (supersede §3/§6 where they disagree)
+
+Directed refinements after the first shipped port. Where these disagree with §3/§6, these win.
+
+- **Header freshness line is standardized across providers:** `Updated: <time> · <relative>` (e.g. `Updated: 3:42:05 PM · 3 minutes ago`). Replaces §3.2's `Updated 11:42:13 AM` and §6-Retained's `Updated HH:MM:SS`. Computed once at render — no timer, so it does not tick while open.
+- **Header title is the provider name only** — `Codex` / `Claude`, not `<App> Usage Monitor`. Resolves the header-branding half of §5.3 (the metadata card was already removed in §6). The footer **Quit Codex Usage Monitor** keeps the app name.
+- **Claude provenance resolved (was §6-consequence-3):** the source label moves into a compact content caption — `Read from: <source>` — beneath the window card, matching Settings' "Read from" wording. This **supersedes** the earlier decision to put it in the header subtitle, so the freshness line stays identical across tabs while provenance stays visible on the menu.
+- **Plan name (§6-consequence-1):** resolved as *Settings only* — not re-added to the popover on either tab.
+- **Provider icon fill:** Codex's mark fills the full `28×28` tile (clipped to the `8px` corners) with no inset, because it already carries its own square background; providers with a transparent glyph (Claude, Copilot) keep the inset. Refines §3.2-left / §6-Changed.
+- **Quota-alerts toggle removed from the popover** (it lives in Settings). The denied-notification recovery it used to host is kept as a **slim strip shown on both tabs** whenever `notificationAuthorizationState == .denied` — warning text + **Open System Notification Settings**. The footer **Notification Settings** row (app Settings) is unchanged.
+- **Credits card balance is rounded to 4 significant figures** in the popover; Settings keeps full precision. Refines §3.5.
+
+### Deferred (documented, not yet implemented)
+
+- **Refresh Now should keep the popover open.** Unlike the other footer commands (which dismiss first), the footer **Refresh Now** should *not* dismiss — it should stay open and show the in-place `Refreshing…` header/footer state so the user sees the result without reopening. Implementation deferred.

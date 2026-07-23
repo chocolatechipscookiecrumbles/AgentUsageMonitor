@@ -27,13 +27,6 @@ struct CodexMenuContent: View {
                     CodexCreditsCard(credits: credits)
                 }
 
-                CodexQuotaAlertsCard(
-                    alertsEnabled: viewModel.alertsEnabled,
-                    authorizationState: viewModel.notificationAuthorizationState,
-                    setAlertsEnabled: viewModel.setAlertsEnabled,
-                    openNotificationSettings: viewModel.openNotificationSettings
-                )
-
                 if !viewModel.connectionState.isConnected {
                     CodexConnectionRecoveryCard(
                         state: viewModel.connectionState,
@@ -47,15 +40,12 @@ struct CodexMenuContent: View {
                     signInWithBrowser: viewModel.signInWithBrowser,
                     signInWithCLI: viewModel.signInWithCLI
                 )
+            }
 
-                if viewModel.connectionState.isConnected {
-                    CodexQuotaAlertsCard(
-                        alertsEnabled: viewModel.alertsEnabled,
-                        authorizationState: viewModel.notificationAuthorizationState,
-                        setAlertsEnabled: viewModel.setAlertsEnabled,
-                        openNotificationSettings: viewModel.openNotificationSettings
-                    )
-                }
+            if viewModel.notificationAuthorizationState == .denied {
+                NotificationPermissionStrip(
+                    openNotificationSettings: viewModel.openNotificationSettings
+                )
             }
         }
         .padding(.horizontal, MenuPopoverTheme.contentHorizontalPadding)
