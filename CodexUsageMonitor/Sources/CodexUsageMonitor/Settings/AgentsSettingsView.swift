@@ -9,26 +9,22 @@ struct AgentsSettingsView: View {
             switch selectedAgent {
             case .codex:
                 CodexAgentSettingsView(
+                    settings: viewModel.settings,
                     status: viewModel.settingsStatus,
                     connectionState: viewModel.connectionState,
                     presentation: viewModel.presentation,
                     quotaValueMode: viewModel.settings.quotaValueMode,
-                    alertsEnabled: viewModel.settings.alertsEnabled,
-                    isWarningThresholdEnabled: { viewModel.settings.isQuotaThresholdEnabled($0, for: .codex) },
-                    setWarningThresholdEnabled: { viewModel.settings.setQuotaThreshold($0, enabled: $1, for: .codex) },
                     signInWithBrowser: viewModel.signInWithBrowser,
                     signInWithCLI: viewModel.signInWithCLI,
                     checkConnection: viewModel.checkCodexConnection
                 )
             case .claudeCode:
                 ClaudeAgentSettingsView(
+                    settings: viewModel.settings,
                     setupState: viewModel.claudeSetupState,
                     connectionState: viewModel.claudeConnectionState,
                     usageState: viewModel.claudeState,
                     valueMode: viewModel.settings.quotaValueMode,
-                    alertsEnabled: viewModel.settings.alertsEnabled,
-                    isWarningThresholdEnabled: { viewModel.settings.isQuotaThresholdEnabled($0, for: .claudeCode) },
-                    setWarningThresholdEnabled: { viewModel.settings.setQuotaThreshold($0, enabled: $1, for: .claudeCode) },
                     connectWithCredentials: viewModel.connectClaudeWithCredentials,
                     disconnect: viewModel.disconnectClaude,
                     refresh: viewModel.refreshClaude,

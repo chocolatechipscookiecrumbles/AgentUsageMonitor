@@ -1,13 +1,11 @@
 import SwiftUI
 
 struct CodexAgentSettingsView: View {
+    @ObservedObject var settings: AppSettings
     let status: SettingsStatus
     let connectionState: AgentConnectionState
     let presentation: QuotaPresentation
     let quotaValueMode: QuotaValueMode
-    let alertsEnabled: Bool
-    let isWarningThresholdEnabled: (RemainingQuotaThreshold) -> Bool
-    let setWarningThresholdEnabled: (RemainingQuotaThreshold, Bool) -> Void
     let signInWithBrowser: () -> Void
     let signInWithCLI: () -> Void
     let checkConnection: () -> Void
@@ -42,12 +40,7 @@ struct CodexAgentSettingsView: View {
             )
         )
 
-        AgentUsageWarningsSection(
-            provider: .codex,
-            alertsEnabled: alertsEnabled,
-            isThresholdEnabled: isWarningThresholdEnabled,
-            setThresholdEnabled: setWarningThresholdEnabled
-        )
+        AgentUsageWarningsSection(settings: settings, provider: .codex)
 
     }
 

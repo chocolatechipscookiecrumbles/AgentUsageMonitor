@@ -8,13 +8,11 @@ import SwiftUI
 /// It uses the shared `AgentQuotaSessionSection`, passing a "used" credits
 /// label (Anthropic reports spend, not a balance) and no reset credits.
 struct ClaudeAgentSettingsView: View {
+    @ObservedObject var settings: AppSettings
     let setupState: ClaudeSetupState
     let connectionState: ClaudeConnectionState
     let usageState: ClaudeUsageState
     let valueMode: QuotaValueMode
-    let alertsEnabled: Bool
-    let isWarningThresholdEnabled: (RemainingQuotaThreshold) -> Bool
-    let setWarningThresholdEnabled: (RemainingQuotaThreshold, Bool) -> Void
     let connectWithCredentials: () -> Void
     let disconnect: () -> Void
     let refresh: () -> Void
@@ -95,12 +93,7 @@ struct ClaudeAgentSettingsView: View {
 
         // Claude now has a real per-provider threshold store and notification
         // delivery, so its Remaining Quota chips are live like Codex's.
-        AgentUsageWarningsSection(
-            provider: .claudeCode,
-            alertsEnabled: alertsEnabled,
-            isThresholdEnabled: isWarningThresholdEnabled,
-            setThresholdEnabled: setWarningThresholdEnabled
-        )
+        AgentUsageWarningsSection(settings: settings, provider: .claudeCode)
     }
 
     /// Tier 2 — deliberately separated from the free refresh above, with the

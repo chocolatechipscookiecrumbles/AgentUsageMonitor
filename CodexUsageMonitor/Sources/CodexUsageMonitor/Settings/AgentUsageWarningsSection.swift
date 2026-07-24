@@ -1,15 +1,14 @@
 import SwiftUI
 
-/// Reusable per-agent "Remaining Quota" control. The caller supplies the
-/// provider-scoped preference accessors so this visual component does not imply
-/// a specific store. Styled after the approved chip mockup (Option A1): a
-/// multi-select row of threshold chips with a blue selected state and a
-/// checkmark.
+/// Reusable per-agent "Remaining Quota" control. It observes `AppSettings`
+/// directly so toggling a chip re-renders immediately (a closure-only API left
+/// the chips in a subtree that did not observe the store, so taps showed only a
+/// press animation with no state change). Styled after the approved chip mockup
+/// (Option A1): a multi-select row of threshold chips with a blue selected
+/// state and a checkmark.
 struct AgentUsageWarningsSection: View {
+    @ObservedObject var settings: AppSettings
     let provider: AgentProvider
-    let alertsEnabled: Bool
-    let isThresholdEnabled: (RemainingQuotaThreshold) -> Bool
-    let setThresholdEnabled: (RemainingQuotaThreshold, Bool) -> Void
 
     var body: some View {
         SettingsSection("Remaining Quota") {
@@ -27,34 +26,33 @@ struct AgentUsageWarningsSection: View {
                 }
             }
         }
-        .disabled(!alertsEnabled)
+        .disabled(!settings.alertsEnabled)
     }
 
     private func chip(for threshold: RemainingQuotaThreshold) -> some View {
-        let enabled = isThresholdEnabled(threshold)
+        let enabled = settings.isQuotaThresholdEnabled(threshold, for: provider)
         let shape = RoundedRectangle(cornerRadius: SettingsLayoutMetrics.agentWarningChipCornerRadius)
 
         return Button {
-            setThresholdEnabled(threshold, !enabled)
+            settings.setQuotaThreshold(threshold, enabled: !enabled, for: provider)
         } label: {
             HStack(spacing: SettingsLayoutMetrics.agentWarningChipIconSpacing) {
-                if enabled {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: SettingsLayoutMetrics.agentWarningChipCheckmarkSize, weight: .semibold))
-                }
+                Image(systemName: enabled ? "checkmark" : "plus")
+                    .font(.system(size: SettingsLayoutMetrics.agentWarningChipCheckmarkSize, weight: .semibold))
                 Text("\(threshold.rawValue)%")
             }
-            .font(.callout.weight(.medium))
-            .foregroundStyle(enabled ? Color.accentColor : Color.secondary)
+            .font(.callout.weight(enabled ? .semibold : .regular))
+            .foregroundStyle(enabled ? Color.white : Color.secondary)
             .frame(height: SettingsLayoutMetrics.agentWarningChipHeight)
             .padding(.horizontal, SettingsLayoutMetrics.agentWarningChipHorizontalPadding)
-            .background(shape.fill(enabled ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.12)))
-            .overlay(shape.strokeBorder(enabled ? Color.accentColor.opacity(0.5) : .clear, lineWidth: 1))
+            .background(shape.fill(enabled ? Color.accentColor : Color.secondary.opacity(0.12)))
+            .overlay(shape.strokeBorder(enabled ? .clear : Color.secondary.opacity(0.35), lineWidth: 1))
             .contentShape(shape)
         }
         .buttonStyle(.plain)
+        .animation(.easeInOut(duration: 0.12), value: enabled)
         .accessibilityLabel("\(provider.tabTitle), \(threshold.title)")
-        .accessibilityValue(enabled ? "Enabled" : "Disabled")
+        .accessibilityValue(enabled ? "On" : "Off")
         .accessibilityAddTraits(enabled ? .isSelected : [])
     }
 }
