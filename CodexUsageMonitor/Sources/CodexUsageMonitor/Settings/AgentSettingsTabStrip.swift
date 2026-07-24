@@ -25,11 +25,6 @@ struct AgentSettingsTabStrip: View {
         HStack(spacing: 0) {
             ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
                 Button {
-                    ProviderSwitchTrace.record(
-                        surface: .settingsAgents,
-                        phase: .buttonAction,
-                        provider: entry.provider
-                    )
                     selection = entry.provider
                 } label: {
                     HStack(spacing: SettingsLayoutMetrics.agentHeaderItemSpacing) {
@@ -57,6 +52,9 @@ struct AgentSettingsTabStrip: View {
                                 .accessibilityHidden(true)
                         }
                     }
+                    // The whole fixed tab rectangle is the hit target, not just
+                    // the icon and text glyphs, so the tab is easy to click.
+                    .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(entry.provider.title)

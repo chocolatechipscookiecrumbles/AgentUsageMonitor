@@ -8,6 +8,8 @@
 
 **Tech Stack:** Swift 6.2, SwiftUI for macOS 14+, AppKit `NSWindow`/`CALayer`, `OSLog`, Swift Package Manager, signed-app frame capture.
 
+**Status — 2026-07-24:** This is now the **last open visual-defect track** on the branch. The provider-switch instability is resolved and visually confirmed (stable intrinsic host geometry: shared 288-point menu content floor plus the Settings viewport-filling envelope), and the too-small provider-tab hit area is corrected under a separate bounded plan ([provider-tab hit area](2026-07-24-provider-tab-hit-area.md)). Neither of those changes touches window/layer rendering ownership, so this plan is unaffected and remains the plan of record. The corner artifact is still **not fixed**; no fix is claimed. This plan is unexecuted (all task steps below are open) and is ready to run when signed-app first-frame capture is authorized.
+
 ## Global Constraints
 
 - Work on `feature/multiprovider-menubar-popover`; do not push without explicit approval.

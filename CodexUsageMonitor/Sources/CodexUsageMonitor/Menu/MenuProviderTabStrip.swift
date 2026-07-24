@@ -11,22 +11,19 @@ struct MenuProviderTabStrip: View {
         HStack(spacing: 0) {
             ForEach(providers) { provider in
                 Button {
-                    ProviderSwitchTrace.record(
-                        surface: .menuPopover,
-                        phase: .buttonAction,
-                        provider: provider
-                    )
                     selection = provider
                 } label: {
+                    // The frame and content shape live inside the label so the
+                    // plain button owns the whole equal-width column as its hit
+                    // target, not just the text. `maxWidth: .infinity` also lets
+                    // each button divide the strip width equally.
                     Text(provider.tabTitle)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(selection == provider ? theme.accent : theme.secondaryText)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(selection == provider ? theme.accent : theme.secondaryText)
-                // The whole equal-width column is the target, not just the text,
-                // so the tab is easy to hit; the hover fill makes that area read.
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .contentShape(.rect)
                 .background(hoveredProvider == provider ? theme.hoverBackground : .clear)
                 .overlay(alignment: .bottom) {
                     Rectangle()
