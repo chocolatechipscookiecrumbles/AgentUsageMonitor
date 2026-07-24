@@ -57,25 +57,18 @@ Adopt the *shape* (tagline → why → install/build → provider/data-source ta
 
 ## Workstream B — Multi-provider menu-bar readout — RESUMED & IMPLEMENTED (2026-07-24)
 
-**Status: implemented under a dedicated approved plan** ([menu-bar graphical indicators](2026-07-24-menu-bar-graphical-indicators.md)). The user supplied UI samples and approved **"Bars"** (four stacked bars) and **"Combined"** (weekly background + five-hour inset), then added a July 24 follow-up: widen graphical tracks from 22 to 34 points and add **"Single Provider"**, which shows the sole connected provider's 5-hour and weekly bars. All three are in the existing menu-bar Style selector (a dropdown). Source + unit/geometry/accessibility tests are complete (272 passing), and the signed bundle builds with the Developer ID identity; signed-app visual validation remains because an existing user-owned app instance was already running and was not replaced. The earlier single-active-window "glyph + percent" idea below is superseded by the approved bar modes.
+**Status: implemented under a dedicated approved plan** ([menu-bar graphical indicators](2026-07-24-menu-bar-graphical-indicators.md)). The user supplied UI samples and approved **"Bars"** (four stacked bars) and **"Combined"** (weekly background + five-hour inset). After trying the modes, the selector was trimmed (2026-07-24): the **Gauge** text mode and the experimental **Single Provider** bar mode were removed, and the default is now **Combined**. The remaining Style options are **"5-hour and weekly"** (text, now showing both Codex windows again), **"Bars"**, and **"Combined"**. Graphical track width was tuned to 40 points. Source + unit/geometry/accessibility tests are complete (272 passing); signed-app visual validation of the bar rendering remains (waiver). The earlier single-active-window "glyph + percent" design below is **superseded**.
 
-**Goal:** The menu-bar item shows usage for **both** connected providers at a glance — one glyph + percent per provider — while degrading cleanly to one provider or the unavailable label.
+> **SUPERSEDED — do not implement.** The following goal/decision/steps described the original "glyph + percent pair" concept, which the approved bar modes replaced. Retained only for provenance.
 
-**Decision (2026-07-24, confirmed — retained for resumption):**
-- Format is **glyph + percent pairs**, one pair per available provider (e.g. `<glyph> 82% · <glyph> 40%`), using the existing provider assets and honoring `QuotaValueMode` and the pause/cache markers.
-- Each provider contributes a **single "active window" percent**, not both windows: **default to the 5-hour window, fall back to the weekly window when there is no active 5-hour limit.** (Example: Codex with no active 5-hour limit shows its weekly figure; Claude shows its 5-hour figure.)
-- A **stacked per-provider** variant (both windows per provider) is also wanted, **but is gated on UI drawing samples** — produce mockups and get the user's visual choice before implementing either the pair or the stacked layout.
+**Goal (superseded):** The menu-bar item shows usage for **both** connected providers at a glance — one glyph + percent per provider — while degrading cleanly to one provider or the unavailable label.
 
-**Blocked until:** UI drawing samples of the pair layout and the stacked layout are produced and the user picks one. Do not write production label code for Workstream B before that.
+**Decision (superseded):**
+- Format is **glyph + percent pairs**, one pair per available provider.
+- Each provider contributes a **single "active window" percent** (5-hour default, weekly fallback).
+- A stacked per-provider variant was gated on UI samples — those samples produced the approved bar modes instead.
 
-**Files:** `Menu/MenuBarLabelPresentation.swift`, `Menu/MenuBarLabelView.swift`, `Menu/MenuBarStatusLabel.swift`, `Menu/MenuProviderSummary.swift`; tests in `MenuProviderSummaryTests`/a new label test.
-
-- [ ] **Step 0 (blocking):** Produce UI drawing samples for (a) the single-active-window glyph+percent pair layout and (b) the stacked per-provider layout, at realistic menu-bar widths in Light/Dark. Get the user's selection and record it here before coding.
-- [ ] **Step 1:** Define the "active window" selector on `MenuProviderSummary` — prefer the 5-hour window, fall back to weekly when no active 5-hour limit exists — and expose the chosen percent + freshness per provider. Add a deterministic test for the selector (5-hour present, 5-hour absent → weekly, both absent → unavailable).
-- [ ] **Step 2:** Extend `MenuBarLabelPresentation` with the selected multi-provider readout branch; keep the single-provider and unavailable branches unchanged. Preserve accessibility: one combined label naming each provider, its active-window percent, value mode, and freshness.
-- [ ] **Step 3:** Update `MenuBarLabelView` to render the selected layout within the menu-bar width budget; fall back to text-only if width is constrained.
-- [ ] **Step 4:** Reconcile with the deferred status-marker plan (disconnected vs cached vs confirmed) so the multi-provider readout does not contradict it.
-- [ ] **Step 5:** Add deterministic presentation tests for two-provider, one-provider, mixed-availability, and all-unavailable cases. Signed-app visual acceptance for width/rendering.
+*(Original Steps 0–5 for the glyph+percent approach removed as superseded; the bar modes were implemented under the dedicated plan.)*
 
 ## Workstream C — Standardized Connect/Disconnect for every agent
 
