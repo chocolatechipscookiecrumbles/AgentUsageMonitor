@@ -177,17 +177,27 @@ struct ClaudeAgentSettingsView: View {
             // so the user understands the Keychain prompt they will approve.
             SettingsDescription(ClaudeSignInPresentation.keychainPromptExplanation)
         }
-        if case .connected = connectionState {
+        if isEffectivelyConnected {
             SettingsPreferenceControlRow("Connected account") {
                 AgentDisconnectButton(provider: .claudeCode, disconnect: disconnect)
             }
         }
     }
 
+    /// A live read (passive capture with a working credential) or an explicit
+    /// sign-in both count as connected here, matching the status row.
+    private var isEffectivelyConnected: Bool {
+        ClaudeConnectionStatus.isEffectivelyConnected(
+            signInState: connectionState,
+            usageState: usageState
+        )
+    }
+
     private var showsConnectAction: Bool {
+        if isEffectivelyConnected { return false }
         switch connectionState {
-        case .notConnected, .failed, .signingIn, .missingCLI: true
-        case .checking, .connected: false
+        case .notConnected, .failed, .signingIn, .missingCLI: return true
+        case .checking, .connected: return false
         }
     }
 
