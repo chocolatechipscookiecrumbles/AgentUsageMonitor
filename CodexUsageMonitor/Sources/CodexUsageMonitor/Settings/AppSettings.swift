@@ -26,6 +26,7 @@ final class AppSettings: ObservableObject {
         static let claudeCLIProbeConsented = "claude.cliProbeConsented"
         static let claudeSetupHistory = "claude.hasSetupHistory"
         static let selectedMenuProvider = "menu.selectedProvider"
+        static let codexDisconnected = "codex.disconnected"
     }
 
     private let defaults: UserDefaults
@@ -55,6 +56,10 @@ final class AppSettings: ObservableObject {
     /// with no current snapshot stays selected while an unsupported one falls
     /// back to Codex.
     @Published var selectedMenuProvider: AgentProvider { didSet { defaults.set(selectedMenuProvider.rawValue, forKey: Key.selectedMenuProvider) } }
+    /// App-local Codex disconnect: the user hid Codex usage without touching the
+    /// Codex CLI session. Persisted so the disconnect survives relaunch and the
+    /// app does not auto-reconnect from the still-valid CLI credential.
+    @Published var codexDisconnected: Bool { didSet { defaults.set(codexDisconnected, forKey: Key.codexDisconnected) } }
     /// Whether the user has acknowledged that the CLI usage probe costs
     /// tokens. Gates the confirmation prompt so it appears on first use, not
     /// on every press.
@@ -96,6 +101,7 @@ final class AppSettings: ObservableObject {
         keyboardShortcutsEnabled = Self.value(for: Key.keyboardShortcutsEnabled, defaults: defaults, defaultValue: true)
         selectedMenuProvider = defaults.string(forKey: Key.selectedMenuProvider)
             .flatMap(AgentProvider.init(rawValue:)) ?? .codex
+        codexDisconnected = defaults.bool(forKey: Key.codexDisconnected)
         // Seed per-provider keys on first run / migration so the store is
         // durable from the start.
         persistQuotaThresholds()

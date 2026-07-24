@@ -56,9 +56,11 @@ final class QuotaViewModel: ObservableObject {
         )
         let monitor = QuotaMonitor(settings: settings)
         self.monitor = monitor
-        let connectionController = CodexConnectionController {
-            monitor.refresh(reason: .authentication)
-        }
+        let connectionController = CodexConnectionController(
+            onConnected: { monitor.refresh(reason: .authentication) },
+            isUserDisconnected: { [settings] in settings.codexDisconnected },
+            setUserDisconnected: { [settings] disconnected in settings.codexDisconnected = disconnected }
+        )
         self.connectionController = connectionController
         // Claude follows the shared Refresh Preferences like Codex, but its
         // networked OAuth read is floored for endpoint safety.
@@ -175,6 +177,12 @@ final class QuotaViewModel: ObservableObject {
 
     func checkCodexConnection() {
         connectionController.checkConnection()
+    }
+
+    /// App-local disconnect: hide Codex usage and stop auto-detecting, leaving
+    /// the Codex CLI session and stored credential untouched.
+    func disconnectCodex() {
+        connectionController.disconnect()
     }
 
     func signInWithBrowser() {

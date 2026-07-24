@@ -42,6 +42,10 @@ final class CodexConnectionController: ObservableObject {
     private let notificationCenter: NotificationCenter
     private let activationNotification: Notification.Name
     private let disconnectedCheckInterval: Duration
+    /// Persisted app-local disconnect flag. While set, the controller stays
+    /// disconnected and never auto-detects the still-valid CLI credential.
+    private let isUserDisconnected: @MainActor () -> Bool
+    private let setUserDisconnected: @MainActor (Bool) -> Void
     private var connectionTask: Task<Void, Never>?
     private var disconnectedWatchTask: Task<Void, Never>?
     private var activationObserver: ActivationObserver?
@@ -52,7 +56,9 @@ final class CodexConnectionController: ObservableObject {
         statusReader: (@Sendable () async -> AgentConnectionState)? = nil,
         notificationCenter: NotificationCenter = .default,
         activationNotification: Notification.Name? = nil,
-        disconnectedCheckInterval: Duration = .seconds(30)
+        disconnectedCheckInterval: Duration = .seconds(30),
+        isUserDisconnected: @escaping @MainActor () -> Bool = { false },
+        setUserDisconnected: @escaping @MainActor (Bool) -> Void = { _ in }
     ) {
         let activationNotification = activationNotification ?? NSApplication.didBecomeActiveNotification
         self.service = service
@@ -61,6 +67,8 @@ final class CodexConnectionController: ObservableObject {
         self.notificationCenter = notificationCenter
         self.activationNotification = activationNotification
         self.disconnectedCheckInterval = disconnectedCheckInterval
+        self.isUserDisconnected = isUserDisconnected
+        self.setUserDisconnected = setUserDisconnected
     }
 
     deinit {
@@ -69,10 +77,30 @@ final class CodexConnectionController: ObservableObject {
     }
 
     func start() {
+        // Respect a persisted app-local disconnect: stay disconnected without
+        // detecting, so the still-valid CLI credential does not auto-reconnect.
+        guard !isUserDisconnected() else {
+            state = .disconnected
+            return
+        }
         detectConnection(trigger: .startup)
     }
 
+    /// App-local disconnect: hide Codex usage and stop auto-detecting, leaving
+    /// the Codex CLI session and stored credential untouched.
+    func disconnect() {
+        connectionTask?.cancel()
+        connectionTask = nil
+        stopDisconnectedWatch()
+        stopActivationObserver()
+        setUserDisconnected(true)
+        // Set directly rather than via applyState so the disconnected watcher
+        // and activation observer are not restarted (they would auto-reconnect).
+        state = .disconnected
+    }
+
     func checkConnection() {
+        setUserDisconnected(false)
         detectConnection(trigger: .userInitiated)
     }
 
@@ -165,6 +193,7 @@ final class CodexConnectionController: ObservableObject {
     }
 
     func signInWithBrowser() {
+        setUserDisconnected(false)
         beginSignIn(using: .browser) { [service] in
             try await service.startBrowserLogin()
         }
@@ -172,6 +201,7 @@ final class CodexConnectionController: ObservableObject {
 
     func signInWithCLI() {
         guard connectionTask == nil else { return }
+        setUserDisconnected(false)
         applyState(.signingIn(.cli))
         let service = service
         connectionTask = Task { [weak self, service] in
