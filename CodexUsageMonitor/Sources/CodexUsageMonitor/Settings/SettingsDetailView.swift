@@ -24,6 +24,7 @@ struct SettingsDetailView: View {
         case .agents:
             AgentsSettingsView(
                 viewModel: viewModel,
+                settings: viewModel.settings,
                 selectedAgent: selectedSettingsAgent
             )
         case .dataPrivacy:

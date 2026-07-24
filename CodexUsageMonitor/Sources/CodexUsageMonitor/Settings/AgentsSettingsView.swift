@@ -2,6 +2,10 @@ import SwiftUI
 
 struct AgentsSettingsView: View {
     @ObservedObject var viewModel: QuotaViewModel
+    // Observed here (not only in the leaf chip view) because
+    // `AgentSettingsPageTemplate` captures its content once, freezing the
+    // subtree; rebuilding this container is what actually refreshes the chips.
+    @ObservedObject var settings: AppSettings
     let selectedAgent: AgentProvider
 
     var body: some View {

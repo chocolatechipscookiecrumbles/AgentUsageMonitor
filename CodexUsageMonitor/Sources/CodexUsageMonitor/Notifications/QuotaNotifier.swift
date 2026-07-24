@@ -97,6 +97,23 @@ final class QuotaNotifier {
         await quotaAlerts(provider: .claudeCode, for: weekly, name: "Weekly")
     }
 
+    /// Confirms a settings change (e.g. "Will warn you when Claude reaches 25%").
+    /// Unlike quota alerts this always delivers — it is direct feedback for an
+    /// action the user just took, not a deduplicated recurring event.
+    func deliverConfirmation(_ body: String) async {
+        guard alertsEnabled else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "Quota Alerts"
+        content.body = body
+        content.sound = .default
+        let request = UNNotificationRequest(
+            identifier: "quota-confirmation-\(UUID().uuidString)",
+            content: content,
+            trigger: nil
+        )
+        try? await center.add(request)
+    }
+
     private func quotaAlerts(provider: AgentProvider, for window: QuotaWindow?, name: String) async {
         for alert in QuotaThresholdEvaluator.alerts(
             provider: provider,

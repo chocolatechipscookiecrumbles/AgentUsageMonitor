@@ -102,8 +102,9 @@ final class AppSettings: ObservableObject {
     }
 
     /// Providers that have remaining-quota windows and therefore threshold
-    /// alerts. Copilot has no personal quota, so it is excluded.
-    static let quotaThresholdProviders: [AgentProvider] = [.codex, .claudeCode]
+    /// alerts. Copilot has no personal quota, so it is excluded. `nonisolated`
+    /// so pure helpers (e.g. confirmation copy) can read the canonical order.
+    nonisolated static let quotaThresholdProviders: [AgentProvider] = [.codex, .claudeCode]
 
     private static func value(for key: String, defaults: UserDefaults, defaultValue: Bool) -> Bool {
         defaults.object(forKey: key) == nil ? defaultValue : defaults.bool(forKey: key)
