@@ -20,13 +20,6 @@ struct AgentsSettingsView: View {
                     signInWithCLI: viewModel.signInWithCLI,
                     checkConnection: viewModel.checkCodexConnection
                 )
-                .onAppear {
-                    ProviderSwitchTrace.record(
-                        surface: .settingsAgents,
-                        phase: .contentAppeared,
-                        provider: .codex
-                    )
-                }
             case .claudeCode:
                 ClaudeAgentSettingsView(
                     setupState: viewModel.claudeSetupState,
@@ -42,13 +35,6 @@ struct AgentsSettingsView: View {
                     setCLIProbeConsent: { viewModel.settings.claudeCLIProbeConsented = $0 },
                     runCLIProbe: viewModel.runClaudeCLIProbe
                 )
-                .onAppear {
-                    ProviderSwitchTrace.record(
-                        surface: .settingsAgents,
-                        phase: .contentAppeared,
-                        provider: .claudeCode
-                    )
-                }
             case .githubCopilot:
                 EmptyView()
             }

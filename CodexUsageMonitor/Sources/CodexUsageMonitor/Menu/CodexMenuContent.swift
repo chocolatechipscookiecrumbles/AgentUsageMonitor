@@ -50,12 +50,5 @@ struct CodexMenuContent: View {
         }
         .padding(.horizontal, MenuPopoverTheme.contentHorizontalPadding)
         .padding(.bottom, MenuPopoverTheme.contentBottomPadding)
-        .onAppear {
-            ProviderSwitchTrace.record(
-                surface: .menuPopover,
-                phase: .contentAppeared,
-                provider: .codex
-            )
-        }
     }
 }

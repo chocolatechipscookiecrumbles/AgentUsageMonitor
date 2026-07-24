@@ -46,13 +46,6 @@ struct SettingsView: View {
         .environment(\.settingsAppearancePalette, appearancePalette)
         .preferredColorScheme(presentationColorScheme)
         .onAppear(perform: repairSelectedSettingsAgentIfNeeded)
-        .onChange(of: selectedSettingsAgent) { _, provider in
-            ProviderSwitchTrace.record(
-                surface: .settingsAgents,
-                phase: .selectionChanged,
-                provider: provider
-            )
-        }
     }
 
     private var settingsPage: some View {
