@@ -22,7 +22,10 @@ struct MenuBarLabelPresentation: Equatable, Sendable {
         providerAssetName = nil
 
         switch style {
-        case .gaugeAndLowest:
+        // The graphical bar modes render via `MenuBarQuotaBars`/`MenuBarBarsView`
+        // rather than this text presentation; they fall back to the gauge text
+        // if ever constructed as a label.
+        case .gaugeAndLowest, .stackedBars, .combinedBars:
             let value = Self.gaugeValue(
                 fiveHour: fiveHourValue,
                 weekly: weeklyValue,
