@@ -133,15 +133,15 @@ Manual validation (signed app, both appearances): full, medium, low, critical, m
 7. **"Show" (Used/Remaining):** leave as-is (governs text modes only); the bar modes are always remaining. A disable-when-bar-mode tweak is a small optional follow-up, not in scope.
 8. **Provider tint:** reuse `settingsPresentationTint`; verify legibility in both appearances during manual validation. No menu-bar-specific tint variant unless legibility fails.
 
-## 5. Recommended implementation order
+## 5. Implementation order — DONE (approved 2026-07-24)
 
-1. `MenuBarDisplayStyle` cases + titles (compiles, selectable, renders nothing new yet).
-2. `MenuBarQuotaBars` model + builders + unit tests (pure, no UI).
-3. `MenuBarBarsView` renderer (stacked, then combined) + geometry tests.
-4. Wire `MenuBarStatusLabel` to branch on style; fixed-width guard.
-5. Accessibility string + tests.
-6. Selector control treatment + preview update.
-7. Manual validation matrix in the signed app; reconcile docs/board.
+1. [x] `MenuBarDisplayStyle` cases (`.stackedBars`/`.combinedBars`) + `isGraphical`; text presentation falls back to gauge (`ea334fe`).
+2. [x] `MenuBarQuotaBars` model + builders + unit tests (`ea334fe`).
+3. [x] `MenuBarBarsView` + `MenuBarBarMetrics` renderer (stacked + combined) + geometry tests (`46402e6`).
+4. [x] `MenuBarStatusLabel` branches on style; fixed 22pt width (`46402e6`).
+5. [x] Accessibility description on the model + tests (`46402e6`).
+6. [x] Style picker → dropdown menu; preview renders bar modes with both providers (`46402e6`).
+7. [~] **Pending:** signed-app manual validation matrix (full/medium/low/critical/mixed/disconnected/single-provider, light+dark). Unobserved under the branch waiver until run. Reconcile board on acceptance.
 
 ## 6. Checkpoint — approval required before production implementation
 

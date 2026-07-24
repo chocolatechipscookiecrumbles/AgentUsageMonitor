@@ -55,9 +55,9 @@ Adopt the *shape* (tagline → why → install/build → provider/data-source ta
 - [x] **Step 2 (done):** Compact architecture note (owners `QuotaViewModel`, `QuotaMonitor`/`ClaudeUsageMonitor`, `QuotaNotifier`), plus an explicit personal, non-commercial scope and the Anthropic ToS caveat. All cross-links verified to resolve.
 - [ ] **Step 3:** Verify links resolve and no build/verification claim is asserted as observed unless it was run.
 
-## Workstream B — Multi-provider menu-bar readout — SKIPPED FOR NOW
+## Workstream B — Multi-provider menu-bar readout — RESUMED & IMPLEMENTED (2026-07-24)
 
-**Status (2026-07-24): deferred by user direction — "don't generate the menubar icons, skip that part for now."** Do not produce menu-bar icon/label samples or write Workstream B code in the current pass. The confirmed format decision below is preserved for when B resumes; the UI-drawing-samples step remains its entry gate. Nothing else in this plan depends on B.
+**Status: implemented under a dedicated approved plan** ([menu-bar graphical indicators](2026-07-24-menu-bar-graphical-indicators.md)). The user supplied UI samples and approved two graphical modes — **"Bars"** (four stacked bars) and **"Combined"** (weekly background + five-hour inset) — added to the existing menu-bar Style selector (now a dropdown). Source + unit/geometry/accessibility tests are complete (272 passing); signed-app visual validation is the remaining gate. The earlier single-active-window "glyph + percent" idea below is superseded by the approved bar modes.
 
 **Goal:** The menu-bar item shows usage for **both** connected providers at a glance — one glyph + percent per provider — while degrading cleanly to one provider or the unavailable label.
 
