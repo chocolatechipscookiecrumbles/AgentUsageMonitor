@@ -29,6 +29,10 @@ final class QuotaViewModel: ObservableObject {
     let settings: AppSettings
     private let monitor: QuotaMonitor
     private let claudeMonitor: ClaudeUsageMonitor
+    /// Claude's threshold notifications. Codex delivers through its own
+    /// `QuotaMonitor`-owned notifier; both share the same authorization gate and
+    /// UserDefaults-backed dedup, so a second instance cannot double-fire.
+    private let claudeNotifier: QuotaNotifier?
     private let claudeConnectionController: ClaudeConnectionController
     private let connectionController: CodexConnectionController
     private var subscriptions: Set<AnyCancellable> = []
@@ -58,6 +62,11 @@ final class QuotaViewModel: ObservableObject {
             }
         )
         self.claudeMonitor = claudeMonitor
+        // Same `.app`-only gate the Codex notifier uses, so tests and previews
+        // never touch the notification center.
+        self.claudeNotifier = Bundle.main.bundleURL.pathExtension == "app"
+            ? QuotaNotifier(settings: settings)
+            : nil
         self.claudeConnectionController = ClaudeConnectionController(
             browserSignIn: {
                 // Browser sign-in (claude setup-token) is shelved as unverified;
@@ -106,6 +115,7 @@ final class QuotaViewModel: ObservableObject {
         claudeMonitor.$state.sink { [weak self] state in
             self?.claudeState = state
             self?.updateClaudeSetupState()
+            self?.deliverClaudeThresholdAlerts(for: state)
         }.store(in: &subscriptions)
         claudeMonitor.$hasCompletedInitialRefresh.removeDuplicates().sink { [weak self] _ in
             self?.updateClaudeSetupState()
@@ -249,5 +259,25 @@ final class QuotaViewModel: ObservableObject {
 
     func stopClaude() {
         claudeMonitor.stop()
+    }
+
+    /// Evaluates Claude's windows for threshold alerts, but only on a confirmed
+    /// (live) read — a cached read must not re-alert. Dedup by reset time in the
+    /// notifier makes repeated live reads safe.
+    private func deliverClaudeThresholdAlerts(for state: ClaudeUsageState) {
+        guard let claudeNotifier,
+              case .available(let presentation) = state,
+              presentation.delivery == .live else { return }
+        let model = ClaudeUsageDisplayModel(presentation: presentation)
+        let fiveHour = Self.claudeThresholdWindow(model.fiveHour)
+        let weekly = Self.claudeThresholdWindow(model.sevenDay)
+        Task { await claudeNotifier.evaluateClaudeThresholds(fiveHour: fiveHour, weekly: weekly) }
+    }
+
+    /// Maps a Claude window into the provider-neutral `QuotaWindow`. A window
+    /// that has already reset is dropped rather than alerted on a stale figure.
+    private static func claudeThresholdWindow(_ window: ClaudeUsageDisplayModel.Window?) -> QuotaWindow? {
+        guard let window, !window.hasReset else { return nil }
+        return QuotaWindow(usedPercent: window.usedPercent, resetAt: window.resetsAt, durationMinutes: nil)
     }
 }
