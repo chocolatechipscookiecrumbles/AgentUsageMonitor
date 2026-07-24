@@ -85,11 +85,11 @@ Adopt the *shape* (tagline → why → install/build → provider/data-source ta
 
 **Files:** Create a shared `Settings/AgentDisconnectButton.swift` (standardized control); `Settings/CodexAgentSettingsView.swift` and `Settings/ClaudeAgentSettingsView.swift` (adopt it); `Connection/CodexConnectionController.swift` (owner of Codex connection state); `Menu/QuotaViewModel.swift` (expose `disconnectCodex`, mirroring `disconnectClaude`).
 
-- [ ] **Step 1 (decision — confirmed 2026-07-24):** Codex disconnect is **app-local only** — clear the app's cached Codex snapshot/connection and stop showing usage, leaving the Codex CLI session and stored credential untouched. This matches Claude's disconnect and the personal-build boundary.
-- [ ] **Step 2:** Implement `disconnectCodex` on the connection owner and expose it through `QuotaViewModel`, mirroring `disconnectClaude`. Add a deterministic state-transition test (connected → disconnected → reconnect).
-- [ ] **Step 3:** Build the standardized `AgentDisconnectButton` (shared label, confirmation, disabled-while-signing-in rule, provider tint, injected action + guidance). Keep the shown-only-when-connected rule.
-- [ ] **Step 4:** Adopt `AgentDisconnectButton` on both agent pages — Codex wired to `disconnectCodex` (replacing the `Button("Disconnect") {}` stub), Claude wired to its existing `disconnect`. Align surrounding Connect/status copy so both pages read as one system.
-- [ ] **Step 5:** Signed-app acceptance: connect, disconnect, reconnect on both pages via the identical control; confirm the popover (and, once B resumes, the menu-bar readout) reflect each transition.
+- [x] **Step 1 (decision — confirmed 2026-07-24):** Codex disconnect is **app-local only** — hides Codex usage and stops auto-detecting, leaving the Codex CLI session and stored credential untouched.
+- [x] **Step 2 (done):** `AppSettings.codexDisconnected` (persisted) + `CodexConnectionController.disconnect()` (stops the watcher/activation observer, no auto-reconnect; `start()` respects a persisted disconnect; `checkConnection`/sign-in clear it) + `QuotaMonitor` gate (blanks usage to an explicit disconnected state, resumes on reconnect) + `QuotaViewModel.disconnectCodex()`. Tests: disconnect persists + stays disconnected, persisted disconnect respected at start, reconnect clears the flag.
+- [x] **Step 3 (done):** `AgentDisconnectButton` — one shared destructive control with a confirmation dialog whose copy reassures that the provider's own login/credential is untouched; only the provider name and injected action differ. Shown only when connected.
+- [x] **Step 4 (done):** Adopted on both pages — Codex wired to `disconnectCodex` (replacing the disabled stub and its "Disconnect is planned" copy), Claude wired to its existing `disconnect`. Codex connected-guidance copy updated.
+- [~] **Step 5 (not run):** Signed-app connect/disconnect/reconnect acceptance on both pages — pending a signed build (record honestly). Automated coverage proves the connection-state transitions; the visual/interaction pass is unobserved under the branch waiver.
 
 ## Workstream D — Popover first-run authentication state
 

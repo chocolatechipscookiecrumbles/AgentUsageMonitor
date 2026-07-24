@@ -179,7 +179,7 @@ struct ClaudeAgentSettingsView: View {
                 "Connected account",
                 description: ClaudeSignInPresentation.keychainPromptExplanation
             ) {
-                Button("Disconnect", action: disconnect)
+                AgentDisconnectButton(provider: .claudeCode, disconnect: disconnect)
             }
         }
     }

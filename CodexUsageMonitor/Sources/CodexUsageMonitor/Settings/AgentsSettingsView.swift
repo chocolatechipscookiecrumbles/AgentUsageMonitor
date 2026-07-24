@@ -20,7 +20,8 @@ struct AgentsSettingsView: View {
                     quotaValueMode: viewModel.settings.quotaValueMode,
                     signInWithBrowser: viewModel.signInWithBrowser,
                     signInWithCLI: viewModel.signInWithCLI,
-                    checkConnection: viewModel.checkCodexConnection
+                    checkConnection: viewModel.checkCodexConnection,
+                    disconnect: viewModel.disconnectCodex
                 )
             case .claudeCode:
                 ClaudeAgentSettingsView(
