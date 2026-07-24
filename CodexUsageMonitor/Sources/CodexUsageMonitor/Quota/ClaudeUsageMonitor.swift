@@ -10,10 +10,11 @@ extension ClaudeUsageCollector: ClaudeUsageCollecting {}
 
 @MainActor
 final class ClaudeUsageMonitor: ObservableObject {
-    /// Network-appropriate: a refresh can now reach the OAuth endpoint, so the
-    /// old 30s local-file cadence would mean an API call every 30 seconds.
-    /// The collector's own fallback order handles the cheap statusLine/cache
-    /// paths within each refresh, so this only paces the expensive one.
+    /// Fallback cadence for the fixed-interval initializer (tests and any caller
+    /// that does not supply a `cadence`). Production derives the interval from the
+    /// shared `RefreshMode` via `ClaudeRefreshCadence`, which floors the networked
+    /// OAuth read for endpoint safety; this constant stays network-appropriate for
+    /// the plain fixed-interval path.
     static let defaultPollInterval: Duration = .seconds(12 * 60)
 
     @Published private(set) var state: ClaudeUsageState = .unavailable(reason: ClaudeUsageState.notConnectedReason)
@@ -21,7 +22,9 @@ final class ClaudeUsageMonitor: ObservableObject {
     @Published private(set) var isRefreshing = false
 
     private let collector: ClaudeUsageCollecting
-    private let pollInterval: Duration
+    /// Evaluated before each scheduled poll so a live change to the shared
+    /// Refresh Preferences takes effect without restarting the monitor.
+    private let pollInterval: @MainActor () -> Duration
     private var pollTask: Task<Void, Never>?
 
     init(
@@ -33,7 +36,21 @@ final class ClaudeUsageMonitor: ObservableObject {
         pollInterval: Duration = ClaudeUsageMonitor.defaultPollInterval
     ) {
         self.collector = collector
-        self.pollInterval = pollInterval
+        self.pollInterval = { pollInterval }
+    }
+
+    /// Production initializer: the poll cadence follows the shared `RefreshMode`
+    /// setting (clamped to Claude's network floor) and is re-read each tick.
+    init(
+        collector: ClaudeUsageCollecting = ClaudeUsageCollector(
+            oauthSource: ClaudeOAuthUsageSource(credentialStore: ClaudeCompositeCredentialStore()),
+            statusLineReader: ClaudeRateLimitSnapshotReader(),
+            cache: ClaudeUsageCache()
+        ),
+        cadence: @escaping @MainActor () -> Duration
+    ) {
+        self.collector = collector
+        self.pollInterval = cadence
     }
 
     deinit {
@@ -51,7 +68,7 @@ final class ClaudeUsageMonitor: ObservableObject {
             guard !Task.isCancelled else { return }
             await refreshNow(reason: .appLaunch)
             while !Task.isCancelled {
-                try? await Task.sleep(for: self.pollInterval)
+                try? await Task.sleep(for: self.pollInterval())
                 guard !Task.isCancelled else { return }
                 await self.refreshNow(reason: .scheduled)
             }

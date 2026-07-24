@@ -50,7 +50,13 @@ final class QuotaViewModel: ObservableObject {
             monitor.refresh(reason: .authentication)
         }
         self.connectionController = connectionController
-        let claudeMonitor = ClaudeUsageMonitor()
+        // Claude follows the shared Refresh Preferences like Codex, but its
+        // networked OAuth read is floored for endpoint safety.
+        let claudeMonitor = ClaudeUsageMonitor(
+            cadence: { [settings] in
+                ClaudeRefreshCadence.pollInterval(for: settings.refreshMode)
+            }
+        )
         self.claudeMonitor = claudeMonitor
         self.claudeConnectionController = ClaudeConnectionController(
             browserSignIn: {
