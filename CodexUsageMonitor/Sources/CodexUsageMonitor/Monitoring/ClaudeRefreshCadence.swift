@@ -12,11 +12,13 @@ import Foundation
 /// inside each refresh still update as part of the collector's own fallback
 /// order.
 enum ClaudeRefreshCadence {
-    /// Conservative network floor for Claude's OAuth read, pending the dedicated
-    /// rate-safety probe (plan Workstream G, Step 1b). Five minutes means at most
-    /// twelve networked reads per hour, which stays well clear of any reasonable
-    /// endpoint limit. Adjust only with probe evidence, never below what the
-    /// endpoint tolerates.
+    /// Network floor for Claude's OAuth read. Five minutes means at most twelve
+    /// reads per hour, which is negligible for a lightweight status GET. The
+    /// rate-safety probe (docs/development/claude-usage-endpoint-rate-safety.md)
+    /// found the real risk was a missing `User-Agent` header, now sent, plus a
+    /// `Retry-After` back-off on 429 in the collector; with those, 5 minutes is
+    /// safe. Do not lower it — there is no user benefit and the endpoint 429s
+    /// aggressively.
     static let networkFloor: Duration = .seconds(5 * 60)
 
     /// Claude's steady automatic interval. Claude does not burst on the network

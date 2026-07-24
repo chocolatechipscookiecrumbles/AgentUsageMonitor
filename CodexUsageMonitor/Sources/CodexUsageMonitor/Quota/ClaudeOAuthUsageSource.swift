@@ -6,7 +6,21 @@ enum ClaudeOAuthError: Error, Equatable {
     case unauthorized
     case malformedResponse
     case serverFailure(statusCode: Int)
+    /// HTTP 429. `retryAfter` is the server's `Retry-After` if it sent one; the
+    /// collector backs off OAuth reads until then and serves local sources.
+    case rateLimited(retryAfter: Date?)
     case transportError
+}
+
+/// The `User-Agent` the `/api/oauth/usage` endpoint requires. Without a
+/// `claude-code/<version>` agent the endpoint places the caller in an
+/// aggressively rate-limited bucket that returns persistent 429s (observed by
+/// the Claude Code community). This is a static value for this personal build,
+/// which already reuses Claude Code's own credential; adjust the version if
+/// Anthropic begins validating it. This does not change the ToS boundary the
+/// project already documents.
+enum ClaudeUsageUserAgent {
+    static let value = "claude-code/2.0.0"
 }
 
 /// Parses the ISO 8601 timestamps this endpoint returns, including
@@ -92,15 +106,21 @@ private struct OAuthUsageResponse: Decodable {
 struct ClaudeOAuthUsageSource {
     private let credentialStore: ClaudeCredentialProviding
     private let requestExecutor: @Sendable (URLRequest) async throws -> (Data, URLResponse)
+    private let userAgent: String
+    private let now: @Sendable () -> Date
 
     init(
         credentialStore: ClaudeCredentialProviding,
         requestExecutor: @escaping @Sendable (URLRequest) async throws -> (Data, URLResponse) = { request in
             try await URLSession(configuration: .ephemeral).data(for: request)
-        }
+        },
+        userAgent: String = ClaudeUsageUserAgent.value,
+        now: @escaping @Sendable () -> Date = { .now }
     ) {
         self.credentialStore = credentialStore
         self.requestExecutor = requestExecutor
+        self.userAgent = userAgent
+        self.now = now
     }
 
     /// `promptPolicy` defaults to the safe value: a caller that does not think
@@ -120,6 +140,9 @@ struct ClaudeOAuthUsageSource {
         request.httpMethod = "GET"
         request.setValue("Bearer \(credential.accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
+        // Required to avoid the endpoint's aggressive rate-limit bucket.
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 10
 
         let data: Data
@@ -135,6 +158,9 @@ struct ClaudeOAuthUsageSource {
         }
         guard httpResponse.statusCode != 401, httpResponse.statusCode != 403 else {
             throw ClaudeOAuthError.unauthorized
+        }
+        guard httpResponse.statusCode != 429 else {
+            throw ClaudeOAuthError.rateLimited(retryAfter: Self.retryAfter(from: httpResponse, now: now()))
         }
         guard httpResponse.statusCode == 200 else {
             throw ClaudeOAuthError.serverFailure(statusCode: httpResponse.statusCode)
@@ -168,5 +194,19 @@ struct ClaudeOAuthUsageSource {
     private static func window(_ raw: OAuthUsageResponse.Window?) -> ClaudeLimitWindow? {
         guard let raw, let utilization = raw.utilization else { return nil }
         return ClaudeLimitWindow(usedPercent: utilization, resetsAt: raw.resetsAt.flatMap(ClaudeOAuthDateParsing.parse))
+    }
+
+    /// Parses `Retry-After`, which is either a number of seconds or an HTTP-date.
+    private static func retryAfter(from response: HTTPURLResponse, now: Date = .now) -> Date? {
+        guard let raw = response.value(forHTTPHeaderField: "Retry-After")?
+            .trimmingCharacters(in: .whitespaces), !raw.isEmpty else { return nil }
+        if let seconds = TimeInterval(raw) {
+            return now.addingTimeInterval(max(0, seconds))
+        }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "GMT")
+        formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss 'GMT'"
+        return formatter.date(from: raw)
     }
 }

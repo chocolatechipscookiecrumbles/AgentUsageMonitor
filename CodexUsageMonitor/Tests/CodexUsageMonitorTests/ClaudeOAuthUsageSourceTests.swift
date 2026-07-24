@@ -125,7 +125,7 @@ final class ClaudeOAuthUsageSourceTests: XCTestCase {
         }
     }
 
-    func testFetchSetsAuthorizationHeaderAndBetaHeaderWithoutLoggingToken() async throws {
+    func testFetchSetsRequiredHeadersWithoutLoggingToken() async throws {
         let response = realShapedResponse
         let captured = CapturedRequestBox()
         let source = ClaudeOAuthUsageSource(
@@ -141,10 +141,49 @@ final class ClaudeOAuthUsageSourceTests: XCTestCase {
         XCTAssertEqual(captured.request?.url?.absoluteString, "https://api.anthropic.com/api/oauth/usage")
         XCTAssertEqual(captured.request?.value(forHTTPHeaderField: "Authorization"), "Bearer fixture-token")
         XCTAssertEqual(captured.request?.value(forHTTPHeaderField: "anthropic-beta"), "oauth-2025-04-20")
+        // The claude-code User-Agent is required to avoid the endpoint's
+        // aggressive rate-limit bucket.
+        XCTAssertEqual(captured.request?.value(forHTTPHeaderField: "User-Agent"), ClaudeUsageUserAgent.value)
+        XCTAssertTrue(ClaudeUsageUserAgent.value.hasPrefix("claude-code/"))
+        XCTAssertEqual(captured.request?.value(forHTTPHeaderField: "Content-Type"), "application/json")
     }
 
-    private static func httpResponse(status: Int) -> URLResponse {
-        HTTPURLResponse(url: URL(string: "https://api.anthropic.com/api/oauth/usage")!, statusCode: status, httpVersion: nil, headerFields: nil)!
+    func testFetchThrowsRateLimitedWithRetryAfterSecondsOn429() async {
+        let source = ClaudeOAuthUsageSource(
+            credentialStore: credentialStore(),
+            requestExecutor: { _ in (Data(), Self.httpResponse(status: 429, headers: ["Retry-After": "120"])) }
+        )
+
+        do {
+            _ = try await source.fetch()
+            XCTFail("expected an error")
+        } catch let ClaudeOAuthError.rateLimited(retryAfter) {
+            let seconds = try? XCTUnwrap(retryAfter).timeIntervalSinceNow
+            XCTAssertNotNil(seconds)
+            XCTAssertEqual(seconds ?? 0, 120, accuracy: 5)
+        } catch {
+            XCTFail("unexpected error: \(error)")
+        }
+    }
+
+    func testFetchThrowsRateLimitedWithNilRetryAfterWhenHeaderMissing() async {
+        let source = ClaudeOAuthUsageSource(
+            credentialStore: credentialStore(),
+            requestExecutor: { _ in (Data(), Self.httpResponse(status: 429)) }
+        )
+
+        do {
+            _ = try await source.fetch()
+            XCTFail("expected an error")
+        } catch let ClaudeOAuthError.rateLimited(retryAfter) {
+            XCTAssertNil(retryAfter)
+        } catch {
+            XCTFail("unexpected error: \(error)")
+        }
+    }
+
+    private static func httpResponse(status: Int, headers: [String: String]? = nil) -> URLResponse {
+        HTTPURLResponse(url: URL(string: "https://api.anthropic.com/api/oauth/usage")!, statusCode: status, httpVersion: nil, headerFields: headers)!
     }
 }
 
