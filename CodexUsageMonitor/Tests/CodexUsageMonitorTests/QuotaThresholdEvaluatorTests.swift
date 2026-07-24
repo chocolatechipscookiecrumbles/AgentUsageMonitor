@@ -65,6 +65,29 @@ final class QuotaThresholdEvaluatorTests: XCTestCase {
         XCTAssertNotEqual(codexKey, claudeKey)
     }
 
+    /// Claude's reset time carries fractional seconds that jitter between reads;
+    /// the dedup key must stay stable so the alert is not re-delivered on every
+    /// refresh.
+    func testClaudeKeyIsStableAcrossSubSecondResetJitter() {
+        let base = Date(timeIntervalSince1970: 1_800_000_033.111)
+        let jittered = Date(timeIntervalSince1970: 1_800_000_033.987)
+        XCTAssertEqual(
+            QuotaThresholdEvaluator.key(provider: .claudeCode, name: "5-hour", resetAt: base, threshold: .fifty),
+            QuotaThresholdEvaluator.key(provider: .claudeCode, name: "5-hour", resetAt: jittered, threshold: .fifty)
+        )
+    }
+
+    /// A genuinely different reset window (hours later) still produces a distinct
+    /// key, so a real reset re-arms the alert.
+    func testDifferentResetWindowProducesDistinctKey() {
+        let first = Date(timeIntervalSince1970: 1_800_000_000)
+        let nextWindow = first.addingTimeInterval(5 * 3_600)
+        XCTAssertNotEqual(
+            QuotaThresholdEvaluator.key(provider: .claudeCode, name: "5-hour", resetAt: first, threshold: .fifty),
+            QuotaThresholdEvaluator.key(provider: .claudeCode, name: "5-hour", resetAt: nextWindow, threshold: .fifty)
+        )
+    }
+
     /// Titles name the provider so a user can tell Codex and Claude alerts apart.
     func testTitleNamesTheProvider() {
         let codex = QuotaThresholdEvaluator.alerts(provider: .codex, window: window(usedPercent: 95), name: "5-hour", isEnabled: { $0 == .ten })

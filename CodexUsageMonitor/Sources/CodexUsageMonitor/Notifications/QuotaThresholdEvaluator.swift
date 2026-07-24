@@ -33,7 +33,11 @@ enum QuotaThresholdEvaluator {
 
     /// Codex keeps its original, provider-less key so already-delivered alerts do
     /// not re-fire now that the key carries a provider dimension. Every other
-    /// provider is namespaced.
+    /// provider is namespaced and buckets the reset time to the whole minute:
+    /// Codex resets are whole-second unix timestamps, but Claude's reset comes
+    /// from an ISO8601 string with fractional seconds that jitter between reads,
+    /// which would otherwise make the dedup key — and thus the alert — recur on
+    /// every refresh. Reset windows are hours apart, so minute-bucketing is safe.
     static func key(
         provider: AgentProvider,
         name: String,
@@ -42,6 +46,7 @@ enum QuotaThresholdEvaluator {
     ) -> String {
         let legacy = "quota-\(name)-\(resetAt.timeIntervalSince1970)-\(threshold.rawValue)"
         guard provider != .codex else { return legacy }
-        return "quota-\(provider.rawValue)-\(name)-\(resetAt.timeIntervalSince1970)-\(threshold.rawValue)"
+        let resetMinute = Int(resetAt.timeIntervalSince1970 / 60)
+        return "quota-\(provider.rawValue)-\(name)-\(resetMinute)-\(threshold.rawValue)"
     }
 }
