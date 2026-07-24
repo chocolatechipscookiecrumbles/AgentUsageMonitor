@@ -4,6 +4,7 @@ struct GeneralSettingsContextView: View {
     @ObservedObject var settings: AppSettings
     let status: SettingsStatus
     let displayState: QuotaDisplayState
+    let claudeState: ClaudeUsageState
     @Environment(\.settingsAppearancePalette) private var palette
 
     private var presentation: QuotaPresentation? {
@@ -12,13 +13,25 @@ struct GeneralSettingsContextView: View {
 
     var body: some View {
         SettingsContextCard("Menu Bar Preview") {
-            MenuBarLabelView(
-                presentation: MenuBarLabelPresentation(
-                    displayState: displayState,
-                    style: settings.menuBarDisplayStyle,
-                    valueMode: settings.quotaValueMode
-                )
-            )
+            Group {
+                if settings.menuBarDisplayStyle.isGraphical {
+                    MenuBarBarsView(
+                        style: settings.menuBarDisplayStyle,
+                        providers: MenuBarQuotaBars.providers(
+                            codexDisplayState: displayState,
+                            claudeState: claudeState
+                        )
+                    )
+                } else {
+                    MenuBarLabelView(
+                        presentation: MenuBarLabelPresentation(
+                            displayState: displayState,
+                            style: settings.menuBarDisplayStyle,
+                            valueMode: settings.quotaValueMode
+                        )
+                    )
+                }
+            }
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.vertical, 14)
             .background(palette.searchFieldBackground, in: .rect(cornerRadius: 8))

@@ -27,6 +27,23 @@ struct MenuBarQuotaBars: Equatable {
         fiveHour.normalizedRemaining != nil || weekly.normalizedRemaining != nil
     }
 
+    /// Spoken description for the whole provider row (the bar modes show no
+    /// text), e.g. "Codex: five-hour 49% remaining, weekly 76% remaining".
+    /// Cached/passive freshness is appended; confirmed is left implicit.
+    var accessibilityDescription: String {
+        func phrase(_ name: String, _ fill: Fill) -> String {
+            switch fill {
+            case .value(let v): "\(name) \(Int((v * 100).rounded())) percent remaining"
+            case .unavailable: "\(name) unavailable"
+            }
+        }
+        var text = "\(provider.tabTitle): \(phrase("five-hour", fiveHour)), \(phrase("weekly", weekly))"
+        if let freshness, freshness != .confirmed {
+            text += ", \(freshness.accessibilityName)"
+        }
+        return text
+    }
+
     init(
         provider: AgentProvider,
         fiveHourRemaining: Int?,

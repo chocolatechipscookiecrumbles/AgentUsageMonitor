@@ -10,16 +10,26 @@ struct MenuBarStatusLabel: View {
     }
 
     var body: some View {
-        MenuBarLabelView(
-            presentation: MenuBarLabelPresentation(
-                displayState: viewModel.displayState,
-                providerSummaries: [
-                    .codex(displayState: viewModel.displayState),
-                    .claude(usageState: viewModel.claudeState),
-                ],
+        if settings.menuBarDisplayStyle.isGraphical {
+            MenuBarBarsView(
                 style: settings.menuBarDisplayStyle,
-                valueMode: settings.quotaValueMode
+                providers: MenuBarQuotaBars.providers(
+                    codexDisplayState: viewModel.displayState,
+                    claudeState: viewModel.claudeState
+                )
             )
-        )
+        } else {
+            MenuBarLabelView(
+                presentation: MenuBarLabelPresentation(
+                    displayState: viewModel.displayState,
+                    providerSummaries: [
+                        .codex(displayState: viewModel.displayState),
+                        .claude(usageState: viewModel.claudeState),
+                    ],
+                    style: settings.menuBarDisplayStyle,
+                    valueMode: settings.quotaValueMode
+                )
+            )
+        }
     }
 }

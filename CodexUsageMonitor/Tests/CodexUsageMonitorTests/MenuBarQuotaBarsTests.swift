@@ -75,6 +75,35 @@ final class MenuBarQuotaBarsTests: XCTestCase {
         XCTAssertNil(bars.freshness)
     }
 
+    // MARK: Accessibility
+
+    func testAccessibilityDescribesBothWindows() {
+        let bars = MenuBarQuotaBars(provider: .codex, fiveHourRemaining: 49, weeklyRemaining: 76, freshness: .confirmed)
+        XCTAssertEqual(bars.accessibilityDescription, "Codex: five-hour 49 percent remaining, weekly 76 percent remaining")
+    }
+
+    func testAccessibilitySpeaksUnavailableAndStaleness() {
+        let bars = MenuBarQuotaBars(provider: .claudeCode, fiveHourRemaining: nil, weeklyRemaining: 62, freshness: .cached)
+        XCTAssertEqual(bars.accessibilityDescription, "Claude: five-hour unavailable, weekly 62 percent remaining, cached")
+    }
+
+    // MARK: Rendering geometry (MenuBarBarMetrics.fillWidth)
+
+    func testFillWidthMapsRemainingToWidth() {
+        XCTAssertEqual(MenuBarBarMetrics.fillWidth(1.0), MenuBarBarMetrics.trackWidth)
+        XCTAssertEqual(MenuBarBarMetrics.fillWidth(0.5), MenuBarBarMetrics.trackWidth * 0.5, accuracy: 0.001)
+    }
+
+    func testFillWidthUnavailableAndZeroAreEmpty() {
+        XCTAssertEqual(MenuBarBarMetrics.fillWidth(nil), 0)
+        XCTAssertEqual(MenuBarBarMetrics.fillWidth(0), 0)
+    }
+
+    func testFillWidthFloorsAtMinimumVisibleFill() {
+        // 1% of 22pt = 0.22pt, which would be invisible; floor to the sliver.
+        XCTAssertEqual(MenuBarBarMetrics.fillWidth(0.01), MenuBarBarMetrics.minimumVisibleFill)
+    }
+
     // MARK: Ordering / list
 
     func testProvidersListIsCodexThenClaude() {

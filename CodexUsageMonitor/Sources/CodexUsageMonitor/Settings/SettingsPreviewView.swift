@@ -38,7 +38,8 @@ struct SettingsPreviewView: View {
             GeneralSettingsContextView(
                 settings: viewModel.settings,
                 status: viewModel.settingsStatus,
-                displayState: viewModel.displayState
+                displayState: viewModel.displayState,
+                claudeState: viewModel.claudeState
             )
         case .notifications:
             NotificationSettingsContextView(settings: viewModel.settings)
