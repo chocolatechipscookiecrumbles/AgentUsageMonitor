@@ -6,7 +6,12 @@ final class AppSettings: ObservableObject {
     private enum Key {
         static let alertsEnabled = "alertsEnabled"
         static let thresholdWarnings = "notification.thresholdWarnings"
+        /// Legacy global remaining-quota thresholds. Superseded by the
+        /// per-provider keys below; retained only as the migration source.
         static let enabledQuotaThresholds = "notification.enabledQuotaThresholds"
+        static func enabledQuotaThresholds(for provider: AgentProvider) -> String {
+            "notification.enabledQuotaThresholds.\(provider.rawValue)"
+        }
         static let forecastWarnings = "notification.forecastWarnings"
         static let resetCreditWarnings = "notification.resetCreditWarnings"
         static let resetWarnings = "notification.resetWarnings"
@@ -28,13 +33,10 @@ final class AppSettings: ObservableObject {
     @Published var selectedSettingsTab: SettingsTab = .notifications
     @Published private(set) var notificationAuthorizationState: NotificationAuthorizationState = .unknown
     @Published var alertsEnabled: Bool { didSet { defaults.set(alertsEnabled, forKey: Key.alertsEnabled) } }
-    @Published private(set) var enabledQuotaThresholds: Set<RemainingQuotaThreshold> {
-        didSet {
-            defaults.set(
-                enabledQuotaThresholds.map(\.rawValue).sorted(by: >),
-                forKey: Key.enabledQuotaThresholds
-            )
-        }
+    /// Remaining-quota thresholds per provider. Each supported agent owns its
+    /// own set so a user can, e.g., alert at 25% for Codex but 10% for Claude.
+    @Published private(set) var enabledQuotaThresholdsByProvider: [AgentProvider: Set<RemainingQuotaThreshold>] {
+        didSet { persistQuotaThresholds() }
     }
     @Published var forecastWarningsEnabled: Bool { didSet { defaults.set(forecastWarningsEnabled, forKey: Key.forecastWarnings) } }
     @Published var resetCreditWarningsEnabled: Bool { didSet { defaults.set(resetCreditWarningsEnabled, forKey: Key.resetCreditWarnings) } }
@@ -74,7 +76,7 @@ final class AppSettings: ObservableObject {
         if legacyClaudeSetupEvidence {
             defaults.set(true, forKey: Key.claudeSetupHistory)
         }
-        enabledQuotaThresholds = Self.quotaThresholds(defaults: defaults)
+        enabledQuotaThresholdsByProvider = Self.quotaThresholdsByProvider(defaults: defaults)
         forecastWarningsEnabled = Self.value(for: Key.forecastWarnings, defaults: defaults, defaultValue: true)
         resetCreditWarningsEnabled = Self.value(for: Key.resetCreditWarnings, defaults: defaults, defaultValue: true)
         resetWarningsEnabled = Self.value(for: Key.resetWarnings, defaults: defaults, defaultValue: true)
@@ -94,38 +96,72 @@ final class AppSettings: ObservableObject {
         keyboardShortcutsEnabled = Self.value(for: Key.keyboardShortcutsEnabled, defaults: defaults, defaultValue: true)
         selectedMenuProvider = defaults.string(forKey: Key.selectedMenuProvider)
             .flatMap(AgentProvider.init(rawValue:)) ?? .codex
-        if defaults.object(forKey: Key.enabledQuotaThresholds) == nil {
-            defaults.set(
-                enabledQuotaThresholds.map(\.rawValue).sorted(by: >),
-                forKey: Key.enabledQuotaThresholds
-            )
-        }
+        // Seed per-provider keys on first run / migration so the store is
+        // durable from the start.
+        persistQuotaThresholds()
     }
+
+    /// Providers that have remaining-quota windows and therefore threshold
+    /// alerts. Copilot has no personal quota, so it is excluded.
+    static let quotaThresholdProviders: [AgentProvider] = [.codex, .claudeCode]
 
     private static func value(for key: String, defaults: UserDefaults, defaultValue: Bool) -> Bool {
         defaults.object(forKey: key) == nil ? defaultValue : defaults.bool(forKey: key)
     }
 
-    private static func quotaThresholds(defaults: UserDefaults) -> Set<RemainingQuotaThreshold> {
-        if let rawValues = defaults.array(forKey: Key.enabledQuotaThresholds) {
-            return Set(rawValues.compactMap { value in
-                (value as? NSNumber).flatMap { RemainingQuotaThreshold(rawValue: $0.intValue) }
-            })
+    /// Loads each provider's thresholds, migrating any pre-existing global set
+    /// into every supported provider so an upgrade loses no user choice.
+    private static func quotaThresholdsByProvider(defaults: UserDefaults) -> [AgentProvider: Set<RemainingQuotaThreshold>] {
+        let legacyGlobal = legacyGlobalThresholds(defaults: defaults)
+        var result: [AgentProvider: Set<RemainingQuotaThreshold>] = [:]
+        for provider in quotaThresholdProviders {
+            if let stored = thresholds(forKey: Key.enabledQuotaThresholds(for: provider), defaults: defaults) {
+                result[provider] = stored
+            } else {
+                // First run for this provider key: inherit the migrated global set.
+                result[provider] = legacyGlobal
+            }
+        }
+        return result
+    }
+
+    private static func legacyGlobalThresholds(defaults: UserDefaults) -> Set<RemainingQuotaThreshold> {
+        if let stored = thresholds(forKey: Key.enabledQuotaThresholds, defaults: defaults) {
+            return stored
         }
         let legacyEnabled = value(for: Key.thresholdWarnings, defaults: defaults, defaultValue: true)
         return legacyEnabled ? Set(RemainingQuotaThreshold.allCases) : []
     }
 
-    func isQuotaThresholdEnabled(_ threshold: RemainingQuotaThreshold) -> Bool {
-        enabledQuotaThresholds.contains(threshold)
+    private static func thresholds(forKey key: String, defaults: UserDefaults) -> Set<RemainingQuotaThreshold>? {
+        guard let rawValues = defaults.array(forKey: key) else { return nil }
+        return Set(rawValues.compactMap { value in
+            (value as? NSNumber).flatMap { RemainingQuotaThreshold(rawValue: $0.intValue) }
+        })
     }
 
-    func setQuotaThreshold(_ threshold: RemainingQuotaThreshold, enabled: Bool) {
-        if enabled {
-            enabledQuotaThresholds.insert(threshold)
-        } else {
-            enabledQuotaThresholds.remove(threshold)
+    private func persistQuotaThresholds() {
+        for provider in Self.quotaThresholdProviders {
+            let thresholds = enabledQuotaThresholdsByProvider[provider] ?? []
+            defaults.set(
+                thresholds.map(\.rawValue).sorted(by: >),
+                forKey: Key.enabledQuotaThresholds(for: provider)
+            )
         }
+    }
+
+    func isQuotaThresholdEnabled(_ threshold: RemainingQuotaThreshold, for provider: AgentProvider) -> Bool {
+        enabledQuotaThresholdsByProvider[provider]?.contains(threshold) ?? false
+    }
+
+    func setQuotaThreshold(_ threshold: RemainingQuotaThreshold, enabled: Bool, for provider: AgentProvider) {
+        var thresholds = enabledQuotaThresholdsByProvider[provider] ?? []
+        if enabled {
+            thresholds.insert(threshold)
+        } else {
+            thresholds.remove(threshold)
+        }
+        enabledQuotaThresholdsByProvider[provider] = thresholds
     }
 
     func updateNotificationAuthorization(_ state: NotificationAuthorizationState) {

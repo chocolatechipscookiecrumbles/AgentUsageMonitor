@@ -91,7 +91,7 @@ final class QuotaNotifier {
     private func quotaAlerts(for window: QuotaWindow?, name: String) async {
         guard let window, let resetAt = window.resetAt else { return }
         for threshold in RemainingQuotaThreshold.allCases
-            where settings.isQuotaThresholdEnabled(threshold) && window.remainingPercent <= threshold.rawValue {
+            where settings.isQuotaThresholdEnabled(threshold, for: .codex) && window.remainingPercent <= threshold.rawValue {
             await deliverOnce(
                 key: "quota-\(name)-\(resetAt.timeIntervalSince1970)-\(threshold.rawValue)",
                 title: "Codex \(name) limit is low",

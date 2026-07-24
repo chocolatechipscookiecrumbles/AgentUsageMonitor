@@ -4,7 +4,11 @@ struct NotificationSettingsContextView: View {
     @ObservedObject var settings: AppSettings
 
     private var previewThreshold: RemainingQuotaThreshold? {
-        RemainingQuotaThreshold.allCases.first(where: settings.isQuotaThresholdEnabled)
+        RemainingQuotaThreshold.allCases.first { threshold in
+            AppSettings.quotaThresholdProviders.contains { provider in
+                settings.isQuotaThresholdEnabled(threshold, for: provider)
+            }
+        }
     }
 
     var body: some View {

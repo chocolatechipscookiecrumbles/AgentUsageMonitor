@@ -12,6 +12,9 @@ struct ClaudeAgentSettingsView: View {
     let connectionState: ClaudeConnectionState
     let usageState: ClaudeUsageState
     let valueMode: QuotaValueMode
+    let alertsEnabled: Bool
+    let isWarningThresholdEnabled: (RemainingQuotaThreshold) -> Bool
+    let setWarningThresholdEnabled: (RemainingQuotaThreshold, Bool) -> Void
     let connectWithCredentials: () -> Void
     let disconnect: () -> Void
     let refresh: () -> Void
@@ -90,13 +93,14 @@ struct ClaudeAgentSettingsView: View {
 
         forceCLISection
 
-        // No Usage Warnings section here, deliberately (decided 2026-07-23).
-        // Codex's chips write to a real threshold store and feed a notifier;
-        // Claude has neither yet, so the section could only render inert —
-        // vertical space on a page just compacted, in exchange for nothing the
-        // user can act on. Claude's chips arrive with the general
-        // notification-settings port, which brings the per-provider store with
-        // it, rather than as a Claude-specific stub now.
+        // Claude now has a real per-provider threshold store and notification
+        // delivery, so its Remaining Quota chips are live like Codex's.
+        AgentUsageWarningsSection(
+            provider: .claudeCode,
+            alertsEnabled: alertsEnabled,
+            isThresholdEnabled: isWarningThresholdEnabled,
+            setThresholdEnabled: setWarningThresholdEnabled
+        )
     }
 
     /// Tier 2 — deliberately separated from the free refresh above, with the
