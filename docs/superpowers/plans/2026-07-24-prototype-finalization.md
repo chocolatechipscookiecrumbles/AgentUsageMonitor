@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Follow `docs/development/evidence-rich-pull-requests.md` when preparing the PR.
 
-**Goal:** Bring the multi-provider (Codex + Claude) menu-bar app from working prototype to a finalizable state: a real README and app icon, a menu-bar readout that shows *both* providers' usage, real Connect/Disconnect for every agent, a first-run authentication state inside the popover for both agents, and per-agent quota-warning settings backed by real per-agent notification delivery.
+**Goal:** Bring the multi-provider (Codex + Claude) menu-bar app from working prototype to a finalizable state: a real README (modeled on prior art) and app icon, a standardized Connect/Disconnect for every agent, a first-run authentication state inside the popover for both agents, per-agent quota-warning settings backed by real per-agent notification delivery, and a consistent refresh cadence across all agents. (A both-providers menu-bar readout is planned but **skipped for now** by user direction.)
 
 **Architecture:** Each item is an independent vertical slice through the existing owners — `QuotaViewModel` (state), `QuotaMonitor`/`ClaudeUsageMonitor` (read cycles), `QuotaNotifier` (delivery), `AppSettings` (persistence), and the menu/Settings SwiftUI surfaces. No new global owner is introduced; the largest structural change is generalizing today's Codex-only notification path into a provider-scoped one.
 
@@ -43,17 +43,25 @@
 
 **Goal:** A repo-root `README.md` that lets a new reader understand what the app is, what it reads, how to build/run the signed app, and where the durable docs live.
 
+**Reference prior art (structure only, not copy):**
+- [steipete/CodexBar](https://github.com/steipete/CodexBar) — a macOS 14+ menu-bar usage monitor. Useful structural patterns: a one-line tagline ("Every AI coding limit, in your menu bar"); leads with concrete use cases before features; badges (release, macOS requirement, install methods); a "Why" problem statement; prominent install/first-run/CLI setup; a provider table linking to per-provider docs; a **privacy & permissions** section stated upfront; and a docs index (architecture/development/config).
+- [Javis603/token-monitor](https://github.com/Javis603/token-monitor) — a cross-platform token/usage monitor. Useful patterns: feature badges upfront; a provider capability **table** (token usage / limits detection / session detail); a **local-vs-sync architecture diagram**; per-platform install with code-signing notes; a build-from-source guide; and privacy-forward positioning ("prompts, responses, source code stay on your machine").
+
+Adopt the *shape* (tagline → why → install/build → provider/data-source table → privacy → docs index), sized to this app's actual, smaller provider set (Codex + Claude). Do not copy their text, and do not claim providers or features this app does not have.
+
 **Files:** Create `README.md`; cross-link `how-to.md`, `AGENTS.md`, `docs/product/planning-board.md`, `docs/development/evidence-rich-pull-requests.md`, `UsageProbe/README.md`.
 
-- [ ] **Step 1:** Draft the README: one-paragraph product statement (personal multi-provider usage monitor for Codex + Claude), supported providers and their data sources with the privacy boundary (Claude OAuth/statusLine/cache; no outbound content), a build/run section (`swift build`, `swift test`, `CodexUsageMonitor/Scripts/build-app.sh`), a feature tour (menu-bar readout, popover, Settings), and a "durable docs" index.
-- [ ] **Step 2:** State the personal, non-commercial scope and the Anthropic ToS caveat already recorded in the plans, so the README does not overclaim.
+- [ ] **Step 1:** Draft the README following the reference shape: tagline + one-paragraph product statement (personal multi-provider usage monitor for Codex + Claude); a provider/data-source table with the privacy boundary per provider (Claude OAuth/statusLine/cache; no outbound content; Codex app-server read); a build/run section (`swift build`, `swift test`, `CodexUsageMonitor/Scripts/build-app.sh`); a feature tour (menu-bar readout, popover, per-agent Settings, notifications); and a "durable docs" index.
+- [ ] **Step 2:** Include a compact architecture note (owners: `QuotaViewModel`, `QuotaMonitor`/`ClaudeUsageMonitor`, `QuotaNotifier`) in the token-monitor spirit, and state the personal, non-commercial scope + the Anthropic ToS caveat already recorded in the plans, so the README does not overclaim.
 - [ ] **Step 3:** Verify links resolve and no build/verification claim is asserted as observed unless it was run.
 
-## Workstream B — Multi-provider menu-bar readout
+## Workstream B — Multi-provider menu-bar readout — SKIPPED FOR NOW
+
+**Status (2026-07-24): deferred by user direction — "don't generate the menubar icons, skip that part for now."** Do not produce menu-bar icon/label samples or write Workstream B code in the current pass. The confirmed format decision below is preserved for when B resumes; the UI-drawing-samples step remains its entry gate. Nothing else in this plan depends on B.
 
 **Goal:** The menu-bar item shows usage for **both** connected providers at a glance — one glyph + percent per provider — while degrading cleanly to one provider or the unavailable label.
 
-**Decision (2026-07-24, confirmed):**
+**Decision (2026-07-24, confirmed — retained for resumption):**
 - Format is **glyph + percent pairs**, one pair per available provider (e.g. `<glyph> 82% · <glyph> 40%`), using the existing provider assets and honoring `QuotaValueMode` and the pause/cache markers.
 - Each provider contributes a **single "active window" percent**, not both windows: **default to the 5-hour window, fall back to the weekly window when there is no active 5-hour limit.** (Example: Codex with no active 5-hour limit shows its weekly figure; Claude shows its 5-hour figure.)
 - A **stacked per-provider** variant (both windows per provider) is also wanted, **but is gated on UI drawing samples** — produce mockups and get the user's visual choice before implementing either the pair or the stacked layout.
@@ -69,17 +77,19 @@
 - [ ] **Step 4:** Reconcile with the deferred status-marker plan (disconnected vs cached vs confirmed) so the multi-provider readout does not contradict it.
 - [ ] **Step 5:** Add deterministic presentation tests for two-provider, one-provider, mixed-availability, and all-unavailable cases. Signed-app visual acceptance for width/rendering.
 
-## Workstream C — Real Connect/Disconnect for every agent
+## Workstream C — Standardized Connect/Disconnect for every agent
 
-**Goal:** Both agent Settings pages expose working Connect and Disconnect actions with consistent copy and status, replacing the Codex disconnect stub.
+**Goal:** A **single, standardized Disconnect control** (shared component with consistent label, placement, confirmation, and disabled rules) used on every agent page, **wired per-provider** to each provider's own disconnect mechanism. Replaces the Codex disconnect stub and de-duplicates the two hand-rolled connection-action blocks.
 
-**Files:** `Settings/CodexAgentSettingsView.swift`, `Connection/CodexConnectionController.swift` (owner of Codex connection state), `Menu/QuotaViewModel.swift` (expose a `disconnectCodex` action), `Settings/ClaudeAgentSettingsView.swift` (consistency pass only).
+**Design (2026-07-24):** The disconnect button is the same reusable view for all agents — one visual/interaction contract. What differs per provider is only the injected action and the "what this touches" guidance, because each provider is connected differently (Codex via browser/CLI session; Claude via the Keychain credential read). The component takes a provider tint, a disconnect closure, an enabled/confirmation policy, and provider-specific guidance copy. Connect affordances stay provider-specific (Codex browser+CLI vs Claude Keychain) since those genuinely differ, but the **Disconnect** affordance is unified.
+
+**Files:** Create a shared `Settings/AgentDisconnectButton.swift` (standardized control); `Settings/CodexAgentSettingsView.swift` and `Settings/ClaudeAgentSettingsView.swift` (adopt it); `Connection/CodexConnectionController.swift` (owner of Codex connection state); `Menu/QuotaViewModel.swift` (expose `disconnectCodex`, mirroring `disconnectClaude`).
 
 - [ ] **Step 1 (decision — confirmed 2026-07-24):** Codex disconnect is **app-local only** — clear the app's cached Codex snapshot/connection and stop showing usage, leaving the Codex CLI session and stored credential untouched. This matches Claude's disconnect and the personal-build boundary.
-- [ ] **Step 2:** Implement the chosen `disconnectCodex` on the connection owner and expose it through `QuotaViewModel`, mirroring `disconnectClaude`. Add a deterministic state-transition test (connected → disconnected → reconnect).
-- [ ] **Step 3:** Replace the Codex `Button("Disconnect") {}` stub with the real action and accurate guidance copy (what it does and does not touch). Keep the disabled/enabled rules aligned with `signInDisabled`.
-- [ ] **Step 4:** Align Claude's Connect/Disconnect copy and status wording with Codex so both pages read as one system. No behavior change to Claude's working path beyond copy.
-- [ ] **Step 5:** Signed-app acceptance: connect, disconnect, reconnect on both pages; confirm the menu-bar readout and popover reflect each transition.
+- [ ] **Step 2:** Implement `disconnectCodex` on the connection owner and expose it through `QuotaViewModel`, mirroring `disconnectClaude`. Add a deterministic state-transition test (connected → disconnected → reconnect).
+- [ ] **Step 3:** Build the standardized `AgentDisconnectButton` (shared label, confirmation, disabled-while-signing-in rule, provider tint, injected action + guidance). Keep the shown-only-when-connected rule.
+- [ ] **Step 4:** Adopt `AgentDisconnectButton` on both agent pages — Codex wired to `disconnectCodex` (replacing the `Button("Disconnect") {}` stub), Claude wired to its existing `disconnect`. Align surrounding Connect/status copy so both pages read as one system.
+- [ ] **Step 5:** Signed-app acceptance: connect, disconnect, reconnect on both pages via the identical control; confirm the popover (and, once B resumes, the menu-bar readout) reflect each transition.
 
 ## Workstream D — Popover first-run authentication state
 
@@ -115,22 +125,42 @@
 - [ ] **Step 2:** Add the `AppIcon.appiconset` to the catalog and set `CFBundleIconName`/icon reference so AppKit loads it; ensure the menu-bar template glyph (status item) is unaffected.
 - [ ] **Step 3:** Build the signed app via `build-app.sh` and confirm the icon appears in Finder, the Dock (if shown), and the About box. Record observed vs not-run.
 
+## Workstream G — Refresh cadence consistency across all agents
+
+**Goal:** All agents share one refresh-cadence contract, so the user's Refresh Preferences (and the automatic adaptive behavior) apply consistently to every provider instead of only Codex.
+
+**Current inconsistency (grounded 2026-07-24):**
+- **Codex** (`Monitoring/QuotaMonitor.swift` + `Monitoring/RefreshSchedule.swift`) uses a rich, user-configurable cadence: `AppSettings.refreshMode` (Automatic / 90s / 2m / 5m / 10m) plus automatic burst/backoff logic (30s burst, 60s low-remaining/exhaustion/reset-verification, 300s normal, 600s idle, 5m failure backoff, 10m interruption backoff).
+- **Claude** (`Quota/ClaudeUsageMonitor.swift`) ignores all of that and polls on a **hardcoded `defaultPollInterval = 12 minutes`**. The user's Refresh Preferences never reach Claude, and its cadence does not adapt to low remaining quota or reset windows.
+- Result: two providers with divergent freshness behavior and one setting that only governs one of them.
+
+**Design intent:** Make `RefreshSchedule`/`RefreshMode` the shared cadence authority. Each provider monitor keeps ownership of its own read cycle but derives its next interval from the same schedule + the same user setting, so "Automatic" and the fixed modes mean the same thing everywhere. Preserve `ClaudeUsageMonitor` as the sole owner of Claude reads (do not add a second scheduler) and keep the accepted Claude source order (OAuth → statusLine → cache). Respect provider-specific floors where a provider's source is more expensive or rate-sensitive.
+
+**Files:** `Monitoring/RefreshSchedule.swift` (generalize/share), `Quota/ClaudeUsageMonitor.swift` (adopt the shared cadence instead of a fixed poll), `Monitoring/QuotaMonitor.swift` (unchanged behavior, shared source), `Settings/RefreshSettingsView.swift` + `Settings/RefreshSettingsContextView.swift` (copy: the setting now governs all agents), `Settings/AppSettings.swift` (only if a per-provider floor/override is needed); cadence tests.
+
+- [ ] **Step 1 (decision):** Confirm with the user whether the cadence setting is **one shared control for all agents** (recommended — simplest, matches the request) or **per-agent cadence**. Default: one shared `refreshMode` governing every provider, with sensible provider-specific minimum floors.
+- [ ] **Step 2:** Extract the schedule decision so it is provider-agnostic (input: mode, last record/availability, timing signals; output: interval + reason). Keep Codex behavior identical under test.
+- [ ] **Step 3:** Have `ClaudeUsageMonitor` derive its poll interval from the shared schedule + `refreshMode` (honoring a Claude minimum floor rather than a flat 12 minutes), replacing the hardcoded `defaultPollInterval` while remaining the single Claude read owner. Preserve immediate-refresh-on-launch and manual "Force a reading".
+- [ ] **Step 4:** Update Refresh Preferences copy to state it governs all agents; ensure the popover/Settings "Updated HH:MM" freshness reads consistently per provider.
+- [ ] **Step 5:** Tests: the same `refreshMode` yields the documented interval for both providers (with each provider's floor); automatic mode adapts identically; Codex regression suite unchanged. Signed-app acceptance that changing the setting visibly changes both providers' cadence (record observed/not-run honestly).
+
 ---
 
 ## Sequencing and dependencies
 
-1. **E (per-agent notifications)** and **C (disconnect)** touch the deepest owners (`AppSettings`, `QuotaNotifier`, connection controllers); land them as separate reviewable slices first.
-2. **B (menu readout)** and **D (popover first-run)** are presentation slices that can follow independently.
+1. **E (per-agent notifications)**, **C (standardized disconnect)**, and **G (refresh cadence)** touch the deepest owners (`AppSettings`, `QuotaNotifier`, `RefreshSchedule`, the monitors and connection controllers); land them as separate reviewable slices first. G and E both generalize a Codex-only mechanism to all providers, so doing G first can de-risk E's per-provider evaluation cadence.
+2. **D (popover first-run)** is a presentation slice that can follow independently. **B (menu readout) is skipped for now** by user direction.
 3. **A (README)** and **F (app icon)** are non-code/asset slices; do them last so the README describes the final behavior and the icon reflects the finished product.
 
 Prefer one focused PR per workstream (or per small group) over one omnibus PR, per the evidence-rich-PR guide.
 
 ## Decisions (resolved 2026-07-24)
 
-- **B — menu-bar format:** glyph + percent pairs, one per provider, each showing a single active window (5-hour default → weekly fallback). A stacked per-provider variant is also wanted. **Still open:** which layout ships — gated on UI drawing samples (Workstream B, Step 0). This is the one remaining blocker before any B code.
-- **C — Codex disconnect:** app-local only (leaves CLI session and credential untouched).
+- **B — menu-bar readout:** **skipped for now** by user direction ("don't generate the menubar icons, skip that part"). Format decision is retained for resumption (glyph + percent pairs, one active window per provider — 5-hour default → weekly fallback; stacked variant gated on UI samples), but no B work happens this pass.
+- **C — disconnect:** a **standardized disconnect button for all agents**, wired per-provider; Codex disconnect is **app-local only** (leaves CLI session and credential untouched).
 - **E/2b — Other Warnings:** stay global; only remaining-quota thresholds move per-agent.
 - **F — app icon:** user supplies the artwork; this workstream only wires it.
+- **G — refresh cadence:** unify cadence across agents so Refresh Preferences govern all providers (Claude currently ignores the setting and polls a fixed 12 min). **Open:** one shared cadence control vs per-agent cadence (Step 1) — default is one shared control with provider floors.
 
 ## Documentation and acceptance
 
