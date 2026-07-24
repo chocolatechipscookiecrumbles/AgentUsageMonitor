@@ -51,8 +51,8 @@ Adopt the *shape* (tagline → why → install/build → provider/data-source ta
 
 **Files:** Create `README.md`; cross-link `how-to.md`, `AGENTS.md`, `docs/product/planning-board.md`, `docs/development/evidence-rich-pull-requests.md`, `UsageProbe/README.md`.
 
-- [ ] **Step 1:** Draft the README following the reference shape: tagline + one-paragraph product statement (personal multi-provider usage monitor for Codex + Claude); a provider/data-source table with the privacy boundary per provider (Claude OAuth/statusLine/cache; no outbound content; Codex app-server read); a build/run section (`swift build`, `swift test`, `CodexUsageMonitor/Scripts/build-app.sh`); a feature tour (menu-bar readout, popover, per-agent Settings, notifications); and a "durable docs" index.
-- [ ] **Step 2:** Include a compact architecture note (owners: `QuotaViewModel`, `QuotaMonitor`/`ClaudeUsageMonitor`, `QuotaNotifier`) in the token-monitor spirit, and state the personal, non-commercial scope + the Anthropic ToS caveat already recorded in the plans, so the README does not overclaim.
+- [x] **Step 1 (done):** `README.md` created following the reference shape — tagline, product statement, a provider/data-source table with the per-provider privacy boundary, a build/run section (`swift build`, `swift test`, `Scripts/build-app.sh`), a feature tour, and a durable-docs index.
+- [x] **Step 2 (done):** Compact architecture note (owners `QuotaViewModel`, `QuotaMonitor`/`ClaudeUsageMonitor`, `QuotaNotifier`), plus an explicit personal, non-commercial scope and the Anthropic ToS caveat. All cross-links verified to resolve.
 - [ ] **Step 3:** Verify links resolve and no build/verification claim is asserted as observed unless it was run.
 
 ## Workstream B — Multi-provider menu-bar readout — SKIPPED FOR NOW
