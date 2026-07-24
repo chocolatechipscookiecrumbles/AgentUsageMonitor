@@ -1,14 +1,13 @@
 import SwiftUI
 
-/// Dimensions for the graphical menu-bar indicators. Width is deliberately tight
-/// (menu-bar real estate is scarce and shared with system + third-party items).
+/// Dimensions for the graphical menu-bar indicators.
 enum MenuBarBarMetrics {
     /// Total block width; also each bar's track width. Fixed so the menu-bar
     /// item never resizes as fills change on refresh.
-    static let trackWidth: CGFloat = 22
+    static let trackWidth: CGFloat = 40
 
     // Option 1 — stacked (four thin bars).
-    static let stackedBarHeight: CGFloat = 2
+    static let stackedBarHeight: CGFloat = 3
     static let stackedWithinPairSpacing: CGFloat = 1.5
     static let stackedCornerRadius: CGFloat = 1
 
@@ -35,8 +34,8 @@ enum MenuBarBarMetrics {
     }
 }
 
-/// Renders the `.stackedBars` / `.combinedBars` menu-bar modes from the pure
-/// `MenuBarQuotaBars` model. No text; a single combined accessibility label.
+/// Renders the graphical menu-bar modes from the pure `MenuBarQuotaBars`
+/// model. No text; a single combined accessibility label.
 struct MenuBarBarsView: View {
     let style: MenuBarDisplayStyle
     let providers: [MenuBarQuotaBars]
@@ -57,9 +56,9 @@ struct MenuBarBarsView: View {
     private func row(for provider: MenuBarQuotaBars) -> some View {
         let tint = provider.provider.settingsPresentationTint
         switch style {
-        case .stackedBars, .gaugeAndLowest, .fiveHourAndWeekly:
-            // gauge/text cases are unreachable here (the label view handles them)
-            // but keep the switch exhaustive; treat as stacked.
+        case .stackedBars, .fiveHourAndWeekly:
+            // the text case is unreachable here (the label view handles it) but
+            // keeps the switch exhaustive; treat as stacked.
             VStack(alignment: .leading, spacing: MenuBarBarMetrics.stackedWithinPairSpacing) {
                 bar(fill: provider.fiveHour, color: tint,
                     height: MenuBarBarMetrics.stackedBarHeight,

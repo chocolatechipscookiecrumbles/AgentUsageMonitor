@@ -1,7 +1,7 @@
 import Foundation
 
 /// Per-provider, two-window **remaining** data for the graphical menu-bar modes
-/// (`.stackedBars` / `.combinedBars`). Each window is either a normalized
+/// menu-bar styles. Each window is either a normalized
 /// remaining value in `0...1` or `unavailable`, so an absent reading is never
 /// drawn as an empty (0%) bar. This is the pure, testable core; the SwiftUI
 /// renderer maps it to bar widths.

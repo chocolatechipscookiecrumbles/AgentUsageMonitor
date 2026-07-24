@@ -14,13 +14,12 @@ struct MenuBarStatusLabel: View {
         if settings.menuBarDisplayStyle.isGraphical {
             barsLabel
         } else {
+            // The text mode ("5-hour and weekly") shows both windows for Codex
+            // via the single-provider presentation; the multi-provider glyph +
+            // single percentage was for the removed gauge mode.
             MenuBarLabelView(
                 presentation: MenuBarLabelPresentation(
                     displayState: viewModel.displayState,
-                    providerSummaries: [
-                        .codex(displayState: viewModel.displayState),
-                        .claude(usageState: viewModel.claudeState),
-                    ],
                     style: settings.menuBarDisplayStyle,
                     valueMode: settings.quotaValueMode
                 )

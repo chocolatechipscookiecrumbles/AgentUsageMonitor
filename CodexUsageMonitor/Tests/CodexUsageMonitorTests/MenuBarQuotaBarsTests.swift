@@ -100,7 +100,7 @@ final class MenuBarQuotaBarsTests: XCTestCase {
     }
 
     func testFillWidthFloorsAtMinimumVisibleFill() {
-        // 1% of 22pt = 0.22pt, which would be invisible; floor to the sliver.
+        // A 1% fill would be nearly invisible; floor it to the sliver.
         XCTAssertEqual(MenuBarBarMetrics.fillWidth(0.01), MenuBarBarMetrics.minimumVisibleFill)
     }
 

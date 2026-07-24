@@ -17,15 +17,15 @@ struct MenuBarLabelPresentation: Equatable, Sendable {
         let weeklyValue = quota?.weekly.map(valueMode.value(for:))
         let freshness = displayState.mode == .confirmedCompleted ? "confirmed" : "cached"
 
-        showsGauge = style == .gaugeAndLowest
+        showsGauge = false
         showsPauseMarker = displayState.mode == .cachedPaused
         providerAssetName = nil
 
         switch style {
         // The graphical bar modes render via `MenuBarQuotaBars`/`MenuBarBarsView`
-        // rather than this text presentation; they fall back to the gauge text
-        // if ever constructed as a label.
-        case .gaugeAndLowest, .stackedBars, .combinedBars:
+        // rather than this text presentation; they fall back to a lowest-value
+        // text if ever constructed as a label.
+        case .stackedBars, .combinedBars:
             let value = Self.gaugeValue(
                 fiveHour: fiveHourValue,
                 weekly: weeklyValue,
@@ -44,51 +44,6 @@ struct MenuBarLabelPresentation: Equatable, Sendable {
                 freshness,
             ].joined(separator: "; ")
         }
-    }
-
-    init(
-        displayState: QuotaDisplayState,
-        providerSummaries: [MenuProviderSummary],
-        style: MenuBarDisplayStyle,
-        valueMode: QuotaValueMode
-    ) {
-        let availableSummaries = providerSummaries.filter { $0.usedPercent != nil }
-
-        if availableSummaries.isEmpty
-            || (availableSummaries.count == 1 && availableSummaries[0].provider == .codex) {
-            self.init(displayState: displayState, style: style, valueMode: valueMode)
-            return
-        }
-
-        guard let summary = MenuProviderSummary.mostAtRisk(in: availableSummaries),
-              let value = summary.visiblePercent(for: valueMode),
-              let freshness = summary.freshness else {
-            self.init(displayState: displayState, style: style, valueMode: valueMode)
-            return
-        }
-
-        self.init(
-            text: "\(value)%",
-            showsGauge: false,
-            showsPauseMarker: !freshness.isConfirmed,
-            providerAssetName: summary.provider.settingsAssetName,
-            accessibilityLabel:
-                "\(summary.provider.title) quota, \(value) percent \(valueMode.accessibilityName), \(freshness.accessibilityName)"
-        )
-    }
-
-    private init(
-        text: String,
-        showsGauge: Bool,
-        showsPauseMarker: Bool,
-        providerAssetName: String?,
-        accessibilityLabel: String
-    ) {
-        self.text = text
-        self.showsGauge = showsGauge
-        self.showsPauseMarker = showsPauseMarker
-        self.providerAssetName = providerAssetName
-        self.accessibilityLabel = accessibilityLabel
     }
 
     private static func gaugeValue(

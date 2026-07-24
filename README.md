@@ -31,7 +31,9 @@ The app adds no new account, network login, or credential of its own.
 
 ## Features
 
-- **Menu-bar readout** of current usage with a reset countdown.
+- **Menu-bar readout** with text or 34-point graphical quota bars. The graphical
+  choices include per-provider stacked or combined windows and a two-bar
+  single-provider layout when exactly one provider is connected.
 - **Multi-provider popover** with Codex and Claude tabs — per-window usage bars,
   reset timing, cached-vs-confirmed freshness, and a first-run "connect to get
   started" state that reuses each provider's own sign-in.

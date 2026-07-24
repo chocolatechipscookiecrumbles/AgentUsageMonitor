@@ -1,11 +1,14 @@
 # Menu-Bar Graphical Indicators — Implementation Plan (for review)
 
-> **Status: PLAN ONLY — do not implement until approved.** This resumes Workstream B of the [prototype-finalization plan](2026-07-24-prototype-finalization.md) with the user-provided UI samples ("Two Parallel Stacked Bars" and "Overlayed Progress Bars"). Scope is strictly: add two graphical display modes to the existing menu-bar display selector and their renderers. A dedicated Settings destination for display modes is **deferred**.
+> **Status: IMPLEMENTED; signed-app visual acceptance remains.** This resumes Workstream B of the [prototype-finalization plan](2026-07-24-prototype-finalization.md) with the user-provided UI samples ("Two Parallel Stacked Bars" and "Overlayed Progress Bars"). A dedicated Settings destination for display modes is **deferred**.
+>
+> **Selector trimmed (2026-07-24, by user direction):** the menu-bar Style options are now **"5-hour and weekly"** (text), **"Bars"** (stacked), and **"Combined"** (default). The **Gauge** text mode and the experimental **Single Provider** bar mode were removed. The text "5-hour and weekly" mode now shows both windows for Codex again (it had been overridden by the removed gauge's multi-provider glyph + single-percentage behavior). Persisted values for the removed modes fall back to the new default (**Combined**).
 
 **Goal:** Add two new selectable menu-bar indicator modes that show, per provider, the **remaining** quota for the five-hour and weekly windows as bars (no text), reusing each provider's brand color.
 
 - **Option 1 — "Stacked bars":** four bars total. Each provider = one row of two thin stacked bars (5-hour on top, weekly below); Provider 1's pair above Provider 2's pair. Weekly is a lower-emphasis version of the same provider color.
 - **Option 2 — "Combined bars":** two bars total, one per provider. Within one track, the weekly fill is the lower-emphasis background and the five-hour fill is the higher-emphasis foreground; both start at the leading edge, each sized by its own remaining %. A deterministic layered treatment keeps the weekly layer visible even when 5-hour ≥ weekly.
+- **Option 3 — "Single Provider":** when exactly one provider is connected, show only that provider's two stacked bars (5-hour above weekly). With zero or two connected providers, retain the full provider layout rather than choosing a provider arbitrarily.
 
 All fills represent **remaining** quota and shrink right-to-left from a left anchor.
 
@@ -35,6 +38,7 @@ Add two cases to `MenuBarDisplayStyle`:
 | --- | --- | --- |
 | `.stackedBars` | `"stacked-bars"` | **Bars** *(open: "Stacked bars" / "Windows")* |
 | `.combinedBars` | `"combined-bars"` | **Combined** *(open: "Combined bars" / "Overlay")* |
+| `.singleProviderBars` | `"single-provider-bars"` | **Single Provider** |
 
 Persistence is unchanged: they ride the existing `menuBar.displayStyle` key. An unknown stored value already falls back to `.gaugeAndLowest`.
 
@@ -127,7 +131,7 @@ Manual validation (signed app, both appearances): full, medium, low, critical, m
 1. **Selector control:** switch "Style" to the dropdown **menu** picker (for now, until a dedicated page exists). ✅
 2. **Mode names:** **"Bars"** (stacked) and **"Combined"**. ✅
 3. **Option 2 layered treatment:** **inset foreground** 5-hour over full-height weekly, **and** differentiate by tint too (weekly lower-opacity, 5-hour solid) — so the two layers differ by both height and tint. ✅
-4. **Dimensions (tightened):** total block **width 22pt** (down from 26; menu-bar real estate is scarce). Option 1: bar height 2pt, within-pair gap 1.5pt, between-provider gap 3pt, radius 1pt (block height ≈ 14pt). Option 2: track height 6pt with a 3.5pt inset 5-hour bar, between-provider gap 3pt, radius 1.5pt (block height ≈ 15pt). Minimum visible fill 2pt. ✅
+4. **Dimensions (updated July 24):** total block **width 34pt**. Option 1 and Single Provider: bar height 2pt, within-pair gap 1.5pt, between-provider gap 3pt, radius 1pt. Option 2: track height 6pt with a 3.5pt inset 5-hour bar, between-provider gap 3pt, radius 1.5pt. Minimum visible fill 2pt. ✅
 5. **Stale/cached treatment:** opacity multiplier **0.5** on that provider's bars; no text/marker. (Default; adjustable.)
 6. **`unavailable` window treatment:** empty low-opacity track (~0.15 tint). ✅
 7. **"Show" (Used/Remaining):** leave as-is (governs text modes only); the bar modes are always remaining. A disable-when-bar-mode tweak is a small optional follow-up, not in scope.
@@ -138,10 +142,11 @@ Manual validation (signed app, both appearances): full, medium, low, critical, m
 1. [x] `MenuBarDisplayStyle` cases (`.stackedBars`/`.combinedBars`) + `isGraphical`; text presentation falls back to gauge (`ea334fe`).
 2. [x] `MenuBarQuotaBars` model + builders + unit tests (`ea334fe`).
 3. [x] `MenuBarBarsView` + `MenuBarBarMetrics` renderer (stacked + combined) + geometry tests (`46402e6`).
-4. [x] `MenuBarStatusLabel` branches on style; fixed 22pt width (`46402e6`).
+4. [x] `MenuBarStatusLabel` branches on style; fixed width, updated to 34pt in the July 24 follow-up (`46402e6` plus working-tree follow-up).
 5. [x] Accessibility description on the model + tests (`46402e6`).
 6. [x] Style picker → dropdown menu; preview renders bar modes with both providers (`46402e6`).
-7. [~] **Pending:** signed-app manual validation matrix (full/medium/low/critical/mixed/disconnected/single-provider, light+dark). Unobserved under the branch waiver until run. Reconcile board on acceptance.
+7. [~] **Pending:** the Developer ID signed app builds successfully and 272 tests pass, but the signed-app manual validation matrix (full/medium/low/critical/mixed/disconnected/single-provider, light+dark) remains. An existing user-owned app process was running during the July 24 follow-up, so it was left untouched and the new bundle was not launched for visual inspection. Reconcile the board on acceptance.
+8. [x] **July 24 follow-up:** extend graphical tracks from 22pt to 34pt and add the dedicated **Single Provider** style, which collapses to one 5-hour/weekly pair only when exactly one provider is connected.
 
 ## 6. Checkpoint — approval required before production implementation
 

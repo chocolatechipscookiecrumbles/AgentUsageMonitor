@@ -100,7 +100,7 @@ final class AppSettings: ObservableObject {
             refreshMode = storedRefreshMode.flatMap(RefreshMode.init(rawValue:)) ?? .twoMinutes
         }
         refreshOnWake = Self.value(for: Key.refreshOnWake, defaults: defaults, defaultValue: true)
-        menuBarDisplayStyle = defaults.string(forKey: Key.menuBarDisplayStyle).flatMap(MenuBarDisplayStyle.init(rawValue:)) ?? .gaugeAndLowest
+        menuBarDisplayStyle = defaults.string(forKey: Key.menuBarDisplayStyle).flatMap(MenuBarDisplayStyle.init(rawValue:)) ?? .combinedBars
         quotaValueMode = defaults.string(forKey: Key.quotaValueMode).flatMap(QuotaValueMode.init(rawValue:)) ?? .remaining
         appearancePreference = defaults.string(forKey: Key.appearancePreference).flatMap(AppearancePreference.init(rawValue:)) ?? .system
         keyboardShortcutsEnabled = Self.value(for: Key.keyboardShortcutsEnabled, defaults: defaults, defaultValue: true)

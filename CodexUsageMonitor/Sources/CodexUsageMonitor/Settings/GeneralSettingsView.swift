@@ -33,8 +33,8 @@ struct GeneralSettingsView: View {
             SettingsSection("Menu Bar Icon") {
                 SettingsSectionRow {
                     SettingsPreferenceControlRow("Style") {
-                        // A menu (dropdown) rather than a segmented control: four
-                        // options (two text, two graphical) no longer fit a
+                        // A menu (dropdown) rather than a segmented control:
+                        // text and graphical options no longer fit a
                         // segmented control at the compact width. A dedicated
                         // display-mode destination is deferred.
                         Picker("Style", selection: $settings.menuBarDisplayStyle) {
