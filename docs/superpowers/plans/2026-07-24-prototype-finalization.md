@@ -95,12 +95,14 @@ Adopt the *shape* (tagline → why → install/build → provider/data-source ta
 
 **Goal:** When a provider has never been set up, its popover tab shows a clear "authenticate to get started" state that reuses the existing sign-in affordances — Codex browser + CLI, Claude Keychain — distinct from the transient "connected, no snapshot yet" state.
 
-**Files:** `Menu/CodexUnavailableContent.swift`, `Menu/CodexSignInActions.swift`, `Menu/ClaudeUnavailableContent.swift`, `Menu/ClaudeCredentialActions.swift`, `Menu/CodexMenuContent.swift`, `Menu/ClaudeMenuContent.swift`, `Menu/MenuBarPopoverView.swift`; setup-state resolvers already in `QuotaViewModel`/`ClaudeUsageMonitor`.
+**Status (2026-07-24): already satisfied by the shipped popover — no new code needed.** Verified on inspection during finalization:
 
-- [ ] **Step 1:** Define the first-run condition per provider from existing setup state (Codex: `.disconnected`/never-signed-in; Claude: `ClaudeSetupState` first-run vs lapse — already distinguished). Do not treat a normal "not connected but passively capturable" Claude account as first-run.
-- [ ] **Step 2:** Render a first-run auth card on each tab that reuses `CodexSignInActions` (browser + CLI) and `ClaudeCredentialActions` (Keychain connect), with concise onboarding copy. Keep the existing unavailable/recovery cards for the non-first-run cases; do not show disabled sign-in buttons in the reachable "connected, no snapshot yet" state (already fixed for Codex — preserve it).
-- [ ] **Step 3:** Ensure the first-run action dismisses/opens correctly (browser/CLI flows) and that completing auth transitions the tab to normal content without a host resize (respect the shared content floor).
-- [ ] **Step 4:** Keep provider content bounded and non-scrolling. Add a presentation test for the first-run vs unavailable vs recovery decision per provider. Signed-app acceptance of both first-run flows.
+- `Menu/CodexMenuContent.swift` falls back to `CodexUnavailableContent` when there is no presentation; that card shows `CodexSignInActions` (browser + CLI) for `.disconnected`/`.missingCLI`/`.failed`, and **suppresses** them for `.connected` (points at Refresh Now instead).
+- `Menu/ClaudeMenuContent.swift` falls back to `ClaudeUnavailableContent` when no model is available; that card shows `ClaudeCredentialActions` ("Use Claude Code credentials…") for `.notConnected`/`.missingCLI`/`.failed`, and suppresses it for `.connected`. Passive capture (a merely-not-connected but readable account) is treated as normal, not first-run.
+- The C-workstream app-local disconnect flows straight through these: disconnecting a provider makes its usage unavailable, so the popover shows the same authenticate-to-reconnect card.
+- The "connected, no snapshot yet" distinction (Step 2's requirement) is already the `.connected` branch of both cards, which does not render disabled sign-in buttons.
+
+Remaining (unobserved under the branch waiver): signed-app acceptance that completing auth from the popover transitions the tab to normal content without a host resize. No source change is warranted; if a genuine first-run vs app-local-disconnect **copy** distinction is later desired (e.g. "disconnected" vs "isn't connected"), that is a small polish, not a structural gap.
 
 ## Workstream E — Per-agent quota warnings + real per-agent notifications
 
