@@ -164,7 +164,13 @@ final class QuotaViewModel: ObservableObject {
     func start() {
         connectionController.start()
         monitor.start()
-        claudeMonitor.start()
+        // Respect a persisted Claude disconnect: show disconnected without
+        // reading, rather than resuming passive capture.
+        if settings.claudeDisconnected {
+            claudeMonitor.disconnect()
+        } else {
+            claudeMonitor.start()
+        }
         Task { [weak self] in
             guard let self else { return }
             _ = await monitor.refreshNotificationAuthorization()
@@ -219,10 +225,16 @@ final class QuotaViewModel: ObservableObject {
     /// Explicit user action — the only path that may raise the Keychain
     /// prompt for Claude Code's credential.
     func connectClaudeWithCredentials() {
+        settings.claudeDisconnected = false
+        claudeMonitor.reconnect()
         claudeConnectionController.useClaudeCodeCredentials()
     }
 
+    /// App-local disconnect: hide Claude usage (including passive capture) and
+    /// reset the connection, leaving the Claude Code Keychain credential intact.
     func disconnectClaude() {
+        settings.claudeDisconnected = true
+        claudeMonitor.disconnect()
         claudeConnectionController.signOut()
     }
 

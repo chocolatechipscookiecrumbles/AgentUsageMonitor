@@ -59,7 +59,9 @@ struct CodexAgentSettingsView: View {
         case .signingIn(.cli):
             SettingsDescription("Finish signing in in the Terminal window.")
         case .connected:
-            SettingsDescription("Codex is connected. Account switching is not included in this phase.")
+            // The connected explanation renders below the Disconnect row (see
+            // connectionActions), like the other agent-page subtext.
+            EmptyView()
         case .failed(let failure):
             Text(failure.displayMessage)
                 .font(.callout)
@@ -97,6 +99,7 @@ struct CodexAgentSettingsView: View {
             SettingsPreferenceControlRow("Connected account") {
                 AgentDisconnectButton(provider: .codex, disconnect: disconnect)
             }
+            SettingsDescription("Codex is connected. Account switching is not included in this phase.")
         }
     }
 

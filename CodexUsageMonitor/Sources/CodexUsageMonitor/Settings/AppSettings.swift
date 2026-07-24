@@ -27,6 +27,7 @@ final class AppSettings: ObservableObject {
         static let claudeSetupHistory = "claude.hasSetupHistory"
         static let selectedMenuProvider = "menu.selectedProvider"
         static let codexDisconnected = "codex.disconnected"
+        static let claudeDisconnected = "claude.disconnected"
     }
 
     private let defaults: UserDefaults
@@ -60,6 +61,10 @@ final class AppSettings: ObservableObject {
     /// Codex CLI session. Persisted so the disconnect survives relaunch and the
     /// app does not auto-reconnect from the still-valid CLI credential.
     @Published var codexDisconnected: Bool { didSet { defaults.set(codexDisconnected, forKey: Key.codexDisconnected) } }
+    /// App-local Claude disconnect: hide Claude usage (passive capture included)
+    /// without touching the Claude Code Keychain credential. Persisted so the
+    /// disconnect survives relaunch.
+    @Published var claudeDisconnected: Bool { didSet { defaults.set(claudeDisconnected, forKey: Key.claudeDisconnected) } }
     /// Whether the user has acknowledged that the CLI usage probe costs
     /// tokens. Gates the confirmation prompt so it appears on first use, not
     /// on every press.
@@ -102,6 +107,7 @@ final class AppSettings: ObservableObject {
         selectedMenuProvider = defaults.string(forKey: Key.selectedMenuProvider)
             .flatMap(AgentProvider.init(rawValue:)) ?? .codex
         codexDisconnected = defaults.bool(forKey: Key.codexDisconnected)
+        claudeDisconnected = defaults.bool(forKey: Key.claudeDisconnected)
         // Seed per-provider keys on first run / migration so the store is
         // durable from the start.
         persistQuotaThresholds()

@@ -21,6 +21,13 @@ final class ClaudeUsageMonitor: ObservableObject {
     @Published private(set) var hasCompletedInitialRefresh = false
     @Published private(set) var isRefreshing = false
 
+    /// App-local disconnect: while set, the monitor stops reading and publishes
+    /// an explicit disconnected state, so passive capture does not keep showing
+    /// Claude usage after the user disconnects. The Keychain credential itself
+    /// is never touched.
+    static let disconnectedReason = "Claude is disconnected. Reconnect to show usage."
+    private var isDisconnected = false
+
     private let collector: ClaudeUsageCollecting
     /// Evaluated before each scheduled poll so a live change to the shared
     /// Refresh Preferences takes effect without restarting the monitor.
@@ -60,6 +67,7 @@ final class ClaudeUsageMonitor: ObservableObject {
     /// Refreshes once immediately so callers see a state without waiting a
     /// full interval, then re-refreshes on the configured cadence.
     func start() {
+        guard !isDisconnected else { return }
         guard pollTask == nil else { return }
         pollTask = Task { [weak self] in
             guard let self else { return }
@@ -80,9 +88,26 @@ final class ClaudeUsageMonitor: ObservableObject {
         pollTask = nil
     }
 
+    /// App-local disconnect: stop reading and show the disconnected state
+    /// without touching the Keychain credential.
+    func disconnect() {
+        isDisconnected = true
+        stop()
+        state = .unavailable(reason: Self.disconnectedReason)
+        hasCompletedInitialRefresh = true
+    }
+
+    /// Clears the disconnect and resumes passive capture.
+    func reconnect() {
+        guard isDisconnected else { return }
+        isDisconnected = false
+        start()
+    }
+
     /// The reason is load-bearing: it decides whether the Keychain read is
     /// allowed to prompt (only `.userInitiated` is).
     func refreshNow(reason: ClaudeRefreshReason) async {
+        guard !isDisconnected else { return }
         guard !isRefreshing else { return }
         isRefreshing = true
         defer { isRefreshing = false }
@@ -96,6 +121,7 @@ final class ClaudeUsageMonitor: ObservableObject {
     /// user-initiated CLI probe. Marked `.live` because the user just paid
     /// tokens for a fresh reading.
     func applyManualSnapshot(_ snapshot: ClaudeUsageSnapshot) {
+        guard !isDisconnected else { return }
         state = Self.mapState(
             ClaudeUsagePresentation(snapshot: snapshot, delivery: .live, warnings: [])
         )

@@ -198,6 +198,43 @@ final class ClaudeUsageMonitorTests: XCTestCase {
         XCTAssertEqual(collector.seenReasons.count, countAfterStop, "no polling after stop")
     }
 
+    /// App-local disconnect must hide passive-capture usage: publish the
+    /// disconnected state and refuse to read until reconnected.
+    func testDisconnectPublishesUnavailableAndSuppressesRefresh() async {
+        let collector = FakeCollector(presentation(delivery: .live))
+        let monitor = ClaudeUsageMonitor(collector: collector)
+
+        monitor.disconnect()
+
+        guard case .unavailable(let reason) = monitor.state else {
+            return XCTFail("expected .unavailable after disconnect")
+        }
+        XCTAssertEqual(reason, ClaudeUsageMonitor.disconnectedReason)
+
+        await monitor.refreshNow(reason: .userInitiated)
+        XCTAssertTrue(collector.seenReasons.isEmpty, "a disconnected monitor must not read the collector")
+        guard case .unavailable = monitor.state else {
+            return XCTFail("state must stay unavailable while disconnected")
+        }
+    }
+
+    func testReconnectResumesReading() async {
+        let collector = FakeCollector(presentation(delivery: .live))
+        let monitor = ClaudeUsageMonitor(collector: collector)
+        monitor.disconnect()
+
+        monitor.reconnect()
+        for _ in 0..<500 where collector.seenReasons.isEmpty {
+            await Task.yield()
+        }
+        monitor.stop()
+
+        XCTAssertFalse(collector.seenReasons.isEmpty, "reconnect must resume passive capture")
+        guard case .available = monitor.state else {
+            return XCTFail("expected .available after reconnect")
+        }
+    }
+
     /// The cadence is network-appropriate now that a refresh can reach OAuth —
     /// the previous 30s local-file poll would mean an API call every 30s.
     func testDefaultPollIntervalIsNetworkAppropriate() {
