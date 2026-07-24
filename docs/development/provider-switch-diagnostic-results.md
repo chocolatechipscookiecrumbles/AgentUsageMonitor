@@ -143,9 +143,11 @@ high-confidence hypothesis rather than a completed root-cause finding.
    - Prediction matched: selection and content traces are immediate while
      captured frames contain displaced/duplicated hierarchy fragments.
 2. **`SettingsPage` scroll-host replacement amplifies the compositor defect**
-   - Medium confidence.
-   - Each provider branch constructs a new `SettingsPage` and `ScrollView`.
-     Stable-child retention or a native selection container can falsify this.
+   - Falsified by a closer source-boundary review.
+   - `AgentsSettingsView` owns one `AgentSettingsPageTemplate` and one
+     `SettingsPage`; only the provider content inside that stable scroll host is
+     replaced. The remaining geometry variable is the switched content's
+     document-height envelope inside the scroll host.
 3. **Hit testing or main-actor delay**
    - Low confidence after the trace.
 
@@ -166,19 +168,12 @@ high-confidence hypothesis rather than a completed root-cause finding.
 Do not select production code from this list until the user checkpoint is
 accepted.
 
-1. Settings: retain the current fitting tab strip and compare only the content
-   container, in this order:
-   - native `TabView(selection:)`;
-   - stable host retaining both provider children;
-   - AppKit `NSTabViewController` adapter only if both SwiftUI variants remain
-     red.
-2. Menu:
-   - first equalize the two provider content height envelopes while preserving
-     the existing switch, to isolate host resize from subtree replacement;
-   - then compare native `TabView(selection:)`;
-   - then a stable retained-child host;
-   - use an AppKit child-controller host only if the SwiftUI variants remain
-     red.
+1. Settings Agents: retain the current fitting tab strip, shared
+   `SettingsPage`, and vertical scrolling. First give only the provider-content
+   envelope a viewport-filling minimum height; if that remains red, revert it
+   before comparing a retained-child or native/AppKit selection container.
+2. Menu: the first equal-height prototype was accepted; do not stack another
+   container experiment on it.
 3. Rebuild the signed app and replay the exact minimal loop after each isolated
    prototype. Revert each losing prototype before testing the next.
 4. Do not use destination/provider `.id`, disabled-animation transactions,
@@ -186,8 +181,63 @@ accepted.
 
 ## Current limitation
 
-The Settings defect is red-capable and ready for controlled prototypes. The
-menu event/selection/resize loop is deterministic, but final proof that the
-reported menu artifact aligns with the resize still needs a user-operated
-recording or another capture path that reliably includes the tracked
-`MenuBarExtra` panel.
+Global Settings destination switching is a separate deferred boundary. The
+Settings Agents defect itself is resolved (see the resolution note below).
+
+## Accepted menu result and deferred scope
+
+The first menu prototype added a 207-point minimum height to the shared
+provider-content slot, outside the enum switch. In a signed diagnostic build:
+
+- the host produced one initial `340 × 446` frame and no resize event during
+  20 alternating provider switches;
+- all 20 button actions produced immediate selection and content events;
+- the popover remained 340 points wide and non-scrolling;
+- direct screenshots showed no clipping; the shorter Codex passive state
+  intentionally leaves unused space above the footer.
+
+The user visually accepted this tradeoff and confirmed that both the stuck
+switch behavior and duplicated/displaced content were gone. This establishes
+stable intrinsic host geometry as the menu root cause and winning fix.
+
+A subsequent live-data screenshot showed that the original 207-point floor was
+only sufficient for passive states. Confirmed Codex content and cached Claude
+content extended beyond the proposed slot while the footer was laid out after
+the 207-point envelope, producing visible overlap. The follow-up prototype:
+
+- raises the shared normal-state floor to 288 points, covering the taller
+  measured cached Claude state;
+- makes provider content report its natural vertical size so exceptional
+  longer states grow instead of drawing beneath the footer;
+- leaves the 340-point width, non-scrolling behavior, selection model, and tab
+  hit-testing code unchanged.
+
+## Resolution — 2026-07-24
+
+The provider-switch instability is **fixed and visually confirmed** on both
+surfaces:
+
+- **Menu popover:** the shared 288-point content floor (with provider content
+  reporting its natural vertical size so longer states grow instead of drawing
+  beneath the footer) is accepted. The stuck switch and duplicated/displaced
+  content are gone.
+- **Settings Agents:** the viewport-filling provider-content envelope inside the
+  shared `SettingsPage` is accepted; Codex/Claude pointer and keyboard switching
+  no longer produces duplicated/displaced frames, and scrolling, focus, and
+  accessibility are preserved.
+
+Stable intrinsic host geometry is the confirmed root cause and fix for both.
+
+The separately tracked too-small provider-tab **hit area** was then corrected
+under [its own plan](../superpowers/plans/2026-07-24-provider-tab-hit-area.md):
+`MenuProviderTabStrip` moves its fill frame and `contentShape` inside the button
+label, and `AgentSettingsTabStrip` adds `.contentShape(.rect)` to its fixed-size
+label. That is a hit-testing change only and does not touch the accepted
+geometry above.
+
+By user direction, the following work remains deferred:
+
+- the global Settings destination-switch compositor defect.
+
+The remaining open visual track is the menu-popover corner artifact, which keeps
+its own diagnosis plan and has no claimed fix.

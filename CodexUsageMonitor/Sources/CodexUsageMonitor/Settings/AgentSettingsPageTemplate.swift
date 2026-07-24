@@ -12,7 +12,7 @@ struct AgentSettingsPageTemplate<Content: View>: View {
     }
 
     var body: some View {
-        SettingsPage {
+        SettingsPage(fillsViewport: true) {
             content
         }
     }

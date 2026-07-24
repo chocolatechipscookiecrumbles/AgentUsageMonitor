@@ -8,6 +8,8 @@
 
 **Tech Stack:** Swift 6.2, SwiftUI for macOS 14+, AppKit window notifications, `OSLog`, XCTest where a deterministic nonvisual seam exists, Swift Package Manager, and the signed `.app`.
 
+**Resolution — 2026-07-24:** This diagnosis is complete. The instability is fixed and visually confirmed on both surfaces via stable intrinsic host geometry (menu: shared 288-point content floor; Settings: viewport-filling provider-content envelope). The separately tracked too-small tab hit area is fixed under [the hit-area plan](2026-07-24-provider-tab-hit-area.md). The argument-gated diagnostic scaffolding this plan introduced (`ProviderSwitchTrace`, `ProviderSwitchWindowProbe`, the `--provider-switch-diagnostic` launch gate, and every `record(…)` call site) has been **removed** now that the cause is established. See [provider-switch diagnostic results](../development/provider-switch-diagnostic-results.md#resolution--2026-07-24). Only the global Settings destination-switch defect remains deferred.
+
 ## Global Constraints
 
 - Work on `feature/multiprovider-menubar-popover` in its existing linked worktree; do not push before explicit approval.
@@ -500,20 +502,27 @@ Use this evidence mapping:
 5. **Settings `ViewThatFits` branch replacement**
    - Prediction: only Settings reproduces near the fit threshold; forcing the fitting branch or overflow branch removes it.
 
-- [ ] **Step 2: Show the ranked list and trace evidence to the user.**
+- [x] **Step 2: Show the ranked list and trace evidence to the user.**
 
 Do not select a production fix before this checkpoint. Record any user evidence that changes the order.
+
+**Checkpoint update — 2026-07-24:** The user accepted the menu's first
+equal-height prototype after visually confirming that both the stuck switch and
+duplicated/displaced content were gone. The signed trace held one `340 × 446`
+host frame across 20 switches. The user then narrowed active implementation to
+Settings Agents only; global Settings destination switching and larger menu tab
+hit areas are documented as deferred.
 
 - [ ] **Step 3: Test one variable at a time.**
 
 For Settings, compare these temporary prototypes against the same red loop:
 
 1. existing `ViewThatFits` baseline;
-2. fitting `HStack` only;
-3. horizontal `ScrollView` only;
+2. a viewport-filling minimum envelope around the provider content inside the
+   existing shared `SettingsPage`;
+3. stable host retaining both provider children;
 4. native `TabView(selection:)` using `AgentProvider` values;
-5. stable host retaining both provider children;
-6. `NSTabViewController` adapter.
+5. `NSTabViewController` adapter.
 
 For the menu, compare:
 

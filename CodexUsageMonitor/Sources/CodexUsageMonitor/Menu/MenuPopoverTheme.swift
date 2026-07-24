@@ -31,6 +31,7 @@ struct MenuPopoverTheme {
     static let headerTextSpacing: CGFloat = 2
     static let contentHorizontalPadding: CGFloat = 16
     static let contentBottomPadding: CGFloat = 12
+    static let providerContentMinimumHeight: CGFloat = 288
     static let contentPlaceholderHeight: CGFloat = 72
     static let contentSpacing: CGFloat = 12
     static let cardHorizontalPadding: CGFloat = 16

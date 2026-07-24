@@ -75,6 +75,21 @@ When changing Settings rows, cards, or dividers:
 - The recorded Settings destination-switch defect can transiently duplicate and displace text across the whole window. The tested detail-subtree identity and disabled-animation transaction workarounds did not correct it and are prohibited as fixes. Defer further changes until a dedicated prototype can compare the existing branch switch, a native selection container, and an AppKit-hosted alternative with signed-app frame capture.
 - Before accepting a shared geometry change, inspect General and Notifications side by side at the default size with the Context Rail both hidden and visible. Check for empty regions, normal scrolling, equal card gutters, compact one-item cards, wrapped descriptions that do not run under controls, and fixed controls contained inside the page.
 
+## SwiftUI selection-host geometry guardrails
+
+The July 24 provider-switch audit found that replacing one enum-selected SwiftUI subtree with another while its presentation host also changes geometry can leave transient duplicated/displaced content and temporarily stale hit testing. In the menu-bar popover, Codex and Claude differed by 64 points in passive state; giving the shared provider-content slot a common minimum height removed that resize. The user then confirmed that both the stuck switch and duplicated/displaced content were gone. A later live-data check exposed a second boundary: the slot must also report its natural vertical size and its common floor must cover the tallest verified normal live state, otherwise larger card stacks draw beyond the proposed slot and underneath the footer.
+
+When a custom tab or segmented selector swaps substantial SwiftUI subtrees:
+
+- Keep the selector and its content inside one stable outer presentation host. Do not put selection identity on the window, presentation root, or full detail subtree.
+- Measure passive, confirmed, cached, unavailable, and relevant recovery geometry in the signed app. If an intrinsic-size host changes during selection, stabilize a shared content slot to the largest verified normal-state envelope while still allowing genuinely larger content to report its natural height and grow.
+- Apply the stable envelope outside the enum switch so both branches negotiate through the same slot. Do not duplicate height constants in individual provider pages.
+- Preserve the surface's intended overflow behavior. The menu popover remains 340 points wide and non-scrolling; Settings pages retain their shared vertical `ScrollView` and may grow beyond the viewport.
+- Treat larger click targets as a separate hit-testing change. Put the expanded frame and `contentShape` inside the `Button` label so the button owns the full visual tab region. This rule is now satisfied in both selectors: `MenuProviderTabStrip` carries its fill frame and `contentShape` inside the button label (each equal-width column is the target), and `AgentSettingsTabStrip` adds `.contentShape(.rect)` to its fixed-size label (the full 132×52 tab is the target). Applying frame/`contentShape` *outside* a `.plain` button leaves only the label glyphs hit-testable — that was the prior defect.
+- Re-run pointer and keyboard switching in the signed app after each isolated container change. Automated state tests cannot prove private SwiftUI/AppKit compositing behavior.
+
+The global Settings destination-switch defect is still deferred. Do not infer that the accepted menu fix or an Agents-only content envelope repairs `SettingsDetailView`; verify that boundary independently before changing it.
+
 ## Settings appearance-transition guardrails
 
 The July 15 appearance audit found that changing a live Settings root from `.preferredColorScheme(.light)` to `.preferredColorScheme(nil)` does not reliably clear SwiftUI's presentation-level override. The picker persists **System** and AppKit chrome follows Dark, while the hosted SwiftUI content can remain Light, producing a mixed window with dark outlines/title bar and light page/card bodies.
