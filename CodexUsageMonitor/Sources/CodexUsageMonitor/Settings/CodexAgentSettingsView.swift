@@ -94,7 +94,9 @@ struct CodexAgentSettingsView: View {
             Button("Check again", action: checkConnection)
         }
         if case .connected = connectionState {
-            AgentDisconnectButton(provider: .codex, disconnect: disconnect)
+            SettingsPreferenceControlRow("Connected account") {
+                AgentDisconnectButton(provider: .codex, disconnect: disconnect)
+            }
         }
     }
 

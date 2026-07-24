@@ -173,12 +173,12 @@ struct ClaudeAgentSettingsView: View {
                 Button("Connect", action: connectWithCredentials)
                     .disabled(isSigningIn)
             }
+            // The Always Allow / Allow explanation belongs before connecting,
+            // so the user understands the Keychain prompt they will approve.
+            SettingsDescription(ClaudeSignInPresentation.keychainPromptExplanation)
         }
         if case .connected = connectionState {
-            SettingsPreferenceControlRow(
-                "Connected account",
-                description: ClaudeSignInPresentation.keychainPromptExplanation
-            ) {
+            SettingsPreferenceControlRow("Connected account") {
                 AgentDisconnectButton(provider: .claudeCode, disconnect: disconnect)
             }
         }
