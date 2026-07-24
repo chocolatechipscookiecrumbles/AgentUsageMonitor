@@ -52,6 +52,9 @@ struct AgentSettingsTabStrip: View {
                                 .accessibilityHidden(true)
                         }
                     }
+                    // The whole fixed tab rectangle is the hit target, not just
+                    // the icon and text glyphs, so the tab is easy to click.
+                    .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(entry.provider.title)

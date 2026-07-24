@@ -29,11 +29,20 @@ struct CodexUsageMonitorApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra {
-            QuotaMenuView(viewModel: viewModel)
+        MenuBarExtra(isInserted: .constant(MenuPopoverViabilityGate.isEnabled)) {
+            WindowPopoverGateView()
         } label: {
             MenuBarStatusLabel(viewModel: viewModel)
         }
+        .menuBarExtraStyle(.window)
+
+        MenuBarExtra(isInserted: .constant(!MenuPopoverViabilityGate.isEnabled)) {
+            MenuBarPopoverView(viewModel: viewModel)
+        } label: {
+            MenuBarStatusLabel(viewModel: viewModel)
+        }
+        .menuBarExtraStyle(.window)
+
         Settings {
             SettingsView(viewModel: viewModel)
         }

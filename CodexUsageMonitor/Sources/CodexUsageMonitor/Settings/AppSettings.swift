@@ -20,6 +20,7 @@ final class AppSettings: ObservableObject {
         static let keyboardShortcutsEnabled = "general.keyboardShortcutsEnabled"
         static let claudeCLIProbeConsented = "claude.cliProbeConsented"
         static let claudeSetupHistory = "claude.hasSetupHistory"
+        static let selectedMenuProvider = "menu.selectedProvider"
     }
 
     private let defaults: UserDefaults
@@ -46,6 +47,12 @@ final class AppSettings: ObservableObject {
     @Published var quotaValueMode: QuotaValueMode { didSet { defaults.set(quotaValueMode.rawValue, forKey: Key.quotaValueMode) } }
     @Published var appearancePreference: AppearancePreference { didSet { defaults.set(appearancePreference.rawValue, forKey: Key.appearancePreference) } }
     @Published var keyboardShortcutsEnabled: Bool { didSet { defaults.set(keyboardShortcutsEnabled, forKey: Key.keyboardShortcutsEnabled) } }
+    /// The menu-bar popover tab the user last viewed. Stored raw; whether it is
+    /// still a *supported* provider is resolved at the point of use
+    /// (`MenuPopoverProviderCatalog.resolvedSelection`), so a supported provider
+    /// with no current snapshot stays selected while an unsupported one falls
+    /// back to Codex.
+    @Published var selectedMenuProvider: AgentProvider { didSet { defaults.set(selectedMenuProvider.rawValue, forKey: Key.selectedMenuProvider) } }
     /// Whether the user has acknowledged that the CLI usage probe costs
     /// tokens. Gates the confirmation prompt so it appears on first use, not
     /// on every press.
@@ -85,6 +92,8 @@ final class AppSettings: ObservableObject {
         quotaValueMode = defaults.string(forKey: Key.quotaValueMode).flatMap(QuotaValueMode.init(rawValue:)) ?? .remaining
         appearancePreference = defaults.string(forKey: Key.appearancePreference).flatMap(AppearancePreference.init(rawValue:)) ?? .system
         keyboardShortcutsEnabled = Self.value(for: Key.keyboardShortcutsEnabled, defaults: defaults, defaultValue: true)
+        selectedMenuProvider = defaults.string(forKey: Key.selectedMenuProvider)
+            .flatMap(AgentProvider.init(rawValue:)) ?? .codex
         if defaults.object(forKey: Key.enabledQuotaThresholds) == nil {
             defaults.set(
                 enabledQuotaThresholds.map(\.rawValue).sorted(by: >),

@@ -13,11 +13,9 @@ final class QuotaViewModel: ObservableObject {
     @Published private(set) var isRefreshing = false
     @Published private(set) var alertsEnabled = false
     @Published private(set) var notificationAuthorizationState: NotificationAuthorizationState = .unknown
-    @Published private(set) var nextRefreshAt: Date?
     @Published private(set) var effectiveRefreshInterval: TimeInterval?
     @Published private(set) var refreshScheduleReason: RefreshScheduleReason?
     @Published private(set) var connectionState: AgentConnectionState = .checking
-    @Published private(set) var refreshTimingPresentation: MenuRefreshTimingPresentation
     /// Claude's read cycle, owned here the same way Codex's QuotaMonitor is.
     @Published private(set) var claudeState: ClaudeUsageState = .unavailable(reason: ClaudeUsageState.notConnectedReason)
     @Published private(set) var claudeConnectionState: ClaudeConnectionState = .notConnected
@@ -25,6 +23,7 @@ final class QuotaViewModel: ObservableObject {
     /// the user paid tokens for.
     @Published private(set) var claudeCLIProbeError: String?
     @Published private(set) var isRunningClaudeCLIProbe = false
+    @Published private(set) var isRefreshingClaude = false
     @Published private(set) var claudeSetupState: ClaudeSetupState
 
     let settings: AppSettings
@@ -70,11 +69,6 @@ final class QuotaViewModel: ObservableObject {
             }
         )
         displayState = monitor.displayState
-        refreshTimingPresentation = MenuRefreshTimingPresentation(
-            lastRefreshAt: monitor.displayState.lastAttemptAt,
-            refreshState: .idle,
-            nextRefreshAt: nil,
-        )
         alertsEnabled = settings.alertsEnabled
         monitor.$displayState.sink { [weak self] state in
             self?.displayState = state
@@ -83,20 +77,14 @@ final class QuotaViewModel: ObservableObject {
                 ?? QuotaPresentation.unavailable("No confirmed Codex quota result is available yet.")
             self?.fiveHourForecast = displayedRecord?.fiveHourForecast
             self?.weeklyForecast = displayedRecord?.weeklyForecast
-            self?.updateRefreshTimingPresentation()
         }.store(in: &subscriptions)
         monitor.$refreshState.sink { [weak self] state in
             self?.refreshState = state
             if case .refreshing = state { self?.isRefreshing = true } else { self?.isRefreshing = false }
             if case .failed = state { self?.connectionController.recheckConnection() }
-            self?.updateRefreshTimingPresentation()
         }.store(in: &subscriptions)
         monitor.$diagnosticSummary.sink { [weak self] summary in
             self?.diagnosticSummary = summary
-        }.store(in: &subscriptions)
-        monitor.$nextRefreshAt.sink { [weak self] nextRefreshAt in
-            self?.nextRefreshAt = nextRefreshAt
-            self?.updateRefreshTimingPresentation()
         }.store(in: &subscriptions)
         monitor.$effectiveRefreshInterval.sink { [weak self] in self?.effectiveRefreshInterval = $0 }.store(in: &subscriptions)
         monitor.$refreshScheduleReason.sink { [weak self] in self?.refreshScheduleReason = $0 }.store(in: &subscriptions)
@@ -116,6 +104,9 @@ final class QuotaViewModel: ObservableObject {
         claudeMonitor.$hasCompletedInitialRefresh.removeDuplicates().sink { [weak self] _ in
             self?.updateClaudeSetupState()
         }.store(in: &subscriptions)
+        claudeMonitor.$isRefreshing.removeDuplicates().sink { [weak self] isRefreshing in
+            self?.isRefreshingClaude = isRefreshing
+        }.store(in: &subscriptions)
         claudeConnectionController.$state.removeDuplicates().sink { [weak self] state in
             self?.claudeConnectionState = state
             self?.updateClaudeSetupState()
@@ -123,10 +114,15 @@ final class QuotaViewModel: ObservableObject {
             // rather than waiting for the next scheduled refresh.
             if state.isConnected { self?.refreshClaude() }
         }.store(in: &subscriptions)
-        if !CommandLine.arguments.contains("--live-read-once")
-            && !CommandLine.arguments.contains(ClaudeUsageProbeCommand.flag) {
+        if Self.shouldStartProviderMonitoring(arguments: CommandLine.arguments) {
             start()
         }
+    }
+
+    static func shouldStartProviderMonitoring(arguments: [String]) -> Bool {
+        !arguments.contains("--live-read-once")
+            && !arguments.contains(ClaudeUsageProbeCommand.flag)
+            && !arguments.contains(MenuPopoverViabilityGate.launchArgument)
     }
 
     var settingsStatus: SettingsStatus {
@@ -178,29 +174,11 @@ final class QuotaViewModel: ObservableObject {
         NSWorkspace.shared.open(url)
     }
 
-    private func updateRefreshTimingPresentation() {
-        let newPresentation = MenuRefreshTimingPresentation(
-            lastRefreshAt: displayState.lastAttemptAt,
-            refreshState: refreshState,
-            nextRefreshAt: nextRefreshAt,
-        )
-        if newPresentation != refreshTimingPresentation {
-            refreshTimingPresentation = newPresentation
-        }
-    }
-
     /// User-initiated: this is the only path allowed to raise a Keychain
     /// prompt, so it must never be called from a background trigger.
     func refreshClaude() {
         Task { [claudeMonitor] in
             await claudeMonitor.refreshNow(reason: .userInitiated)
-        }
-    }
-
-    /// Menu-open refresh — reads with interaction forbidden.
-    func refreshClaudeOnMenuOpen() {
-        Task { [claudeMonitor] in
-            await claudeMonitor.refreshNow(reason: .menuOpened)
         }
     }
 

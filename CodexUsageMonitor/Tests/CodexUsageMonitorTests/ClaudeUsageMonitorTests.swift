@@ -22,6 +22,36 @@ private final class FakeCollector: ClaudeUsageCollecting, @unchecked Sendable {
     }
 }
 
+private actor BlockingCollector: ClaudeUsageCollecting {
+    private let result: ClaudeUsagePresentation
+    private var reasons: [ClaudeRefreshReason] = []
+    private var continuation: CheckedContinuation<Void, Never>?
+
+    init(_ result: ClaudeUsagePresentation) {
+        self.result = result
+    }
+
+    func refresh(reason: ClaudeRefreshReason) async -> ClaudeUsagePresentation {
+        reasons.append(reason)
+        if reasons.count > 1 {
+            return result
+        }
+        await withCheckedContinuation { continuation in
+            self.continuation = continuation
+        }
+        return result
+    }
+
+    func seenReasons() -> [ClaudeRefreshReason] {
+        reasons
+    }
+
+    func release() {
+        continuation?.resume()
+        continuation = nil
+    }
+}
+
 private func presentation(
     delivery: ClaudeUsageDelivery,
     source: ClaudeUsageSource = .oauth,
@@ -102,6 +132,36 @@ final class ClaudeUsageMonitorTests: XCTestCase {
         await monitor.refreshNow(reason: .userInitiated)
 
         XCTAssertEqual(collector.seenReasons, [.userInitiated])
+    }
+
+    func testConcurrentRefreshReasonsShareOneInFlightRead() async {
+        let collector = BlockingCollector(presentation(delivery: .live))
+        let monitor = ClaudeUsageMonitor(collector: collector)
+
+        let scheduled = Task {
+            await monitor.refreshNow(reason: .scheduled)
+        }
+        for _ in 0..<500 {
+            if !(await collector.seenReasons()).isEmpty {
+                break
+            }
+            await Task.yield()
+        }
+
+        let manual = Task {
+            await monitor.refreshNow(reason: .userInitiated)
+        }
+        await Task.yield()
+
+        let reasonsWhileBlocked = await collector.seenReasons()
+        XCTAssertEqual(reasonsWhileBlocked, [.scheduled])
+        XCTAssertTrue(monitor.isRefreshing)
+
+        await collector.release()
+        await scheduled.value
+        await manual.value
+
+        XCTAssertFalse(monitor.isRefreshing)
     }
 
     func testMenuOpenedRefreshPassesMenuOpenedReason() async {

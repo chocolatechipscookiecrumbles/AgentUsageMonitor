@@ -18,6 +18,7 @@ final class ClaudeUsageMonitor: ObservableObject {
 
     @Published private(set) var state: ClaudeUsageState = .unavailable(reason: ClaudeUsageState.notConnectedReason)
     @Published private(set) var hasCompletedInitialRefresh = false
+    @Published private(set) var isRefreshing = false
 
     private let collector: ClaudeUsageCollecting
     private let pollInterval: Duration
@@ -65,6 +66,10 @@ final class ClaudeUsageMonitor: ObservableObject {
     /// The reason is load-bearing: it decides whether the Keychain read is
     /// allowed to prompt (only `.userInitiated` is).
     func refreshNow(reason: ClaudeRefreshReason) async {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        defer { isRefreshing = false }
+
         let presentation = await collector.refresh(reason: reason)
         state = Self.mapState(presentation)
         hasCompletedInitialRefresh = true

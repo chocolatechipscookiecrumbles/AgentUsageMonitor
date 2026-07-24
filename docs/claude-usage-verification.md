@@ -37,12 +37,12 @@ Run these first — if they fail, don't bother with the live checks.
 ```bash
 cd CodexUsageMonitor && swift test
 ```
-**Expected:** `Executed 119 tests, with 0 failures`
+**Expected:** `Executed 229 tests, with 0 failures`
 
 ```bash
 cd CodexUsageMonitor && swift test --filter Claude
 ```
-**Expected:** `Executed 111 tests, with 0 failures`
+**Expected:** `Executed 193 tests, with 0 failures`
 
 ```bash
 cd ClaudeUsageBridge && /opt/anaconda3/bin/pytest -q
@@ -386,7 +386,7 @@ ls -l ~/.codex/auth.json
 ## 10. Known gaps (do not report as bugs)
 
 - **Tier 2 (CLI `/usage`) is not implemented** — deferred to its own plan.
-- **The sign-in UI is not reachable in the app yet.** `ClaudeConnectionController` / `ClaudeSignInView` are built and tested but not wired into `AgentsSettingsView`; that's the [wiring plan](superpowers/plans/2026-07-21-claude-usage-provider-wiring.md). Until then, method selection is only exercisable via the probe and `CLAUDE_CODE_OAUTH_TOKEN`.
+- **Claude credential sign-in is now reachable in the app** — Settings ▸ Agents ▸ Claude Code and the menu-bar popover's Claude tab both offer **Use Claude Code credentials…** (tier-1 method (b)). Browser/`setup-token` sign-in (method (a)) stays shelved and is deliberately not offered in the UI, so only method (b) is exercisable there; the probe and `CLAUDE_CODE_OAUTH_TOKEN` still exercise method (a).
 - **`--claude-live-read-once` currently hardcodes `selectedMethod: .browser`**, since there's no persisted setting yet — so it always prefers a self-issued token and degrades to Claude Code credentials.
 - **A revoked self-issued token does not auto-degrade to method (b).** `ClaudeCompositeCredentialStore.invalidateSelfIssued()` exists and is tested, but nothing calls it yet — that hook belongs to the not-yet-built Settings wiring. Today a bad tier-1 credential drops to tier 3 instead.
 - **`ClaudeStatusLineInstaller`'s production bridge path doesn't resolve** — `ClaudeUsageBridge/` isn't bundled into a signed `.app`.
@@ -426,3 +426,64 @@ Claude's figure is **spend against a cap**, not a balance held. Rendering `usedC
 ### Not surfaced
 
 `scopedWindows` (`session`, `weekly_all`) duplicate the five-hour and weekly figures — `session` tracked 45% against a five-hour 44%, `weekly_all` 28% against a weekly 28%. They add no information and are deliberately not shown.
+
+---
+
+## 12. Menu-bar popover (menu-level manual checks)
+
+These verify the multi-provider popover that replaced the old inline menu (`QuotaMenuView` / `ConnectedQuotaMenuView` / `CodexDisconnectedMenuView`, now removed). Build and launch the app first:
+
+```bash
+CODESIGN_IDENTITY=- zsh CodexUsageMonitor/Scripts/build-app.sh
+open CodexUsageMonitor/.build/CodexUsageMonitor.app
+```
+
+> ⚠️ This branch **waives** visual/keyboard/VoiceOver/Light-Dark acceptance. The steps below are the menu-level script to run against the real app — record them as **unobserved** until a human performs them, never as passed.
+
+**Tabs and persistence (Task 7)**
+- The popover opens with **Codex** and **Claude** tabs; **Copilot is absent** (unsupported).
+- Switch to **Claude**, close and reopen the popover — it reopens on **Claude** (`AppSettings.selectedMenuProvider` round-trips; covered by `MenuProviderSelectionPersistenceTests`).
+- A *supported* provider with no current snapshot keeps its tab selected (Claude stays Claude); only an *unsupported* persisted provider falls back to Codex (`MenuPopoverProviderResolutionTests`).
+
+**Shell, tabs, and header (both tabs)**
+- The popover is a **single rounded piece** — no square background or stray artifacts peeking at the four corners.
+- The **Codex** / **Claude** tabs are easy to hit: the whole equal-width column (not just the text) switches tabs, and hovering fills the column.
+- The header title is just the provider name — **Codex** / **Claude**, not "… Usage Monitor".
+- The subtitle is the standard `Updated: <time> · <relative>` with **no seconds** (e.g. `Updated: 3:42 PM · 3 minutes ago`) on both tabs, plus the **Confirmed / Cached / Refreshing / Unavailable** status pill.
+- Usage bars and the `% used` numerals are **green below 75%, yellow 75–90%, red above 90%** — the same on both tabs, and the color follows usage regardless of used/remaining wording. (Settings' bars keep their provider tint by design.)
+
+**Codex tab**
+- Two window cards (Five Hour, Weekly): `N% used` at right, `Remaining M%` and reset timing in the footer, and a forecast line when one is available.
+- The credit-balance card appears only when Codex reports a balance or earned reset credits; the popover balance is rounded to **4 significant figures** (Settings ▸ Agents ▸ Codex shows it in full).
+- A **cached** read shows the "Showing Last Confirmed Snapshot" strip above the cards.
+- Disconnected: the tab shows a connection card with **Sign in with browser** and **Sign in with Codex CLI…**. Connected-but-no-snapshot shows "Unable to Read Usage" with **no** sign-in buttons — recovery is the footer's **Refresh Now**.
+- There is **no** quota-alerts toggle in the popover (it lives in Settings).
+
+**Codex icon**
+- On the Codex tab the header tile is filled edge-to-edge by the Codex mark (it carries its own square background); the Claude tile keeps padding around its glyph.
+
+**Claude tab**
+- A `Read from: <source>` caption (e.g. `Read from: Claude OAuth`) sits beneath the window card — this is where Claude provenance lives now (the capture time is the header's freshness line).
+- Two window cards (Five Hour, Weekly). The weekly card carries the shared-pool caveat; when the five-hour window has not started (live data only), it shows the session note.
+- A non-live read shows the staleness strip above the cards.
+- **No** credit card and **no** collector line appear (Codex-only furniture is absent here).
+- With no reading: an unavailable card offers **Use Claude Code credentials…** only (browser sign-in is shelved). macOS raises the Keychain prompt **only** on that explicit click — never on open.
+- An *actively failed* connection shows a recovery card alongside the last result; a *merely-not-connected* passive read does not (passive capture needs no connection).
+
+**Notifications (both tabs)**
+- When macOS notification permission is **denied**, a slim strip with "Notifications are disabled in System Settings." + **Open System Notification Settings** appears on both tabs; it is absent otherwise.
+
+**Footer and passivity**
+- The bottom action row runs **Refresh Now**, **Notification Settings**, **Preferences…**, and **Quit Codex Usage Monitor**, flush to the edges: **Refresh Now** sits against the divider and **Quit** against the bottom edge, no extra padding. **Refresh Now** keeps the popover open, targets the active tab's provider, and exposes the in-place `Refreshing…` state. The other footer commands dismiss first.
+- [ ] With the production signed app, press **Escape** while the popover is open and confirm it dismisses without activating a footer command.
+- Opening the popover triggers no refresh, timer, `TimelineView`, or per-second invalidation.
+
+**Unobserved signed-app regression matrix**
+- [ ] Manufacture an expired Claude five-hour window beside an active weekly window; confirm the tab and compact menu-bar summary use only the active weekly value.
+- [ ] Overlap a launch or scheduled Claude refresh with a manual **Refresh Now** click; confirm only one read runs, the button remains disabled for that read, and the state clears on completion.
+- [ ] Run **Refresh Now** for both providers; confirm the popover remains open through completion and updates the header/footer state in place.
+- [ ] Manufacture the maximum-height Codex combination: cached warning, both forecasts, credits, disconnected recovery, and denied-notification strip. Confirm every footer action remains visible without scrolling or clipping.
+- [ ] Supply more than two reset-credit expiries; confirm exactly two dates and the “+N more in Settings” caption appear, while Settings retains the complete list.
+- [ ] Repeat the maximum-height, refresh, tab-switch, and Escape checks in Light and Dark appearance with keyboard focus and VoiceOver. Confirm focus order, activation, announcements, and escape from the popover.
+- [ ] Alternate Codex and Claude tabs repeatedly on both the Settings Agents page and popover; record any jumping, delayed click, or stuck selection before attempting a fix.
+- [ ] Inspect native-pixel crops of all four popover corners on first open, repeated open, and provider switches; the currently reported artifact remains unresolved.

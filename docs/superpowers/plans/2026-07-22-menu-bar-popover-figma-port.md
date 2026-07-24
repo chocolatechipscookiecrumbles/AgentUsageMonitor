@@ -16,6 +16,8 @@ The exported layout was revised before porting — see [SPEC §6](../../design/m
 
 Net effect: a shorter popover that is tabs → header (icon, title, pill) → window cards → credits (Codex only) → action menu. Port against SPEC §3, not against `reference/MenuBarDropdown.tsx`.
 
+**Visual target update (2026-07-23):** the user-supplied updated screenshot is the visual acceptance target for the port. SPEC §3 remains the durable written contract and should be reconciled to that screenshot if a later implementation detail is ambiguous.
+
 ## Where this sits (state as of 2026-07-22)
 
 - **Current menu is 168 lines of plain rows** across [QuotaMenuView.swift](../../../CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/QuotaMenuView.swift) (31), [ConnectedQuotaMenuView.swift](../../../CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/ConnectedQuotaMenuView.swift) (66) and [CodexDisconnectedMenuView.swift](../../../CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/CodexDisconnectedMenuView.swift) (71). It is Codex-only and has no provider concept.
@@ -49,7 +51,7 @@ From [SPEC.md §5](../../design/menu-bar-popover/SPEC.md):
 - **`MenuActionFooter`** — Refresh Now / Notification Settings / Preferences… / Quit.
 - **Presentation stays in testable structs** (`MenuBarLabelPresentation`, `ClaudeUsageDisplayModel`, a new `CodexMenuPresentation`), never in view bodies.
 
-**Tech Stack:** SwiftUI, Combine, XCTest. No new dependencies. SVG provider marks in `docs/design/menu-bar-popover/reference/` may be converted to asset catalog entries or redrawn as `Path`s.
+**Tech Stack:** SwiftUI, Combine, XCTest for the preserved existing suite. No new dependencies. SVG provider marks in `docs/design/menu-bar-popover/reference/` may be converted to asset catalog entries; do not redraw or substitute those Figma-owned marks.
 
 ## Global constraints
 
@@ -58,7 +60,13 @@ From [SPEC.md §5](../../design/menu-bar-popover/SPEC.md):
 - **Never render a missing value as `0%`** — absent data shows as unavailable, per gate criterion #5.
 - **Cached/stale/expired must stay visibly labelled** (probe plan §7/§9) — the design's amber "Showing Last Confirmed Snapshot" strip satisfies this for Codex; Claude's equivalent comes from `stalenessNotice`.
 - **No behavior regressions in the Codex menu.** Sign-in, alerts toggle, refresh, notification-settings link, forecasts all keep working.
-- **TDD for all presentation logic**; full suite green each task.
+- **Current regression-test policy overrides the test-first language in later tasks (2026-07-23).** Preserve and run the existing suite. Do not add feature-presence, routing, happy-path, implementation-detail, or broad general tests. Add only the smallest deterministic regression test when an actual defect has first been reproduced; otherwise record the manual regression boundary and why it remains manual.
+- **Opening the popover is not a refresh trigger.** Refresh continues to follow the existing scheduler and explicit Refresh Now action.
+- **Build acceptance for this port uses `Scripts/build-app.sh`.** A local/ad-hoc signature is sufficient during implementation; do not require a Developer ID signature.
+
+### Visual-verification waiver (2026-07-23)
+
+The user explicitly waived the remaining GUI, keyboard, VoiceOver, and Light/Dark visual-verification steps for this branch and directed implementation to continue. Those states remain **unobserved**, not passed. Source review, compilation, and the preserved automated regression suite remain required; later manual acceptance can resume from the unchecked visual states without inferring coverage.
 
 ---
 
@@ -66,64 +74,154 @@ From [SPEC.md §5](../../design/menu-bar-popover/SPEC.md):
 
 **Why first:** if popover dismissal can't be made to work acceptably, the whole port is in question and it is far cheaper to learn that now.
 
-- [ ] **Step 1:** Switch `MenuBarExtra` to `.menuBarExtraStyle(.window)` with a placeholder 340pt card behind a temporary flag.
+- [x] **Step 1:** Switch `MenuBarExtra` to `.menuBarExtraStyle(.window)` with a placeholder 340pt card behind a temporary flag.
 - [ ] **Step 2:** Manually verify and **write down** the result for: clicking an action dismisses the popover; clicking outside dismisses; Escape dismisses; the menu bar icon toggles; VoiceOver/keyboard focus is not trapped.
-- [ ] **Step 3:** If dismissal does not work by default, implement it explicitly (e.g. an environment-injected dismiss handler each action calls) and re-verify.
-- [ ] **Step 4: Record the finding** in this plan. If unresolvable, stop and reconsider — a popover that will not close is worse than a plain menu. **Commit.**
+- [x] **Step 3:** If dismissal does not work by default, implement it explicitly (e.g. an environment-injected dismiss handler each action calls) and re-verify.
+- [x] **Step 4: Record the finding** in this plan. If unresolvable, stop and reconsider — a popover that will not close is worse than a plain menu. **Commit.**
+
+### Task 1 gate implementation and pending acceptance (2026-07-23)
+
+Launch the locally built app with `--window-popover-gate` to install a dedicated `.window` `MenuBarExtra`; SwiftUI requires the scene declarations to remain static, so mutually exclusive `isInserted` bindings keep only the selected item in the menu bar. Launching without the argument installs the shipping `.menu` surface instead. The gate renders a 340-point placeholder with native, labelled buttons and no open-triggered task or refresh call. Both actions call SwiftUI's presentation-scoped `DismissAction`; Escape is also bound to the Close Popover action. Open Settings dismisses before changing application activation.
+
+Build and source inspection established that the gate is reachable, scoped, and does not refresh on open. Controller inspection after the startup fix established the directly observed native behavior recorded below. Step 2 remains unchecked because keyboard activation and VoiceOver focus escape could not be observed; no result is inferred for those blocked states.
+
+#### Task 1 audit-launch startup defect and fix (2026-07-23)
+
+The first unlocked GUI launch with `--window-popover-gate` reproduced a real defect before the placeholder could be audited: `QuotaViewModel.init()` still called its normal `start()` fan-out, which starts the Codex connection check, Codex quota monitor, Claude usage monitor, and notification-authorization refresh. The Claude launch read raised a Claude Code Keychain permission dialog. The controller terminated only the audit app without responding. Later inspection established that the stale dialog survives process termination, predates the fixed audit launch, and was not answered.
+
+The audit argument now participates in `QuotaViewModel.shouldStartProviderMonitoring(arguments:)`. That policy returns false for the window-popover gate, so the audit launch constructs the state needed by the scene but starts no provider monitors, connection checks, refreshes, notification authorization, or credential reads. Normal launches retain the existing startup path.
+
+This reproduced defect qualifies for the repository's narrow regression exception. `QuotaViewModelLaunchPolicyTests.testWindowPopoverGateDoesNotStartProviderMonitoring` protects only the startup decision: its red run failed because the policy boundary did not exist; its green run passed after the gate exclusion. The post-fix full suite passed 223 tests with zero failures before the fix commit.
+
+#### Task 1 controller GUI evidence after `1604595` (2026-07-23)
+
+The controller launched the rebuilt audit app with `--window-popover-gate` and directly observed:
+
+- [x] the 340-point window-style popover rendered;
+- [x] the fixed audit launch started no new provider monitoring;
+- [x] **Close Popover** dismissed on the first action;
+- [x] **Open Settings…** dismissed the popover and opened Settings;
+- [x] clicking outside dismissed;
+- [x] Escape dismissed;
+- [x] clicking the menu bar item reopened the popover after dismissal;
+- [x] repeated manual open/close cycles left no stuck state;
+- [ ] Tab/Shift-Tab focus traversal;
+- [ ] Return/Space activation of the focused action;
+- [ ] VoiceOver focus entry and escape.
+
+The last three states remain unobserved because an outstanding SecurityAgent Claude credential prompt owns keyboard and accessibility focus. That stale prompt survives even after the audit process is terminated, demonstrating that it predates and is independent of the fixed audit launch; it was not answered during this audit.
+
+Screenshot evidence:
+
+- outside-open state: `/private/tmp/gate-outside-open.png`;
+- outside-dismissed state: `/private/tmp/gate-outside-closed.png`;
+- Escape-dismissed state: `/private/tmp/gate-escape-closed.png`;
+- Open Settings result: `/private/tmp/gate-open-settings-result.png`.
+
+The observed mouse dismissal, Escape, reopen, and repeated-cycle behavior make the `.window` presentation viable for continued implementation. Task 1 remains partially open only for the keyboard and VoiceOver checks blocked by SecurityAgent focus.
 
 ## Task 2: Settle the multi-provider label rule
 
-- [ ] **Step 1: Failing tests** (`MenuProviderSummaryTests.swift`): summary carries provider + percent + availability; "most at risk" picks highest utilization; providers with no data are excluded, not treated as 0%; ties resolve deterministically.
-- [ ] **Step 2: Run to verify they fail.**
-- [ ] **Step 3:** Record the chosen rule in this plan, then implement `MenuProviderSummary` + selection.
-- [ ] **Step 4:** Extend `MenuBarLabelPresentation`: one provider → unchanged from today (no regression); two → at-risk provider **with glyph**; none → existing unavailable label. **Run the full suite. Commit.**
+- [x] **Step 1: Skipped by repository policy.** No reproducible defect preceded this new feature, so no feature-presence tests were added. `MenuProviderSummary` still keeps availability explicit rather than representing a missing read as zero.
+- [x] **Step 2: Skipped with Step 1.** The existing suite was preserved and run after implementation.
+- [x] **Step 3:** Record the chosen rule in this plan, then implement `MenuProviderSummary` + selection.
+- [x] **Step 4:** Extend `MenuBarLabelPresentation`: one provider → unchanged from today (no regression); two → at-risk provider **with glyph**; none → existing unavailable label. **Run the full suite. Commit.**
+
+### Task 2 label decision and implementation (2026-07-23)
+
+The menu-bar label selects the provider with the **highest used percentage across its available windows**. Missing windows and providers with no usage read are excluded; they never participate as `0%`. Equal utilization resolves in stable provider order: Codex, Claude, then any future capable provider. The selected provider does not change when the user's display mode changes: **Used** shows its utilization, while **Remaining** shows the complement for that same at-risk provider.
+
+With only Codex data available, `MenuBarLabelPresentation` delegates to the original Codex-only initializer byte-for-byte, preserving both existing display styles, gauge behavior, cached pause marker, accessibility copy, and unavailable fallback. When Claude is the only available read or both providers have data, the compact label shows the selected value with that provider's bundled mark. Each available summary couples its utilization with typed freshness: Codex maps confirmed/cached display mode, while Claude maps live/cached/passive delivery. A selected non-confirmed reading carries the compact pause marker, and accessibility names the provider and its confirmed, cached, or passive state. `MenuBarStatusLabel` derives Codex and Claude summaries from their existing display models and performs no refresh. The full existing suite passed 223 tests with zero failures. The provider-glyph and non-confirmed-marker rendering remain visually unobserved under the user waiver above.
 
 ## Task 3: Theme and primitives
 
-- [ ] **Step 1: Failing tests** (`MenuPopoverThemeTests.swift`): the threshold rule returns danger ≤10, warning ≤25, success above; boundary values (exactly 10, exactly 25) resolve as specified; light and dark both return a surface for every token.
-- [ ] **Step 2: Run to verify they fail.**
-- [ ] **Step 3: Implement** `MenuPopoverTheme`, `UsageProgressBar`, `UsageProgressRing`, `StatusPill`, `MetadataRow` per SPEC §1–2.
-- [ ] **Step 4: Run to verify they pass. Commit.**
+- [x] **Step 1: Skipped by repository policy.** Theme and primitive presence is new-feature coverage, not a reproducible defect regression, so no new tests were added.
+- [x] **Step 2: Skipped with Step 1.** The existing suite is preserved and run after implementation.
+- [x] **Step 3: Implement** `MenuPopoverTheme`, `UsageProgressBar`, `StatusPill`, and `ProviderIconTile` per SPEC §1–2 and the 2026-07-22 revision. The removed `UsageProgressRing` and `MetadataRow` are intentionally not implemented.
+- [x] **Step 4:** `swift build --disable-sandbox` succeeded, the ad-hoc
+  `Scripts/build-app.sh` bundle build succeeded, and the unchanged full suite
+  passed 223 tests with zero failures. Commit.
+
+Visual acceptance of the Task 3 primitives is unobserved under the user's
+explicit waiver. Light and Dark appearances, provider marks, threshold colors,
+and status-pill states were not directly inspected.
 
 ## Task 4: Shell + provider tab strip
 
-- [ ] **Step 1: Failing tests**: `availableProviders` includes Codex always, Claude only when its state is usable, **never Copilot**; the persisted selection falls back to the default when the persisted provider is unavailable.
-- [ ] **Step 2: Run to verify they fail.**
-- [ ] **Step 3: Implement** `MenuPopoverChrome` + `MenuProviderTabStrip` + `ProviderIconTile` + the header row (provider icon, title/subtitle, status pill) + the root `MenuBarPopoverView` (strip, header, content, footer). The provider marks are full-color SVGs, so pick the tile background deliberately rather than reusing the old blue-violet gradient.
-- [ ] **Step 4: Run the full suite. Commit.**
+- [x] **Step 1: Skipped by repository policy.** Provider routing and selection fallback are new-feature coverage, not a reproduced defect, so no tests were added.
+- [x] **Step 2: Skipped with Step 1.**
+- [x] **Step 3: Implement** `MenuPopoverChrome` + `MenuProviderTabStrip` + the header row (using the Task 3 `ProviderIconTile`, title/subtitle, and status pill) + the root `MenuBarPopoverView` (strip, header, content, footer). The provider marks are full-color SVGs; Task 3 deliberately placed them on a low-emphasis provider-tinted surface rather than reusing the old blue-violet gradient.
+- [x] **Step 4:** `swift build --disable-sandbox` succeeded and the unchanged full suite passed 223 tests with zero failures. Commit.
+
+### Task 4 provider-availability reconciliation (2026-07-23)
+
+“Provider with a real read” is a capability/support gate, not a requirement
+that a usable snapshot exist at the instant the popover opens. Claude passed
+that gate and is marked `.supported` in `AgentSettingsCatalog`, so the
+production strip consistently contains Codex and Claude. This is required for
+Task 6's Claude unavailable/setup state to remain reachable. Copilot is absent
+because it has no supported catalog entry. A requested unsupported selection
+(including a future persisted Copilot value) resolves to the first supported
+provider instead of presenting empty content.
+
+The shipping `MenuBarExtra` now uses `.window` presentation and hosts the
+340-point shell, provider tabs, provider-specific header, temporary content
+slots for Tasks 5 and 6, and the action footer. Refresh dispatches explicitly
+to the selected provider and opening the popover performs no refresh.
+Notification Settings opens the app's Notifications destination, Preferences
+opens General, and each command dismisses the popover before continuing.
+The existing menu-bar status label is unchanged and the old native-menu views
+remain until Task 8 confirms that their affordances have all been ported.
+
+#### Task 4 refresh-state review fix (2026-07-23)
+
+Review found that Claude refreshes had no in-flight owner: each footer action
+could create another untracked task, while the Claude header and footer stayed
+enabled. `QuotaViewModel` now owns one Claude refresh task and publishes
+`isRefreshingClaude`; a second explicit refresh is ignored until the first
+read completes. The Claude header now presents **Refreshing…** and the shared
+footer disables the active provider's Refresh Now action for both providers.
+The explicit Claude action retains its user-initiated Keychain prompt policy.
+This was identified by source tracing; no new test was added under the
+repository's regression-only policy, and the existing full suite passed.
+
+Visual, keyboard, VoiceOver, and Light/Dark verification for this task remain
+unobserved under the user waiver above.
 
 ## Task 5: Codex content — behavior-preserving port
 
-- [ ] **Step 1: Failing tests** for `CodexMenuPresentation`: window rows (used %, remaining %, reset time + time-until), credit balance and reset-credit expiries, and the status-pill state. Assert **`% used` shows used, not remaining** (design defect #1 — still unfixed in the revision). No primary-card or metadata-row assertions; those elements are removed.
-- [ ] **Step 2: Run to verify they fail.**
-- [ ] **Step 3: Implement** `CodexMenuContent` from `QuotaPresentation`/`QuotaDisplayState`, including the cached warning strip and the unavailable card.
-- [ ] **Step 4: Manually verify every existing affordance still works** — sign-in (browser + CLI), alerts toggle, refresh now, notification-settings link, forecasts, cached/paused status. **Commit.**
+- [x] **Step 1–2 (tests): superseded by the repository test policy.** The SDD policy for this branch is "no new feature-presence tests; add only narrow regression coverage for reproduced defects." The TDD-first steps from the original brief were therefore not taken: `CodexMenuPresentation` is new but purely behavior-preserving mapping over the existing `QuotaPresentation`/`QuotaDisplayState`, and design defect #1 (`% used` shows used, not remaining) is deliberately *preserved* in the revision, so no failing test was warranted. The existing 223-test suite is the automated baseline.
+- [x] **Step 3: Implemented** `CodexMenuContent` from `QuotaPresentation`/`QuotaDisplayState` — cached warning strip (SPEC §47 wording "Showing Last Confirmed Snapshot"), two window rows (used% right, remaining% + reset timing footer, forecast line), optional credits card, quota-alerts card with denied-notification recovery, connection-recovery card when disconnected-with-cache, and the unavailable/sign-in card.
+- [x] **Step 4: Behavior preservation reviewed against the old menu views.** Every affordance from `ConnectedQuotaMenuView`/`CodexDisconnectedMenuView`/`QuotaMenuView` is carried across: browser + CLI sign-in, quota-alerts toggle, denied-notification recovery link, footer Refresh Now, notification-settings link, forecasts, reset credits, Settings, quit. Intentionally not re-added (they live in Settings or the header now): plan tier, pause-reason detail (SPEC §47 fixes the strip text), the next-refresh-timing card (the header's "Updated HH:MM:SS" carries freshness). **Review fix applied:** `CodexUnavailableContent` no longer renders disabled sign-in buttons when `state == .connected` (the reachable "connected but no snapshot yet" state); that card now relies on the footer's Refresh Now, which its own copy already directs the user to.
+
+**Visual/keyboard/VoiceOver/Light-Dark states are waived for this branch and recorded as unobserved, never passed.** Verified: `swift build`, full 223-test suite, and `git diff --check` all pass.
 
 ## Task 5a: Decide where the removed information goes (DESIGN GATE)
 
-The revision removed three pieces of information from the popover. Settle each **before** building Claude's tab, since two of them affect it directly.
+The revision removed three pieces of information from the popover. Settled below (decisions recorded 2026-07-23) before building Claude's tab, since two of them affect it directly.
 
-- [ ] **Plan name** ("Pro") — had no home outside the removed card. Decide: header subtitle, a window-card header, or accept that plan tier lives only in Settings.
-- [ ] **"Lowest remaining %"** — the at-a-glance figure and ring are gone. Decide whether per-window numbers suffice, or whether the menu bar label now carries that role (it overlaps with Task 2's rule).
-- [ ] **Provenance** (`Source` / `Collector`) — **the consequential one.** Claude's data can come from OAuth, a statusLine capture, or cache, and these differ materially in freshness and authority; `claude_probe_plan` §9 asks for source labelling. Options: fold the source into the status pill text, put it in the header subtitle, or accept the loss on the menu given `ClaudeUsageStatusView` in Settings already shows "Read from: <source> · <relative time>". **Record the choice here.**
-- [ ] **Commit the decision** as an edit to this plan before Task 6.
+- [x] **Plan name** ("Pro") — **Decision: plan tier lives only in Settings.** It has no home in the revised popover and is not re-added on either tab. The header title names the provider ("Codex Usage Monitor" / "Claude Usage Monitor"); tier is not identity and Settings already presents it. No Codex plan-name furniture, and Claude's tab does not add a plan card either.
+- [x] **"Lowest remaining %"** — **Decision: per-window values plus the menu-bar label carry this role.** Each window row shows real `used%` (right) and `remaining%` (footer); the at-a-glance at-risk signal is the menu-bar label's Task 2 rule (highest used% across available windows, provider-identified). No ring or single lowest-remaining figure returns to the popover.
+- [x] **Provenance** (`Source` / `Collector`) — **Decision: Claude provenance goes in the header subtitle alongside freshness time (source + updated time); the status pill/strip keeps freshness state.** Because Claude's data can come from OAuth, a statusLine capture, or cache — materially different in authority — the source label must stay visible on the menu, not only in Settings. ~~It rides in the header subtitle (e.g. "OAuth · Updated HH:MM:SS")~~, while the status pill continues to signal confirmed/cached and the staleness strip continues to flag stale reads. Codex keeps its plainer subtitle (single collector, no provenance ambiguity) and shows no "Collector: …" furniture.
+  - **SUPERSEDED 2026-07-23** by the [refinements plan](2026-07-23-menu-bar-popover-refinements.md) / [SPEC §7](../../design/menu-bar-popover/SPEC.md): the header freshness line is now standardized to `Updated: <time> · <relative>` and **identical across tabs**, so Claude's source moved *out* of the header into a `Read from: <source>` caption in the tab content. Provenance stays visible on the menu; it just lives in the content rather than the header.
+- [x] **Committed** as this plan edit before Task 6.
 
 ## Task 6: Claude content
 
-- [ ] **Step 1: Implement** `ClaudeMenuContent` from `ClaudeUsageDisplayModel`: plan, five-hour and weekly window cards, source label + relative capture time, the shared-pool caveat, `stalenessNotice` surfaced like the Codex cached strip, and the explicit unavailable state with the credential affordance.
-- [ ] **Step 2:** Hide Codex-only furniture (credits card, `Collector: Codex App Server`) on this tab; the header must name the active provider.
-- [ ] **Step 3:** Manual verification against the live account. **Commit.**
+- [x] **Step 1: Implemented** `ClaudeMenuContent` from `ClaudeUsageDisplayModel`: five-hour and weekly window cards (used% right, remaining% + reset footer), the shared-pool caveat under the weekly figure, the five-hour session note when the window has not started (live data only), `stalenessNotice` surfaced as `ClaudeStalenessStrip` (the Claude counterpart of the Codex cached strip), and the explicit unavailable card carrying the single user-initiated credential affordance (`ClaudeCredentialActions` → `connectClaudeWithCredentials`). Per the **Task 5a** decision, **plan tier is not re-added** (the older draft of this step listed "plan"; Task 5a supersedes it — tier lives in Settings), and **source label + capture time ride in the header subtitle** (`"<sourceLabel> · <capturedAtText>"`), not duplicated in the content. A `ClaudeConnectionRecoveryCard` appears alongside the last result only when the connection has **actively failed** — a merely-not-connected account is normal because passive capture needs no connection.
+- [x] **Step 2:** No Codex-only furniture on this tab — no credits card, no collector line. The header names the active provider ("Claude Usage Monitor"). The core mapping (`showsFiveHourSessionNote`, window/staleness/source logic) is already covered by `ClaudeUsageDisplayModelTests`; the views compose those tested helpers, so no new tests were added (branch policy).
+- [x] **Step 3:** Live-account manual verification is **waived and unobserved** for this branch. Verified: `swift build`, the full 223-test suite, and `git diff --check` pass. **Committed.**
 
 ## Task 7: Persist the selected tab
 
-- [ ] **Step 1: Failing tests**: selection round-trips through `AppSettings`; an unavailable persisted provider falls back rather than showing an empty tab.
-- [ ] **Step 2: Implement. Run the full suite. Commit.**
+- [x] **Step 1: Tests added** (persistence/resolution logic, not feature-presence — permitted, and this step was designated test-first): `MenuProviderSelectionPersistenceTests` covers the `AppSettings.selectedMenuProvider` round-trip and Codex default; `MenuPopoverProviderResolutionTests` pins the rule that a *supported* provider (Claude) stays selected while an *unsupported* one (Copilot) and a nil request fall back to Codex, and that resolution always yields a supported provider.
+- [x] **Step 2: Implemented.** `AppSettings.selectedMenuProvider` persists the raw last-viewed tab; the popover reads it at init (an explicit caller `initialProvider` still wins) through `MenuPopoverProviderCatalog.resolvedSelection`, so an unsupported persisted provider falls back to Codex while a supported-but-currently-unavailable one (e.g. Claude with no snapshot) stays selected. An `onChange` writes the resolved tab back on every switch. Full suite (229 tests) and `git diff --check` pass. **Committed.**
 
 ## Task 8: Retire the old menu and document
 
-- [ ] **Step 1:** Remove `QuotaMenuView`/`ConnectedQuotaMenuView`/`CodexDisconnectedMenuView` once their affordances are confirmed ported. Keep `CodexDisconnectedMenuView`'s sign-in copy if reused.
-- [ ] **Step 2:** Update the planning board and extend [the verification guide](../../claude-usage-verification.md) with menu-level manual checks.
-- [ ] **Step 3: Commit.**
+- [x] **Step 1:** Removed `QuotaMenuView`, `ConnectedQuotaMenuView`, and `CodexDisconnectedMenuView` (affordances confirmed ported in Tasks 5–6). Also removed the view helpers they solely fed — `QuotaWindowRow`, `MenuRefreshTimingView` — and the now-dead `MenuRefreshTimingPresentation` plus its `QuotaViewModel` plumbing (`refreshTimingPresentation`/`nextRefreshAt` and `updateRefreshTimingPresentation()`); the revised design dropped the next-refresh row, and `RefreshNowButton`/`effectiveRefreshInterval`/`refreshScheduleReason` stay because Settings still uses them. The `CodexDisconnectedMenuView` sign-in copy was already reproduced in `CodexUnavailableContent`. **Not touched (out of scope):** the base-inherited, unwired `ClaudeSignInView` (old-menu-style, references the shelved browser sign-in); the popover uses the themed `ClaudeCredentialActions` instead.
+- [x] **Step 2:** Updated the [planning board](../../product/planning-board.md) (new popover entry; fixed board links that pointed at the deleted files) and extended [the verification guide](../../claude-usage-verification.md) with a menu-level manual-check section (§12) plus corrected suite counts and the stale Claude sign-in gap note. Also refreshed the menu descriptions in [how-to.md](../../../how-to.md) and [UsageProbe/README.md](../../../UsageProbe/README.md). Historical plan files that reference the deleted views are left intact as provenance.
+- [x] **Step 3:** `swift build`, the full 229-test suite, and `git diff --check` pass. **Committed.**
 
 ---
 
@@ -133,6 +231,17 @@ The revision removed three pieces of information from the popover. Settle each *
 - **Per-provider view models.** `QuotaViewModel` stays one type; splitting it collides with recent changes and should follow this port.
 - **Desktop widget / watch complication** — the export also contains `DesktopWidget.tsx` and `WatchComplication.tsx`; out of scope here.
 - **Tab reordering / pinned primary provider** — depends on Task 2's outcome.
+
+## Review follow-ups — 2026-07-24
+
+The source-only review follow-up pass corrected four boundaries:
+
+- expired Claude windows no longer participate in menu-bar provider selection;
+- `ClaudeUsageMonitor` now serializes launch, scheduled, connection, and user-initiated refresh reasons and publishes the single in-flight state mirrored by `QuotaViewModel`;
+- **Refresh Now** keeps the popover open, and the production root handles Escape dismissal;
+- the popover remains non-scrolling by capping reset-credit expiries at two visible rows, handing additional rows off to Settings, and bounding variable recovery/supporting copy.
+
+Automated regression coverage was added only for the three reproduced defects: expired-window selection, cross-reason refresh overlap, and unbounded reset-credit expiry mapping. The signed `.app` was not built or launched in this pass. Rendered height, corner/shadow behavior, Light/Dark appearance, keyboard behavior, VoiceOver, and live-provider interaction remain unobserved. Provider-tab jumping/delayed selection and the still-visible corner artifact are preserved as separate deferred diagnostic tasks in the [review follow-up plan](2026-07-23-menu-bar-popover-review-followups.md).
 
 ## Completion criteria
 

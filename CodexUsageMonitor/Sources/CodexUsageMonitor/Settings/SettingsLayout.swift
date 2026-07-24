@@ -109,23 +109,35 @@ extension EnvironmentValues {
 
 struct SettingsPage<Content: View>: View {
     private let content: Content
+    private let fillsViewport: Bool
     @Environment(\.settingsAppearancePalette) private var palette
 
-    init(@ViewBuilder content: () -> Content) {
+    init(
+        fillsViewport: Bool = false,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.fillsViewport = fillsViewport
         self.content = content()
     }
 
     var body: some View {
         GeometryReader { geometry in
             let layout = SettingsLayoutMode(width: geometry.size.width)
+            let verticalPadding = SettingsLayoutMetrics.pageVerticalPadding(for: layout)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: SettingsLayoutMetrics.sectionSpacing(for: layout)) {
                     content
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(
+                    maxWidth: .infinity,
+                    minHeight: fillsViewport
+                        ? max(0, geometry.size.height - verticalPadding * 2)
+                        : nil,
+                    alignment: .topLeading
+                )
                 .padding(.horizontal, SettingsLayoutMetrics.pageHorizontalPadding(for: layout))
-                .padding(.vertical, SettingsLayoutMetrics.pageVerticalPadding(for: layout))
+                .padding(.vertical, verticalPadding)
             }
             .background(palette.pageBackground)
             .environment(\.settingsLayoutMode, layout)
