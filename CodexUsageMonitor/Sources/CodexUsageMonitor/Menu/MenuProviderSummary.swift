@@ -118,7 +118,7 @@ struct MenuProviderSummary: Equatable {
         return window.usedPercent
     }
 
-    private static func freshness(for delivery: ClaudeUsageDelivery) -> Freshness {
+    static func freshness(for delivery: ClaudeUsageDelivery) -> Freshness {
         switch delivery {
         case .live: .confirmed
         case .cached: .cached

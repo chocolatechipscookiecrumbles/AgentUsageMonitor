@@ -97,6 +97,37 @@ final class ClaudeConnectionStatusTests: XCTestCase {
         XCTAssertTrue(status.isConnected)
     }
 
+    // MARK: Connect/Disconnect button consistency
+
+    /// The reported bug: a live read via passive capture showed "Connected" yet
+    /// the Connect button still appeared because the sign-in button was never
+    /// pressed. The buttons must follow the resolved status.
+    func testLiveReadIsEffectivelyConnectedEvenWithoutSignIn() {
+        XCTAssertTrue(
+            ClaudeConnectionStatus.isEffectivelyConnected(
+                signInState: .notConnected,
+                usageState: .available(presentation(.live))
+            ),
+            "a live read hides Connect and offers Disconnect"
+        )
+    }
+
+    func testCachedOrUnavailableIsNotEffectivelyConnected() {
+        XCTAssertFalse(ClaudeConnectionStatus.isEffectivelyConnected(
+            signInState: .notConnected, usageState: .available(presentation(.cached))
+        ))
+        XCTAssertFalse(ClaudeConnectionStatus.isEffectivelyConnected(
+            signInState: .notConnected, usageState: .unavailable(reason: "x")
+        ))
+    }
+
+    func testExplicitSignInIsEffectivelyConnectedRegardlessOfRead() {
+        XCTAssertTrue(ClaudeConnectionStatus.isEffectivelyConnected(
+            signInState: .connected(ClaudeAccountSummary(planType: "pro")),
+            usageState: .available(presentation(.cached))
+        ))
+    }
+
     /// The rail and the agent page must never disagree again.
     func testRailAndPageDeriveFromTheSameSource() {
         let usage = ClaudeUsageState.available(presentation(.live))

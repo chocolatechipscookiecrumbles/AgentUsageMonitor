@@ -10,18 +10,28 @@ extension ClaudeUsageCollector: ClaudeUsageCollecting {}
 
 @MainActor
 final class ClaudeUsageMonitor: ObservableObject {
-    /// Network-appropriate: a refresh can now reach the OAuth endpoint, so the
-    /// old 30s local-file cadence would mean an API call every 30 seconds.
-    /// The collector's own fallback order handles the cheap statusLine/cache
-    /// paths within each refresh, so this only paces the expensive one.
+    /// Fallback cadence for the fixed-interval initializer (tests and any caller
+    /// that does not supply a `cadence`). Production derives the interval from the
+    /// shared `RefreshMode` via `ClaudeRefreshCadence`, which floors the networked
+    /// OAuth read for endpoint safety; this constant stays network-appropriate for
+    /// the plain fixed-interval path.
     static let defaultPollInterval: Duration = .seconds(12 * 60)
 
     @Published private(set) var state: ClaudeUsageState = .unavailable(reason: ClaudeUsageState.notConnectedReason)
     @Published private(set) var hasCompletedInitialRefresh = false
     @Published private(set) var isRefreshing = false
 
+    /// App-local disconnect: while set, the monitor stops reading and publishes
+    /// an explicit disconnected state, so passive capture does not keep showing
+    /// Claude usage after the user disconnects. The Keychain credential itself
+    /// is never touched.
+    static let disconnectedReason = "Claude is disconnected. Reconnect to show usage."
+    private var isDisconnected = false
+
     private let collector: ClaudeUsageCollecting
-    private let pollInterval: Duration
+    /// Evaluated before each scheduled poll so a live change to the shared
+    /// Refresh Preferences takes effect without restarting the monitor.
+    private let pollInterval: @MainActor () -> Duration
     private var pollTask: Task<Void, Never>?
 
     init(
@@ -33,7 +43,21 @@ final class ClaudeUsageMonitor: ObservableObject {
         pollInterval: Duration = ClaudeUsageMonitor.defaultPollInterval
     ) {
         self.collector = collector
-        self.pollInterval = pollInterval
+        self.pollInterval = { pollInterval }
+    }
+
+    /// Production initializer: the poll cadence follows the shared `RefreshMode`
+    /// setting (clamped to Claude's network floor) and is re-read each tick.
+    init(
+        collector: ClaudeUsageCollecting = ClaudeUsageCollector(
+            oauthSource: ClaudeOAuthUsageSource(credentialStore: ClaudeCompositeCredentialStore()),
+            statusLineReader: ClaudeRateLimitSnapshotReader(),
+            cache: ClaudeUsageCache()
+        ),
+        cadence: @escaping @MainActor () -> Duration
+    ) {
+        self.collector = collector
+        self.pollInterval = cadence
     }
 
     deinit {
@@ -43,6 +67,7 @@ final class ClaudeUsageMonitor: ObservableObject {
     /// Refreshes once immediately so callers see a state without waiting a
     /// full interval, then re-refreshes on the configured cadence.
     func start() {
+        guard !isDisconnected else { return }
         guard pollTask == nil else { return }
         pollTask = Task { [weak self] in
             guard let self else { return }
@@ -51,7 +76,7 @@ final class ClaudeUsageMonitor: ObservableObject {
             guard !Task.isCancelled else { return }
             await refreshNow(reason: .appLaunch)
             while !Task.isCancelled {
-                try? await Task.sleep(for: self.pollInterval)
+                try? await Task.sleep(for: self.pollInterval())
                 guard !Task.isCancelled else { return }
                 await self.refreshNow(reason: .scheduled)
             }
@@ -63,9 +88,26 @@ final class ClaudeUsageMonitor: ObservableObject {
         pollTask = nil
     }
 
+    /// App-local disconnect: stop reading and show the disconnected state
+    /// without touching the Keychain credential.
+    func disconnect() {
+        isDisconnected = true
+        stop()
+        state = .unavailable(reason: Self.disconnectedReason)
+        hasCompletedInitialRefresh = true
+    }
+
+    /// Clears the disconnect and resumes passive capture.
+    func reconnect() {
+        guard isDisconnected else { return }
+        isDisconnected = false
+        start()
+    }
+
     /// The reason is load-bearing: it decides whether the Keychain read is
     /// allowed to prompt (only `.userInitiated` is).
     func refreshNow(reason: ClaudeRefreshReason) async {
+        guard !isDisconnected else { return }
         guard !isRefreshing else { return }
         isRefreshing = true
         defer { isRefreshing = false }
@@ -79,6 +121,7 @@ final class ClaudeUsageMonitor: ObservableObject {
     /// user-initiated CLI probe. Marked `.live` because the user just paid
     /// tokens for a fresh reading.
     func applyManualSnapshot(_ snapshot: ClaudeUsageSnapshot) {
+        guard !isDisconnected else { return }
         state = Self.mapState(
             ClaudeUsagePresentation(snapshot: snapshot, delivery: .live, warnings: [])
         )

@@ -126,8 +126,66 @@ final class ClaudeUsageCollectorTests: XCTestCase {
         """.utf8)
     }
 
-    private static func httpResponse(_ status: Int) -> URLResponse {
-        HTTPURLResponse(url: URL(string: "https://api.anthropic.com/api/oauth/usage")!, statusCode: status, httpVersion: nil, headerFields: nil)!
+    func testRateLimitBacksOffOAuthUntilRetryAfter() async throws {
+        let cache = ClaudeUsageCache(fileURL: cacheFileURL)
+        cache.save(ClaudeUsageSnapshot(
+            planHint: "pro", fiveHour: ClaudeLimitWindow(usedPercent: 40, resetsAt: nil),
+            sevenDay: nil, scopedWindows: [], extraUsage: nil, source: .oauth, capturedAt: .now, schemaVersion: 1
+        ))
+
+        let calls = CallCounter()
+        let clock = NowBox(Date(timeIntervalSince1970: 1_000_000))
+        let oauthSource = ClaudeOAuthUsageSource(
+            credentialStore: FakeCredentialStore(result: .success(
+                ClaudeOAuthCredential(accessToken: "t", refreshToken: nil, expiresAt: nil, scopes: ["user:profile"], subscriptionType: "pro")
+            )),
+            requestExecutor: { _ in
+                calls.increment()
+                return (Data(), Self.httpResponse(429, headers: ["Retry-After": "600"]))
+            },
+            now: { clock.value }
+        )
+        let collector = ClaudeUsageCollector(
+            oauthSource: oauthSource,
+            statusLineReader: ClaudeRateLimitSnapshotReader(fileURL: statusLineFileURL),
+            cache: cache,
+            now: { clock.value }
+        )
+
+        // 1) 429 -> back-off recorded, serves the cache.
+        let first = await collector.refresh(reason: .scheduled)
+        XCTAssertEqual(first.delivery, .cached)
+        XCTAssertEqual(calls.count, 1)
+
+        // 2) still within the back-off window -> OAuth is not hit again.
+        _ = await collector.refresh(reason: .scheduled)
+        XCTAssertEqual(calls.count, 1, "OAuth must not be retried during the Retry-After back-off")
+
+        // 3) after Retry-After passes -> OAuth resumes.
+        clock.value = clock.value.addingTimeInterval(601)
+        _ = await collector.refresh(reason: .scheduled)
+        XCTAssertEqual(calls.count, 2, "OAuth resumes once the back-off window elapses")
+    }
+
+    private static func httpResponse(_ status: Int, headers: [String: String]? = nil) -> URLResponse {
+        HTTPURLResponse(url: URL(string: "https://api.anthropic.com/api/oauth/usage")!, statusCode: status, httpVersion: nil, headerFields: headers)!
+    }
+}
+
+private final class CallCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = 0
+    var count: Int { lock.withLock { value } }
+    func increment() { lock.withLock { value += 1 } }
+}
+
+private final class NowBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: Date
+    init(_ date: Date) { stored = date }
+    var value: Date {
+        get { lock.withLock { stored } }
+        set { lock.withLock { stored = newValue } }
     }
 }
 

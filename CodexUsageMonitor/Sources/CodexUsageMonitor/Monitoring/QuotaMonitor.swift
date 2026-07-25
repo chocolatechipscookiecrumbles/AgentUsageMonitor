@@ -22,6 +22,7 @@ final class QuotaMonitor: ObservableObject {
     private var refreshTimer: Timer?
     private var wakeObserver: NSObjectProtocol?
     private var settingsSubscription: AnyCancellable?
+    private var disconnectSubscription: AnyCancellable?
     private var hasStarted = false
     private var hasPendingAuthenticationRefresh = false
     private var automaticBurstStartedAt: Date?
@@ -58,6 +59,7 @@ final class QuotaMonitor: ObservableObject {
         MainActor.assumeIsolated {
             refreshTimer?.invalidate()
             settingsSubscription?.cancel()
+            disconnectSubscription?.cancel()
             if let wakeObserver { NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver) }
         }
     }
@@ -70,6 +72,17 @@ final class QuotaMonitor: ObservableObject {
             .dropFirst()
             .sink { [weak self] _ in
                 self?.refreshModeChanged()
+            }
+        disconnectSubscription = settings.$codexDisconnected
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] disconnected in
+                guard let self else { return }
+                if disconnected {
+                    self.applyDisconnectedState()
+                } else {
+                    self.refresh(reason: .authentication)
+                }
             }
         refresh(reason: .launch)
         wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
@@ -84,7 +97,34 @@ final class QuotaMonitor: ObservableObject {
         }
     }
 
+    /// Blanks Codex usage for an app-local disconnect: cancels any in-flight
+    /// read, stops scheduling, and shows an explicit disconnected state without
+    /// touching the CLI session.
+    private func applyDisconnectedState() {
+        refreshTask?.cancel()
+        refreshTask = nil
+        invalidateRefreshTimer()
+        nextRefreshAt = nil
+        let disconnected = QuotaRecord.withoutForecasts(
+            .unavailable("Codex is disconnected. Reconnect to show usage.")
+        )
+        record = disconnected
+        displayState = QuotaDisplayState(
+            mode: .cachedPaused,
+            displayedRecord: nil,
+            lastAttemptAt: disconnected.presentation.collectedAt,
+            lastConfirmedAt: nil,
+            pauseReason: .unavailable
+        )
+        refreshState = .idle
+    }
+
     func refresh(reason: RefreshReason) {
+        // App-local disconnect hides Codex usage without reading the CLI.
+        guard !settings.codexDisconnected else {
+            applyDisconnectedState()
+            return
+        }
         guard refreshTask == nil else {
             if reason == .authentication {
                 hasPendingAuthenticationRefresh = true

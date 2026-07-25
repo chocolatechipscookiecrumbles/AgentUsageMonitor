@@ -31,18 +31,6 @@ struct NotificationSettingsView: View {
                 }
             }
 
-            SettingsSection("Remaining Quota") {
-                ForEach(RemainingQuotaThreshold.allCases) { threshold in
-                    SettingsSectionRow(showsDivider: true) {
-                        SettingsPreferenceToggle(threshold.title, isOn: thresholdBinding(threshold))
-                    }
-                }
-                SettingsSectionRow(showsDivider: false) {
-                    SettingsDescription("Applies to both the 5-hour and weekly limits.")
-                }
-            }
-            .disabled(!settings.alertsEnabled)
-
             SettingsSection("Other Warnings") {
                 SettingsSectionRow {
                     SettingsPreferenceToggle("Forecasted exhaustion", isOn: $settings.forecastWarningsEnabled)
@@ -65,12 +53,5 @@ struct NotificationSettingsView: View {
             }
             .disabled(!settings.alertsEnabled)
         }
-    }
-
-    private func thresholdBinding(_ threshold: RemainingQuotaThreshold) -> Binding<Bool> {
-        Binding(
-            get: { settings.isQuotaThresholdEnabled(threshold) },
-            set: { settings.setQuotaThreshold(threshold, enabled: $0) }
-        )
     }
 }

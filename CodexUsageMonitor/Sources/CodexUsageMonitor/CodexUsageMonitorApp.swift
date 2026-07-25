@@ -1,5 +1,6 @@
 import SwiftUI
 import Darwin
+import UserNotifications
 
 @main
 @MainActor
@@ -14,17 +15,26 @@ struct CodexUsageMonitorApp: App {
             }
             return
         }
-        guard CommandLine.arguments.contains("--live-read-once") else { return }
-        Task {
-            let record = await QuotaRepository().refresh()
-            let presentation = record.presentation
-            let encoder = JSONEncoder()
-            encoder.dateEncodingStrategy = .iso8601
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            if let data = try? encoder.encode(presentation), let output = String(data: data, encoding: .utf8) {
-                print(output)
+        if CommandLine.arguments.contains("--live-read-once") {
+            Task {
+                let record = await QuotaRepository().refresh()
+                let presentation = record.presentation
+                let encoder = JSONEncoder()
+                encoder.dateEncodingStrategy = .iso8601
+                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                if let data = try? encoder.encode(presentation), let output = String(data: data, encoding: .utf8) {
+                    print(output)
+                }
+                exit(0)
             }
-            exit(0)
+            return
+        }
+
+        // Normal launch: banner every notification even when the app is
+        // frontmost. Gated to the real `.app` bundle like the notifiers, so
+        // command-line runs never touch the notification center.
+        if Bundle.main.bundleURL.pathExtension == "app" {
+            UNUserNotificationCenter.current().delegate = NotificationPresentationDelegate.shared
         }
     }
 

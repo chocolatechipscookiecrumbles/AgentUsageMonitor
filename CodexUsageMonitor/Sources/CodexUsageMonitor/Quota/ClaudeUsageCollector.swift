@@ -42,17 +42,42 @@ actor ClaudeUsageCollector {
     private let oauthSource: ClaudeOAuthUsageSource
     private let statusLineReader: ClaudeRateLimitSnapshotReader
     private let cache: ClaudeUsageCache
+    private let now: @Sendable () -> Date
+    /// When the endpoint returns 429, skip the networked OAuth read until this
+    /// time and serve local sources. `/api/oauth/usage` rate-limits aggressively
+    /// and does not recover if hammered, so hitting it again during a back-off
+    /// only compounds the limit.
+    private var oauthBackoffUntil: Date?
+    /// Used when a 429 arrives with no `Retry-After` header.
+    private static let defaultRateLimitBackoff: TimeInterval = 15 * 60
 
-    init(oauthSource: ClaudeOAuthUsageSource, statusLineReader: ClaudeRateLimitSnapshotReader, cache: ClaudeUsageCache) {
+    init(
+        oauthSource: ClaudeOAuthUsageSource,
+        statusLineReader: ClaudeRateLimitSnapshotReader,
+        cache: ClaudeUsageCache,
+        now: @escaping @Sendable () -> Date = { .now }
+    ) {
         self.oauthSource = oauthSource
         self.statusLineReader = statusLineReader
         self.cache = cache
+        self.now = now
     }
 
     func refresh(reason: ClaudeRefreshReason) async -> ClaudeUsagePresentation {
-        if let snapshot = try? await oauthSource.fetch(promptPolicy: reason.keychainPromptPolicy) {
-            cache.save(snapshot)
-            return ClaudeUsagePresentation(snapshot: snapshot, delivery: .live, warnings: [])
+        if oauthBackoffUntil.map({ now() >= $0 }) ?? true {
+            do {
+                let snapshot = try await oauthSource.fetch(promptPolicy: reason.keychainPromptPolicy)
+                oauthBackoffUntil = nil
+                cache.save(snapshot)
+                return ClaudeUsagePresentation(snapshot: snapshot, delivery: .live, warnings: [])
+            } catch let error as ClaudeOAuthError {
+                if case .rateLimited(let retryAfter) = error {
+                    oauthBackoffUntil = retryAfter ?? now().addingTimeInterval(Self.defaultRateLimitBackoff)
+                }
+                // fall through to the local sources below
+            } catch {
+                // fall through to the local sources below
+            }
         }
 
         // Tier 3 outranks tier 4 because a statusLine capture is *normally*

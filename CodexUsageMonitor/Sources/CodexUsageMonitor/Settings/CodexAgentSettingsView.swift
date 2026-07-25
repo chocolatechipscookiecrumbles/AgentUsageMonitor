@@ -1,16 +1,15 @@
 import SwiftUI
 
 struct CodexAgentSettingsView: View {
+    @ObservedObject var settings: AppSettings
     let status: SettingsStatus
     let connectionState: AgentConnectionState
     let presentation: QuotaPresentation
     let quotaValueMode: QuotaValueMode
-    let alertsEnabled: Bool
-    let isWarningThresholdEnabled: (RemainingQuotaThreshold) -> Bool
-    let setWarningThresholdEnabled: (RemainingQuotaThreshold, Bool) -> Void
     let signInWithBrowser: () -> Void
     let signInWithCLI: () -> Void
     let checkConnection: () -> Void
+    let disconnect: () -> Void
 
     var body: some View {
         SettingsSection("Connection") {
@@ -42,12 +41,7 @@ struct CodexAgentSettingsView: View {
             )
         )
 
-        AgentUsageWarningsSection(
-            provider: .codex,
-            alertsEnabled: alertsEnabled,
-            isThresholdEnabled: isWarningThresholdEnabled,
-            setThresholdEnabled: setWarningThresholdEnabled
-        )
+        AgentUsageWarningsSection(settings: settings, provider: .codex)
 
     }
 
@@ -65,7 +59,9 @@ struct CodexAgentSettingsView: View {
         case .signingIn(.cli):
             SettingsDescription("Finish signing in in the Terminal window.")
         case .connected:
-            SettingsDescription("Codex is connected. Logout and account switching are not included in this phase.")
+            // The connected explanation renders below the Disconnect row (see
+            // connectionActions), like the other agent-page subtext.
+            EmptyView()
         case .failed(let failure):
             Text(failure.displayMessage)
                 .font(.callout)
@@ -100,9 +96,10 @@ struct CodexAgentSettingsView: View {
             Button("Check again", action: checkConnection)
         }
         if case .connected = connectionState {
-            Button("Disconnect") {}
-                .disabled(true)
-            SettingsDescription("Disconnect is planned. It does not yet change this app or your Codex CLI session.")
+            SettingsPreferenceControlRow("Connected account") {
+                AgentDisconnectButton(provider: .codex, disconnect: disconnect)
+            }
+            SettingsDescription("Codex is connected. Account switching is not included in this phase.")
         }
     }
 

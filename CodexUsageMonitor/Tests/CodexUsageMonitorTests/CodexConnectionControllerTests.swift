@@ -41,6 +41,63 @@ final class CodexConnectionControllerTests: XCTestCase {
         XCTAssertEqual(connectedCount, 1)
     }
 
+    private let connected = AgentConnectionState.connected(AgentAccountSummary(planType: "test"))
+
+    func test_disconnectStaysDisconnectedAndPersistsTheFlag() async {
+        var disconnected = false
+        let controller = CodexConnectionController(
+            onConnected: {},
+            statusReader: { [connected] in connected },
+            isUserDisconnected: { disconnected },
+            setUserDisconnected: { disconnected = $0 }
+        )
+
+        controller.start()
+        await waitForState(connected, in: controller)
+
+        controller.disconnect()
+
+        XCTAssertTrue(disconnected, "disconnect must persist the flag")
+        XCTAssertEqual(controller.state, .disconnected)
+        // The still-valid credential must not auto-reconnect.
+        for _ in 0..<20 { await Task.yield() }
+        XCTAssertEqual(controller.state, .disconnected)
+    }
+
+    func test_startRespectsAPersistedDisconnect() async {
+        var disconnected = true
+        let controller = CodexConnectionController(
+            onConnected: {},
+            statusReader: { [connected] in connected },
+            isUserDisconnected: { disconnected },
+            setUserDisconnected: { disconnected = $0 }
+        )
+
+        controller.start()
+        for _ in 0..<20 { await Task.yield() }
+
+        XCTAssertEqual(controller.state, .disconnected, "a persisted disconnect must not auto-detect the CLI")
+    }
+
+    func test_checkConnectionClearsTheDisconnectAndReconnects() async {
+        var disconnected = true
+        let controller = CodexConnectionController(
+            onConnected: {},
+            statusReader: { [connected] in connected },
+            isUserDisconnected: { disconnected },
+            setUserDisconnected: { disconnected = $0 }
+        )
+
+        controller.start()
+        for _ in 0..<20 { await Task.yield() }
+        XCTAssertEqual(controller.state, .disconnected)
+
+        controller.checkConnection()
+
+        await waitForState(connected, in: controller)
+        XCTAssertFalse(disconnected, "an explicit reconnect must clear the disconnect flag")
+    }
+
     private func waitForState(
         _ expected: AgentConnectionState,
         in controller: CodexConnectionController

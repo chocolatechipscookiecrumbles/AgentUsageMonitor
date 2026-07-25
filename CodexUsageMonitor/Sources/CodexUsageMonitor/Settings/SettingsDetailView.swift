@@ -10,6 +10,7 @@ struct SettingsDetailView: View {
         switch selection {
         case .general:
             GeneralSettingsView(
+                viewModel: viewModel,
                 settings: viewModel.settings,
                 launchAtLogin: launchAtLogin
             )
@@ -24,6 +25,7 @@ struct SettingsDetailView: View {
         case .agents:
             AgentsSettingsView(
                 viewModel: viewModel,
+                settings: viewModel.settings,
                 selectedAgent: selectedSettingsAgent
             )
         case .dataPrivacy:

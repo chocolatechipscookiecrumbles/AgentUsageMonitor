@@ -2,6 +2,10 @@ import SwiftUI
 
 struct AgentsSettingsView: View {
     @ObservedObject var viewModel: QuotaViewModel
+    // Observed here (not only in the leaf chip view) because
+    // `AgentSettingsPageTemplate` captures its content once, freezing the
+    // subtree; rebuilding this container is what actually refreshes the chips.
+    @ObservedObject var settings: AppSettings
     let selectedAgent: AgentProvider
 
     var body: some View {
@@ -9,19 +13,19 @@ struct AgentsSettingsView: View {
             switch selectedAgent {
             case .codex:
                 CodexAgentSettingsView(
+                    settings: viewModel.settings,
                     status: viewModel.settingsStatus,
                     connectionState: viewModel.connectionState,
                     presentation: viewModel.presentation,
                     quotaValueMode: viewModel.settings.quotaValueMode,
-                    alertsEnabled: viewModel.settings.alertsEnabled,
-                    isWarningThresholdEnabled: viewModel.settings.isQuotaThresholdEnabled,
-                    setWarningThresholdEnabled: viewModel.settings.setQuotaThreshold,
                     signInWithBrowser: viewModel.signInWithBrowser,
                     signInWithCLI: viewModel.signInWithCLI,
-                    checkConnection: viewModel.checkCodexConnection
+                    checkConnection: viewModel.checkCodexConnection,
+                    disconnect: viewModel.disconnectCodex
                 )
             case .claudeCode:
                 ClaudeAgentSettingsView(
+                    settings: viewModel.settings,
                     setupState: viewModel.claudeSetupState,
                     connectionState: viewModel.claudeConnectionState,
                     usageState: viewModel.claudeState,

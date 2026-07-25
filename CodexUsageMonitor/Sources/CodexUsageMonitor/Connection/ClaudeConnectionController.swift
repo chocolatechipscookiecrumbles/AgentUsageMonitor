@@ -96,7 +96,7 @@ final class ClaudeConnectionController: ObservableObject {
             switch oauthError {
             case .credentialsNotFound, .unauthorized, .insufficientScope:
                 return .failed(.credentialsNotFound)
-            case .malformedResponse, .serverFailure, .transportError:
+            case .malformedResponse, .serverFailure, .rateLimited, .transportError:
                 return .failed(.usageUnavailable)
             }
         }

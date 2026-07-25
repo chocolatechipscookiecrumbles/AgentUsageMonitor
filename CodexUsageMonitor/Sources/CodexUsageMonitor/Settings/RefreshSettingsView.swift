@@ -51,8 +51,9 @@ struct RefreshSettingsView: View {
                 }
                 SettingsSectionRow(showsDivider: false) {
                     VStack(alignment: .leading, spacing: 6) {
-                        SettingsDescription("The monitor refreshes at launch, when the enabled wake trigger occurs, on schedule, and when requested manually.")
+                        SettingsDescription("This interval governs every agent. The monitor refreshes at launch, when the enabled wake trigger occurs, on schedule, and when requested manually.")
                         SettingsDescription("Automatic may temporarily refresh every 30 seconds near a warning threshold, qualified exhaustion, or quota reset. Fixed choices never use 30 seconds.")
+                        SettingsDescription("Claude reads its usage over the network, so its automatic refresh never goes faster than every 5 minutes to stay within Anthropic's limits, even at faster settings.")
                         SettingsDescription("After three unsuccessful refreshes, every mode temporarily retries every 10 minutes until an update is confirmed.")
                     }
                 }

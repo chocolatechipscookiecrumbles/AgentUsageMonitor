@@ -59,4 +59,18 @@ struct ClaudeConnectionStatus: Equatable {
         }
         return ClaudeConnectionStatus(isConnected: true, text: "Connected", detail: nil)
     }
+
+    /// Whether the agent page should offer **Disconnect** (and hide **Connect**).
+    /// True on a live read — passive capture with a working credential counts —
+    /// or on an explicit sign-in. This keeps the Connect/Disconnect buttons
+    /// consistent with the status row, which reads "Connected" on a live read
+    /// even when the sign-in button was never pressed.
+    static func isEffectivelyConnected(
+        signInState: ClaudeConnectionState,
+        usageState: ClaudeUsageState
+    ) -> Bool {
+        if resolve(signInState: signInState, usageState: usageState).isConnected { return true }
+        if case .connected = signInState { return true }
+        return false
+    }
 }

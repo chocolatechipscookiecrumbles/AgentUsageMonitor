@@ -59,8 +59,8 @@ final class QuotaNotifier {
         }
         guard presentation.confirmation.isTrusted else { return }
         if presentation.confirmation == .confirmed || presentation.confirmation == .confirmedAfterRetry {
-            await quotaAlerts(for: presentation.fiveHour, name: "5-hour")
-            await quotaAlerts(for: presentation.weekly, name: "Weekly")
+            await quotaAlerts(provider: .codex, for: presentation.fiveHour, name: "5-hour")
+            await quotaAlerts(provider: .codex, for: presentation.weekly, name: "Weekly")
         }
         if settings.resetCreditWarningsEnabled {
             for expiry in presentation.resetCreditExpiryDates {
@@ -88,15 +88,40 @@ final class QuotaNotifier {
         )
     }
 
-    private func quotaAlerts(for window: QuotaWindow?, name: String) async {
-        guard let window, let resetAt = window.resetAt else { return }
-        for threshold in RemainingQuotaThreshold.allCases
-            where settings.isQuotaThresholdEnabled(threshold) && window.remainingPercent <= threshold.rawValue {
-            await deliverOnce(
-                key: "quota-\(name)-\(resetAt.timeIntervalSince1970)-\(threshold.rawValue)",
-                title: "Codex \(name) limit is low",
-                body: "\(window.remainingPercent)% remains before the current limit resets."
-            )
+    /// Delivers Claude's remaining-quota threshold alerts. Called on a confirmed
+    /// (live) Claude read; cached reads must not re-alert. Reuses the shared
+    /// authorization gate and one-shot dedup.
+    func evaluateClaudeThresholds(fiveHour: QuotaWindow?, weekly: QuotaWindow?) async {
+        guard alertsEnabled else { return }
+        await quotaAlerts(provider: .claudeCode, for: fiveHour, name: "5-hour")
+        await quotaAlerts(provider: .claudeCode, for: weekly, name: "Weekly")
+    }
+
+    /// Confirms a settings change (e.g. "Will warn you when Claude reaches 25%").
+    /// Unlike quota alerts this always delivers — it is direct feedback for an
+    /// action the user just took, not a deduplicated recurring event.
+    func deliverConfirmation(_ body: String) async {
+        guard alertsEnabled else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "Quota Alerts"
+        content.body = body
+        content.sound = .default
+        let request = UNNotificationRequest(
+            identifier: "quota-confirmation-\(UUID().uuidString)",
+            content: content,
+            trigger: nil
+        )
+        try? await center.add(request)
+    }
+
+    private func quotaAlerts(provider: AgentProvider, for window: QuotaWindow?, name: String) async {
+        for alert in QuotaThresholdEvaluator.alerts(
+            provider: provider,
+            window: window,
+            name: name,
+            isEnabled: { settings.isQuotaThresholdEnabled($0, for: provider) }
+        ) {
+            await deliverOnce(key: alert.key, title: alert.title, body: alert.body)
         }
     }
 

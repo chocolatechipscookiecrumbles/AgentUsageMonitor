@@ -8,6 +8,7 @@ import SwiftUI
 /// It uses the shared `AgentQuotaSessionSection`, passing a "used" credits
 /// label (Anthropic reports spend, not a balance) and no reset credits.
 struct ClaudeAgentSettingsView: View {
+    @ObservedObject var settings: AppSettings
     let setupState: ClaudeSetupState
     let connectionState: ClaudeConnectionState
     let usageState: ClaudeUsageState
@@ -90,13 +91,9 @@ struct ClaudeAgentSettingsView: View {
 
         forceCLISection
 
-        // No Usage Warnings section here, deliberately (decided 2026-07-23).
-        // Codex's chips write to a real threshold store and feed a notifier;
-        // Claude has neither yet, so the section could only render inert —
-        // vertical space on a page just compacted, in exchange for nothing the
-        // user can act on. Claude's chips arrive with the general
-        // notification-settings port, which brings the per-provider store with
-        // it, rather than as a Claude-specific stub now.
+        // Claude now has a real per-provider threshold store and notification
+        // delivery, so its Remaining Quota chips are live like Codex's.
+        AgentUsageWarningsSection(settings: settings, provider: .claudeCode)
     }
 
     /// Tier 2 — deliberately separated from the free refresh above, with the
@@ -176,21 +173,31 @@ struct ClaudeAgentSettingsView: View {
                 Button("Connect", action: connectWithCredentials)
                     .disabled(isSigningIn)
             }
+            // The Always Allow / Allow explanation belongs before connecting,
+            // so the user understands the Keychain prompt they will approve.
+            SettingsDescription(ClaudeSignInPresentation.keychainPromptExplanation)
         }
-        if case .connected = connectionState {
-            SettingsPreferenceControlRow(
-                "Connected account",
-                description: ClaudeSignInPresentation.keychainPromptExplanation
-            ) {
-                Button("Disconnect", action: disconnect)
+        if isEffectivelyConnected {
+            SettingsPreferenceControlRow("Connected account") {
+                AgentDisconnectButton(provider: .claudeCode, disconnect: disconnect)
             }
         }
     }
 
+    /// A live read (passive capture with a working credential) or an explicit
+    /// sign-in both count as connected here, matching the status row.
+    private var isEffectivelyConnected: Bool {
+        ClaudeConnectionStatus.isEffectivelyConnected(
+            signInState: connectionState,
+            usageState: usageState
+        )
+    }
+
     private var showsConnectAction: Bool {
+        if isEffectivelyConnected { return false }
         switch connectionState {
-        case .notConnected, .failed, .signingIn, .missingCLI: true
-        case .checking, .connected: false
+        case .notConnected, .failed, .signingIn, .missingCLI: return true
+        case .checking, .connected: return false
         }
     }
 

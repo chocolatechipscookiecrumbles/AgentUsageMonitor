@@ -27,11 +27,42 @@ final class QuotaViewModel: ObservableObject {
     @Published private(set) var claudeSetupState: ClaudeSetupState
 
     let settings: AppSettings
+
+    /// Providers currently connected enough to show a menu-bar reading, in
+    /// canonical order. Drives the smart provider selector: with fewer than two,
+    /// the effective provider is forced and no selector is offered.
+    var menuBarEligibleProviders: [AgentProvider] {
+        MenuBarProviderSelection.eligibleProviders(
+            codexDisplayState: displayState,
+            claudeState: claudeState
+        )
+    }
+
+    /// The provider the single-provider menu-bar styles should render: the
+    /// user's stored choice when it is connected, otherwise the sole connected
+    /// provider.
+    var effectiveMenuBarProvider: AgentProvider {
+        MenuBarProviderSelection.effectiveProvider(
+            stored: settings.menuBarProvider,
+            eligible: menuBarEligibleProviders
+        )
+    }
+
     private let monitor: QuotaMonitor
     private let claudeMonitor: ClaudeUsageMonitor
+    /// App-level notifier for things `QuotaMonitor` (Codex) does not own: Claude
+    /// threshold alerts and quota-setting confirmations. Shares the same
+    /// authorization gate and UserDefaults dedup, so it cannot double-fire.
+    private let appNotifier: QuotaNotifier?
     private let claudeConnectionController: ClaudeConnectionController
     private let connectionController: CodexConnectionController
     private var subscriptions: Set<AnyCancellable> = []
+    /// Confirmation debounce: newly-enabled thresholds are collected and one
+    /// summary notification is sent 3 seconds after the last toggle.
+    private var previousThresholds: [AgentProvider: Set<RemainingQuotaThreshold>]
+    private var pendingConfirmations: Set<PendingThresholdConfirmation> = []
+    private var confirmationTask: Task<Void, Never>?
+    private static let confirmationDebounce: Duration = .seconds(3)
 
     init() {
         let settings = AppSettings(
@@ -46,12 +77,26 @@ final class QuotaViewModel: ObservableObject {
         )
         let monitor = QuotaMonitor(settings: settings)
         self.monitor = monitor
-        let connectionController = CodexConnectionController {
-            monitor.refresh(reason: .authentication)
-        }
+        let connectionController = CodexConnectionController(
+            onConnected: { monitor.refresh(reason: .authentication) },
+            isUserDisconnected: { [settings] in settings.codexDisconnected },
+            setUserDisconnected: { [settings] disconnected in settings.codexDisconnected = disconnected }
+        )
         self.connectionController = connectionController
-        let claudeMonitor = ClaudeUsageMonitor()
+        // Claude follows the shared Refresh Preferences like Codex, but its
+        // networked OAuth read is floored for endpoint safety.
+        let claudeMonitor = ClaudeUsageMonitor(
+            cadence: { [settings] in
+                ClaudeRefreshCadence.pollInterval(for: settings.refreshMode)
+            }
+        )
         self.claudeMonitor = claudeMonitor
+        // Same `.app`-only gate the Codex notifier uses, so tests and previews
+        // never touch the notification center.
+        self.appNotifier = Bundle.main.bundleURL.pathExtension == "app"
+            ? QuotaNotifier(settings: settings)
+            : nil
+        self.previousThresholds = settings.enabledQuotaThresholdsByProvider
         self.claudeConnectionController = ClaudeConnectionController(
             browserSignIn: {
                 // Browser sign-in (claude setup-token) is shelved as unverified;
@@ -97,9 +142,13 @@ final class QuotaViewModel: ObservableObject {
         connectionController.$state.removeDuplicates().sink { [weak self] state in
             self?.connectionState = state
         }.store(in: &subscriptions)
+        settings.$enabledQuotaThresholdsByProvider.sink { [weak self] newValue in
+            self?.handleThresholdChange(newValue)
+        }.store(in: &subscriptions)
         claudeMonitor.$state.sink { [weak self] state in
             self?.claudeState = state
             self?.updateClaudeSetupState()
+            self?.deliverClaudeThresholdAlerts(for: state)
         }.store(in: &subscriptions)
         claudeMonitor.$hasCompletedInitialRefresh.removeDuplicates().sink { [weak self] _ in
             self?.updateClaudeSetupState()
@@ -136,7 +185,13 @@ final class QuotaViewModel: ObservableObject {
     func start() {
         connectionController.start()
         monitor.start()
-        claudeMonitor.start()
+        // Respect a persisted Claude disconnect: show disconnected without
+        // reading, rather than resuming passive capture.
+        if settings.claudeDisconnected {
+            claudeMonitor.disconnect()
+        } else {
+            claudeMonitor.start()
+        }
         Task { [weak self] in
             guard let self else { return }
             _ = await monitor.refreshNotificationAuthorization()
@@ -149,6 +204,12 @@ final class QuotaViewModel: ObservableObject {
 
     func checkCodexConnection() {
         connectionController.checkConnection()
+    }
+
+    /// App-local disconnect: hide Codex usage and stop auto-detecting, leaving
+    /// the Codex CLI session and stored credential untouched.
+    func disconnectCodex() {
+        connectionController.disconnect()
     }
 
     func signInWithBrowser() {
@@ -185,10 +246,16 @@ final class QuotaViewModel: ObservableObject {
     /// Explicit user action — the only path that may raise the Keychain
     /// prompt for Claude Code's credential.
     func connectClaudeWithCredentials() {
+        settings.claudeDisconnected = false
+        claudeMonitor.reconnect()
         claudeConnectionController.useClaudeCodeCredentials()
     }
 
+    /// App-local disconnect: hide Claude usage (including passive capture) and
+    /// reset the connection, leaving the Claude Code Keychain credential intact.
     func disconnectClaude() {
+        settings.claudeDisconnected = true
+        claudeMonitor.disconnect()
         claudeConnectionController.signOut()
     }
 
@@ -243,5 +310,57 @@ final class QuotaViewModel: ObservableObject {
 
     func stopClaude() {
         claudeMonitor.stop()
+    }
+
+    /// Evaluates Claude's windows for threshold alerts, but only on a confirmed
+    /// (live) read — a cached read must not re-alert. Dedup by reset time in the
+    /// notifier makes repeated live reads safe.
+    private func deliverClaudeThresholdAlerts(for state: ClaudeUsageState) {
+        guard let appNotifier,
+              case .available(let presentation) = state,
+              presentation.delivery == .live else { return }
+        let model = ClaudeUsageDisplayModel(presentation: presentation)
+        let fiveHour = Self.claudeThresholdWindow(model.fiveHour)
+        let weekly = Self.claudeThresholdWindow(model.sevenDay)
+        Task { await appNotifier.evaluateClaudeThresholds(fiveHour: fiveHour, weekly: weekly) }
+    }
+
+    /// Collects newly-enabled thresholds and, after a short quiet period, sends
+    /// one confirmation summarizing them. A threshold turned on then off within
+    /// the window cancels out, so no confirmation is sent for it.
+    private func handleThresholdChange(_ newValue: [AgentProvider: Set<RemainingQuotaThreshold>]) {
+        for provider in AppSettings.quotaThresholdProviders {
+            let old = previousThresholds[provider] ?? []
+            let new = newValue[provider] ?? []
+            for added in new.subtracting(old) {
+                pendingConfirmations.insert(PendingThresholdConfirmation(provider: provider, threshold: added))
+            }
+            for removed in old.subtracting(new) {
+                pendingConfirmations.remove(PendingThresholdConfirmation(provider: provider, threshold: removed))
+            }
+        }
+        previousThresholds = newValue
+
+        confirmationTask?.cancel()
+        guard appNotifier != nil, !pendingConfirmations.isEmpty else { return }
+        confirmationTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.confirmationDebounce)
+            guard !Task.isCancelled else { return }
+            await self?.flushThresholdConfirmations()
+        }
+    }
+
+    private func flushThresholdConfirmations() async {
+        let pending = pendingConfirmations
+        pendingConfirmations = []
+        guard let body = ThresholdConfirmationMessage.body(for: Array(pending)) else { return }
+        await appNotifier?.deliverConfirmation(body)
+    }
+
+    /// Maps a Claude window into the provider-neutral `QuotaWindow`. A window
+    /// that has already reset is dropped rather than alerted on a stale figure.
+    private static func claudeThresholdWindow(_ window: ClaudeUsageDisplayModel.Window?) -> QuotaWindow? {
+        guard let window, !window.hasReset else { return nil }
+        return QuotaWindow(usedPercent: window.usedPercent, resetAt: window.resetsAt, durationMinutes: nil)
     }
 }
