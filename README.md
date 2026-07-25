@@ -98,6 +98,8 @@ Privacy** Settings page for specifics.
   and fix.
 - [Evidence-rich pull requests](docs/development/evidence-rich-pull-requests.md) —
   the repository's PR contract.
+- [Notification warnings](docs/development/notification-warnings.md) — what each
+  "Other Warnings" toggle does and how it fires.
 - [Implementation plans](docs/superpowers/plans/) — the design and evidence trail.
 
 ## Scope & caveats
