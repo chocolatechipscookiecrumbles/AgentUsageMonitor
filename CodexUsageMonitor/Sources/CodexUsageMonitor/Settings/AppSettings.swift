@@ -21,6 +21,7 @@ final class AppSettings: ObservableObject {
         static let refreshOnWake = "refresh.onWake"
         static let menuBarDisplayStyle = "menuBar.displayStyle"
         static let quotaValueMode = "menuBar.valueMode"
+        static let menuBarProvider = "menuBar.provider"
         static let appearancePreference = "general.appearance"
         static let keyboardShortcutsEnabled = "general.keyboardShortcutsEnabled"
         static let claudeCLIProbeConsented = "claude.cliProbeConsented"
@@ -49,6 +50,11 @@ final class AppSettings: ObservableObject {
     @Published var refreshOnWake: Bool { didSet { defaults.set(refreshOnWake, forKey: Key.refreshOnWake) } }
     @Published var menuBarDisplayStyle: MenuBarDisplayStyle { didSet { defaults.set(menuBarDisplayStyle.rawValue, forKey: Key.menuBarDisplayStyle) } }
     @Published var quotaValueMode: QuotaValueMode { didSet { defaults.set(quotaValueMode.rawValue, forKey: Key.quotaValueMode) } }
+    /// Which provider the single-provider menu-bar styles (e.g. "5-hour and
+    /// weekly" text) display. Only honored when more than one provider is
+    /// connected; otherwise the sole connected provider is shown. See
+    /// `MenuBarProviderSelection`.
+    @Published var menuBarProvider: AgentProvider { didSet { defaults.set(menuBarProvider.rawValue, forKey: Key.menuBarProvider) } }
     @Published var appearancePreference: AppearancePreference { didSet { defaults.set(appearancePreference.rawValue, forKey: Key.appearancePreference) } }
     @Published var keyboardShortcutsEnabled: Bool { didSet { defaults.set(keyboardShortcutsEnabled, forKey: Key.keyboardShortcutsEnabled) } }
     /// The menu-bar popover tab the user last viewed. Stored raw; whether it is
@@ -102,6 +108,7 @@ final class AppSettings: ObservableObject {
         refreshOnWake = Self.value(for: Key.refreshOnWake, defaults: defaults, defaultValue: true)
         menuBarDisplayStyle = defaults.string(forKey: Key.menuBarDisplayStyle).flatMap(MenuBarDisplayStyle.init(rawValue:)) ?? .combinedBars
         quotaValueMode = defaults.string(forKey: Key.quotaValueMode).flatMap(QuotaValueMode.init(rawValue:)) ?? .remaining
+        menuBarProvider = defaults.string(forKey: Key.menuBarProvider).flatMap(AgentProvider.init(rawValue:)) ?? .codex
         appearancePreference = defaults.string(forKey: Key.appearancePreference).flatMap(AppearancePreference.init(rawValue:)) ?? .system
         keyboardShortcutsEnabled = Self.value(for: Key.keyboardShortcutsEnabled, defaults: defaults, defaultValue: true)
         selectedMenuProvider = defaults.string(forKey: Key.selectedMenuProvider)

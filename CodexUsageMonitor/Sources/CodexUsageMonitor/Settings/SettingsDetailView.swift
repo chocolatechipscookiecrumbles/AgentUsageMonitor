@@ -10,6 +10,7 @@ struct SettingsDetailView: View {
         switch selection {
         case .general:
             GeneralSettingsView(
+                viewModel: viewModel,
                 settings: viewModel.settings,
                 launchAtLogin: launchAtLogin
             )

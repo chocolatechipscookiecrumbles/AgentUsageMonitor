@@ -1,8 +1,16 @@
 import SwiftUI
 
 struct GeneralSettingsView: View {
+    @ObservedObject var viewModel: QuotaViewModel
     @ObservedObject var settings: AppSettings
     @ObservedObject var launchAtLogin: LaunchAtLoginController
+
+    /// The provider selector only applies to single-provider (non-graphical)
+    /// styles, and only when more than one provider is connected.
+    private var showsProviderSelector: Bool {
+        settings.menuBarDisplayStyle.isSingleProvider
+            && MenuBarProviderSelection.showsSelector(eligible: viewModel.menuBarEligibleProviders)
+    }
 
     var body: some View {
         SettingsPage {
@@ -45,6 +53,24 @@ struct GeneralSettingsView: View {
                         .labelsHidden()
                         .pickerStyle(.menu)
                         .fixedSize()
+                    }
+                }
+
+                if showsProviderSelector {
+                    SettingsSectionRow {
+                        SettingsPreferenceControlRow(
+                            "Provider",
+                            description: "Which connected agent this style shows in the menu bar."
+                        ) {
+                            Picker("Provider", selection: $settings.menuBarProvider) {
+                                ForEach(viewModel.menuBarEligibleProviders) { provider in
+                                    Text(provider.tabTitle).tag(provider)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .fixedSize()
+                        }
                     }
                 }
 

@@ -18,9 +18,16 @@ enum QuotaValueMode: String, Codable, CaseIterable, Identifiable, Sendable {
     }
 
     func value(for window: QuotaWindow) -> Int {
+        value(forUsedPercent: window.usedPercent)
+    }
+
+    /// Transforms a raw *used* percentage into the displayed value for this
+    /// mode. Lets non-`QuotaWindow` sources (e.g. Claude's display model) share
+    /// the same used/remaining convention.
+    func value(forUsedPercent usedPercent: Int) -> Int {
         let value = switch self {
-        case .remaining: window.remainingPercent
-        case .used: window.usedPercent
+        case .remaining: 100 - usedPercent
+        case .used: usedPercent
         }
         return min(max(value, 0), 100)
     }

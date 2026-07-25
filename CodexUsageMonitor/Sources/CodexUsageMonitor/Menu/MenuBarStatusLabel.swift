@@ -14,14 +14,19 @@ struct MenuBarStatusLabel: View {
         if settings.menuBarDisplayStyle.isGraphical {
             barsLabel
         } else {
-            // The text mode ("5-hour and weekly") shows both windows for Codex
-            // via the single-provider presentation; the multi-provider glyph +
-            // single percentage was for the removed gauge mode.
+            // The text mode ("5-hour and weekly") shows the effective provider's
+            // two windows. When more than one provider is connected the user
+            // picks which via the General-settings selector, and a provider
+            // glyph is shown to disambiguate.
+            let eligible = viewModel.menuBarEligibleProviders
             MenuBarLabelView(
                 presentation: MenuBarLabelPresentation(
-                    displayState: viewModel.displayState,
+                    provider: viewModel.effectiveMenuBarProvider,
+                    codexDisplayState: viewModel.displayState,
+                    claudeState: viewModel.claudeState,
                     style: settings.menuBarDisplayStyle,
-                    valueMode: settings.quotaValueMode
+                    valueMode: settings.quotaValueMode,
+                    showsProviderMarker: MenuBarProviderSelection.showsSelector(eligible: eligible)
                 )
             )
         }

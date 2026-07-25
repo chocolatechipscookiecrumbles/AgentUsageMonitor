@@ -23,11 +23,21 @@ struct GeneralSettingsContextView: View {
                         )
                     )
                 } else {
+                    let eligible = MenuBarProviderSelection.eligibleProviders(
+                        codexDisplayState: displayState,
+                        claudeState: claudeState
+                    )
                     MenuBarLabelView(
                         presentation: MenuBarLabelPresentation(
-                            displayState: displayState,
+                            provider: MenuBarProviderSelection.effectiveProvider(
+                                stored: settings.menuBarProvider,
+                                eligible: eligible
+                            ),
+                            codexDisplayState: displayState,
+                            claudeState: claudeState,
                             style: settings.menuBarDisplayStyle,
-                            valueMode: settings.quotaValueMode
+                            valueMode: settings.quotaValueMode,
+                            showsProviderMarker: MenuBarProviderSelection.showsSelector(eligible: eligible)
                         )
                     )
                 }

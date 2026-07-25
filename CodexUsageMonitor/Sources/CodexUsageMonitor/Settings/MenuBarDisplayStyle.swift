@@ -22,4 +22,15 @@ enum MenuBarDisplayStyle: String, Codable, CaseIterable, Identifiable, Sendable 
         case .stackedBars, .combinedBars: true
         }
     }
+
+    /// Whether the style shows a single provider (and therefore needs a provider
+    /// choice) rather than every provider at once. The bar modes already show
+    /// all providers; the text mode shows one. Any future single-provider icon
+    /// style should return `true` here so it inherits the provider selector.
+    var isSingleProvider: Bool {
+        switch self {
+        case .fiveHourAndWeekly: true
+        case .stackedBars, .combinedBars: false
+        }
+    }
 }

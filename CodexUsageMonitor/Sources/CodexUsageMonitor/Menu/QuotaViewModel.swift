@@ -27,6 +27,27 @@ final class QuotaViewModel: ObservableObject {
     @Published private(set) var claudeSetupState: ClaudeSetupState
 
     let settings: AppSettings
+
+    /// Providers currently connected enough to show a menu-bar reading, in
+    /// canonical order. Drives the smart provider selector: with fewer than two,
+    /// the effective provider is forced and no selector is offered.
+    var menuBarEligibleProviders: [AgentProvider] {
+        MenuBarProviderSelection.eligibleProviders(
+            codexDisplayState: displayState,
+            claudeState: claudeState
+        )
+    }
+
+    /// The provider the single-provider menu-bar styles should render: the
+    /// user's stored choice when it is connected, otherwise the sole connected
+    /// provider.
+    var effectiveMenuBarProvider: AgentProvider {
+        MenuBarProviderSelection.effectiveProvider(
+            stored: settings.menuBarProvider,
+            eligible: menuBarEligibleProviders
+        )
+    }
+
     private let monitor: QuotaMonitor
     private let claudeMonitor: ClaudeUsageMonitor
     /// App-level notifier for things `QuotaMonitor` (Codex) does not own: Claude
