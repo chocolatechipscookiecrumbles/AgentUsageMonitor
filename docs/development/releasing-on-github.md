@@ -52,9 +52,9 @@ both paths.
 4. **Know the known gaps** so your release notes are honest:
    - **No app icon yet** (Workstream F is pending artwork) — the app ships with a
      generic icon until you add `AppIcon.appiconset`.
-   - **The Claude bridge needs `python3`** on the user's Mac. macOS no longer
-     ships Python by default (removed in 12.3), so a clean machine may lack it.
-     Note this in the release, or the Claude tab's bridge path will fail there.
+   - ~~**The Claude bridge needs `python3`.**~~ **Resolved:** the bridge is now a
+     native Swift executable bundled and signed inside the app, so a clean Mac no
+     longer needs Python.
    - **`LSUIElement` app:** it lives in the menu bar with no Dock icon — tell
      users where to look after launch.
 
@@ -233,7 +233,7 @@ Personal, non-commercial build. Menu-bar usage monitor for Codex and Claude.
 
 ## Requirements
 - macOS 14 (Sonoma) or later.
-- `python3` available (needed for the Claude usage bridge).
+- No Python or other runtime required — the Claude usage bridge is native.
 
 ## Known limitations
 - No custom app icon yet.

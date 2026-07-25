@@ -7,19 +7,22 @@ enum ClaudeStatusLineInstallResult: Equatable {
     case unableToUpdateSettings
 }
 
-/// Merges a statusLine entry pointing at the Claude usage bridge into
+/// Merges a statusLine entry pointing at the native Claude usage bridge into
 /// ~/.claude/settings.json, without ever touching an unrelated existing
 /// statusLine or a file that fails to parse as JSON.
 struct ClaudeStatusLineInstaller {
+    static let bridgeExecutableName = "claude-usage-bridge"
+
     private let settingsURL: URL
     private let bridgeCommand: String
 
-    /// Production path: copy the signed bundle's read-only Python resource to
+    /// Production path: copy the signed bundle's read-only bridge executable to
     /// app-owned Application Support before pointing Claude Code at it.
     ///
-    /// Running Python from inside the app bundle could create `__pycache__`
-    /// beside the module and invalidate the app signature. The copied
-    /// directory is also stable across app-bundle replacement.
+    /// Copying (rather than pointing into the .app) does two things: it strips
+    /// the quarantine flag so Claude Code can exec the helper without a Gatekeeper
+    /// block, and it keeps the statusLine command stable across app-bundle
+    /// replacement.
     init?(
         settingsURL: URL = URL(fileURLWithPath: NSHomeDirectory())
             .appendingPathComponent(".claude/settings.json"),
@@ -35,7 +38,7 @@ struct ClaudeStatusLineInstaller {
               let applicationSupportDirectory,
               fileManager.fileExists(
                   atPath: bundledBridgeDirectory
-                      .appendingPathComponent("claude_usage_bridge/__main__.py")
+                      .appendingPathComponent(Self.bridgeExecutableName)
                       .path
               ),
               let bridgeDirectory = try? Self.prepareBridgeDirectory(
@@ -44,12 +47,15 @@ struct ClaudeStatusLineInstaller {
                   fileManager: fileManager
               )
         else { return nil }
-        self.init(settingsURL: settingsURL, bridgeDirectory: bridgeDirectory)
+        self.init(
+            settingsURL: settingsURL,
+            bridgeExecutable: bridgeDirectory.appendingPathComponent(Self.bridgeExecutableName)
+        )
     }
 
-    init(settingsURL: URL, bridgeDirectory: URL) {
+    init(settingsURL: URL, bridgeExecutable: URL) {
         self.settingsURL = settingsURL
-        self.bridgeCommand = "cd \(Self.shellQuoted(bridgeDirectory.path)) && python3 -m claude_usage_bridge --quiet"
+        self.bridgeCommand = "\(Self.shellQuoted(bridgeExecutable.path)) --quiet"
     }
 
     static func prepareBridgeDirectory(
@@ -84,7 +90,24 @@ struct ClaudeStatusLineInstaller {
         } else {
             try fileManager.moveItem(at: staging, to: destination)
         }
+
+        // The copied helper must be executable and free of the quarantine flag
+        // so Claude Code can exec it directly. Both are best-effort: a missing
+        // quarantine attribute is the normal case and not an error.
+        let executable = destination.appendingPathComponent(bridgeExecutableName)
+        try? fileManager.setAttributes(
+            [.posixPermissions: 0o755],
+            ofItemAtPath: executable.path
+        )
+        removeQuarantine(executable)
         return destination
+    }
+
+    /// Best-effort removal of `com.apple.quarantine` from a copied executable.
+    private static func removeQuarantine(_ url: URL) {
+        _ = url.withUnsafeFileSystemRepresentation { path in
+            path.map { removexattr($0, "com.apple.quarantine", 0) }
+        }
     }
 
     /// Single-quotes a path for safe use inside the shell command Claude

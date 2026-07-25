@@ -1,17 +1,25 @@
 # Claude statusLine usage bridge
 
-This is a Phase 0 harness that captures Claude Code's own official `rate_limits`
+A tiny native helper that captures Claude Code's own official `rate_limits`
 fields — the same 5-hour and weekly `used_percentage`/`resets_at` values Claude
 Code already computes from real API response headers — into a small local
 snapshot file, at zero additional token cost. See the
 [capability research](../docs/superpowers/plans/2026-07-20-claude-code-capability-research.md)
 this implements (Signal A).
 
+> **Now native (Swift).** This bridge was originally a Python module. It has been
+> rewritten as a dependency-free Swift executable so a shipped build does not
+> require the user to have `python3` installed. The source lives in the app's
+> Swift package:
+> - executable: `CodexUsageMonitor/Sources/ClaudeUsageBridge/`
+> - shared logic: `CodexUsageMonitor/Sources/ClaudeUsageBridgeCore/`
+> - tests: `CodexUsageMonitor/Tests/CodexUsageMonitorTests/ClaudeUsageBridgeTests.swift`
+
 ## Safety boundary
 
-This script reads exactly one JSON object from stdin — the payload Claude
-Code's own `statusLine` feature already sends after a real turn — and persists
-**only** these fields:
+The bridge reads exactly one JSON object from stdin — the payload Claude Code's
+own `statusLine` feature already sends after a real turn — and persists **only**
+these fields:
 
 - `rate_limits.five_hour.used_percentage`, `rate_limits.five_hour.resets_at`
 - `rate_limits.seven_day.used_percentage`, `rate_limits.seven_day.resets_at`
@@ -27,47 +35,50 @@ with owner-only directory (`0700`) and file (`0600`) permissions.
 
 ## Setup
 
-Claude Code supports one `statusLine` command. Add or merge this into
-`~/.claude/settings.json`:
+Claude Code supports one `statusLine` command. The app installs it for you by
+merging this into `~/.claude/settings.json` (pointing at the copy it places in
+Application Support):
 
 ```json
 {
   "statusLine": {
     "type": "command",
-    "command": "cd '/absolute/path/to/ClaudeUsageBridge' && python3 -m claude_usage_bridge --quiet"
+    "command": "'/absolute/path/to/claude-usage-bridge' --quiet"
   }
 }
 ```
 
-(`--quiet` is optional; drop it if you want this bridge's own compact "Claude usage: 5h N% · 7d N%" line to also show as your status line.)
+(`--quiet` is optional; drop it if you want this bridge's own compact
+"Claude usage: 5h N% · 7d N%" line to also show as your status line.)
 
-If you already have a custom `statusLine` script, call this bridge from
-within it instead of replacing your script — for example, pipe your existing
-stdin payload to `python3 -m claude_usage_bridge --quiet` from
-`ClaudeUsageBridge/` as an additional step, so your own status line keeps
-rendering unchanged.
+If you already have a custom `statusLine` script, call this bridge from within
+it instead of replacing your script — pipe your existing stdin payload to the
+`claude-usage-bridge` executable as an additional step, so your own status line
+keeps rendering unchanged.
 
-## Run manually
-
-From this directory:
+## Build and run manually
 
 ```sh
-echo '{"rate_limits": {"five_hour": {"used_percentage": 12.0, "resets_at": 1800000000}}}' | python3 -m claude_usage_bridge
+cd CodexUsageMonitor
+swift build --product claude-usage-bridge
+echo '{"rate_limits": {"five_hour": {"used_percentage": 12.0, "resets_at": 1800000000}}}' \
+  | .build/debug/claude-usage-bridge
 ```
 
 Optional overrides:
 
 ```sh
-python3 -m claude_usage_bridge --output /path/to/snapshot.json
-python3 -m claude_usage_bridge --quiet
+.build/debug/claude-usage-bridge --output /path/to/snapshot.json
+.build/debug/claude-usage-bridge --quiet
 ```
 
 ## Native app companion
 
 The snapshot this bridge writes is read by `ClaudeRateLimitSnapshotReader` in
 the native app (`CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/`). The app
-bundles this module as a signed resource, copies it to
-`~/Library/Application Support/CodexUsageMonitor/ClaudeBridge/`, and uses it as
-the passive fallback behind the supported Claude Settings page. Interactive
-one-click installation and conflict merging for an existing custom
-`statusLine` remain deferred; manual setup must preserve an existing command.
+bundles the `claude-usage-bridge` executable as a signed resource, copies it to
+`~/Library/Application Support/CodexUsageMonitor/ClaudeBridge/` (stripping the
+download quarantine so Claude Code can exec it), and uses it as the passive
+fallback behind the supported Claude Settings page. Interactive one-click
+installation and conflict merging for an existing custom `statusLine` remain
+deferred; manual setup must preserve an existing command.
