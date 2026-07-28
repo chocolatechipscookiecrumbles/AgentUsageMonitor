@@ -93,6 +93,8 @@ struct ClaudeAgentSettingsView: View {
 
         // Claude now has a real per-provider threshold store and notification
         // delivery, so its Remaining Quota chips are live like Codex's.
+        AgentTokenMonitorSection(settings: settings, provider: .claudeCode)
+
         AgentUsageWarningsSection(settings: settings, provider: .claudeCode)
     }
 

@@ -41,6 +41,8 @@ struct CodexAgentSettingsView: View {
             )
         )
 
+        AgentTokenMonitorSection(settings: settings, provider: .codex)
+
         AgentUsageWarningsSection(settings: settings, provider: .codex)
 
     }
