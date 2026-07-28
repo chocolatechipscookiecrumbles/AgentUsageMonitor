@@ -330,6 +330,41 @@ enum ProviderLocalActivityState: Sendable, Equatable {
 - `xcodebuild -workspace .swiftpm/xcode/package.xcworkspace -scheme CodexUsageMonitor -destination 'platform=macOS' -derivedDataPath /tmp/codex-task2-identity-derived build` exited `0` with `** BUILD SUCCEEDED **`. Xcode retained its multiple-matching-destination warning.
 - Compatibility boundary: a legacy Codex usage row that omits cached-input or reasoning-output evidence now makes that scan unavailable instead of silently treating the missing component as zero. This is intentional fail-closed behavior for the supported four-component contract.
 
+#### Task 2 final review revision — 2026-07-28
+
+The final Task 2 review found three defects that source inspection alone had missed, because every prior diagnostic ran as a CLI harness with a 1048576-descriptor limit and every prior *live* probe predated the strict-parser revision.
+
+- **Unbounded open descriptors.** The source opened every `.jsonl` file under the sessions root before parsing any of them and held all descriptors for the whole scan. That root grows without bound (237 files on the development Mac already), so under a GUI application's descriptor limit the scan would throw and Codex activity would be permanently **Activity unavailable**. Traversal now lives in a shared `LocalActivityFileTraversal` that reads and closes each file as it is reached, holding at most one file descriptor per directory depth. A live scan under a deliberately lowered 64-descriptor limit returned the same accepted count as the unrestricted scan.
+- **`errno` poisoned across skipped entries.** The traversal loop reset `errno` only at the bottom of each iteration, so any `continue` path (a non-`.jsonl` sibling, a duplicate inode) could leave a stale value and turn normal end-of-directory into `.unsafeFilesystem`. `errno` is now cleared immediately before each `readdir`.
+- **Two fail-closed rules rejected valid provider records.** Against the real Codex root the scan returned `.unsafeToRead` outright:
+  - Codex emits rate-limit-only `token_count` records whose `info` is null — 18 of 23,733 sampled `token_count` payloads. These make no usage claim, so they are now ignorable like any other non-usage subtype instead of missing evidence.
+  - Codex emits usage objects whose reported `total_tokens` disagrees with `input_tokens + output_tokens` — 151 of 47,279 sampled usage objects. This plan's normalization rule already says to use the reported total only when internally consistent and `input + output` otherwise, so an inconsistent reported total is now ignored rather than fatal. Component values still decide the total, and every other component requirement stays strict.
+
+A present-but-incomplete usage object (a usage object missing an explicit component) remains `.unsafeToRead`, so the documented fail-closed four-component contract is unchanged for records that do claim usage.
+
+Sanitized disposable-harness output after the corrections:
+
+```text
+live status readable: true
+live accepted-event count: 13037
+live cold-scan seconds: 7.23
+live graph-total equality: true
+live model-presence flag: true
+live today request count: 599
+live readable under low descriptor limit: true
+live count stable under low descriptor limit: true
+rate-limit-only record readable: true
+incomplete usage object unsafeToRead: true
+symlink ancestor refused: true
+symlink final target refused: true
+mixed-directory readable: true
+absent root localRecordsMissing: true
+```
+
+The harness, its fabricated corpus, and its staged source copies were removed after the run. The sole focused regression exited `0` with one XCTest method and zero failures; no test method was added. `xcodebuild -workspace .swiftpm/xcode/package.xcworkspace -scheme CodexUsageMonitor -destination 'platform=macOS' -derivedDataPath /tmp/cum-derived build` exited `0` with `** BUILD SUCCEEDED **`.
+
+Recorded limitation: the 7.23-second cold live scan is a full-history rebuild. Task 4 owns incremental byte-offset reuse so this cost is not repeated per semantic update; Task 8 measures cold and append-only scans.
+
 ### Task 3: Add Claude streaming and sidechain reconciliation
 
 **Files:**

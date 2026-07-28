@@ -1,12 +1,11 @@
 import CryptoKit
-import Darwin
 import Foundation
 
 struct CodexLocalActivitySource: LocalActivitySource {
     let provider: AgentProvider = .codex
 
     private let sessionsRoot: URL
-    private let reader = LocalActivityJSONLReader()
+    private let traversal = LocalActivityFileTraversal()
 
     init(
         sessionsRoot: URL = FileManager.default.homeDirectoryForCurrentUser
@@ -17,23 +16,14 @@ struct CodexLocalActivitySource: LocalActivitySource {
 
     func scan(bounds: LocalActivityScanBounds) async -> LocalActivityScanResult {
         do {
-            let openedFiles = try Self.openRegularJSONLFiles(root: sessionsRoot)
-            defer { openedFiles.forEach { _ = Darwin.close($0.fileDescriptor) } }
-            guard !openedFiles.isEmpty else {
+            let parsedFiles = try await traversal.parseJSONLFiles(
+                root: sessionsRoot,
+                makeState: { FileParseState(opaqueFileID: $0) },
+                consume: { state, line in try state.consume(line) },
+                finish: { state, nextOffset in state.finished(nextOffset: nextOffset) }
+            )
+            guard !parsedFiles.isEmpty else {
                 return LocalActivityScanResult(requests: [], cursors: [], status: .localRecordsMissing)
-            }
-
-            var parsedFiles: [ParsedFile] = []
-            parsedFiles.reserveCapacity(openedFiles.count)
-            for openedFile in openedFiles {
-                let parsed = try await reader.read(
-                    fileDescriptor: openedFile.fileDescriptor,
-                    initialState: FileParseState(opaqueFileID: openedFile.opaqueFileID),
-                    consume: { state, line in
-                        try state.consume(line)
-                    }
-                )
-                parsedFiles.append(parsed.state.finished(nextOffset: parsed.nextOffset))
             }
 
             let priorOffsets = Dictionary(
@@ -50,7 +40,7 @@ struct CodexLocalActivitySource: LocalActivitySource {
                 .map { LocalActivityFileCursor(opaqueFileID: $0.opaqueFileID, nextByteOffset: $0.nextOffset) }
                 .sorted { $0.opaqueFileID < $1.opaqueFileID }
             return LocalActivityScanResult(requests: requests, cursors: cursors, status: .readable)
-        } catch CodexLocalActivityFailure.rootMissing {
+        } catch LocalActivityFileTraversal.TraversalFailure.rootMissing {
             return LocalActivityScanResult(requests: [], cursors: [], status: .localRecordsMissing)
         } catch {
             return LocalActivityScanResult(requests: [], cursors: [], status: .unsafeToRead)
@@ -236,144 +226,12 @@ struct CodexLocalActivitySource: LocalActivitySource {
 }
 
 private enum CodexLocalActivityFailure: Error {
-    case rootMissing
-    case unsafeFilesystem
     case malformedRecord
     case malformedUsage
     case arithmeticOverflow
     case unresolvedFork
     case conflictingMetadata
     case invalidReconciledUsage
-}
-
-private struct OpenedJSONLFile {
-    let fileDescriptor: Int32
-    let opaqueFileID: String
-}
-
-private extension CodexLocalActivitySource {
-    static func openRegularJSONLFiles(root: URL) throws -> [OpenedJSONLFile] {
-        guard root.path.hasPrefix("/") else { throw CodexLocalActivityFailure.unsafeFilesystem }
-        let flags = O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC
-        var currentDescriptor = Darwin.open("/", flags)
-        guard currentDescriptor >= 0 else { throw CodexLocalActivityFailure.unsafeFilesystem }
-
-        do {
-            for component in root.path.split(separator: "/", omittingEmptySubsequences: true) {
-                let name = String(component)
-                guard name != ".", name != ".." else {
-                    throw CodexLocalActivityFailure.unsafeFilesystem
-                }
-                let nextDescriptor = name.withCString {
-                    openat(currentDescriptor, $0, flags)
-                }
-                if nextDescriptor < 0 {
-                    if errno == ENOENT {
-                        throw CodexLocalActivityFailure.rootMissing
-                    }
-                    throw CodexLocalActivityFailure.unsafeFilesystem
-                }
-                _ = Darwin.close(currentDescriptor)
-                currentDescriptor = nextDescriptor
-            }
-
-            var rootStat = stat()
-            guard fstat(currentDescriptor, &rootStat) == 0,
-                  rootStat.st_mode & S_IFMT == S_IFDIR
-            else {
-                throw CodexLocalActivityFailure.unsafeFilesystem
-            }
-
-            var files: [OpenedJSONLFile] = []
-            var seenFileIDs: Set<String> = []
-            do {
-                try collectJSONLFiles(
-                    directoryDescriptor: currentDescriptor,
-                    files: &files,
-                    seenFileIDs: &seenFileIDs
-                )
-                _ = Darwin.close(currentDescriptor)
-                return files
-            } catch {
-                files.forEach { _ = Darwin.close($0.fileDescriptor) }
-                throw error
-            }
-        } catch {
-            _ = Darwin.close(currentDescriptor)
-            throw error
-        }
-    }
-
-    static func collectJSONLFiles(
-        directoryDescriptor: Int32,
-        files: inout [OpenedJSONLFile],
-        seenFileIDs: inout Set<String>
-    ) throws {
-        let duplicate = dup(directoryDescriptor)
-        guard duplicate >= 0, let directory = fdopendir(duplicate) else {
-            if duplicate >= 0 { _ = Darwin.close(duplicate) }
-            throw CodexLocalActivityFailure.unsafeFilesystem
-        }
-        defer { closedir(directory) }
-
-        errno = 0
-        while let entry = readdir(directory) {
-            let name = withUnsafePointer(to: &entry.pointee.d_name) {
-                $0.withMemoryRebound(to: CChar.self, capacity: Int(NAME_MAX) + 1) {
-                    String(cString: $0)
-                }
-            }
-            guard name != ".", name != "..", !name.hasPrefix(".") else { continue }
-
-            let childDescriptor = name.withCString {
-                openat(directoryDescriptor, $0, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
-            }
-            guard childDescriptor >= 0 else {
-                throw CodexLocalActivityFailure.unsafeFilesystem
-            }
-
-            var childStat = stat()
-            guard fstat(childDescriptor, &childStat) == 0 else {
-                _ = Darwin.close(childDescriptor)
-                throw CodexLocalActivityFailure.unsafeFilesystem
-            }
-
-            switch childStat.st_mode & S_IFMT {
-            case S_IFDIR:
-                do {
-                    try collectJSONLFiles(
-                        directoryDescriptor: childDescriptor,
-                        files: &files,
-                        seenFileIDs: &seenFileIDs
-                    )
-                    _ = Darwin.close(childDescriptor)
-                } catch {
-                    _ = Darwin.close(childDescriptor)
-                    throw error
-                }
-            case S_IFREG:
-                guard name.lowercased().hasSuffix(".jsonl") else {
-                    _ = Darwin.close(childDescriptor)
-                    continue
-                }
-                let fileID = digest([
-                    "device",
-                    String(childStat.st_dev),
-                    "inode",
-                    String(childStat.st_ino),
-                ])
-                guard seenFileIDs.insert(fileID).inserted else {
-                    _ = Darwin.close(childDescriptor)
-                    continue
-                }
-                files.append(OpenedJSONLFile(fileDescriptor: childDescriptor, opaqueFileID: fileID))
-            default:
-                _ = Darwin.close(childDescriptor)
-            }
-            errno = 0
-        }
-        guard errno == 0 else { throw CodexLocalActivityFailure.unsafeFilesystem }
-    }
 }
 
 private struct FileParseState: Sendable {
@@ -424,9 +282,13 @@ private struct FileParseState: Sendable {
                 return
             }
             guard payloadType == "token_count" else { return }
+            // Codex also emits rate-limit-only `token_count` records whose
+            // `info` is null. Those make no usage claim at all, so they are
+            // ignorable like any other non-usage subtype rather than missing
+            // evidence. A usage object that *is* present stays strict below.
+            guard let info = payload.info else { return }
             guard let rawTimestamp = record.timestamp,
                   let timestamp = CodexLocalActivitySource.date(rawTimestamp),
-                  let info = payload.info,
                   let turnID = payload.turnID ?? currentTurnID
             else {
                 throw CodexLocalActivityFailure.malformedUsage
@@ -554,11 +416,15 @@ private struct Totals: Sendable, Equatable, Hashable {
         else {
             throw CodexLocalActivityFailure.malformedUsage
         }
+        // The normalized Codex total is the reported `total_tokens` when it is
+        // internally consistent and `input + output` otherwise, which are the
+        // same number whenever the record agrees. Codex does emit records whose
+        // reported total disagrees, so an inconsistent one is ignored rather
+        // than treated as unsafe evidence; the component values still decide.
         let normalizedTotal = input.addingReportingOverflow(output)
         guard input >= 0, cached >= 0, output >= 0, reasoning >= 0,
               cached <= input, reasoning <= output,
-              !normalizedTotal.overflow,
-              usage.totalTokens.map({ $0 == normalizedTotal.partialValue }) ?? true
+              !normalizedTotal.overflow
         else {
             throw CodexLocalActivityFailure.malformedUsage
         }
