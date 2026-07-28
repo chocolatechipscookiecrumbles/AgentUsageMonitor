@@ -308,6 +308,19 @@ enum ProviderLocalActivityState: Sendable, Equatable {
 - `xcodebuild -workspace .swiftpm/xcode/package.xcworkspace -scheme CodexUsageMonitor -destination 'platform=macOS' -derivedDataPath /tmp/codex-task2-derived build` exited `0` with `** BUILD SUCCEEDED **`. The build retained the pre-existing `kSecUseAuthenticationUIFail` deprecation warning.
 - Limitation: the fabricated corpus and diagnostic harness were temporary artifacts outside the repository, not maintained automated coverage. Per the approved regression boundary, only exact cumulative replay is retained as an XCTest; other counter shapes remain manual source-boundary acceptance.
 
+#### Task 2 review revision evidence — 2026-07-28
+
+- The source now fails closed with `.unsafeToRead` when a complete JSONL record is malformed, a usage record is missing or has unsupported evidence, token values are invalid, or any reconciliation addition overflows. Arithmetic overflow is no longer swallowed as a prior counted value.
+- A child session with usage-bearing events now requires a resolvable parent/fork baseline; an unresolved fork is `.unsafeToRead` rather than a guessed partial contribution.
+- Once a cumulative component drop latches interleaved mode, each component contributes only `max(0, current - watermark)`, capped by the matching reported-last component. A fabricated lower-than-watermark row contributed zero.
+- Root traversal and recursive enumeration now use directory-relative descriptors with `O_NOFOLLOW`; every opened descriptor is validated as a directory or regular file before use. Fabricated ancestor-symlink and final-file-symlink cases were both refused.
+- The JSONL reader now feeds each completed bounded line directly into selective decoding. It retains only the current line buffer and sanitized parser state, not an array of raw lines.
+- Request identity now prefers an allowed provider event/request ID. Its fallback hashes provider, opaque session/turn identity, timestamp, cumulative/last usage evidence, reconciled delta, and model evidence; it excludes path, inode cursor, and byte offset. Fabricated move and same-content replacement scans produced the same request ID.
+- The disposable non-XCTest review harness exited `0` and emitted only: malformed usage `unsafeToRead`; unresolved fork `unsafeToRead`; below-watermark accepted delta `0`; symlink ancestor refused `true`; symlink final target refused `true`; movement identity stable `true`; replacement identity stable `true`; graph-total equality `true`. The harness and corpus were removed after the run.
+- `env CLANG_MODULE_CACHE_PATH=/tmp/codex-task2-review-clang SWIFTPM_MODULECACHE_OVERRIDE=/tmp/codex-task2-review-swiftpm swift test --disable-sandbox --scratch-path /tmp/codex-task2-review-build --filter 'LocalActivityReconciliationRegressionTests/testExactCumulativeReplayDoesNotInflateObservedTokens'` exited `0`; exactly one XCTest ran with zero failures. The fixture uses `/private/tmp` because macOS `/var` is a symlink and the descriptor traversal intentionally refuses symlink ancestors.
+- `xcodebuild -workspace .swiftpm/xcode/package.xcworkspace -scheme CodexUsageMonitor -destination 'platform=macOS' -derivedDataPath /tmp/codex-task2-review-derived build` exited `0` with `** BUILD SUCCEEDED **`. Xcode retained its multiple-matching-destination warning; the focused SwiftPM build also retained the pre-existing `kSecUseAuthenticationUIFail` deprecation warnings.
+- Limitation: the expanded safety and counter-shape matrix remains temporary manual source-boundary acceptance under the approved one-regression-method constraint.
+
 ### Task 3: Add Claude streaming and sidechain reconciliation
 
 **Files:**

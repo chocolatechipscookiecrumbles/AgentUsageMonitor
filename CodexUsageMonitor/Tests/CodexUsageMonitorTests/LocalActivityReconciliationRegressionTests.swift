@@ -4,7 +4,7 @@ import XCTest
 
 final class LocalActivityReconciliationRegressionTests: XCTestCase {
     func testExactCumulativeReplayDoesNotInflateObservedTokens() async throws {
-        let root = FileManager.default.temporaryDirectory
+        let root = URL(fileURLWithPath: "/private/tmp", isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
