@@ -44,9 +44,10 @@ both paths.
    swift build
    swift test          # expect: 0 failures
    ```
-2. **Build a *release* binary, not debug.** ⚠️ `build-app.sh` today runs a plain
-   `swift build` (a **debug** build) and installs from `.build/debug/`. For a real
-   release you want an optimized binary — see [Step 2](#step-2--build-the-release-app).
+2. ~~**Build a *release* binary, not debug.**~~ **Resolved 2026-07-28:**
+   `build-app.sh` builds `-c release` and installs the app executable and the
+   bundled bridge from `.build/release/`. Override with `BUILD_CONFIGURATION=debug`
+   only for local iteration — never for a release.
 3. **Bump the version** in `CodexUsageMonitor/Resources/Info.plist`
    (see [Step 1](#step-1--pick-and-set-the-version)).
 4. **Know the known gaps** so your release notes are honest:
@@ -92,23 +93,33 @@ cd CodexUsageMonitor
 
 This produces `CodexUsageMonitor/.build/CodexUsageMonitor.app`.
 
-**To ship an optimized (release) binary** instead of the debug one the script
-currently installs, build release first and point the install at it. The simplest
-durable fix is to make the script build `-c release` and copy from
-`.build/release/`; until then, do it by hand:
-
-```sh
-cd CodexUsageMonitor
-swift build -c release
-# then run the rest of build-app.sh's steps, but install the release binary:
-install -m 755 .build/release/CodexUsageMonitor .build/CodexUsageMonitor.app/Contents/MacOS/CodexUsageMonitor
-# re-sign after replacing the binary (signing must be the LAST mutation):
-codesign --force --options runtime --sign "Developer ID Application" \
-  --identifier com.david.codex-usage-monitor .build/CodexUsageMonitor.app
-```
+**The script builds an optimized binary.** As of 2026-07-28 it runs
+`swift build -c release` and installs both the app executable and the bundled
+Claude bridge from `.build/release/`, so no hand-patching is needed. Set
+`BUILD_CONFIGURATION=debug` if you want a debug bundle for local iteration.
 
 > **Rule of thumb:** *signing must be the last thing you do to the bundle.* Any
-> change to the app's contents after signing invalidates the signature.
+> change to the app's contents after signing invalidates the signature. This is
+> why the script signs the nested bridge first and the app last — and why
+> replacing the binary by hand after a build means re-signing.
+
+### Confirming the bundle is notarization-ready
+
+Apple's notary service rejects a bundle that lacks the hardened runtime, carries
+the `get-task-allow` entitlement, or has no secure timestamp. Check all three
+before submitting:
+
+```sh
+app=.build/CodexUsageMonitor.app
+codesign -dvv "$app" 2>&1 | grep -E "flags|Authority=Developer ID|Timestamp"
+codesign -d --entitlements - "$app"          # expect: no get-task-allow
+spctl -a -vv "$app"                          # expect: rejected / Unnotarized Developer ID
+```
+
+A correct pre-notarization bundle prints `flags=0x10000(runtime)`, a
+`Developer ID Application` authority, a `Timestamp=`, and no entitlements. The
+`spctl` rejection is expected at this point — `source=Unnotarized Developer ID`
+means the signature is right and notarization is the only remaining step.
 
 ### Choosing the signing identity
 
