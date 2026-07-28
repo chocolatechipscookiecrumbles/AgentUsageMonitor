@@ -10,6 +10,7 @@ import SwiftUI
 /// and it never presents these totals as account usage or quota consumption.
 struct ProviderTokenActivityCard: View {
     let presentation: ProviderTokenActivityPresentation
+    var visibleSections: Set<TokenMonitorSection> = Set(TokenMonitorSection.allCases)
 
     @Environment(\.colorScheme) private var colorScheme
     /// Hover lives entirely in the view. It changes the detail line and the
@@ -92,32 +93,57 @@ struct ProviderTokenActivityCard: View {
     }
 
     private func expandedBody(_ expanded: ProviderTokenActivityPresentation.Expanded) -> some View {
-        VStack(alignment: .leading, spacing: MenuPopoverTheme.activitySectionSpacing) {
+        let sections = renderableSections(expanded)
+
+        return VStack(alignment: .leading, spacing: MenuPopoverTheme.activitySectionSpacing) {
+            ForEach(Array(sections.enumerated()), id: \.element) { index, section in
+                if index > 0 {
+                    Rectangle()
+                        .fill(theme.divider)
+                        .frame(height: MenuPopoverTheme.dividerHeight)
+                }
+                sectionBody(section, expanded)
+            }
+        }
+    }
+
+    /// A section renders when the user enabled it *and* it has something to
+    /// show. Both conditions are resolved here so divider placement has one
+    /// source of truth and no rule can appear above or below nothing.
+    private func renderableSections(
+        _ expanded: ProviderTokenActivityPresentation.Expanded
+    ) -> [TokenMonitorSection] {
+        TokenMonitorSection.allCases.filter { section in
+            guard visibleSections.contains(section) else { return false }
+            switch section {
+            case .activityChart, .tokenCategories:
+                return true
+            case .modelUsage:
+                return !expanded.modelUsage.isEmpty
+            case .lastRequest:
+                return expanded.lastRequest != nil
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func sectionBody(
+        _ section: TokenMonitorSection,
+        _ expanded: ProviderTokenActivityPresentation.Expanded
+    ) -> some View {
+        switch section {
+        case .activityChart:
             chart(expanded)
-
-            Rectangle()
-                .fill(theme.divider)
-                .frame(height: MenuPopoverTheme.dividerHeight)
-
+        case .tokenCategories:
             metricColumns(expanded)
-
-            if !expanded.modelUsage.isEmpty {
-                Rectangle()
-                    .fill(theme.divider)
-                    .frame(height: MenuPopoverTheme.dividerHeight)
-
-                VStack(alignment: .leading, spacing: MenuPopoverTheme.activityRowSpacing) {
-                    ForEach(expanded.modelUsage) { model in
-                        modelRow(model)
-                    }
+        case .modelUsage:
+            VStack(alignment: .leading, spacing: MenuPopoverTheme.activityRowSpacing) {
+                ForEach(expanded.modelUsage) { model in
+                    modelRow(model)
                 }
             }
-
+        case .lastRequest:
             if let lastRequest = expanded.lastRequest {
-                Rectangle()
-                    .fill(theme.divider)
-                    .frame(height: MenuPopoverTheme.dividerHeight)
-
                 lastRequestRow(lastRequest)
             }
         }
@@ -143,6 +169,9 @@ struct ProviderTokenActivityCard: View {
                 emptyPlot(expanded)
             }
         }
+        // A pointer resting on a bar when the chart is switched off would
+        // otherwise leave its caption behind for the next time it appears.
+        .onDisappear { hoveredBucket = nil }
     }
 
     private func plot(_ expanded: ProviderTokenActivityPresentation.Expanded) -> some View {
