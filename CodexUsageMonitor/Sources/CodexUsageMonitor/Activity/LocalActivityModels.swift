@@ -135,8 +135,9 @@ enum ProviderLocalActivityState: Sendable, Equatable {
 }
 
 /// The sole pure boundary that converts reconciled requests into presentation
-/// data. Sources must already have removed replayed cumulative, streaming, and
-/// sidechain records before they reach this type.
+/// data. Sources must already have removed replayed or duplicate cumulative,
+/// streaming, and copied-sidechain representations while preserving every
+/// unique reconciled main-agent, subagent, and sidechain request.
 enum LocalActivityAggregation {
     static func state(
         provider: AgentProvider,
