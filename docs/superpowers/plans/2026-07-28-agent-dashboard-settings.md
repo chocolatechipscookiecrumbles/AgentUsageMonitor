@@ -1,6 +1,6 @@
 # Agent Token Monitor Settings Implementation Plan
 
-> **Status (2026-07-28): Planned, not started.** Adds a per-agent **Token Monitor** section to the Agents Settings Destination that shows or hides the menu-popover Token Monitor card and chooses which of its parts appear. It also renames the card itself to Token Monitor so one feature carries one name.
+> **Status (2026-07-28): Implemented; signed-app visual acceptance unobserved.** Adds a per-agent **Token Monitor** section to the Agents Settings Destination that shows or hides the menu-popover Token Monitor card and chooses which of its parts appear. It also renames the card itself to Token Monitor so one feature carries one name.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` (recommended) or `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -711,6 +711,86 @@ codesign --verify --deep --strict --verbose=2 .build/CodexUsageMonitor.app
 - [ ] **Step 11:** Commit as `docs: record token monitor settings verification evidence`.
 
 ---
+
+---
+
+## Implementation evidence — 2026-07-28
+
+Tasks 1 through 6 are implemented. Each task built and ran the full suite before committing.
+
+### A defect found and fixed during review
+
+The first implementation of the master toggle called `cache.save(reconciledRequests)`, rewriting the whole cache file from in-memory state. That silently broke a guarantee established when the cache was added: a scan returning `.unsafeToRead` clears a provider in memory but deliberately leaves its cached history on disk, because an unreadable scan says nothing about what was previously observed. Any later whole-map write would erase exactly the entry meant to survive — so hiding *one* agent could have wiped *another* agent's cached history.
+
+`LocalActivityCache.update(_:requests:)` now writes one provider's entry at a time, loading and re-saving around it. Both the monitor's scan results and the disable path use it. Sanitized harness output for the exact scenario:
+
+```text
+both cached: true
+codex removed: true
+claude cached history survived: true
+codex repopulated: true
+claude still intact: true
+absent removal is a no-op: true
+```
+
+### Preference behavior
+
+```text
+PREF unset visible: true
+PREF unset all sections: true
+PREF unset wrote nothing: true
+PREF visibility persists: true
+PREF claude unaffected: true
+PREF section persists: true
+PREF other sections intact: true
+PREF re-enable keeps section off: true
+PREF unknown dropped: true
+```
+
+Defaults are not written at launch, so an untouched install records no preference it was never given. Re-enabling an agent restores its stored section set rather than resetting it, and a section string this build does not recognize is dropped without disabling the rest.
+
+### Geometry
+
+Card heights at the 308-point content width, with no combination exceeding it horizontally:
+
+```text
+all sections:            369.0
+without activityChart:   244.0  (saves 125.0)
+without modelUsage:      278.0  (saves  91.0)
+without tokenCategories: 316.0  (saves  53.0)
+without lastRequest:     320.0  (saves  49.0)
+header only:              72.0  (saves 297.0)
+```
+
+Composed Codex popover height:
+
+```text
+default (all sections):        929.0
+chart and categories only:     789.0
+header only:                   632.0
+Token Monitor hidden:          548.0
+```
+
+These numbers belong to the deferred Bug-fix item *Token Monitor card makes the popover taller than a laptop screen*. The default is unchanged at 929 points, so this feature does not fix that problem — but it does give a user on a small display a way to fit the popover, and hiding the card entirely returns the tab to 548 points.
+
+### Required verification
+
+- `xcodebuild -workspace .swiftpm/xcode/package.xcworkspace -scheme CodexUsageMonitor -destination 'platform=macOS' build` exited `0` with `** BUILD SUCCEEDED **`.
+- `swift test` executed 299 tests with 0 failures — the 298-test baseline plus the single approved reconciliation regression. No test was added for this feature.
+- `bash Scripts/build-app.sh` produced a Developer ID-signed bundle; `codesign --verify --deep --strict --verbose=2` reported `valid on disk` and `satisfies its Designated Requirement`.
+- `git diff --check` reported no whitespace errors.
+- All disposable harnesses were deleted after their runs.
+
+### Unobserved
+
+Steps 5 and 7 through 9 were **not performed** and must not be recorded as passed:
+
+- signed-app Settings visual acceptance at 680 × 560 with the Context Rail hidden and visible, in Light and Dark;
+- signed-app popover acceptance while toggling sections;
+- keyboard and VoiceOver traversal of the new rows;
+- the live check that a file write under `~/.codex/sessions` schedules no scan while Codex is hidden.
+
+Two reasons, unchanged from the card's own acceptance: the popover height problem is deferred, so visual acceptance should follow its resolution rather than precede it; and launching the bundle to drive Settings and the popover can raise a Keychain/SecurityAgent prompt, which is not an acceptable side effect of an automated audit. The geometry evidence above comes from an isolated hosting harness, which the repository's rules correctly treat as insufficient for final visual acceptance.
 
 ## Explicitly Deferred
 

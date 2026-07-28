@@ -53,6 +53,23 @@ struct LocalActivityCache {
         return result
     }
 
+    /// Writes one provider's entry, leaving every other provider's on disk.
+    ///
+    /// Whole-map writes are unsafe here: the monitor deliberately drops a
+    /// provider whose scan was unsafe to read while leaving its cached history
+    /// alone, so rewriting the file from in-memory state would erase exactly
+    /// the entry that was meant to survive.
+    func update(_ provider: AgentProvider, requests: [LocalActivityRequest]?, now: Date = .now) {
+        var entries = load()
+        if let requests {
+            entries[provider] = requests
+        } else {
+            guard entries[provider] != nil else { return }
+            entries[provider] = nil
+        }
+        save(entries, now: now)
+    }
+
     func save(_ requestsByProvider: [AgentProvider: [LocalActivityRequest]], now: Date = .now) {
         let entries = requestsByProvider.map { provider, requests in
             LocalActivityCachedRequests(

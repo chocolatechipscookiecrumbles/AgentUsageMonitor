@@ -125,8 +125,9 @@ final class LocalActivityMonitor: ObservableObject {
         observers[provider] = nil
         reconciledRequests[provider] = nil
         states[provider] = nil
-        // Rewriting without this provider is what removes it from disk.
-        cache.save(reconciledRequests)
+        // Removing only this provider's entry, so an agent whose scan was
+        // unsafe to read keeps the history that was deliberately left alone.
+        cache.update(provider, requests: nil)
     }
 
     private func startObserver(for provider: AgentProvider) {
@@ -173,11 +174,11 @@ final class LocalActivityMonitor: ObservableObject {
             // events from double counting a request.
             reconciledRequests[provider] = result.requests
             publish(provider)
-            cache.save(reconciledRequests)
+            cache.update(provider, requests: result.requests)
         case .localRecordsMissing:
             reconciledRequests[provider] = nil
             states[provider] = .unavailable(.localRecordsMissing)
-            cache.save(reconciledRequests)
+            cache.update(provider, requests: nil)
         case .unsafeToRead:
             // An unreadable scan says nothing about what was already observed,
             // so the cached history is left alone rather than erased.
