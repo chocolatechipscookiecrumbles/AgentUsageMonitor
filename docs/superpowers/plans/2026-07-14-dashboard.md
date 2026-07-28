@@ -275,14 +275,17 @@ enum ProviderLocalActivityState: Sendable, Equatable {
 
 - Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Activity/LocalActivityJSONLReader.swift`
 - Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Activity/CodexLocalActivitySource.swift`
+- Create: `CodexUsageMonitor/Tests/CodexUsageMonitorTests/LocalActivityReconciliationRegressionTests.swift`
 - Modify: `docs/superpowers/plans/2026-07-14-dashboard.md` with sanitized findings.
 
 **Consumes:** `~/.codex/sessions/**/*.jsonl`.
 
-- [ ] **Step 1:** Implement a byte-offset JSONL reader that reads asynchronously in bounded chunks, carries an incomplete trailing line, and returns the next offset. Cap one line at 8 MiB; skip a larger line without logging it and continue at the next newline.
-- [ ] **Step 2:** Enumerate regular `.jsonl` files without following symbolic links. Keep paths inside the source call and identify cached scan state with an opaque SHA-256 file ID.
-- [ ] **Step 3:** Decode only timestamp, record type, opaque session/fork/turn identifiers, model identifier, `last_token_usage`, and `total_token_usage`. Do not decode content-bearing payloads into the activity domain.
-- [ ] **Step 4:** Build a per-session totals tracker modeled on the proven CodexBar constraints:
+- [x] **Step 1:** At the public `CodexLocalActivitySource.scan(bounds:)` seam, add exactly one deterministic regression method named `testExactCumulativeReplayDoesNotInflateObservedTokens`. It creates a temporary fabricated Codex JSONL root containing one accepted usage event followed by an exact cumulative replay and asserts that the sanitized scan publishes one unique request whose total matches the first event. Do not add another automated activity test, a feature-presence assertion, or a live-source dependency.
+- [x] **Step 2:** Run only that regression and record RED before implementation. The expected failure is that `CodexLocalActivitySource` does not yet exist or that the repeated cumulative record is counted twice.
+- [x] **Step 3:** Implement a byte-offset JSONL reader that reads asynchronously in bounded chunks, carries an incomplete trailing line, and returns the next offset. Cap one line at 8 MiB; skip a larger line without logging it and continue at the next newline.
+- [x] **Step 4:** Enumerate regular `.jsonl` files without following symbolic links. Keep paths inside the source call and identify cached scan state with an opaque SHA-256 file ID.
+- [x] **Step 5:** Decode only timestamp, record type, opaque session/fork/turn identifiers, model identifier, `last_token_usage`, and `total_token_usage`. Do not decode content-bearing payloads into the activity domain.
+- [x] **Step 6:** Build a per-session totals tracker modeled on the proven CodexBar constraints:
   - suppress exact cumulative-total re-emissions;
   - keep a per-component monotonic watermark;
   - prefer a non-negative total delta only when it cannot exceed the reported last usage;
@@ -290,11 +293,20 @@ enum ProviderLocalActivityState: Sendable, Equatable {
   - after latching, count only growth above the watermark, capped by reported last usage;
   - resolve an explicit parent/fork baseline when the local metadata makes it available;
   - never count a copied parent prefix as child activity.
-- [ ] **Step 5:** Attribute accepted deltas to the active model/turn and event timestamp. Build the published request ID as SHA-256 of provider tag + opaque session/turn/event identity + reconciled totals. Never publish the source identifiers.
-- [ ] **Step 6:** Create a temporary sanitized corpus outside the production bundle containing monotonic totals, exact replay, restored copy, counter reset, interleaved high/low lineage, missing total, and truncated-line shapes. Use only fabricated identifiers and counts.
-- [ ] **Step 7:** Run the scanner against that corpus and a field-scoped live probe. Record only accepted-event count, rejected/replayed count, graph-total equality, model-presence flag, and newest timestamp. No prompt, response, identifier, path, project, or account field may appear.
-- [ ] **Step 8:** If replay restraint or graph-total equality fails, stop before Tasks 3–6 and document the unsupported counter shape. Do not compensate in the chart layer.
-- [ ] **Step 9:** Commit as `feat: reconcile local Codex activity`.
+- [x] **Step 7:** Attribute accepted deltas to the active model/turn and event timestamp. Build the published request ID as SHA-256 of provider tag + opaque session/turn/event identity + reconciled totals. Never publish the source identifiers.
+- [x] **Step 8:** Create a temporary sanitized corpus outside the production bundle containing monotonic totals, exact replay, restored copy, counter reset, interleaved high/low lineage, missing total, and truncated-line shapes. Use only fabricated identifiers and counts.
+- [x] **Step 9:** Run the scanner against that corpus and a field-scoped live probe. Record only accepted-event count, rejected/replayed count, graph-total equality, model-presence flag, and newest timestamp. No prompt, response, identifier, path, project, or account field may appear.
+- [x] **Step 10:** Run the one regression GREEN. Then temporarily bypass exact-replay suppression, confirm the same regression fails, restore the implementation, and run it GREEN again. Record all three commands/results without committing the temporary mutation.
+- [x] **Step 11:** If replay restraint or graph-total equality fails, stop before Tasks 3–6 and document the unsupported counter shape. Do not compensate in the chart layer.
+- [x] **Step 12:** Build the main macOS scheme and commit as `feat: reconcile local Codex activity`.
+
+#### Task 2 evidence — 2026-07-28
+
+- The sole regression was RED before implementation because `CodexLocalActivitySource` was absent, GREEN after implementation, failed with request count `2` instead of `1` when exact-replay suppression was temporarily bypassed, and returned to GREEN after restoration. Every focused run executed exactly one XCTest method.
+- A temporary, non-bundled fabricated corpus covered monotonic totals, exact replay, restored copy, counter reset, interleaved high/low lineage, missing total, and a truncated trailing line. Sanitized result: accepted-event count `6`; rejected/replayed count `6`; graph-total equality `true`; model-presence flag `true`; newest timestamp `2026-07-28T04:00:01Z`.
+- The first field-scoped live probe accepted no events and exposed that provider timestamps include fractional seconds. After the source was corrected to accept fractional and whole-second ISO-8601 timestamps, the final sanitized live result was: accepted-event count `12806`; rejected/replayed count `10684`; graph-total equality `true`; model-presence flag `true`; newest timestamp `2026-07-28T05:23:58Z`.
+- `xcodebuild -workspace .swiftpm/xcode/package.xcworkspace -scheme CodexUsageMonitor -destination 'platform=macOS' -derivedDataPath /tmp/codex-task2-derived build` exited `0` with `** BUILD SUCCEEDED **`. The build retained the pre-existing `kSecUseAuthenticationUIFail` deprecation warning.
+- Limitation: the fabricated corpus and diagnostic harness were temporary artifacts outside the repository, not maintained automated coverage. Per the approved regression boundary, only exact cumulative replay is retained as an XCTest; other counter shapes remain manual source-boundary acceptance.
 
 ### Task 3: Add Claude streaming and sidechain reconciliation
 
