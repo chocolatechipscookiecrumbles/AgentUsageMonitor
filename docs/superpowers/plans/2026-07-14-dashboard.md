@@ -321,6 +321,15 @@ enum ProviderLocalActivityState: Sendable, Equatable {
 - `xcodebuild -workspace .swiftpm/xcode/package.xcworkspace -scheme CodexUsageMonitor -destination 'platform=macOS' -derivedDataPath /tmp/codex-task2-review-derived build` exited `0` with `** BUILD SUCCEEDED **`. Xcode retained its multiple-matching-destination warning; the focused SwiftPM build also retained the pre-existing `kSecUseAuthenticationUIFail` deprecation warnings.
 - Limitation: the expanded safety and counter-shape matrix remains temporary manual source-boundary acceptance under the approved one-regression-method constraint.
 
+#### Task 2 parser and identity review revision — 2026-07-28
+
+- Complete records now require a non-empty top-level structural type. `event_msg` records require a non-empty payload subtype; present non-token subtypes remain ignorable. `token_count` records require a session identity, turn identity, timestamp, usage object, and explicit input, cached-input, output, and reasoning-output components in every present last/total object. An optional reported total must equal input plus output.
+- Request IDs no longer use delimiter concatenation. SHA-256 input is a count-prefixed sequence of length-prefixed UTF-8 fields containing the provider tag, session identity, turn identity, provider event/request ID or timestamp/usage/model fallback, reconciled delta, and reconciled-total evidence. Provider event IDs are therefore scoped by session and turn rather than assumed globally unique.
+- A fresh disposable non-XCTest harness exited `0`: `{}` produced `.unsafeToRead`; empty `last_token_usage` and `total_token_usage` objects produced `.unsafeToRead`; and the same provider event ID in two sessions produced two requests with two distinct IDs. The harness and corpus were removed.
+- The sole focused XCTest command using `/tmp/codex-task2-identity-build` exited `0`; exactly one test ran with zero failures. No test method was added.
+- `xcodebuild -workspace .swiftpm/xcode/package.xcworkspace -scheme CodexUsageMonitor -destination 'platform=macOS' -derivedDataPath /tmp/codex-task2-identity-derived build` exited `0` with `** BUILD SUCCEEDED **`. Xcode retained its multiple-matching-destination warning.
+- Compatibility boundary: a legacy Codex usage row that omits cached-input or reasoning-output evidence now makes that scan unavailable instead of silently treating the missing component as zero. This is intentional fail-closed behavior for the supported four-component contract.
+
 ### Task 3: Add Claude streaming and sidechain reconciliation
 
 **Files:**

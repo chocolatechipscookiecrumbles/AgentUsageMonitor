@@ -97,18 +97,26 @@ struct CodexLocalActivitySource: LocalActivitySource {
         }
         var requests: [LocalActivityRequest] = []
 
-        for (sessionKey, sessionFiles) in grouped {
+        for (groupingKey, sessionFiles) in grouped {
+            let metadata = try consistentMetadata(in: sessionFiles)
+            let sessionIdentity = metadata?.sessionID
+            let orderingSessionIdentity = sessionIdentity ?? groupingKey
             let events = sessionFiles.flatMap { file in
                 file.events.map { (file, $0) }
             }.sorted {
                 if $0.1.timestamp == $1.1.timestamp {
-                    return $0.1.logicalIdentity(sessionKey: sessionKey)
-                        < $1.1.logicalIdentity(sessionKey: sessionKey)
+                    return Self.digest(
+                        $0.1.logicalIdentityFields(sessionKey: orderingSessionIdentity)
+                    ) < Self.digest(
+                        $1.1.logicalIdentityFields(sessionKey: orderingSessionIdentity)
+                    )
                 }
                 return $0.1.timestamp < $1.1.timestamp
             }
 
-            let metadata = try consistentMetadata(in: sessionFiles)
+            guard events.isEmpty || sessionIdentity != nil else {
+                throw CodexLocalActivityFailure.malformedRecord
+            }
             let inherited: Totals?
             if let parentID = metadata?.parentSessionID {
                 guard events.isEmpty || metadata?.forkedAt != nil else {
@@ -162,12 +170,17 @@ struct CodexLocalActivitySource: LocalActivitySource {
 
                 let priorOffset = priorOffsets[file.opaqueFileID] ?? 0
                 guard priorOffset > file.nextOffset || event.lineOffset >= priorOffset else { continue }
-                let eventIdentity = event.logicalIdentity(sessionKey: sessionKey)
-                let requestIdentity = [
+                var requestIdentity = [
+                    "provider",
                     "codex",
-                    eventIdentity,
-                    delta.identity,
-                ].joined(separator: "|")
+                ]
+                requestIdentity.append(contentsOf: event.logicalIdentityFields(
+                    sessionKey: sessionIdentity ?? groupingKey
+                ))
+                requestIdentity.append("reconciled-delta")
+                requestIdentity.append(contentsOf: delta.framingFields)
+                requestIdentity.append("reconciled-total")
+                requestIdentity.append(contentsOf: Self.framingFields(for: total))
                 requests.append(LocalActivityRequest(
                     id: Self.digest(requestIdentity),
                     provider: .codex,
@@ -195,8 +208,22 @@ struct CodexLocalActivitySource: LocalActivitySource {
         return first
     }
 
-    private static func digest(_ value: String) -> String {
-        SHA256.hash(data: Data(value.utf8)).map { String(format: "%02x", $0) }.joined()
+    fileprivate static func framingFields(for totals: Totals?) -> [String] {
+        guard let totals else { return ["absent"] }
+        return ["present"] + totals.framingFields
+    }
+
+    fileprivate static func digest(_ fields: [String]) -> String {
+        var framed = Data()
+        var fieldCount = UInt64(fields.count).bigEndian
+        withUnsafeBytes(of: &fieldCount) { framed.append(contentsOf: $0) }
+        for field in fields {
+            let bytes = Data(field.utf8)
+            var byteCount = UInt64(bytes.count).bigEndian
+            withUnsafeBytes(of: &byteCount) { framed.append(contentsOf: $0) }
+            framed.append(bytes)
+        }
+        return SHA256.hash(data: framed).map { String(format: "%02x", $0) }.joined()
     }
 
     fileprivate static func date(_ value: String?) -> Date? {
@@ -329,7 +356,12 @@ private extension CodexLocalActivitySource {
                     _ = Darwin.close(childDescriptor)
                     continue
                 }
-                let fileID = digest("\(childStat.st_dev):\(childStat.st_ino)")
+                let fileID = digest([
+                    "device",
+                    String(childStat.st_dev),
+                    "inode",
+                    String(childStat.st_ino),
+                ])
                 guard seenFileIDs.insert(fileID).inserted else {
                     _ = Darwin.close(childDescriptor)
                     continue
@@ -359,11 +391,19 @@ private struct FileParseState: Sendable {
             throw CodexLocalActivityFailure.malformedRecord
         }
 
-        switch record.type {
+        let recordType = record.type.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !recordType.isEmpty else {
+            throw CodexLocalActivityFailure.malformedRecord
+        }
+
+        switch recordType {
         case "session_meta":
             if metadata == nil {
+                let topLevelSessionID = record.sessionID?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
                 metadata = SessionMetadata(
-                    sessionID: record.payload?.sessionID ?? record.sessionID,
+                    sessionID: record.payload?.sessionID
+                        ?? (topLevelSessionID?.isEmpty == false ? topLevelSessionID : nil),
                     parentSessionID: record.payload?.parentSessionID,
                     forkedAt: CodexLocalActivitySource.date(record.payload?.timestamp ?? record.timestamp)
                 )
@@ -373,17 +413,21 @@ private struct FileParseState: Sendable {
                 currentModel = model
             }
         case "event_msg":
-            guard let payload = record.payload else {
+            guard let payload = record.payload,
+                  let payloadType = payload.type?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !payloadType.isEmpty
+            else {
                 throw CodexLocalActivityFailure.malformedRecord
             }
-            if payload.type == "task_started" {
+            if payloadType == "task_started" {
                 currentTurnID = payload.turnID ?? currentTurnID
                 return
             }
-            guard payload.type == "token_count" else { return }
+            guard payloadType == "token_count" else { return }
             guard let rawTimestamp = record.timestamp,
                   let timestamp = CodexLocalActivitySource.date(rawTimestamp),
-                  let info = payload.info
+                  let info = payload.info,
+                  let turnID = payload.turnID ?? currentTurnID
             else {
                 throw CodexLocalActivityFailure.malformedUsage
             }
@@ -397,7 +441,7 @@ private struct FileParseState: Sendable {
                 timestampIdentity: rawTimestamp,
                 lineOffset: line.startOffset,
                 providerEventID: payload.providerEventID,
-                turnID: payload.turnID ?? currentTurnID,
+                turnID: turnID,
                 modelID: currentModel ?? payload.modelIdentifier ?? info.modelIdentifier,
                 last: last,
                 total: total
@@ -447,22 +491,50 @@ private struct UsageEvent: Sendable {
 
     static func order(_ lhs: Self, _ rhs: Self) -> Bool {
         if lhs.timestamp != rhs.timestamp { return lhs.timestamp < rhs.timestamp }
-        return lhs.logicalIdentity(sessionKey: "") < rhs.logicalIdentity(sessionKey: "")
+        return lhs.orderingIdentity < rhs.orderingIdentity
     }
 
-    func logicalIdentity(sessionKey: String) -> String {
-        if let providerEventID {
-            return "provider-event|\(providerEventID)"
-        }
-        return [
-            "fallback-event",
+    func logicalIdentityFields(sessionKey: String) -> [String] {
+        var fields = [
+            "session",
             sessionKey,
+            "turn",
             turnID ?? "",
+        ]
+        if let providerEventID {
+            fields.append(contentsOf: [
+                "provider-event",
+                providerEventID,
+            ])
+            return fields
+        }
+        fields.append(contentsOf: [
+            "fallback-event",
+            "timestamp",
             timestampIdentity,
-            last?.identity ?? "",
-            total?.identity ?? "",
+            "last",
+        ])
+        fields.append(contentsOf: CodexLocalActivitySource.framingFields(for: last))
+        fields.append("total")
+        fields.append(contentsOf: CodexLocalActivitySource.framingFields(for: total))
+        fields.append(contentsOf: [
+            "model",
             modelID ?? "",
-        ].joined(separator: "|")
+        ])
+        return fields
+    }
+
+    private var orderingIdentity: String {
+        var fields = logicalIdentityFields(sessionKey: "")
+        fields.append(contentsOf: [
+            "timestamp",
+            timestampIdentity,
+            "last",
+        ])
+        fields.append(contentsOf: CodexLocalActivitySource.framingFields(for: last))
+        fields.append("total")
+        fields.append(contentsOf: CodexLocalActivitySource.framingFields(for: total))
+        return CodexLocalActivitySource.digest(fields)
     }
 }
 
@@ -475,10 +547,13 @@ private struct Totals: Sendable, Equatable, Hashable {
     static let zero = Self(input: 0, cached: 0, output: 0, reasoning: 0)
 
     init(_ usage: TokenUsage) throws {
-        let input = usage.inputTokens ?? 0
-        let cached = usage.cachedInputTokens ?? usage.cacheReadInputTokens ?? 0
-        let output = usage.outputTokens ?? 0
-        let reasoning = usage.reasoningOutputTokens ?? 0
+        guard let input = usage.inputTokens,
+              let cached = usage.cachedInputTokens,
+              let output = usage.outputTokens,
+              let reasoning = usage.reasoningOutputTokens
+        else {
+            throw CodexLocalActivityFailure.malformedUsage
+        }
         let normalizedTotal = input.addingReportingOverflow(output)
         guard input >= 0, cached >= 0, output >= 0, reasoning >= 0,
               cached <= input, reasoning <= output,
@@ -497,8 +572,13 @@ private struct Totals: Sendable, Equatable, Hashable {
         self.reasoning = reasoning
     }
 
-    var identity: String {
-        "\(input):\(cached):\(output):\(reasoning)"
+    var framingFields: [String] {
+        [
+            String(input),
+            String(cached),
+            String(output),
+            String(reasoning),
+        ]
     }
 
     func adding(_ other: Self) throws -> Self {
@@ -613,7 +693,7 @@ private struct TotalsTracker {
 
 private struct Record: Decodable {
     let timestamp: String?
-    let type: String?
+    let type: String
     let sessionID: String?
     let payload: RecordPayload?
 
@@ -710,7 +790,6 @@ private struct TokenInfo: Decodable {
 private struct TokenUsage: Decodable {
     let inputTokens: Int64?
     let cachedInputTokens: Int64?
-    let cacheReadInputTokens: Int64?
     let outputTokens: Int64?
     let reasoningOutputTokens: Int64?
     let totalTokens: Int64?
@@ -718,7 +797,6 @@ private struct TokenUsage: Decodable {
     enum CodingKeys: String, CodingKey {
         case inputTokens = "input_tokens"
         case cachedInputTokens = "cached_input_tokens"
-        case cacheReadInputTokens = "cache_read_input_tokens"
         case outputTokens = "output_tokens"
         case reasoningOutputTokens = "reasoning_output_tokens"
         case totalTokens = "total_tokens"
