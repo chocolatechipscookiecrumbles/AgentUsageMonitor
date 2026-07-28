@@ -9,6 +9,9 @@ import SwiftUI
 /// repeated here. No Codex credit/collector furniture appears on this tab.
 struct ClaudeMenuContent: View {
     @ObservedObject var viewModel: QuotaViewModel
+    /// Observed separately from the view model so a Token Monitor preference
+    /// change redraws an open popover.
+    @ObservedObject var settings: AppSettings
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -68,13 +71,17 @@ struct ClaudeMenuContent: View {
         .padding(.horizontal, MenuPopoverTheme.contentHorizontalPadding)
     }
 
+    @ViewBuilder
     private var activityCard: some View {
-        ProviderTokenActivityCard(
-            presentation: ProviderTokenActivityPresentation(
-                provider: .claudeCode,
-                state: viewModel.localActivityState(for: .claudeCode)
+        if settings.isTokenMonitorVisible(for: .claudeCode) {
+            ProviderTokenActivityCard(
+                presentation: ProviderTokenActivityPresentation(
+                    provider: .claudeCode,
+                    state: viewModel.localActivityState(for: .claudeCode)
+                ),
+                visibleSections: settings.enabledTokenMonitorSections(for: .claudeCode)
             )
-        )
+        }
     }
 
     private var theme: MenuPopoverTheme {

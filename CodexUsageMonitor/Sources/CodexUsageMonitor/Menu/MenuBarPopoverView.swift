@@ -97,9 +97,9 @@ struct MenuBarPopoverView: View {
     private var providerContent: some View {
         switch activeProvider {
         case .codex:
-            CodexMenuContent(viewModel: viewModel)
+            CodexMenuContent(viewModel: viewModel, settings: viewModel.settings)
         case .claudeCode:
-            ClaudeMenuContent(viewModel: viewModel)
+            ClaudeMenuContent(viewModel: viewModel, settings: viewModel.settings)
         case .githubCopilot:
             MenuProviderContentPlaceholder()
                 .padding(.horizontal, MenuPopoverTheme.contentHorizontalPadding)

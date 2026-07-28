@@ -174,6 +174,19 @@ final class QuotaViewModel: ObservableObject {
         activityMonitor.$states.sink { [weak self] states in
             self?.localActivityStates = states
         }.store(in: &subscriptions)
+        // Hiding an agent's Token Monitor stops reading that agent's records,
+        // so visibility has to reach the monitor and not only the menu.
+        settings.$tokenMonitorVisibilityByProvider
+            .removeDuplicates()
+            .sink { [weak self] visibility in
+                guard let self else { return }
+                for provider in AgentProvider.allCases {
+                    self.activityMonitor.setCollectionEnabled(
+                        visibility[provider] ?? true,
+                        for: provider
+                    )
+                }
+            }.store(in: &subscriptions)
         if Self.shouldStartProviderMonitoring(arguments: CommandLine.arguments) {
             start()
         }

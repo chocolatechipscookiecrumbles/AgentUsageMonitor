@@ -30,6 +30,10 @@ final class LocalActivityMonitor: ObservableObject {
     private var reconciledRequests: [AgentProvider: [LocalActivityRequest]] = [:]
     private var notificationObservers: [NSObjectProtocol] = []
     private var isRunning = false
+    /// Providers the user has chosen to see. A provider that is off is not
+    /// read at all, so hiding a card is a collection decision rather than a
+    /// display filter.
+    private var collectionEnabled: [AgentProvider: Bool] = [:]
 
     init(
         sources: [AgentProvider: any LocalActivitySource],
@@ -73,6 +77,7 @@ final class LocalActivityMonitor: ObservableObject {
         // totals.
         let cached = cache.load()
         for provider in sources.keys {
+            guard collectionEnabled[provider] ?? true else { continue }
             if let requests = cached[provider] {
                 reconciledRequests[provider] = requests
                 publish(provider)
@@ -98,6 +103,32 @@ final class LocalActivityMonitor: ObservableObject {
         notificationObservers.removeAll()
     }
 
+    /// Turns one provider's collection on or off. Off means no observer, no
+    /// scan, no retained requests, and no cached entry — hiding a card must not
+    /// leave the app reading records the user chose not to see.
+    func setCollectionEnabled(_ enabled: Bool, for provider: AgentProvider) {
+        guard (collectionEnabled[provider] ?? true) != enabled else { return }
+        collectionEnabled[provider] = enabled
+        guard isRunning, sources[provider] != nil else { return }
+
+        if enabled {
+            states[provider] = .loading
+            startObserver(for: provider)
+            scheduleScan(for: provider)
+            return
+        }
+
+        scanTasks[provider]?.cancel()
+        scanTasks[provider] = nil
+        rescanRequested.remove(provider)
+        observers[provider]?.stop()
+        observers[provider] = nil
+        reconciledRequests[provider] = nil
+        states[provider] = nil
+        // Rewriting without this provider is what removes it from disk.
+        cache.save(reconciledRequests)
+    }
+
     private func startObserver(for provider: AgentProvider) {
         // Watching a root that does not exist would watch its future parents,
         // so absent roots are retried on activation instead.
@@ -116,7 +147,7 @@ final class LocalActivityMonitor: ObservableObject {
     }
 
     private func scheduleScan(for provider: AgentProvider) {
-        guard isRunning, let source = sources[provider] else { return }
+        guard isRunning, collectionEnabled[provider] ?? true, let source = sources[provider] else { return }
         guard scanTasks[provider] == nil else {
             // One follow-up scan covers every event that arrived during this
             // one, so repeated file events cannot queue repeated work.

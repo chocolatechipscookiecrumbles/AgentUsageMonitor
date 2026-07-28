@@ -2,6 +2,9 @@ import SwiftUI
 
 struct CodexMenuContent: View {
     @ObservedObject var viewModel: QuotaViewModel
+    /// Observed separately from the view model so a Token Monitor preference
+    /// change redraws an open popover.
+    @ObservedObject var settings: AppSettings
 
     private var presentation: CodexMenuPresentation? {
         CodexMenuPresentation(
@@ -58,12 +61,16 @@ struct CodexMenuContent: View {
         .padding(.horizontal, MenuPopoverTheme.contentHorizontalPadding)
     }
 
+    @ViewBuilder
     private var activityCard: some View {
-        ProviderTokenActivityCard(
-            presentation: ProviderTokenActivityPresentation(
-                provider: .codex,
-                state: viewModel.localActivityState(for: .codex)
+        if settings.isTokenMonitorVisible(for: .codex) {
+            ProviderTokenActivityCard(
+                presentation: ProviderTokenActivityPresentation(
+                    provider: .codex,
+                    state: viewModel.localActivityState(for: .codex)
+                ),
+                visibleSections: settings.enabledTokenMonitorSections(for: .codex)
             )
-        )
+        }
     }
 }
