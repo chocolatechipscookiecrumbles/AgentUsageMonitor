@@ -1,5 +1,12 @@
 # Prototype Finalization Implementation Plan
 
+> **Superseded menu invariant — 2026-07-26:** Direct user direction replaced
+> the 288-point shared popover content floor with provider-intrinsic height and
+> a shared 12-point content-to-footer gap. Preserve the Settings selection-host
+> envelope, but do not apply this plan's no-resize menu invariant to the updated
+> popover. Current evidence is recorded in
+> `docs/development/provider-switch-diagnostic-results.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Follow `docs/development/evidence-rich-pull-requests.md` when preparing the PR.
 
 **Goal:** Bring the multi-provider (Codex + Claude) menu-bar app from working prototype to a finalizable state: a real README (modeled on prior art) and app icon, a standardized Connect/Disconnect for every agent, a first-run authentication state inside the popover for both agents, per-agent quota-warning settings backed by real per-agent notification delivery, and a consistent refresh cadence across all agents. (A both-providers menu-bar readout is planned but **skipped for now** by user direction.)

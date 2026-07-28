@@ -36,10 +36,7 @@ struct MenuBarPopoverView: View {
 
                 providerContent
                     .fixedSize(horizontal: false, vertical: true)
-                    .frame(
-                        minHeight: MenuPopoverTheme.providerContentMinimumHeight,
-                        alignment: .top
-                    )
+                    .padding(.bottom, MenuPopoverTheme.providerContentFooterSpacing)
 
                 MenuActionFooter(
                     isRefreshing: isRefreshing,
@@ -106,7 +103,6 @@ struct MenuBarPopoverView: View {
         case .githubCopilot:
             MenuProviderContentPlaceholder()
                 .padding(.horizontal, MenuPopoverTheme.contentHorizontalPadding)
-                .padding(.bottom, MenuPopoverTheme.contentBottomPadding)
         }
     }
 

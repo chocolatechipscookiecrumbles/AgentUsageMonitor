@@ -59,7 +59,6 @@ struct ClaudeMenuContent: View {
             }
         }
         .padding(.horizontal, MenuPopoverTheme.contentHorizontalPadding)
-        .padding(.bottom, MenuPopoverTheme.contentBottomPadding)
     }
 
     private var theme: MenuPopoverTheme {

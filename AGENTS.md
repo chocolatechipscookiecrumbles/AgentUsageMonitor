@@ -77,13 +77,13 @@ When changing Settings rows, cards, or dividers:
 
 ## SwiftUI selection-host geometry guardrails
 
-The July 24 provider-switch audit found that replacing one enum-selected SwiftUI subtree with another while its presentation host also changes geometry can leave transient duplicated/displaced content and temporarily stale hit testing. In the menu-bar popover, Codex and Claude differed by 64 points in passive state; giving the shared provider-content slot a common minimum height removed that resize. The user then confirmed that both the stuck switch and duplicated/displaced content were gone. A later live-data check exposed a second boundary: the slot must also report its natural vertical size and its common floor must cover the tallest verified normal live state, otherwise larger card stacks draw beyond the proposed slot and underneath the footer.
+The July 24 provider-switch audit found that replacing one enum-selected SwiftUI subtree with another while its presentation host also changes geometry can leave transient duplicated/displaced content and temporarily stale hit testing. A common provider-content floor removed that resize, but the user later rejected its large empty region. The superseding July 26 signed-app treatment keeps one stable outer host, lets provider content report its natural vertical size, and owns one shared 12-point content-to-footer gap outside the enum branches. Fourteen observed live provider transitions resized between natural heights without clipping, overlap, ignored selection, or crash; the complete 20-cycle, keyboard, VoiceOver, and Light/Dark matrix remains required when this geometry changes.
 
 When a custom tab or segmented selector swaps substantial SwiftUI subtrees:
 
 - Keep the selector and its content inside one stable outer presentation host. Do not put selection identity on the window, presentation root, or full detail subtree.
-- Measure passive, confirmed, cached, unavailable, and relevant recovery geometry in the signed app. If an intrinsic-size host changes during selection, stabilize a shared content slot to the largest verified normal-state envelope while still allowing genuinely larger content to report its natural height and grow.
-- Apply the stable envelope outside the enum switch so both branches negotiate through the same slot. Do not duplicate height constants in individual provider pages.
+- Preserve provider-intrinsic menu height. Keep `.fixedSize(horizontal: false, vertical: true)` on the shared provider content and the shared content-to-footer gap outside the enum switch; do not reintroduce the superseded 207/288-point menu minimum-height floor without new user direction.
+- Measure passive, confirmed, cached, unavailable, recovery, and shortest/tallest dynamic-content geometry in the signed app. Each semantic update may produce one natural host resize; it must not clip, overlap the footer, leave an artificial empty provider region, or restore the duplicated/displaced-content symptom.
 - Preserve the surface's intended overflow behavior. The menu popover remains 340 points wide and non-scrolling; Settings pages retain their shared vertical `ScrollView` and may grow beyond the viewport.
 - Treat larger click targets as a separate hit-testing change. Put the expanded frame and `contentShape` inside the `Button` label so the button owns the full visual tab region. This rule is now satisfied in both selectors: `MenuProviderTabStrip` carries its fill frame and `contentShape` inside the button label (each equal-width column is the target), and `AgentSettingsTabStrip` adds `.contentShape(.rect)` to its fixed-size label (the full 132×52 tab is the target). Applying frame/`contentShape` *outside* a `.plain` button leaves only the label glyphs hit-testable — that was the prior defect.
 - Re-run pointer and keyboard switching in the signed app after each isolated container change. Automated state tests cannot prove private SwiftUI/AppKit compositing behavior.
@@ -167,3 +167,14 @@ Before accepting any native-menu dynamic update:
 - Build and launch the signed `.app`, then inspect the actual `MenuBarExtra`; an isolated `NSHostingView`, source review, or compilation is not interaction evidence.
 - Keep the menu open across every affected semantic transition, point across every row, scroll above and below the visible command area, and activate the visibly highlighted command.
 - Check Light and Dark appearance, keyboard and VoiceOver navigation, long/localized content, repeated open/close cycles, and new crash reports. Record states that cannot be manufactured instead of inferring coverage.
+
+## Build verification
+
+After modifying production Swift code:
+
+1. Build the main macOS scheme using `xcodebuild`.
+2. Run the narrowest relevant tests.
+3. Do not modify signing, entitlements, capabilities, bundle identifiers,
+   deployment targets, or build settings merely to make the build pass.
+4. Report compiler warnings and errors precisely.
+5. Do not claim success unless the command exits with status 0.

@@ -30,8 +30,7 @@ struct MenuPopoverTheme {
     static let headerSpacing: CGFloat = 10
     static let headerTextSpacing: CGFloat = 2
     static let contentHorizontalPadding: CGFloat = 16
-    static let contentBottomPadding: CGFloat = 12
-    static let providerContentMinimumHeight: CGFloat = 288
+    static let providerContentFooterSpacing: CGFloat = 12
     static let contentPlaceholderHeight: CGFloat = 72
     static let contentSpacing: CGFloat = 12
     static let cardHorizontalPadding: CGFloat = 16
@@ -85,6 +84,12 @@ struct MenuPopoverTheme {
     let neutral: Color
 
     static func resolve(for colorScheme: ColorScheme) -> Self {
+        // The Settings window is the primary palette. Surface and divider tokens
+        // are pulled from it so the popover shell, tab strip, cards, and
+        // hairlines match the Settings window exactly in both appearances.
+        // Text, icon, shadow, and severity accents stay popover-owned because
+        // Settings does not define them.
+        let settings = SettingsAppearancePalette.resolve(for: colorScheme)
         let accent = rgb(10, 132, 255)
         let success = rgb(48, 209, 88)
         let warning = rgb(255, 159, 10)
@@ -93,11 +98,11 @@ struct MenuPopoverTheme {
 
         if colorScheme == .dark {
             return Self(
-                windowBackground: rgb(36, 36, 36),
-                tabStripBackground: rgb(30, 30, 30),
-                cardBackground: .white.opacity(0.055),
+                windowBackground: settings.windowBackground,
+                tabStripBackground: settings.sidebarBackground,
+                cardBackground: settings.sectionSurface,
                 border: .white.opacity(0.07),
-                divider: .white.opacity(0.06),
+                divider: settings.divider,
                 progressTrack: .white.opacity(0.09),
                 primaryText: .white,
                 secondaryText: .white.opacity(0.40),
@@ -115,11 +120,11 @@ struct MenuPopoverTheme {
         }
 
         return Self(
-            windowBackground: rgb(245, 245, 247),
-            tabStripBackground: rgb(235, 235, 235),
-            cardBackground: .white,
+            windowBackground: settings.windowBackground,
+            tabStripBackground: settings.sidebarBackground,
+            cardBackground: settings.sectionSurface,
             border: .black.opacity(0.07),
-            divider: .black.opacity(0.06),
+            divider: settings.divider,
             progressTrack: .black.opacity(0.07),
             primaryText: rgb(28, 28, 30),
             secondaryText: .black.opacity(0.38),

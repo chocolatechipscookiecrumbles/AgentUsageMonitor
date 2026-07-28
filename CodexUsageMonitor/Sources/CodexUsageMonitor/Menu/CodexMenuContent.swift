@@ -49,6 +49,5 @@ struct CodexMenuContent: View {
             }
         }
         .padding(.horizontal, MenuPopoverTheme.contentHorizontalPadding)
-        .padding(.bottom, MenuPopoverTheme.contentBottomPadding)
     }
 }

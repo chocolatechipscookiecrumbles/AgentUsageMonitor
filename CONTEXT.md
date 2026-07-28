@@ -170,6 +170,56 @@ _Avoid_: Default icon mode, selected-agent view
 A planned menu-bar presentation that renders progress for multiple agents. Single-agent selection and failover rules do not govern this mode; their controls are provisionally disabled while their stored values are preserved.
 _Avoid_: Dual quota view, automatic failover view
 
+## Local Token Activity
+
+**Token Activity**:
+Token usage observed from an agent's local records on this Mac, distinct from provider-reported quota, billing, and account-wide usage.
+_Avoid_: Local quota, account usage, billing usage
+
+**Activity Interval**:
+A 30-minute local-calendar segment whose value is the Observed Tokens attributed to provider-recorded completion times in that interval, not the cumulative total since midnight.
+_Avoid_: Chart point, rolling window, cumulative interval
+
+**Activity Chart**:
+The bar chart of Activity Intervals from local midnight through the current interval. Hover identifies one interval without changing the card's summary rows.
+_Avoid_: Line graph, cumulative chart, quota chart
+
+**Observed Tokens**:
+A provider-native token total derived from reconciled local records. Codex and Claude components retain their provider meanings and are not a cross-provider comparison.
+_Avoid_: Account tokens, quota tokens, comparable tokens
+
+**Model Usage**:
+Observed Token Activity grouped by Short Model Name and ordered by contribution. The popover names the top three groups and combines the remainder as Other.
+_Avoid_: Top model, model quota, model allowance
+
+**Short Model Name**:
+A compact model family and number such as GPT-5.6 or Sonnet 4.5; provider prefixes, product suffixes, and dated build identifiers are omitted.
+_Avoid_: Raw model identifier, model alias, display label
+
+**Last Request**:
+The most recent reconciled local agent interaction for which token usage is observable.
+_Avoid_: Latest request, latest response, last prompt
+
+**Other**:
+The combined Observed Tokens from models outside the three largest Model Usage groups for the current local day.
+_Avoid_: Unknown model, hidden models, remaining usage
+
+**Unknown Model**:
+The Model Usage group for reconciled local requests that contain token evidence but no usable model identifier.
+_Avoid_: Other, omitted model, invalid request
+
+**No Activity**:
+A readable local source with no Observed Tokens in the current local calendar day.
+_Avoid_: Activity unavailable, zero quota, disconnected
+
+**Activity Unavailable**:
+The state in which local Token Activity cannot be read or reconciled safely; it does not mean that no activity occurred.
+_Avoid_: No Activity, zero tokens, disconnected
+
+**Local Records Missing**:
+The state in which the provider's known local activity roots contain no readable session records yet.
+_Avoid_: Activity Unavailable, No Activity, provider disconnected
+
 **Paused Menu Bar State**:
 The menu-bar presentation for an inactive Effective Menu Bar Agent, identified by a pause symbol before its usage statistics.
 _Avoid_: Disconnected state, unavailable state, hidden agent

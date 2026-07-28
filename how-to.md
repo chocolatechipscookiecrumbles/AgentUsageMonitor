@@ -193,7 +193,7 @@ The menu-bar content uses native menu presentation. **Refresh now**, **Settingsâ
 
 Settings presents only privacy-safe status. It never displays the stored account fingerprint, email, credentials, prompts, raw provider responses, raw provider errors, or quota values inside Diagnostics. Data & Privacy lists the local Codex and Claude files, their owner-only permissions, and their applicable replacement or bounded-retention policies without export or deletion actions.
 
-The current interface uses native SwiftUI. A separate future `feature/figma-ui-overhaul` branch will adapt approved Figma designs for app-owned Settings and Dashboard windows after their functional interfaces stabilize. It will not replace the menu's native inline commands or change data collection behavior without a separate decision.
+The current interface uses native SwiftUI. A separate Dashboard page or window is no longer planned. The queued token-activity work will automatically build an in-memory-only index from field-scoped provider records while the app runs. Its dynamic-height **This Mac Â· observed** card uses hoverable 30-minute completion-time bars and lists provider-native token categories, Requests, the top three short model groups plus counted Other, and Last Request across all observed dates. Compact loading/missing/unsafe states expand when a readable current day is available. The card remains independent of quota availability and will not change quota refreshes, notifications, authentication, or provider limits.
 
 The notification settings also control:
 
