@@ -49,13 +49,43 @@ struct DataPrivacySettingsView: View {
                 }
                 SettingsSectionRow {
                     SettingsValueRow(
-                        "Conversations",
-                        value: "Never read",
-                        description: "Only quota percentages, reset times, and plan type are collected."
+                        "Conversation content",
+                        value: "Never collected",
+                        description: "Quota collection reads only percentages, reset times, and plan type."
                     )
                 }
                 SettingsSectionRow(showsDivider: false) {
                     SettingsDescription(ClaudeUsageDisplayModel.weeklyScopeCaveat)
+                }
+            }
+
+            // Token activity reads files the agents own, automatically and
+            // without asking, so the exact boundary belongs in Settings rather
+            // than only in the plan.
+            SettingsSection("Token activity") {
+                SettingsSectionRow {
+                    SettingsValueRow(
+                        "Local records",
+                        value: "Read automatically",
+                        description: "While the app runs it reads the session records Codex and Claude Code already write on this Mac, so the menu can show tokens observed today. This starts on its own, keeps working when an agent is disconnected, makes no network request, and costs no tokens."
+                    )
+                }
+                SettingsSectionRow {
+                    SettingsValueRow(
+                        "What is read",
+                        value: "Timestamps, models, tokens",
+                        description: "Only timestamps, model identifiers, token counts, and opaque identifiers needed to avoid counting the same request twice. Prompts, responses, reasoning, tool activity, file paths, and project names are never decoded."
+                    )
+                }
+                SettingsSectionRow {
+                    SettingsValueRow(
+                        "Where it is kept",
+                        value: "Memory only",
+                        description: "Nothing is written. The activity index lives in memory, disappears when the app quits, and is rebuilt after each launch. The records themselves stay owned by the agents and are never modified."
+                    )
+                }
+                SettingsSectionRow(showsDivider: false) {
+                    SettingsDescription("These totals describe what this Mac observed, not an account. Records that cannot be read safely are reported as unavailable rather than counted as zero.")
                 }
             }
 

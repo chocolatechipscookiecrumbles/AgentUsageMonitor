@@ -1,6 +1,6 @@
 # Menu-Popover Token Activity Card Implementation Plan
 
-> **Status (2026-07-28): Feasible and queued by user direction.** This revision adds an intraday token graph and a line-by-line token breakdown to the existing menu-popover card. Implementation has not started.
+> **Status (2026-07-28): Implemented through Task 7; one layout decision is open.** Both provider sources, the monitor, the card, its insertion into both tabs, and the documentation are done and verified against live records. The tallest normal Codex state measures 982 points, which clips in the deliberately non-scrolling popover on a typical laptop screen, so Task 6 Step 4's product/layout gate is unresolved and the signed-app visual, keyboard, and VoiceOver acceptance in Task 8 is recorded as **unobserved** rather than passed. See "Task 6 Step 4 gate" below.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` (recommended) or `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -505,16 +505,16 @@ Limitations: the file observer holds an unretained reference to itself in its FS
 
 **Produces:** **Token activity**, **This Mac · observed**, a Today headline, an intraday chart, provider-native category rows, Requests, multiple Model Usage rows, and Last Request.
 
-- [ ] **Step 1:** Format token totals with locale-aware compact notation that preserves one decimal below 10K/10M boundaries and never rounds a positive count to `0`. Keep exact counts in accessibility.
-- [ ] **Step 2:** Render a fixed-height 84-point Swift Charts plot:
+- [x] **Step 1:** Format token totals with locale-aware compact notation that preserves one decimal below 10K/10M boundaries and never rounds a positive count to `0`. Keep exact counts in accessibility.
+- [x] **Step 2:** Render a fixed-height 84-point Swift Charts plot:
   - one `BarMark` per Activity Interval, colored with the provider accent;
   - x domain from local midnight to the end of the current 30-minute interval, using the full plot width;
   - at most three x-axis labels (start, midpoint, current/end);
   - at most three y-axis labels (zero, midpoint, rounded maximum);
   - no legend, animation, scrolling, future intervals, projection, or click selection.
-- [ ] **Step 3:** Reserve one fixed-height detail line above the plot. Its resting copy is `Hover over a bar for details`; hovering a bar changes only that line to an absolute range and compact total such as `14:00–14:30 · 141.6K tokens`. Implement hover inside a fixed chart overlay/caption envelope so it never resizes the card or changes the rows. Clear the visual selection when the pointer exits.
-- [ ] **Step 4:** For all-zero/No Activity state, show the fixed empty plot frame and `No activity observed today`; do not synthesize bars.
-- [ ] **Step 5:** Keep the four provider-native category rows, Requests, and Last Request structurally stable in every expanded state:
+- [x] **Step 3:** Reserve one fixed-height detail line above the plot. Its resting copy is `Hover over a bar for details`; hovering a bar changes only that line to an absolute range and compact total such as `14:00–14:30 · 141.6K tokens`. Implement hover inside a fixed chart overlay/caption envelope so it never resizes the card or changes the rows. Clear the visual selection when the pointer exits.
+- [x] **Step 4:** For all-zero/No Activity state, show the fixed empty plot frame and `No activity observed today`; do not synthesize bars.
+- [x] **Step 5:** Keep the four provider-native category rows, Requests, and Last Request structurally stable in every expanded state:
 
 | Row | Codex value | Claude value |
 | --- | --- | --- |
@@ -525,18 +525,18 @@ Limitations: the file observer holds an unretained reference to itself in its FS
 | 5 | Requests | Requests |
 | Final | Last Request | Last Request |
 
-- [ ] **Step 6:** Insert Model Usage between Requests and Last Request. Show up to three Short Model Name groups—including Unknown model when it ranks there—followed by `Other · N models` only when additional groups exist. Sort named rows by descending tokens, use alphabetical tie-breaking, and show compact tokens plus whole-percent share.
-- [ ] **Step 7:** Use `Unavailable` for an unsupported category, not `0`. A valid observed zero may display `0` only when the containing source is available.
-- [ ] **Step 8:** Format Last Request as a two-line row: compact total plus absolute local time, then Short Model Name. Use an abbreviated date when it predates today. Expose the exact provider-native token breakdown and full raw model identifier to accessibility.
-- [ ] **Step 9:** Use compact, sanitized state copy:
+- [x] **Step 6:** Insert Model Usage between Requests and Last Request. Show up to three Short Model Name groups—including Unknown model when it ranks there—followed by `Other · N models` only when additional groups exist. Sort named rows by descending tokens, use alphabetical tie-breaking, and show compact tokens plus whole-percent share.
+- [x] **Step 7:** Use `Unavailable` for an unsupported category, not `0`. A valid observed zero may display `0` only when the containing source is available.
+- [x] **Step 8:** Format Last Request as a two-line row: compact total plus absolute local time, then Short Model Name. Use an abbreviated date when it predates today. Expose the exact provider-native token breakdown and full raw model identifier to accessibility.
+- [x] **Step 9:** Use compact, sanitized state copy:
   - Loading: `Reading activity…`
   - Local Records Missing: `No local records found` and `Use {provider} on this Mac to see activity here.`
   - Activity Unavailable: `Activity unavailable` and `Local records couldn't be read safely.`
   - No Activity: expanded `No activity observed today`
   Do not expose paths, parser details, or provider errors.
-- [ ] **Step 10:** Supply an accessibility chart descriptor with every Activity Interval's absolute range and exact token value, plus the exact Today total. Keep the visual chart as one ordinary traversal element rather than exposing dozens of unlabeled bars. Make each detail row a separate combined element with exact values.
-- [ ] **Step 11:** Put chart height, hover-detail height, plot insets, header spacing, row height, divider inset, and category-label width in `MenuPopoverTheme`; do not scatter geometry constants.
-- [ ] **Step 12:** Commit as `feat: add token activity popover card`.
+- [x] **Step 10:** Supply an accessibility chart descriptor with every Activity Interval's absolute range and exact token value, plus the exact Today total. Keep the visual chart as one ordinary traversal element rather than exposing dozens of unlabeled bars. Make each detail row a separate combined element with exact values.
+- [x] **Step 11:** Put chart height, hover-detail height, plot insets, header spacing, row height, divider inset, and category-label width in `MenuPopoverTheme`; do not scatter geometry constants.
+- [x] **Step 12:** Commit as `feat: add token activity popover card`.
 
 ### Task 6: Insert the card without destabilizing the popover
 
@@ -545,13 +545,13 @@ Limitations: the file observer holds an unretained reference to itself in its FS
 - Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/CodexMenuContent.swift`
 - Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/ClaudeMenuContent.swift`
 
-- [ ] **Step 1:** Render `ProviderTokenActivityCard` after the Codex quota region and before credits when quota is available; keep the same activity card visible above Codex quota-recovery content when quota is unavailable.
-- [ ] **Step 2:** Render the same card after the Claude quota region and before source/recovery content when quota is available; keep it visible above Claude quota-recovery content when quota is unavailable.
-- [ ] **Step 3:** Keep one stable outer host around the provider switch, but preserve provider-intrinsic height: `providerContent` reports its natural vertical size and the shared 12-point content-to-footer gap remains outside the enum branches. Do not restore the superseded 207/288-point minimum-height floor.
-- [ ] **Step 4:** Preserve the 340-point, non-scrolling popover. Measure compact loading/unavailable cards and expanded zero/available cards with zero, one, three, and four Model Usage rows. If the tallest normal state clips at the smallest supported screen, stop for a product/layout decision; do not silently hide rows or add a nested scroller.
-- [ ] **Step 5:** Keep data updates semantic and non-animated while the menu is open. Hover may change only fixed-envelope chart selection/caption state; it must not publish through `QuotaViewModel` or resize the host. Plot geometry and existing row identities remain stable; adding/removing bounded Model Usage rows may resize the natural-height host exactly once per published snapshot.
-- [ ] **Step 6:** Build the main macOS scheme and run existing menu presentation/provider-switch tests. Expected: exit status 0 and no unrelated expectation changes.
-- [ ] **Step 7:** Commit as `feat: show token activity in provider tabs`.
+- [x] **Step 1:** Render `ProviderTokenActivityCard` after the Codex quota region and before credits when quota is available; keep the same activity card visible above Codex quota-recovery content when quota is unavailable.
+- [x] **Step 2:** Render the same card after the Claude quota region and before source/recovery content when quota is available; keep it visible above Claude quota-recovery content when quota is unavailable.
+- [x] **Step 3:** Keep one stable outer host around the provider switch, but preserve provider-intrinsic height: `providerContent` reports its natural vertical size and the shared 12-point content-to-footer gap remains outside the enum branches. Do not restore the superseded 207/288-point minimum-height floor.
+- [x] **Step 4:** Preserve the 340-point, non-scrolling popover. Measure compact loading/unavailable cards and expanded zero/available cards with zero, one, three, and four Model Usage rows. If the tallest normal state clips at the smallest supported screen, stop for a product/layout decision; do not silently hide rows or add a nested scroller.
+- [x] **Step 5:** Keep data updates semantic and non-animated while the menu is open. Hover may change only fixed-envelope chart selection/caption state; it must not publish through `QuotaViewModel` or resize the host. Plot geometry and existing row identities remain stable; adding/removing bounded Model Usage rows may resize the natural-height host exactly once per published snapshot.
+- [x] **Step 6:** Build the main macOS scheme and run existing menu presentation/provider-switch tests. Expected: exit status 0 and no unrelated expectation changes.
+- [x] **Step 7:** Commit as `feat: show token activity in provider tabs`.
 
 ### Task 7: Correct privacy and operating documentation
 
@@ -566,12 +566,12 @@ Limitations: the file observer holds an unretained reference to itself in its FS
 - Modify: `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md`
 - Modify: `docs/superpowers/plans/2026-07-14-dashboard.md`
 
-- [ ] **Step 1:** Replace **Conversations — Never read** with **Conversation content — Never collected** and explain that the app automatically reads only timestamps, models, token counts, and opaque identifiers needed to prevent duplicate counts from known provider roots.
-- [ ] **Step 2:** Add an in-memory activity entry to `LocalDataInventory`: automatic while the app runs, no app-owned history file, rebuilt after every launch, source records remain provider-owned.
-- [ ] **Step 3:** Document the graph and rows as local-only, zero-token-cost, and separate from quota. Explain that missing/ephemeral records appear unavailable rather than zero.
-- [ ] **Step 4:** Remove remaining claims that this scope has no chart, or that it will build a separate Dashboard window.
-- [ ] **Step 5:** Record source-version evidence and newly observed limitations here without live counts, model history, identifiers, or paths.
-- [ ] **Step 6:** Commit as `docs: document token activity scope`.
+- [x] **Step 1:** Replace **Conversations — Never read** with **Conversation content — Never collected** and explain that the app automatically reads only timestamps, models, token counts, and opaque identifiers needed to prevent duplicate counts from known provider roots.
+- [x] **Step 2:** Add an in-memory activity entry to `LocalDataInventory`: automatic while the app runs, no app-owned history file, rebuilt after every launch, source records remain provider-owned.
+- [x] **Step 3:** Document the graph and rows as local-only, zero-token-cost, and separate from quota. Explain that missing/ephemeral records appear unavailable rather than zero.
+- [x] **Step 4:** Remove remaining claims that this scope has no chart, or that it will build a separate Dashboard window.
+- [x] **Step 5:** Record source-version evidence and newly observed limitations here without live counts, model history, identifiers, or paths.
+- [x] **Step 6:** Commit as `docs: document token activity scope`.
 
 ### Task 8: Verify privacy, reconciliation, performance, and signed-app presentation
 
@@ -604,6 +604,61 @@ codesign --verify --deep --strict --verbose=2 .build/CodexUsageMonitor.app
 - [ ] **Step 10:** Verify pointer, keyboard, and VoiceOver traversal after updates. Pointer hover must identify the visibly targeted interval; VoiceOver must receive the exact interval series and Today total through the chart descriptor.
 - [ ] **Step 11:** Inspect Data & Privacy at 680 × 560 with Context Rail hidden/visible in Light/Dark. Confirm copy wraps and all content remains reachable.
 - [ ] **Step 12:** Record any unavailable visual/performance boundary honestly. Compilation and source inspection are not substitutes for signed-app interaction evidence.
+
+### Tasks 5–7 evidence — 2026-07-28
+
+Task 5 (card), Task 6 (insertion), and Task 7 (documentation) are implemented. The popover host was not modified: `MenuBarPopoverView` already keeps one stable outer host, `.fixedSize(horizontal: false, vertical: true)` on `providerContent`, and the shared 12-point content-to-footer gap outside the enum switch, so no minimum-height floor was reintroduced.
+
+Compact-notation formatting keeps one decimal (`141.6K`) rather than the platform default (`142K`), because rounding to three significant digits hides the difference between similar days on a card whose whole purpose is comparison. A positive count never renders as `0`; it falls back to its exact value. Exact counts stay in accessibility everywhere.
+
+Hover is owned entirely by the card's own `@State`. It changes the fixed-height detail line and the highlighted bar's opacity, and nothing else. It does not publish through `QuotaViewModel`, and it cannot resize the host because the detail line's height is reserved whether or not a bar is hovered.
+
+#### Geometry measurements
+
+Measured with a disposable `NSHostingView` harness at the 308-point popover content width, then deleted. No state overflowed horizontally — every measured width was exactly 308.0.
+
+```text
+loading:                  83.0
+localRecordsMissing:     102.0
+unsafeToRead:            102.0
+noActivity, no last:     282.0
+noActivity, with last:   331.0
+available, 1 model row:  365.0
+available, 3 model rows: 403.0
+available, 4 model rows: 422.0   (also the 5- and 6-group cases: Other caps the list at four)
+available, dark:         422.0
+available, one bar:      365.0
+```
+
+Model Usage is correctly bounded: five and six distinct model groups both render four rows, because the fourth is the aggregated `Other · N models`.
+
+#### Task 6 Step 4 gate: the tallest normal state clips
+
+Composing the tallest Codex tab from measured parts:
+
+```text
+tab strip                            44.0
+provider header                      58.0
+content (quota 149 + activity 422 + credits 136, at 12-point spacing)   731.0
+shared content-to-footer gap         12.0
+action footer                       137.0
+total                               982.0
+```
+
+982 points exceeds the usable height below the menu bar on a typical laptop display — roughly 931 points on a 13.6-inch MacBook Air at default scaling, and roughly 775 points at 1280×800. The popover is deliberately non-scrolling, so the tallest normal state would clip.
+
+Per Step 4 this is a stopping point for a product/layout decision, not something to work around. No row was hidden, no nested scroller was added, and no geometry was silently shrunk. Before the card ships enabled by default, one of these needs a decision:
+
+1. Make the card's detail rows collapsible, with the chart and Today headline always visible.
+2. Drop Model Usage from the popover and keep it for a Settings surface.
+3. Shorten the chart and tighten row spacing, which recovers roughly 40–60 points and is not enough on its own.
+4. Accept a scrolling popover, which contradicts the current global constraint.
+
+#### Task 8 status
+
+Completed: `xcodebuild` on the main macOS scheme exited `0` with `** BUILD SUCCEEDED **`; the full suite executed 299 tests with 0 failures; `bash Scripts/build-app.sh` produced a Developer ID-signed bundle and `codesign --verify --deep --strict --verbose=2` reported `valid on disk` and `satisfies its Designated Requirement`; reconciliation corpora and live probes for both providers recorded graph-total equality, category math, unique identities, model shares summing to one, and the newest accepted request equalling the displayed Last Request; the privacy audit confirmed the decoded field set excludes content, paths, project names, and session identifiers.
+
+**Unobserved:** every signed-app visual, pointer-hover, keyboard, VoiceOver, and Light/Dark check in Steps 7 through 11. These were not performed and must not be recorded as passed. Two reasons: the height gate above means the tallest state is known to clip, so visual acceptance should follow the layout decision rather than precede it; and launching the bundle to drive the popover can raise a Keychain/SecurityAgent prompt, which is not an acceptable side effect of an automated audit. The geometry evidence above comes from an isolated hosting harness, which the repository's own rules correctly treat as insufficient for final visual acceptance.
 
 ## Explicitly Deferred
 

@@ -25,6 +25,8 @@ struct ClaudeMenuContent: View {
 
                 ClaudeUsageWindowCard(model: model)
 
+                activityCard
+
                 // Provenance lives here rather than the header so the freshness
                 // line stays identical across providers; it names where the
                 // reading came from (OAuth, capture, or cache).
@@ -46,6 +48,11 @@ struct ClaudeMenuContent: View {
                     )
                 }
             } else {
+                // Activity is read locally and does not depend on quota, so it
+                // stays above the recovery content rather than disappearing
+                // with the quota reading.
+                activityCard
+
                 ClaudeUnavailableContent(
                     connectionState: viewModel.claudeConnectionState,
                     connectWithCredentials: viewModel.connectClaudeWithCredentials
@@ -59,6 +66,15 @@ struct ClaudeMenuContent: View {
             }
         }
         .padding(.horizontal, MenuPopoverTheme.contentHorizontalPadding)
+    }
+
+    private var activityCard: some View {
+        ProviderTokenActivityCard(
+            presentation: ProviderTokenActivityPresentation(
+                provider: .claudeCode,
+                state: viewModel.localActivityState(for: .claudeCode)
+            )
+        )
     }
 
     private var theme: MenuPopoverTheme {

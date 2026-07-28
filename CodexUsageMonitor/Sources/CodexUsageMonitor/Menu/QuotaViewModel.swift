@@ -185,6 +185,10 @@ final class QuotaViewModel: ObservableObject {
             && !arguments.contains(MenuPopoverViabilityGate.launchArgument)
     }
 
+    func localActivityState(for provider: AgentProvider) -> ProviderLocalActivityState {
+        localActivityStates[provider] ?? .loading
+    }
+
     var settingsStatus: SettingsStatus {
         SettingsStatus.make(
             displayState: displayState,

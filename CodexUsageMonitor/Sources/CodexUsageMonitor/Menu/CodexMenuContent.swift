@@ -23,6 +23,8 @@ struct CodexMenuContent: View {
                     isCached: presentation.isCached
                 )
 
+                activityCard
+
                 if let credits = presentation.credits {
                     CodexCreditsCard(credits: credits)
                 }
@@ -35,6 +37,11 @@ struct CodexMenuContent: View {
                     )
                 }
             } else {
+                // Activity is read locally and does not depend on quota, so it
+                // stays above the recovery content rather than disappearing
+                // with the quota reading.
+                activityCard
+
                 CodexUnavailableContent(
                     state: viewModel.connectionState,
                     signInWithBrowser: viewModel.signInWithBrowser,
@@ -49,5 +56,14 @@ struct CodexMenuContent: View {
             }
         }
         .padding(.horizontal, MenuPopoverTheme.contentHorizontalPadding)
+    }
+
+    private var activityCard: some View {
+        ProviderTokenActivityCard(
+            presentation: ProviderTokenActivityPresentation(
+                provider: .codex,
+                state: viewModel.localActivityState(for: .codex)
+            )
+        )
     }
 }
