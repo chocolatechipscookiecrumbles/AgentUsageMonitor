@@ -443,15 +443,57 @@ Limitation: nested `usage.iterations` advisor/iteration usage remains un-ingeste
 - Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Activity/LocalActivityMonitor.swift`
 - Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/QuotaViewModel.swift`
 
-- [ ] **Step 1:** Wrap one recursive FSEvent stream for each provider root that exists. Debounce a burst for one second, coalesce paths, and emit only after writes settle; do not watch the whole home directory.
-- [ ] **Step 2:** Make `LocalActivityMonitor` the only owner of sources, in-memory file metadata, parsed byte offsets, reconciliation state, per-file contributions, scan tasks, and observer lifetime.
-- [ ] **Step 3:** On an unchanged `(size, modification time, parser producer key)`, reuse the in-memory contribution. On append, parse from the prior complete-line byte offset. On truncation/replacement/parser-version change, rebuild that file from zero.
-- [ ] **Step 4:** Start scans automatically with app monitoring, regardless of quota/connection state. Publish `.loading`, scan every existing known provider root off the main actor, then publish `.available`, `.noActivity`, or sanitized `.unavailable`. Opening the popover is never the trigger.
-- [ ] **Step 5:** Replace a changed file's contribution before re-aggregation so repeated file events cannot double-count.
-- [ ] **Step 6:** Observe calendar-day, significant-time, and time-zone changes through system notifications. Rebuild buckets on those semantic events; do not add a midnight or chart polling timer.
-- [ ] **Step 7:** On application activation, retry only roots previously absent. Opening/redrawing the popover must not start, scan, or refresh activity.
-- [ ] **Step 8:** Add one monitor to `QuotaViewModel`, start it with app monitoring rather than quota availability, and stop it with app teardown. Keep all file metadata, byte offsets, reconciled requests, and aggregates in memory; every app launch rebuilds asynchronously.
-- [ ] **Step 9:** Commit as `feat: monitor local token activity`.
+- [x] **Step 1:** Wrap one recursive FSEvent stream for each provider root that exists. Debounce a burst for one second, coalesce paths, and emit only after writes settle; do not watch the whole home directory.
+- [x] **Step 2:** Make `LocalActivityMonitor` the only owner of sources, in-memory file metadata, parsed byte offsets, reconciliation state, per-file contributions, scan tasks, and observer lifetime.
+- [x] **Step 3:** On an unchanged `(size, modification time, parser producer key)`, reuse the in-memory contribution. On append, parse from the prior complete-line byte offset. On truncation/replacement/parser-version change, rebuild that file from zero.
+- [x] **Step 4:** Start scans automatically with app monitoring, regardless of quota/connection state. Publish `.loading`, scan every existing known provider root off the main actor, then publish `.available`, `.noActivity`, or sanitized `.unavailable`. Opening the popover is never the trigger.
+- [x] **Step 5:** Replace a changed file's contribution before re-aggregation so repeated file events cannot double-count.
+- [x] **Step 6:** Observe calendar-day, significant-time, and time-zone changes through system notifications. Rebuild buckets on those semantic events; do not add a midnight or chart polling timer.
+- [x] **Step 7:** On application activation, retry only roots previously absent. Opening/redrawing the popover must not start, scan, or refresh activity.
+- [x] **Step 8:** Add one monitor to `QuotaViewModel`, start it with app monitoring rather than quota availability, and stop it with app teardown. Keep all file metadata, byte offsets, reconciled requests, and aggregates in memory; every app launch rebuilds asynchronously.
+- [x] **Step 9:** Commit as `feat: monitor local token activity`.
+
+#### Task 4 evidence — 2026-07-28
+
+Ownership deviates from Step 2 in one respect, deliberately. The monitor owns which sources exist, when they scan, observer lifetime, the reconciled request set, and everything published. Each source owns its own per-file parse cache, because the parsed representation is provider-specific and privacy-sensitive; handing decoded transcript state to a shared monitor would widen the boundary that Tasks 2 and 3 worked to keep narrow. Sources are therefore actors rather than structs.
+
+The monitor replaces a provider's whole reconciled request set on every scan instead of merging per-file contributions. Whole-set replacement is what makes repeated file events idempotent, and it is strictly safer than assembling incremental suffixes across two providers whose identity strategies differ. Scan bounds and cursors remain on the source seam for a future incremental publisher; the monitor passes empty bounds.
+
+Incremental reuse lives in the traversal, which now fingerprints each file by opaque ID, size, and modification time and asks the source whether to skip it, resume from a cached parser state and byte offset, or rebuild. Only growth beyond the bytes already parsed counts as an append; anything shorter rebuilds, so a truncated or replaced file cannot resume past its own end.
+
+Two performance defects were found while measuring, both of which made the cache nearly worthless:
+
+- Sorting hashed inside the comparator. `reconcile` and `parentBaselines` computed a SHA-256 identity for both operands of every comparison, roughly 700,000 digests per full scan. Ordering keys are now computed once per event.
+- The ordering identity was recomputed on every scan. It is now hashed when a record is first parsed, so it lives in the parse cache and a rescan of unchanged history pays nothing for it.
+
+Measured on the live roots, cold versus fully cached rescan:
+
+```text
+codex cold seconds: 3.47 count: 13037     (was 7.64 before the sort fixes)
+codex cached seconds: 0.61 count: 13037   (was 5.53 before the sort fixes)
+claude cold seconds: 0.18 count: 1951
+claude cached seconds: 0.07 count: 1951
+```
+
+Sanitized incremental-behavior output:
+
+```text
+first scan count: 1 total: 120
+unchanged rescan count: 1 total: 120
+unchanged rescan identical: true
+after append count: 2 total: 190
+append preserved first identity: true
+append rescan stable: true
+after truncation count: 1 total: 12
+after removal status localRecordsMissing: true
+after removal count: 0
+codex cached count stable: true
+claude cached count stable: true
+```
+
+The full suite executed 299 tests with 0 failures — the 298-test baseline plus the single approved Task 2 regression. No test was added for this task.
+
+Limitations: the file observer holds an unretained reference to itself in its FSEvents context, so `stop()` must run before it is released; the monitor owns observers for the application's lifetime, which is the only case that occurs in the app. FSEvents is not started for a root that does not exist, because that would watch its future parents; absent roots are retried on application activation instead. The observer discards changed paths rather than coalescing them, since a transcript path is a project name.
 
 ### Task 5: Build the fixed graph-and-rows card
 

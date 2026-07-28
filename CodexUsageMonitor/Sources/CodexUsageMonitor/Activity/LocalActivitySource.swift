@@ -63,8 +63,14 @@ struct LocalActivityScanResult: Sendable, Equatable {
     let status: LocalActivitySourceStatus
 }
 
-protocol LocalActivitySource: Sendable {
-    var provider: AgentProvider { get }
+/// One provider's local records reader.
+///
+/// Sources are actors because each one owns an in-memory parse cache across
+/// scans. The parsed representation is provider-specific and privacy-sensitive,
+/// so it stays behind the source boundary instead of being handed to the
+/// monitor; the monitor owns which sources exist and when they run.
+protocol LocalActivitySource: Actor {
+    nonisolated var provider: AgentProvider { get }
 
     func scan(bounds: LocalActivityScanBounds) async -> LocalActivityScanResult
 }

@@ -9,11 +9,14 @@ import Foundation
 /// request id. Both collapse here, before any aggregation sees them, so replayed
 /// copies cannot inflate the graph while genuinely distinct subagent and
 /// sidechain responses still count.
-struct ClaudeLocalActivitySource: LocalActivitySource {
-    let provider: AgentProvider = .claudeCode
+actor ClaudeLocalActivitySource: LocalActivitySource {
+    nonisolated let provider: AgentProvider = .claudeCode
 
     private let projectRoots: [URL]
     private let traversal = LocalActivityFileTraversal()
+    /// Decoded per-file parser state, in memory only, holding just the files
+    /// present at the last scan.
+    private var parseCache: [String: ParsedClaudeFile] = [:]
 
     init(projectRoots: [URL]) {
         self.projectRoots = projectRoots
@@ -49,15 +52,24 @@ struct ClaudeLocalActivitySource: LocalActivitySource {
             var parsedFiles: [ParsedClaudeFile] = []
             var seenFileIDs: Set<String> = []
             var anyRootExists = false
+            let cache = parseCache
 
             for root in projectRoots {
                 let files: [ParsedClaudeFile]
                 do {
                     files = try await traversal.parseJSONLFiles(
                         root: root,
+                        resume: {
+                            LocalActivityResumePoint.decide(
+                                fingerprint: $0,
+                                cached: cache[$0.opaqueFileID]
+                            )
+                        },
                         makeState: { ClaudeFileParseState(opaqueFileID: $0) },
                         consume: { state, line in try state.consume(line) },
-                        finish: { state, nextOffset in state.finished(nextOffset: nextOffset) }
+                        finish: { fingerprint, state, nextOffset in
+                            state.finished(fingerprint: fingerprint, nextOffset: nextOffset)
+                        }
                     )
                 } catch LocalActivityFileTraversal.TraversalFailure.rootMissing {
                     continue
@@ -69,6 +81,12 @@ struct ClaudeLocalActivitySource: LocalActivitySource {
                     contentsOf: files.filter { seenFileIDs.insert($0.opaqueFileID).inserted }
                 )
             }
+
+            // Rebuilding rather than merging drops files that no longer exist.
+            parseCache = Dictionary(
+                parsedFiles.map { ($0.opaqueFileID, $0) },
+                uniquingKeysWith: { _, latest in latest }
+            )
 
             guard anyRootExists, !parsedFiles.isEmpty else {
                 return LocalActivityScanResult(requests: [], cursors: [], status: .localRecordsMissing)
@@ -165,10 +183,13 @@ private enum ClaudeLocalActivityFailure: Error {
     case invalidReconciledUsage
 }
 
-private struct ParsedClaudeFile: Sendable {
-    let opaqueFileID: String
+private struct ParsedClaudeFile: LocalActivityParsedFile {
+    let fingerprint: LocalActivityFileFingerprint
     let nextOffset: Int64
-    let events: [ClaudeUsageEvent]
+    let parserState: ClaudeFileParseState
+
+    var opaqueFileID: String { fingerprint.opaqueFileID }
+    var events: [ClaudeUsageEvent] { parserState.events }
 }
 
 private struct ClaudeFileParseState: Sendable {
@@ -214,8 +235,8 @@ private struct ClaudeFileParseState: Sendable {
         ))
     }
 
-    func finished(nextOffset: Int64) -> ParsedClaudeFile {
-        ParsedClaudeFile(opaqueFileID: opaqueFileID, nextOffset: nextOffset, events: events)
+    func finished(fingerprint: LocalActivityFileFingerprint, nextOffset: Int64) -> ParsedClaudeFile {
+        ParsedClaudeFile(fingerprint: fingerprint, nextOffset: nextOffset, parserState: self)
     }
 }
 

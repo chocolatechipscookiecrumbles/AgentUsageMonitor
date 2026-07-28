@@ -26,6 +26,11 @@ final class QuotaViewModel: ObservableObject {
     @Published private(set) var isRefreshingClaude = false
     @Published private(set) var claudeSetupState: ClaudeSetupState
 
+    /// Local Token Activity observed on this Mac. It is deliberately separate
+    /// from the quota pipeline: it starts with app monitoring, not with a
+    /// connection, and it stays readable while a provider's quota is not.
+    @Published private(set) var localActivityStates: [AgentProvider: ProviderLocalActivityState] = [:]
+
     let settings: AppSettings
 
     /// Providers currently connected enough to show a menu-bar reading, in
@@ -50,6 +55,7 @@ final class QuotaViewModel: ObservableObject {
 
     private let monitor: QuotaMonitor
     private let claudeMonitor: ClaudeUsageMonitor
+    private let activityMonitor: LocalActivityMonitor
     /// App-level notifier for things `QuotaMonitor` (Codex) does not own: Claude
     /// threshold alerts and quota-setting confirmations. Shares the same
     /// authorization gate and UserDefaults dedup, so it cannot double-fire.
@@ -91,6 +97,8 @@ final class QuotaViewModel: ObservableObject {
             }
         )
         self.claudeMonitor = claudeMonitor
+        let activityMonitor = LocalActivityMonitor()
+        self.activityMonitor = activityMonitor
         // Same `.app`-only gate the Codex notifier uses, so tests and previews
         // never touch the notification center.
         self.appNotifier = Bundle.main.bundleURL.pathExtension == "app"
@@ -163,6 +171,9 @@ final class QuotaViewModel: ObservableObject {
             // rather than waiting for the next scheduled refresh.
             if state.isConnected { self?.refreshClaude() }
         }.store(in: &subscriptions)
+        activityMonitor.$states.sink { [weak self] states in
+            self?.localActivityStates = states
+        }.store(in: &subscriptions)
         if Self.shouldStartProviderMonitoring(arguments: CommandLine.arguments) {
             start()
         }
@@ -185,6 +196,9 @@ final class QuotaViewModel: ObservableObject {
     func start() {
         connectionController.start()
         monitor.start()
+        // Activity collection is local and costs no tokens, so it follows app
+        // monitoring rather than any provider's connection state.
+        activityMonitor.start()
         // Respect a persisted Claude disconnect: show disconnected without
         // reading, rather than resuming passive capture.
         if settings.claudeDisconnected {

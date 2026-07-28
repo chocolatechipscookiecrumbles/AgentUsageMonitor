@@ -1,11 +1,16 @@
 import CryptoKit
 import Foundation
 
-struct CodexLocalActivitySource: LocalActivitySource {
-    let provider: AgentProvider = .codex
+actor CodexLocalActivitySource: LocalActivitySource {
+    nonisolated let provider: AgentProvider = .codex
 
     private let sessionsRoot: URL
     private let traversal = LocalActivityFileTraversal()
+    /// Decoded per-file parser state, kept only in memory and only for the
+    /// files still present at the last scan. Session transcripts hold full
+    /// conversation content, so re-decoding every one of them on each file
+    /// event would cost seconds of CPU for a single appended usage record.
+    private var parseCache: [String: ParsedFile] = [:]
 
     init(
         sessionsRoot: URL = FileManager.default.homeDirectoryForCurrentUser
@@ -16,12 +21,22 @@ struct CodexLocalActivitySource: LocalActivitySource {
 
     func scan(bounds: LocalActivityScanBounds) async -> LocalActivityScanResult {
         do {
+            let cache = parseCache
             let parsedFiles = try await traversal.parseJSONLFiles(
                 root: sessionsRoot,
+                resume: { LocalActivityResumePoint.decide(fingerprint: $0, cached: cache[$0.opaqueFileID]) },
                 makeState: { FileParseState(opaqueFileID: $0) },
                 consume: { state, line in try state.consume(line) },
-                finish: { state, nextOffset in state.finished(nextOffset: nextOffset) }
+                finish: { fingerprint, state, nextOffset in
+                    state.finished(fingerprint: fingerprint, nextOffset: nextOffset)
+                }
             )
+            // Rebuilding rather than merging drops files that no longer exist.
+            parseCache = Dictionary(
+                parsedFiles.map { ($0.opaqueFileID, $0) },
+                uniquingKeysWith: { _, latest in latest }
+            )
+
             guard !parsedFiles.isEmpty else {
                 return LocalActivityScanResult(requests: [], cursors: [], status: .localRecordsMissing)
             }
@@ -59,9 +74,9 @@ struct CodexLocalActivitySource: LocalActivitySource {
                   let parentFiles = bySession[parentID]
             else { continue }
 
-            let parentEvents = parentFiles.flatMap(\.1.events)
-                .filter { $0.timestamp <= forkedAt }
-                .sorted(by: UsageEvent.order)
+            let parentEvents = UsageEvent.ordered(
+                parentFiles.flatMap(\.1.events).filter { $0.timestamp <= forkedAt }
+            )
             var watermark = Totals.zero
             var countedLastOnly = Totals.zero
             for event in parentEvents {
@@ -90,19 +105,21 @@ struct CodexLocalActivitySource: LocalActivitySource {
         for (groupingKey, sessionFiles) in grouped {
             let metadata = try consistentMetadata(in: sessionFiles)
             let sessionIdentity = metadata?.sessionID
-            let orderingSessionIdentity = sessionIdentity ?? groupingKey
-            let events = sessionFiles.flatMap { file in
-                file.events.map { (file, $0) }
-            }.sorted {
-                if $0.1.timestamp == $1.1.timestamp {
-                    return Self.digest(
-                        $0.1.logicalIdentityFields(sessionKey: orderingSessionIdentity)
-                    ) < Self.digest(
-                        $1.1.logicalIdentityFields(sessionKey: orderingSessionIdentity)
-                    )
+            // Every event here shares one session, so the session-independent
+            // ordering identity gives the same deterministic order without
+            // hashing inside the comparator.
+            var decorated: [(file: ParsedFile, event: UsageEvent, orderingKey: String)] = []
+            for file in sessionFiles {
+                for event in file.events {
+                    decorated.append((file, event, event.orderingIdentity))
                 }
-                return $0.1.timestamp < $1.1.timestamp
             }
+            decorated.sort { lhs, rhs in
+                lhs.event.timestamp == rhs.event.timestamp
+                    ? lhs.orderingKey < rhs.orderingKey
+                    : lhs.event.timestamp < rhs.event.timestamp
+            }
+            let events: [(ParsedFile, UsageEvent)] = decorated.map { ($0.file, $0.event) }
 
             guard events.isEmpty || sessionIdentity != nil else {
                 throw CodexLocalActivityFailure.malformedRecord
@@ -300,21 +317,19 @@ private struct FileParseState: Sendable {
         }
     }
 
-    func finished(nextOffset: Int64) -> ParsedFile {
-        ParsedFile(
-            opaqueFileID: opaqueFileID,
-            nextOffset: nextOffset,
-            metadata: metadata,
-            events: events
-        )
+    func finished(fingerprint: LocalActivityFileFingerprint, nextOffset: Int64) -> ParsedFile {
+        ParsedFile(fingerprint: fingerprint, nextOffset: nextOffset, parserState: self)
     }
 }
 
-private struct ParsedFile: Sendable {
-    let opaqueFileID: String
+private struct ParsedFile: LocalActivityParsedFile {
+    let fingerprint: LocalActivityFileFingerprint
     let nextOffset: Int64
-    let metadata: SessionMetadata?
-    let events: [UsageEvent]
+    let parserState: FileParseState
+
+    var opaqueFileID: String { fingerprint.opaqueFileID }
+    var metadata: SessionMetadata? { parserState.metadata }
+    var events: [UsageEvent] { parserState.events }
 }
 
 private struct SessionMetadata: Sendable, Equatable {
@@ -337,13 +352,87 @@ private struct UsageEvent: Sendable {
     let modelID: String?
     let last: Totals?
     let total: Totals?
+    /// Deterministic tie-break for events sharing a timestamp, hashed once when
+    /// the record is first parsed. Parsed files are cached across scans, so a
+    /// rescan of unchanged history pays nothing for ordering.
+    let orderingIdentity: String
 
-    static func order(_ lhs: Self, _ rhs: Self) -> Bool {
-        if lhs.timestamp != rhs.timestamp { return lhs.timestamp < rhs.timestamp }
-        return lhs.orderingIdentity < rhs.orderingIdentity
+    init(
+        timestamp: Date,
+        timestampIdentity: String,
+        lineOffset: Int64,
+        providerEventID: String?,
+        turnID: String?,
+        modelID: String?,
+        last: Totals?,
+        total: Totals?
+    ) {
+        self.timestamp = timestamp
+        self.timestampIdentity = timestampIdentity
+        self.lineOffset = lineOffset
+        self.providerEventID = providerEventID
+        self.turnID = turnID
+        self.modelID = modelID
+        self.last = last
+        self.total = total
+
+        var fields = Self.identityFields(
+            sessionKey: "",
+            providerEventID: providerEventID,
+            turnID: turnID,
+            timestampIdentity: timestampIdentity,
+            modelID: modelID,
+            last: last,
+            total: total
+        )
+        fields.append(contentsOf: ["timestamp", timestampIdentity, "last"])
+        fields.append(contentsOf: CodexLocalActivitySource.framingFields(for: last))
+        fields.append("total")
+        fields.append(contentsOf: CodexLocalActivitySource.framingFields(for: total))
+        orderingIdentity = CodexLocalActivitySource.digest(fields)
+    }
+
+    /// Sorts by time with a deterministic tie-break. The ordering identity is
+    /// hashed once per event rather than inside the comparator, which would
+    /// otherwise cost hundreds of thousands of digests on a full session root.
+    static func ordered(_ events: [Self]) -> [Self] {
+        var decorated: [(event: Self, orderingKey: String)] = []
+        decorated.reserveCapacity(events.count)
+        for event in events {
+            decorated.append((event, event.orderingIdentity))
+        }
+        decorated.sort { lhs, rhs in
+            lhs.event.timestamp == rhs.event.timestamp
+                ? lhs.orderingKey < rhs.orderingKey
+                : lhs.event.timestamp < rhs.event.timestamp
+        }
+        return decorated.map(\.event)
     }
 
     func logicalIdentityFields(sessionKey: String) -> [String] {
+        Self.identityFields(
+            sessionKey: sessionKey,
+            providerEventID: providerEventID,
+            turnID: turnID,
+            timestampIdentity: timestampIdentity,
+            modelID: modelID,
+            last: last,
+            total: total
+        )
+    }
+
+    /// A provider event ID identifies the event only within its session and
+    /// turn, so those always frame it. Without one, the record's own timestamp,
+    /// usage, and model stand in.
+    private static func identityFields(
+        sessionKey: String,
+        providerEventID: String?,
+        turnID: String?,
+        timestampIdentity: String,
+        modelID: String?,
+        last: Totals?,
+        total: Totals?
+    ) -> [String] {
         var fields = [
             "session",
             sessionKey,
@@ -371,19 +460,6 @@ private struct UsageEvent: Sendable {
             modelID ?? "",
         ])
         return fields
-    }
-
-    private var orderingIdentity: String {
-        var fields = logicalIdentityFields(sessionKey: "")
-        fields.append(contentsOf: [
-            "timestamp",
-            timestampIdentity,
-            "last",
-        ])
-        fields.append(contentsOf: CodexLocalActivitySource.framingFields(for: last))
-        fields.append("total")
-        fields.append(contentsOf: CodexLocalActivitySource.framingFields(for: total))
-        return CodexLocalActivitySource.digest(fields)
     }
 }
 

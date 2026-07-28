@@ -9,6 +9,54 @@ import Foundation
 /// more than one file descriptor per directory depth stays open. Session roots
 /// grow without bound, so collecting descriptors first would eventually exhaust
 /// the process file-descriptor limit and make activity permanently unreadable.
+/// Identity and change evidence for one provider-owned records file.
+///
+/// The identity is an opaque device/inode digest, so nothing derived from a
+/// path leaves the traversal. Size and modification time are what let a caller
+/// decide that a file needs no work at all.
+struct LocalActivityFileFingerprint: Sendable, Equatable, Hashable {
+    let opaqueFileID: String
+    let byteSize: Int64
+    let modifiedAtSeconds: Int64
+    let modifiedAtNanoseconds: Int64
+}
+
+/// How much of a file a caller already holds parsed.
+enum LocalActivityResumePoint<State: Sendable, Parsed: Sendable>: Sendable {
+    /// Nothing changed; reuse the previous result without opening the file.
+    case unchanged(Parsed)
+    /// Appended bytes only; continue from this parser state and byte offset.
+    case resume(State, offset: Int64)
+    /// Truncated, replaced, or never seen; parse from the beginning.
+    case rebuild
+}
+
+/// A file a source parsed on an earlier scan and may be able to reuse.
+protocol LocalActivityParsedFile: Sendable {
+    associatedtype ParserState: Sendable
+
+    var fingerprint: LocalActivityFileFingerprint { get }
+    /// Byte offset just past the last complete line, so a partial trailing
+    /// record is read again once the provider finishes writing it.
+    var nextOffset: Int64 { get }
+    var parserState: ParserState { get }
+}
+
+extension LocalActivityResumePoint where Parsed: LocalActivityParsedFile, Parsed.ParserState == State {
+    /// Picks the cheapest safe way to bring a cached file up to date.
+    static func decide(fingerprint: LocalActivityFileFingerprint, cached: Parsed?) -> Self {
+        guard let cached else { return .rebuild }
+        if cached.fingerprint == fingerprint { return .unchanged(cached) }
+        // Only growth beyond the bytes already parsed can be a pure append.
+        // Anything shorter may have rewritten records that were already
+        // counted, and resuming past the end would silently read nothing.
+        guard fingerprint.byteSize >= cached.fingerprint.byteSize,
+              cached.nextOffset <= fingerprint.byteSize
+        else { return .rebuild }
+        return .resume(cached.parserState, offset: cached.nextOffset)
+    }
+}
+
 struct LocalActivityFileTraversal: Sendable {
     enum TraversalFailure: Error {
         case rootMissing
@@ -17,20 +65,26 @@ struct LocalActivityFileTraversal: Sendable {
 
     private let reader = LocalActivityJSONLReader()
 
-    /// Parses every regular `.jsonl` file below `root`, newest-agnostic and in
-    /// filesystem order. Paths stay inside this call; callers receive only the
-    /// opaque device/inode file ID used to identify cached scan state.
+    /// Parses every regular `.jsonl` file below `root` in filesystem order.
+    /// Paths stay inside this call; callers receive only the opaque file ID.
+    ///
+    /// `resume` decides per file whether to skip it, continue from a cached
+    /// parser state, or rebuild it. Provider roots hold months of transcripts,
+    /// so decoding every line on every file event would dominate the cost of
+    /// a single appended record.
     func parseJSONLFiles<State: Sendable, Parsed: Sendable>(
         root: URL,
+        resume: @Sendable (LocalActivityFileFingerprint) -> LocalActivityResumePoint<State, Parsed>,
         makeState: @Sendable (String) -> State,
         consume: @Sendable (inout State, LocalActivityJSONLReader.Line) throws -> Void,
-        finish: @Sendable (State, Int64) -> Parsed
+        finish: @Sendable (LocalActivityFileFingerprint, State, Int64) -> Parsed
     ) async throws -> [Parsed] {
         let rootDescriptor = try Self.openRootDirectory(root)
         defer { _ = Darwin.close(rootDescriptor) }
         return try await parse(
             directoryDescriptor: rootDescriptor,
             seenFileIDs: [],
+            resume: resume,
             makeState: makeState,
             consume: consume,
             finish: finish
@@ -40,9 +94,10 @@ struct LocalActivityFileTraversal: Sendable {
     private func parse<State: Sendable, Parsed: Sendable>(
         directoryDescriptor: Int32,
         seenFileIDs: Set<String>,
+        resume: @Sendable (LocalActivityFileFingerprint) -> LocalActivityResumePoint<State, Parsed>,
         makeState: @Sendable (String) -> State,
         consume: @Sendable (inout State, LocalActivityJSONLReader.Line) throws -> Void,
-        finish: @Sendable (State, Int64) -> Parsed
+        finish: @Sendable (LocalActivityFileFingerprint, State, Int64) -> Parsed
     ) async throws -> (parsed: [Parsed], seenFileIDs: Set<String>) {
         let duplicate = dup(directoryDescriptor)
         guard duplicate >= 0, let directory = fdopendir(duplicate) else {
@@ -84,6 +139,7 @@ struct LocalActivityFileTraversal: Sendable {
                     let nested = try await parse(
                         directoryDescriptor: childDescriptor,
                         seenFileIDs: seenFileIDs,
+                        resume: resume,
                         makeState: makeState,
                         consume: consume,
                         finish: finish
@@ -95,12 +151,33 @@ struct LocalActivityFileTraversal: Sendable {
                     guard name.lowercased().hasSuffix(".jsonl") else { break }
                     let fileID = Self.opaqueFileID(device: childStat.st_dev, inode: childStat.st_ino)
                     guard seenFileIDs.insert(fileID).inserted else { break }
-                    let result = try await reader.read(
-                        fileDescriptor: childDescriptor,
-                        initialState: makeState(fileID),
-                        consume: consume
+                    let fingerprint = LocalActivityFileFingerprint(
+                        opaqueFileID: fileID,
+                        byteSize: Int64(childStat.st_size),
+                        modifiedAtSeconds: Int64(childStat.st_mtimespec.tv_sec),
+                        modifiedAtNanoseconds: Int64(childStat.st_mtimespec.tv_nsec)
                     )
-                    parsed.append(finish(result.state, result.nextOffset))
+
+                    let start: (state: State, offset: Int64)?
+                    switch resume(fingerprint) {
+                    case .unchanged(let previous):
+                        parsed.append(previous)
+                        start = nil
+                    case .resume(let state, let offset):
+                        start = (state, offset)
+                    case .rebuild:
+                        start = (makeState(fileID), 0)
+                    }
+
+                    if let start {
+                        let result = try await reader.read(
+                            fileDescriptor: childDescriptor,
+                            from: start.offset,
+                            initialState: start.state,
+                            consume: consume
+                        )
+                        parsed.append(finish(fingerprint, result.state, result.nextOffset))
+                    }
 
                 default:
                     break
