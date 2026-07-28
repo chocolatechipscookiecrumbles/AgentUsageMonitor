@@ -1,7 +1,7 @@
 import Charts
 import SwiftUI
 
-/// The Token activity card: an intraday chart of 30-minute intervals followed
+/// The Token Monitor card: an intraday chart of 30-minute intervals followed
 /// by provider-native token rows, Requests, bounded Model Usage, and the last
 /// observed request.
 ///

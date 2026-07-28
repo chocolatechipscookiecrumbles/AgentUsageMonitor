@@ -59,15 +59,15 @@ struct DataPrivacySettingsView: View {
                 }
             }
 
-            // Token activity reads files the agents own, automatically and
+            // The Token Monitor reads files the agents own, automatically and
             // without asking, so the exact boundary belongs in Settings rather
             // than only in the plan.
-            SettingsSection("Token activity") {
+            SettingsSection("Token Monitor") {
                 SettingsSectionRow {
                     SettingsValueRow(
                         "Local records",
                         value: "Read automatically",
-                        description: "While the app runs it reads the session records Codex and Claude Code already write on this Mac, so the menu can show tokens observed today. This starts on its own, keeps working when an agent is disconnected, makes no network request, and costs no tokens."
+                        description: "For each agent whose Token Monitor is shown, this app reads the session records that agent already writes on this Mac, so the menu can show tokens observed today. This starts on its own, keeps working when an agent is disconnected, makes no network request, and costs no tokens. Turning an agent's Token Monitor off in Agents stops reading that agent's records and removes what was cached for it."
                     )
                 }
                 SettingsSectionRow {

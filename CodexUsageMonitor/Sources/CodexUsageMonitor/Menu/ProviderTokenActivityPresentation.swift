@@ -1,13 +1,18 @@
 import Foundation
 
-/// Everything the Token activity card renders, derived once from one published
+/// Everything the Token Monitor card renders, derived once from one published
 /// activity state.
 ///
 /// Formatting and copy live here rather than in the view so the number rules
 /// and the sanitized state wording are readable in one place, and so hovering a
 /// bar can never change anything except the chart's own detail line.
+///
+/// The name shown to the user is **Token Monitor**. The surrounding type names
+/// still say `TokenActivity` and are deliberately left alone: they are internal
+/// identifiers, and renaming them would add churn and review surface to a
+/// change whose value is entirely in the copy.
 struct ProviderTokenActivityPresentation: Equatable {
-    static let title = "Token activity"
+    static let title = "Token Monitor"
     static let scope = "This Mac · observed"
     static let hoverResting = "Hover over a bar for details"
     static let emptyDay = "No activity observed today"

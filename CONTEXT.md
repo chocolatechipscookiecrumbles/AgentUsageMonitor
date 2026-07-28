@@ -172,9 +172,17 @@ _Avoid_: Dual quota view, automatic failover view
 
 ## Local Token Activity
 
-**Token Activity**:
-Token usage observed from an agent's local records on this Mac, distinct from provider-reported quota, billing, and account-wide usage.
-_Avoid_: Local quota, account usage, billing usage
+**Token Monitor**:
+The menu-popover card showing token usage observed from an agent's local records on this Mac, distinct from provider-reported quota, billing, and account-wide usage. This name supersedes both **Dashboard** and **Token Activity** in everything a user reads; internal Swift type names still say `TokenActivity` and are deliberately not renamed.
+_Avoid_: Dashboard, Token Activity, local quota, account usage, billing usage
+
+**Token Monitor Visibility**:
+The per-agent preference deciding whether that agent contributes a Token Monitor card. Turning it off also stops reading that agent's local records and discards its cached observations, so it is a collection decision rather than a display filter.
+_Avoid_: Hide card, disable activity, pause monitoring
+
+**Token Monitor Section**:
+One toggleable region of the Token Monitor card — Activity chart, Token categories, Model usage, or Last request. Section toggles change only what is rendered; every section is derived from the same reconciled request set. The card's title, **This Mac · observed**, day total, and request count are not sections and always remain.
+_Avoid_: Card row, widget, module
 
 **Activity Interval**:
 A 30-minute local-calendar segment whose value is the Observed Tokens attributed to provider-recorded completion times in that interval, not the cumulative total since midnight.

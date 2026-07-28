@@ -51,7 +51,7 @@ enum LocalDataInventory {
         // next launch can display them before re-reading anything.
         LocalDataStoreDescriptor(
             id: "token-activity",
-            title: "Token activity",
+            title: "Token Monitor",
             fileName: "token-activity-cache.json",
             retention: "Three days plus the most recent request, replaced by each completed scan",
             contents: "Hashed request identities, timestamps, models, and token counts; no file paths, agent session identifiers, or record contents"

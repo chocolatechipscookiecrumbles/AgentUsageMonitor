@@ -63,7 +63,7 @@ struct MenuPopoverTheme {
     static let actionRowIconSize: CGFloat = 13
     static let actionRowIconWidth: CGFloat = 16
     static let actionRowSpacing: CGFloat = 10
-    // Token activity card. The chart and its hover line are fixed-height so a
+    // Token Monitor card. The chart and its hover line are fixed-height so a
     // semantic update can resize the card but hovering a bar never can.
     static let activityHeaderSpacing: CGFloat = 10
     static let activityHeaderTextSpacing: CGFloat = 2

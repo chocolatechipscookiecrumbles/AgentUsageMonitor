@@ -2,7 +2,7 @@
 
 > **Status (2026-07-28): Implemented through Task 7; the height problem is deferred.** Both provider sources, the monitor, the card, its insertion into both tabs, and the documentation are done and verified against live records. The tallest normal Codex state measures 929 points after two rounds of layout tightening, which still clips in the deliberately non-scrolling popover on smaller displays. **Deferred by direction on 2026-07-28** and tracked on the Bug-fix board as *Token Monitor card makes the popover taller than a laptop screen*; Task 6 Step 4's gate stays unresolved and the signed-app visual, keyboard, and VoiceOver acceptance in Task 8 remains **unobserved** rather than passed until it is. See "Task 6 Step 4 gate" below.
 
-> **Naming (2026-07-28):** the card is being renamed **Token Monitor**, superseding both "Dashboard" and "Token Activity" in user-facing copy. See `docs/superpowers/plans/2026-07-28-agent-dashboard-settings.md`. This document keeps its historical filename and the internal `Activity`/`TokenActivity` type names, which are deliberately not renamed.
+> **Naming (2026-07-28): applied.** The card is named **Token Monitor**, superseding both "Dashboard" and "Token Activity" in user-facing copy. See `docs/superpowers/plans/2026-07-28-agent-dashboard-settings.md`. This document keeps its historical filename and the internal `Activity`/`TokenActivity` type names, which are deliberately not renamed.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` (recommended) or `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
