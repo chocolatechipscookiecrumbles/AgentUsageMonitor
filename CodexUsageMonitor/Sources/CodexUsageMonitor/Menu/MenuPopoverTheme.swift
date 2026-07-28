@@ -73,7 +73,10 @@ struct MenuPopoverTheme {
     static let activityChartTopSpacing: CGFloat = 6
     static let activityRowSpacing: CGFloat = 6
     static let activityRowDividerInset: CGFloat = 0
-    static let activityCategoryLabelWidth: CGFloat = 96
+    /// Token totals are short, so pairing them into two columns spends the
+    /// popover's horizontal space instead of five nearly empty full-width rows.
+    static let activityMetricColumnSpacing: CGFloat = 14
+    static let activityMetricLabelSpacing: CGFloat = 6
     static let activityModelShareWidth: CGFloat = 40
     static let activityLastRequestSpacing: CGFloat = 2
 

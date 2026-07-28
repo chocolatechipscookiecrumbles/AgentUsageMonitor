@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum AgentProvider: String, CaseIterable, Identifiable, Sendable {
+enum AgentProvider: String, CaseIterable, Identifiable, Sendable, Codable {
     case codex
     case claudeCode
     case githubCopilot

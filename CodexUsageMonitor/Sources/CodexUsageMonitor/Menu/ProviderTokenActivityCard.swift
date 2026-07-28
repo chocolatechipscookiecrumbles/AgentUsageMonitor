@@ -91,16 +91,7 @@ struct ProviderTokenActivityCard: View {
                 .fill(theme.divider)
                 .frame(height: MenuPopoverTheme.dividerHeight)
 
-            VStack(alignment: .leading, spacing: MenuPopoverTheme.activityRowSpacing) {
-                ForEach(expanded.categories) { row in
-                    detailRow(label: row.label, value: row.value, accessibilityValue: row.accessibilityValue)
-                }
-                detailRow(
-                    label: expanded.requests.label,
-                    value: expanded.requests.value,
-                    accessibilityValue: expanded.requests.accessibilityValue
-                )
-            }
+            metricColumns(expanded)
 
             if !expanded.modelUsage.isEmpty {
                 Rectangle()
@@ -257,18 +248,42 @@ struct ProviderTokenActivityCard: View {
 
     // MARK: - Rows
 
+    /// The four categories and Requests are paired into two columns, which
+    /// costs three rows instead of five and puts the popover's spare width to
+    /// work. Columns are filled top-down so each provider's input-side and
+    /// output-side categories stay together.
+    private func metricColumns(_ expanded: ProviderTokenActivityPresentation.Expanded) -> some View {
+        let cells = expanded.categories + [expanded.requests]
+        let split = (cells.count + 1) / 2
+
+        return HStack(alignment: .top, spacing: MenuPopoverTheme.activityMetricColumnSpacing) {
+            metricColumn(Array(cells.prefix(split)))
+            metricColumn(Array(cells.dropFirst(split)))
+        }
+    }
+
+    private func metricColumn(_ rows: [ProviderTokenActivityPresentation.Row]) -> some View {
+        VStack(alignment: .leading, spacing: MenuPopoverTheme.activityRowSpacing) {
+            ForEach(rows) { row in
+                detailRow(label: row.label, value: row.value, accessibilityValue: row.accessibilityValue)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private func detailRow(label: String, value: String, accessibilityValue: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: MenuPopoverTheme.activityHeaderSpacing) {
+        HStack(alignment: .firstTextBaseline, spacing: MenuPopoverTheme.activityMetricLabelSpacing) {
             Text(label)
                 .font(.caption)
                 .foregroundStyle(theme.secondaryText)
-                .frame(width: MenuPopoverTheme.activityCategoryLabelWidth, alignment: .leading)
+                .lineLimit(1)
 
             Spacer(minLength: 0)
 
             Text(value)
                 .font(.caption.weight(.medium))
                 .foregroundStyle(value == "Unavailable" ? theme.neutral : theme.primaryText)
+                .lineLimit(1)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)

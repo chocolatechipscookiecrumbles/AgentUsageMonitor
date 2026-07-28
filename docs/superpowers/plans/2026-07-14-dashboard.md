@@ -19,7 +19,7 @@
 - The card is always scoped as **This Mac · observed**. Never present local records as account-wide usage, billing, quota consumption, or remaining allowance.
 - Keep quota and activity pipelines separate. The card must not alter `QuotaMonitor`, `ClaudeUsageMonitor`, rate-limit validation, credits, refresh scheduling, or notification policy.
 - Read only timestamp, model identifier, token counts, provider request/turn identifiers, and opaque session/fork/sidechain fields needed to reconcile duplicates. Never retain or publish prompts, responses, reasoning text, source code, tool inputs/outputs, project names, repository paths, working directories, transcript paths, account identifiers, or raw provider errors.
-- Do not persist provider file paths or raw JSONL lines. The first implementation keeps its activity index in memory and rebuilds it asynchronously after launch.
+- Do not persist provider file paths or raw JSONL lines. **Revised 2026-07-28 by user direction:** reconciled requests are cached across launches so a new instance renders the previous instance's figures before rescanning. Only values the card already displays are written — hashed request identities, timestamps, model identifiers, and token counts. Per-file parser state, provider session/turn/event identifiers, paths, and raw records remain memory-only. See the amendment in `docs/adr/0001-read-local-token-activity-automatically.md`.
 - Start field-scoped local activity reads automatically while the app runs for every known provider root that exists, including when quota is disconnected or unavailable. Do not add an opt-in preference or make opening the popover the scan trigger. This decision is recorded in `docs/adr/0001-read-local-token-activity-automatically.md`.
 - Do not run `codex exec`, `claude -p`, `/usage`, an SDK query, or any other model turn. Collection must remain local and zero-token-cost.
 - Do not use Codex `thread/resume`/`thread/fork` to recover usage. Do not install or require an OpenTelemetry collector.
@@ -659,6 +659,52 @@ Per Step 4 this is a stopping point for a product/layout decision, not something
 Completed: `xcodebuild` on the main macOS scheme exited `0` with `** BUILD SUCCEEDED **`; the full suite executed 299 tests with 0 failures; `bash Scripts/build-app.sh` produced a Developer ID-signed bundle and `codesign --verify --deep --strict --verbose=2` reported `valid on disk` and `satisfies its Designated Requirement`; reconciliation corpora and live probes for both providers recorded graph-total equality, category math, unique identities, model shares summing to one, and the newest accepted request equalling the displayed Last Request; the privacy audit confirmed the decoded field set excludes content, paths, project names, and session identifiers.
 
 **Unobserved:** every signed-app visual, pointer-hover, keyboard, VoiceOver, and Light/Dark check in Steps 7 through 11. These were not performed and must not be recorded as passed. Two reasons: the height gate above means the tallest state is known to clip, so visual acceptance should follow the layout decision rather than precede it; and launching the bundle to drive the popover can raise a Keychain/SecurityAgent prompt, which is not an acceptable side effect of an automated audit. The geometry evidence above comes from an isolated hosting harness, which the repository's own rules correctly treat as insufficient for final visual acceptance.
+
+### Post-implementation revision — 2026-07-28 (user direction)
+
+Two changes were requested after reviewing the rendered card.
+
+#### Two-column metrics
+
+The four token categories and Requests were five full-width rows whose values sat far right of short labels, spending vertical space the popover cannot afford and leaving the middle empty. They are now paired into two columns filled top-down, which keeps each provider's input-side categories together (Codex: Input/Cached input left, Output/Reasoning right; Claude: Input/Cache creation left, Cache read/Output right) with Requests at the bottom left. Three rows replace five.
+
+Re-measured at the 308-point content width, with no horizontal overflow:
+
+```text
+card, 4 model rows:   422.0 → 384.0
+card, 1 model row:    365.0 → 327.0
+card, no activity:    282.0 → 244.0
+composed Codex content: 731.0 → 693.0
+total Codex popover:    982.0 → 944.0
+```
+
+The Task 6 Step 4 gate is improved but **still open**: 944 points still exceeds roughly 931 usable points on a 13.6-inch MacBook Air and far exceeds the ~775 points available at 1280×800. Applying the same two-column treatment to Model Usage is the next obvious lever and would recover a similar amount; it was not done because it was not part of the request.
+
+#### Cached activity across launches
+
+Rebuilding from nothing on every launch meant the card always opened in a reading state and repeated a full cold reconciliation. `LocalActivityCache` now persists reconciled requests to `token-activity-cache.json` in the app's Application Support directory, and `LocalActivityMonitor.start()` republishes them before opening a file.
+
+Design points that keep this inside the privacy boundary:
+
+- Only values the card already displays are written: hashed request identities, timestamps, model identifiers, and token counts. No path, provider session/turn/event identifier, per-file parser state, or raw record is persisted, so the cache cannot reconstruct a conversation or name a project.
+- Requests, not snapshots, are cached, and they are re-aggregated against the current day at load. A cache written yesterday therefore reads as no activity today rather than as stale totals — the day boundary needs no special handling.
+- Retention is three days plus the single newest request, so Last Request still has an answer after a long gap without storing history that no longer affects the card.
+- Synthesized `Codable` decoding bypasses the validating initializer, so every loaded request is re-validated by re-deriving its provider-normalized total. A tampered, corrupt, or foreign-schema cache is discarded rather than rendered.
+- An `.unsafeToRead` scan leaves the cached history alone instead of erasing it, because an unreadable scan says nothing about what was previously observed.
+- A full rescan still runs at launch and on file events and replaces the cached set when it lands. The cache is a head start, not a source of truth, so it does not weaken the "never fabricate a zero" rule.
+
+Sanitized cache diagnostics (disposable harness, since deleted):
+
+```text
+CACHE retained recent only: true
+CACHE tokens preserved: true
+CACHE keeps newest when all are old: true
+CACHE rejects tampered total: true
+CACHE rejects corrupt file: true
+CACHE rejects unknown schema: true
+```
+
+This supersedes the original in-memory-only constraint. The first *scan* of a launch is still a cold reconciliation (Codex ~3.5 s on the development corpus); only the display is instant. Persisting per-file parser state would also remove that cost but would write decoded provider session, turn, and event identifiers, which is a materially wider boundary and was not adopted.
 
 ## Explicitly Deferred
 

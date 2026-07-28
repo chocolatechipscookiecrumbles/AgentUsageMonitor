@@ -5,7 +5,7 @@ import Foundation
 /// The optional categories are unavailable only when that provider does not
 /// report them. Construction is deliberately failable: malformed records must
 /// stop at the reconciliation boundary rather than become plausible activity.
-struct LocalActivityTokenBreakdown: Sendable, Equatable {
+struct LocalActivityTokenBreakdown: Sendable, Equatable, Codable {
     let inputTokens: Int64
     let cacheCreationTokens: Int64?
     let cachedInputTokens: Int64?
@@ -90,7 +90,7 @@ struct LocalActivityTokenBreakdown: Sendable, Equatable {
     }
 }
 
-struct LocalActivityRequest: Sendable, Equatable, Identifiable {
+struct LocalActivityRequest: Sendable, Equatable, Identifiable, Codable {
     let id: String
     let provider: AgentProvider
     let occurredAt: Date

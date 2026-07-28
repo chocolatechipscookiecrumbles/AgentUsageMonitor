@@ -6,8 +6,13 @@ import Foundation
 ///
 /// Scanning starts with application monitoring rather than with quota
 /// availability or with the popover opening, so activity stays useful while a
-/// provider is disconnected. Everything it derives lives in memory and is
-/// rebuilt asynchronously after every launch; no activity history is written.
+/// provider is disconnected.
+///
+/// A launch republishes the previous instance's reconciled requests from
+/// `LocalActivityCache` before any file is read, so the card shows the numbers
+/// it last showed instead of an empty reading state. A full rescan still runs
+/// immediately and replaces that as soon as it lands, because records can
+/// change while the app is closed.
 @MainActor
 final class LocalActivityMonitor: ObservableObject {
     @Published private(set) var states: [AgentProvider: ProviderLocalActivityState] = [:]
@@ -15,6 +20,7 @@ final class LocalActivityMonitor: ObservableObject {
     private let sources: [AgentProvider: any LocalActivitySource]
     private let rootsByProvider: [AgentProvider: [URL]]
     private let calendar: () -> Calendar
+    private let cache: LocalActivityCache
     private var observers: [AgentProvider: LocalActivityFileObserver] = [:]
     private var scanTasks: [AgentProvider: Task<Void, Never>] = [:]
     /// Providers whose records changed while their scan was already running.
@@ -28,11 +34,13 @@ final class LocalActivityMonitor: ObservableObject {
     init(
         sources: [AgentProvider: any LocalActivitySource],
         rootsByProvider: [AgentProvider: [URL]],
-        calendar: @escaping () -> Calendar = { .autoupdatingCurrent }
+        calendar: @escaping () -> Calendar = { .autoupdatingCurrent },
+        cache: LocalActivityCache = LocalActivityCache()
     ) {
         self.sources = sources
         self.rootsByProvider = rootsByProvider
         self.calendar = calendar
+        self.cache = cache
     }
 
     convenience init() {
@@ -58,8 +66,19 @@ final class LocalActivityMonitor: ObservableObject {
         guard !isRunning else { return }
         isRunning = true
 
+        // Republish what the last instance reconciled before touching a file,
+        // so the card opens with numbers rather than a reading state. Requests
+        // are re-aggregated against the current day, so a cache written
+        // yesterday correctly reads as no activity today rather than as stale
+        // totals.
+        let cached = cache.load()
         for provider in sources.keys {
-            states[provider] = .loading
+            if let requests = cached[provider] {
+                reconciledRequests[provider] = requests
+                publish(provider)
+            } else {
+                states[provider] = .loading
+            }
             startObserver(for: provider)
             scheduleScan(for: provider)
         }
@@ -123,10 +142,14 @@ final class LocalActivityMonitor: ObservableObject {
             // events from double counting a request.
             reconciledRequests[provider] = result.requests
             publish(provider)
+            cache.save(reconciledRequests)
         case .localRecordsMissing:
             reconciledRequests[provider] = nil
             states[provider] = .unavailable(.localRecordsMissing)
+            cache.save(reconciledRequests)
         case .unsafeToRead:
+            // An unreadable scan says nothing about what was already observed,
+            // so the cached history is left alone rather than erased.
             reconciledRequests[provider] = nil
             states[provider] = .unavailable(.unsafeToRead)
         }

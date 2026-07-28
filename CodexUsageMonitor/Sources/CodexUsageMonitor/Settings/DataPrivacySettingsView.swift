@@ -80,8 +80,8 @@ struct DataPrivacySettingsView: View {
                 SettingsSectionRow {
                     SettingsValueRow(
                         "Where it is kept",
-                        value: "Memory only",
-                        description: "Nothing is written. The activity index lives in memory, disappears when the app quits, and is rebuilt after each launch. The records themselves stay owned by the agents and are never modified."
+                        value: "Cached on this Mac",
+                        description: "Recent totals are cached in this app's own folder so the menu can show them immediately at the next launch instead of rebuilding first. Only the figures shown on the card are cached — never file paths, agent session identifiers, or record contents. The records themselves stay owned by the agents and are never modified."
                     )
                 }
                 SettingsSectionRow(showsDivider: false) {

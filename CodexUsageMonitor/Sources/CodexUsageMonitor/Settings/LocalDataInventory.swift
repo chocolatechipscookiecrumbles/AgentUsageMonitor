@@ -47,14 +47,14 @@ enum LocalDataInventory {
             retention: "Overwritten each time Claude Code renders its status line",
             contents: "Rate-limit percentages and reset times, written by the Claude usage bridge and only read here"
         ),
-        // Deliberately has no file name: Token activity is derived in memory
-        // while the app runs and is never written anywhere.
+        // Only the reconciled values the card already shows are written, so the
+        // next launch can display them before re-reading anything.
         LocalDataStoreDescriptor(
             id: "token-activity",
             title: "Token activity",
-            fileName: "None — memory only",
-            retention: "Discarded when the app quits and rebuilt after every launch",
-            contents: "Timestamps, models, token counts, and opaque identifiers derived from records the agents own; the app writes no activity history of its own"
+            fileName: "token-activity-cache.json",
+            retention: "Three days plus the most recent request, replaced by each completed scan",
+            contents: "Hashed request identities, timestamps, models, and token counts; no file paths, agent session identifiers, or record contents"
         ),
     ]
 }
