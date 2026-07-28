@@ -34,6 +34,58 @@ struct SettingsStatus: Sendable {
         }
     }
 
+    /// A plain-text rendering of exactly what the Diagnostics page shows, so a
+    /// pasted report cannot disagree with the page it was copied from. It
+    /// carries the same stable classifications the page does — never raw
+    /// provider error text or quota values.
+    func diagnosticsReport(now: Date = .now) -> String {
+        var lines = [
+            "Codex Usage Monitor diagnostics",
+            "Copied: \(now.formatted(date: .abbreviated, time: .shortened))",
+            "Version: \(appVersion) (\(buildNumber))",
+            "",
+            "Latest refresh",
+            "  Status: \(displayMode.displayName)",
+            "  Last attempt: \(lastAttemptAt.formatted(date: .abbreviated, time: .shortened))",
+        ]
+        if let lastConfirmedAt {
+            lines.append("  Last confirmed: \(lastConfirmedAt.formatted(date: .abbreviated, time: .shortened))")
+        }
+        lines.append("  Activity: \(refreshActivity)")
+
+        lines.append(contentsOf: ["", "Outcomes · last 30 days"])
+        if diagnostics.outcomes.isEmpty {
+            lines.append("  No recorded outcomes")
+        } else {
+            for outcome in Self.outcomeOrder {
+                if let count = diagnostics.outcomes[outcome] {
+                    lines.append("  \(outcome.displayName): \(count.formatted())")
+                }
+            }
+        }
+
+        lines.append(contentsOf: ["", "Classified failures · last 30 days"])
+        if diagnostics.failureKinds.isEmpty {
+            lines.append("  No classified failures")
+        } else {
+            for kind in diagnostics.failureKinds.keys.sorted() {
+                lines.append("  \(kind): \(diagnostics.failureKinds[kind, default: 0].formatted())")
+            }
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    /// Shared by the page and the copied report so both list outcomes in the
+    /// same order.
+    static let outcomeOrder: [RefreshOutcome] = [
+        .confirmed,
+        .confirmedAfterRetry,
+        .cachedLastKnownGood,
+        .unconfirmed,
+        .unavailable,
+    ]
+
     static func make(
         displayState: QuotaDisplayState,
         refreshState: RefreshState,

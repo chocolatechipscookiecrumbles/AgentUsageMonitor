@@ -38,8 +38,10 @@ struct MenuBarLabelPresentation: Equatable, Sendable {
         showsGauge = false
         showsPauseMarker = provider == .codex && codexDisplayState.mode == .cachedPaused
         // Show the provider glyph only when the user actually has a choice, so a
-        // single-provider setup keeps its clean text-only label.
-        providerAssetName = showsProviderMarker ? provider.settingsAssetName : nil
+        // single-provider setup keeps its clean text-only label. The menu-bar
+        // artwork is deliberately not the settings artwork: this label renders
+        // as a template, so the glyph's knockouts have to be transparent.
+        providerAssetName = showsProviderMarker ? provider.menuBarAssetName : nil
 
         switch style {
         // The graphical bar modes render via `MenuBarQuotaBars`/`MenuBarBarsView`

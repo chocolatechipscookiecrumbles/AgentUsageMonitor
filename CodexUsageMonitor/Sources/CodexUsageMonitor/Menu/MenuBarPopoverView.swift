@@ -39,6 +39,7 @@ struct MenuBarPopoverView: View {
                     .padding(.bottom, MenuPopoverTheme.providerContentFooterSpacing)
 
                 MenuActionFooter(
+                    settings: viewModel.settings,
                     isRefreshing: isRefreshing,
                     refresh: refresh,
                     openNotificationSettings: showNotificationSettings,

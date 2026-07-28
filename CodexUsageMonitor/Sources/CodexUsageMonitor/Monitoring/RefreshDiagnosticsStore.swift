@@ -62,6 +62,12 @@ final class RefreshDiagnosticsStore {
         save(prune(entries))
     }
 
+    /// Discards the recorded history. Collection continues: the next completed
+    /// refresh writes a new file.
+    func clear() {
+        try? FileManager.default.removeItem(at: fileURL)
+    }
+
     func diagnosticSummary(from start: Date, through end: Date) -> RefreshDiagnosticSummary {
         let matching = load().filter { $0.completedAt >= start && $0.completedAt <= end }
         return RefreshDiagnosticSummary(

@@ -2,14 +2,12 @@ import SwiftUI
 
 struct DiagnosticsSettingsView: View {
     let status: SettingsStatus
+    let clearDiagnostics: () -> Void
 
-    private let outcomeOrder: [RefreshOutcome] = [
-        .confirmed,
-        .confirmedAfterRetry,
-        .cachedLastKnownGood,
-        .unconfirmed,
-        .unavailable,
-    ]
+    @State private var isConfirmingClear = false
+    @State private var hasCopiedReport = false
+
+    private static let diagnosticsFileName = "refresh-diagnostics.json"
 
     var body: some View {
         SettingsPage {
@@ -41,7 +39,7 @@ struct DiagnosticsSettingsView: View {
                             .foregroundStyle(.secondary)
                     } else {
                         VStack(alignment: .leading, spacing: SettingsLayoutMetrics.sectionRowVerticalPadding) {
-                            ForEach(outcomeOrder, id: \.rawValue) { outcome in
+                            ForEach(SettingsStatus.outcomeOrder, id: \.rawValue) { outcome in
                                 if let count = status.diagnostics.outcomes[outcome] {
                                     SettingsLabeledRow(outcome.displayName) { Text(count.formatted()) }
                                 }
@@ -71,6 +69,30 @@ struct DiagnosticsSettingsView: View {
                 }
             }
 
+            SettingsSection("Actions") {
+                SettingsSectionRow {
+                    VStack(alignment: .leading, spacing: SettingsLayoutMetrics.preferenceTitleDescriptionSpacing) {
+                        HStack(spacing: SettingsLayoutMetrics.rowSpacing) {
+                            Button("Copy Report", action: copyReport)
+                            Button("Reveal in Finder") {
+                                LocalDataActions.revealFile(named: Self.diagnosticsFileName)
+                            }
+                        }
+                        if hasCopiedReport {
+                            Text("Copied everything shown on this page.")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                SettingsSectionRow(showsDivider: false) {
+                    VStack(alignment: .leading, spacing: SettingsLayoutMetrics.preferenceTitleDescriptionSpacing) {
+                        Button("Clear History…") { isConfirmingClear = true }
+                        SettingsDescription("Removes the recorded outcomes and classified failures. Quota readings and the refresh schedule are unaffected, and the next refresh starts a new history.")
+                    }
+                }
+            }
+
             SettingsSection("Application") {
                 SettingsSectionRow {
                     SettingsLabeledRow("Name") { Text("Codex Usage Monitor") }
@@ -83,5 +105,23 @@ struct DiagnosticsSettingsView: View {
                 }
             }
         }
+        .confirmationDialog(
+            "Clear the recorded refresh history?",
+            isPresented: $isConfirmingClear,
+            titleVisibility: .visible
+        ) {
+            Button("Clear History", role: .destructive) {
+                clearDiagnostics()
+                hasCopiedReport = false
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Deletes \(Self.diagnosticsFileName) — up to 30 days of outcomes and classified failures. This cannot be undone.")
+        }
+    }
+
+    private func copyReport() {
+        LocalDataActions.copyToPasteboard(status.diagnosticsReport())
+        hasCopiedReport = true
     }
 }

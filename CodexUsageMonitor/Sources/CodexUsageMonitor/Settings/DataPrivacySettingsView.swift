@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct DataPrivacySettingsView: View {
+    @State private var exportError: String?
+    @State private var exportedFileName: String?
+
     var body: some View {
         SettingsPage {
             SettingsSection("Local storage") {
@@ -14,8 +17,14 @@ struct DataPrivacySettingsView: View {
                 SettingsSectionRow {
                     SettingsLabeledRow("Directory permissions") { Text("Owner only (0700)") }
                 }
-                SettingsSectionRow(showsDivider: false) {
+                SettingsSectionRow {
                     SettingsLabeledRow("File permissions") { Text("Owner only (0600)") }
+                }
+                SettingsSectionRow(showsDivider: false) {
+                    HStack(spacing: SettingsLayoutMetrics.rowSpacing) {
+                        Button("Reveal in Finder", action: LocalDataActions.revealInFinder)
+                        Button("Copy Path", action: LocalDataActions.copyDirectoryPath)
+                    }
                 }
             }
 
@@ -90,13 +99,46 @@ struct DataPrivacySettingsView: View {
             }
 
             SettingsSection("Excluded data") {
-                SettingsSectionRow {
+                SettingsSectionRow(showsDivider: false) {
                     SettingsDescription("The app does not store passwords, OAuth tokens, email addresses, prompts, source code, raw provider responses, or raw provider errors.")
                 }
+            }
+
+            SettingsSection("Export") {
+                SettingsSectionRow {
+                    SettingsDescription("Writes every store listed above to one JSON file you choose. A store this Mac has not written yet is named and marked unavailable rather than left out. Nothing outside this app's own folder is included — not Claude Code's Keychain item, and not the agents' own records.")
+                }
+                SettingsSectionRow {
+                    VStack(alignment: .leading, spacing: SettingsLayoutMetrics.preferenceTitleDescriptionSpacing) {
+                        Button("Export Local Data…", action: exportLocalData)
+                        if let exportedFileName {
+                            Text("Exported to \(exportedFileName).")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                        }
+                        if let exportError {
+                            Text(exportError)
+                                .font(.callout)
+                                .foregroundStyle(.orange)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
                 SettingsSectionRow(showsDivider: false) {
-                    SettingsDescription("Export and deletion controls are intentionally deferred.")
+                    SettingsDescription("The exported file leaves this app's owner-only folder. It is protected by wherever you save it. Deletion controls remain deferred; remove the files in Finder to clear this data today.")
                 }
             }
+        }
+    }
+
+    private func exportLocalData() {
+        exportError = nil
+        exportedFileName = nil
+        do {
+            guard let url = try LocalDataActions.runExportPanel() else { return }
+            exportedFileName = url.lastPathComponent
+        } catch {
+            exportError = "Could not write the export: \(error.localizedDescription)"
         }
     }
 }

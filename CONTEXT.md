@@ -96,6 +96,14 @@ _Avoid_: Settings Agent selector, active-agent selector, provider filter
 The persisted Single-Agent Menu Bar Mode choice governing connection loss: Stay Selected keeps the Preferred Menu Bar Agent effective while showing its disconnected state, while Switch Automatically temporarily chooses another Connected Agent. Stay Selected is the default.
 _Avoid_: Disconnect toggle, fallback agent, active-agent switching
 
+**Command Shortcut**:
+The key equivalent for one menu popover footer command, shown right-aligned on its row and listed in General's Startup & Shortcuts section. Display and binding come from one catalog, so a listed shortcut is always the one that fires. Enable keyboard shortcuts governs both: with it off, nothing is shown and nothing is bound. The assignments are fixed; editing them is deferred.
+_Avoid_: Hotkey, global shortcut, accelerator
+
+**Menu Bar Glyph**:
+The provider mark drawn beside the menu bar's text label, shown only when more than one agent is eligible. It renders as a template, so its artwork is monochrome with transparent knockouts and is named separately from the colored artwork used on Settings tiles.
+_Avoid_: Provider icon, menu bar logo, status icon
+
 ## Usage Warnings
 
 **Shared Refresh Cadence**:

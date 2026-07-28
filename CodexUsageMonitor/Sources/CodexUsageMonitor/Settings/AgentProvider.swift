@@ -31,6 +31,19 @@ enum AgentProvider: String, CaseIterable, Identifiable, Sendable, Codable {
         }
     }
 
+    /// The menu bar draws its glyph as a template, which paints every
+    /// non-transparent pixel with the tint. Codex therefore needs artwork of
+    /// its own: its colored mark is a full-bleed opaque square — deliberate in
+    /// the settings tiles, a solid block in the menu bar. Claude's and
+    /// Copilot's marks are already transparent, so they reuse theirs.
+    var menuBarAssetName: String {
+        switch self {
+        case .codex: "CodexMenuBar"
+        case .claudeCode: "Claude"
+        case .githubCopilot: "Copilot"
+        }
+    }
+
     var systemImage: String {
         switch self {
         case .codex: "sparkles"

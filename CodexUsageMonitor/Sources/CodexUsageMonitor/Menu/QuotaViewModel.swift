@@ -233,6 +233,11 @@ final class QuotaViewModel: ObservableObject {
         monitor.refresh(reason: .manual)
     }
 
+    /// User-initiated from Diagnostics: drop the recorded refresh history.
+    func clearRefreshDiagnostics() {
+        monitor.clearDiagnostics()
+    }
+
     func checkCodexConnection() {
         connectionController.checkConnection()
     }
