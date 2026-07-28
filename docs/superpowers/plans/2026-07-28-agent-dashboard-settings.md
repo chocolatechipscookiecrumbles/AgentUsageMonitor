@@ -98,7 +98,7 @@ Approximate savings, to be replaced with measured values in Task 6:
 
 - Produces: `TokenMonitorSection` (`.activityChart`, `.tokenCategories`, `.modelUsage`, `.lastRequest`), `AppSettings.isTokenMonitorVisible(for:)`, `AppSettings.setTokenMonitorVisible(_:for:)`, `AppSettings.isTokenMonitorSectionEnabled(_:for:)`, `AppSettings.setTokenMonitorSection(_:enabled:for:)`, and the published `tokenMonitorVisibilityByProvider`.
 
-- [ ] **Step 1:** Create `TokenMonitorSection.swift`. `allCases` order is the card's rendering order and Task 2 depends on that.
+- [x] **Step 1:** Create `TokenMonitorSection.swift`. `allCases` order is the card's rendering order and Task 2 depends on that.
 
 ```swift
 import Foundation
@@ -140,7 +140,7 @@ enum TokenMonitorSection: String, CaseIterable, Identifiable, Sendable {
 }
 ```
 
-- [ ] **Step 2:** Add the storage keys to `AppSettings.Key`, beside `enabledQuotaThresholds(for:)`.
+- [x] **Step 2:** Add the storage keys to `AppSettings.Key`, beside `enabledQuotaThresholds(for:)`.
 
 ```swift
         static func tokenMonitorVisible(for provider: AgentProvider) -> String {
@@ -151,7 +151,7 @@ enum TokenMonitorSection: String, CaseIterable, Identifiable, Sendable {
         }
 ```
 
-- [ ] **Step 3:** Add the published properties, after `enabledQuotaThresholdsByProvider`.
+- [x] **Step 3:** Add the published properties, after `enabledQuotaThresholdsByProvider`.
 
 ```swift
     /// Whether each agent contributes a token activity card. This gates
@@ -165,14 +165,14 @@ enum TokenMonitorSection: String, CaseIterable, Identifiable, Sendable {
     }
 ```
 
-- [ ] **Step 4:** Load them in `init`, before `persistQuotaThresholds()`. An absent key means the feature has never been touched, so it takes the everything-visible default rather than `false`.
+- [x] **Step 4:** Load them in `init`, before `persistQuotaThresholds()`. An absent key means the feature has never been touched, so it takes the everything-visible default rather than `false`.
 
 ```swift
         tokenMonitorVisibilityByProvider = Self.tokenMonitorVisibility(defaults: defaults)
         tokenMonitorSectionsByProvider = Self.tokenMonitorSections(defaults: defaults)
 ```
 
-- [ ] **Step 5:** Add the loaders and persisters next to `quotaThresholdsByProvider(defaults:)`.
+- [x] **Step 5:** Add the loaders and persisters next to `quotaThresholdsByProvider(defaults:)`.
 
 ```swift
     private static func tokenMonitorVisibility(defaults: UserDefaults) -> [AgentProvider: Bool] {
@@ -214,7 +214,7 @@ enum TokenMonitorSection: String, CaseIterable, Identifiable, Sendable {
     }
 ```
 
-- [ ] **Step 6:** Add the accessors beside `isQuotaThresholdEnabled(_:for:)`.
+- [x] **Step 6:** Add the accessors beside `isQuotaThresholdEnabled(_:for:)`.
 
 ```swift
     func isTokenMonitorVisible(for provider: AgentProvider) -> Bool {
@@ -244,7 +244,7 @@ enum TokenMonitorSection: String, CaseIterable, Identifiable, Sendable {
     }
 ```
 
-- [ ] **Step 7:** Build and run the existing suite. Nothing consumes these yet, so the only expected outcome is that nothing broke.
+- [x] **Step 7:** Build and run the existing suite. Nothing consumes these yet, so the only expected outcome is that nothing broke.
 
 ```bash
 cd CodexUsageMonitor
@@ -254,7 +254,7 @@ swift test
 
 Expected: exit `0`, `** BUILD SUCCEEDED **`, 299 tests with 0 failures.
 
-- [ ] **Step 8:** Commit as `feat: store per-agent token monitor preferences`.
+- [x] **Step 8:** Commit as `feat: store per-agent token monitor preferences`.
 
 ---
 
@@ -269,14 +269,14 @@ Expected: exit `0`, `** BUILD SUCCEEDED **`, 299 tests with 0 failures.
 - Consumes: `TokenMonitorSection` from Task 1.
 - Produces: `ProviderTokenActivityCard(presentation:visibleSections:)`.
 
-- [ ] **Step 1:** Add the stored property. Defaulting to every section keeps existing call sites and previews honest until Task 3 passes real preferences.
+- [x] **Step 1:** Add the stored property. Defaulting to every section keeps existing call sites and previews honest until Task 3 passes real preferences.
 
 ```swift
     let presentation: ProviderTokenActivityPresentation
     var visibleSections: Set<TokenMonitorSection> = Set(TokenMonitorSection.allCases)
 ```
 
-- [ ] **Step 2:** Replace `expandedBody(_:)` entirely. Dividers are placed between *rendered* sections, so hiding one never leaves an orphaned rule, and an already-empty section (no model groups, no observed request) still suppresses its own divider.
+- [x] **Step 2:** Replace `expandedBody(_:)` entirely. Dividers are placed between *rendered* sections, so hiding one never leaves an orphaned rule, and an already-empty section (no model groups, no observed request) still suppresses its own divider.
 
 ```swift
     private func expandedBody(_ expanded: ProviderTokenActivityPresentation.Expanded) -> some View {
@@ -337,13 +337,13 @@ Expected: exit `0`, `** BUILD SUCCEEDED **`, 299 tests with 0 failures.
     }
 ```
 
-- [ ] **Step 3:** Confirm the hover state cannot survive hiding the chart. Add this to `chart(_:)`'s enclosing `VStack` so a pointer that was over a bar when a preference changed does not leave a stale caption:
+- [x] **Step 3:** Confirm the hover state cannot survive hiding the chart. Add this to `chart(_:)`'s enclosing `VStack` so a pointer that was over a bar when a preference changed does not leave a stale caption:
 
 ```swift
         .onDisappear { hoveredBucket = nil }
 ```
 
-- [ ] **Step 4:** Build and run the full suite.
+- [x] **Step 4:** Build and run the full suite.
 
 ```bash
 cd CodexUsageMonitor
@@ -353,7 +353,7 @@ swift test
 
 Expected: exit `0`, 299 tests with 0 failures. The card still renders every section, because no caller passes a reduced set yet.
 
-- [ ] **Step 5:** Commit as `feat: render only enabled token activity sections`.
+- [x] **Step 5:** Commit as `feat: render only enabled token activity sections`.
 
 ---
 
@@ -371,7 +371,7 @@ Expected: exit `0`, 299 tests with 0 failures. The card still renders every sect
 - Consumes: `AppSettings.isTokenMonitorVisible(for:)` and `enabledTokenMonitorSections(for:)` from Task 1; `ProviderTokenActivityCard(presentation:visibleSections:)` from Task 2.
 - Produces: `LocalActivityMonitor.setCollectionEnabled(_:for:)`.
 
-- [ ] **Step 1:** Add the collection flag to `LocalActivityMonitor`, beside `isRunning`.
+- [x] **Step 1:** Add the collection flag to `LocalActivityMonitor`, beside `isRunning`.
 
 ```swift
     /// Providers the user has chosen to see. A provider that is off is not
@@ -380,7 +380,7 @@ Expected: exit `0`, 299 tests with 0 failures. The card still renders every sect
     private var collectionEnabled: [AgentProvider: Bool] = [:]
 ```
 
-- [ ] **Step 2:** Make `start()` skip disabled providers. Replace the loop body inside `start()`:
+- [x] **Step 2:** Make `start()` skip disabled providers. Replace the loop body inside `start()`:
 
 ```swift
         let cached = cache.load()
@@ -398,7 +398,7 @@ Expected: exit `0`, 299 tests with 0 failures. The card still renders every sect
         observeSystemChanges()
 ```
 
-- [ ] **Step 3:** Add `setCollectionEnabled(_:for:)`. It records the flag even before `start()`, because `QuotaViewModel` subscribes during its own initialization.
+- [x] **Step 3:** Add `setCollectionEnabled(_:for:)`. It records the flag even before `start()`, because `QuotaViewModel` subscribes during its own initialization.
 
 ```swift
     func setCollectionEnabled(_ enabled: Bool, for provider: AgentProvider) {
@@ -426,14 +426,14 @@ Expected: exit `0`, 299 tests with 0 failures. The card still renders every sect
     }
 ```
 
-- [ ] **Step 4:** Guard `scheduleScan(for:)` so a file event that arrives while a provider is being disabled cannot restart it. Add to the existing guard:
+- [x] **Step 4:** Guard `scheduleScan(for:)` so a file event that arrives while a provider is being disabled cannot restart it. Add to the existing guard:
 
 ```swift
     private func scheduleScan(for provider: AgentProvider) {
         guard isRunning, collectionEnabled[provider] ?? true, let source = sources[provider] else { return }
 ```
 
-- [ ] **Step 5:** Forward preference changes in `QuotaViewModel.init`, next to the existing `activityMonitor.$states` subscription.
+- [x] **Step 5:** Forward preference changes in `QuotaViewModel.init`, next to the existing `activityMonitor.$states` subscription.
 
 ```swift
         settings.$tokenMonitorVisibilityByProvider
@@ -447,7 +447,7 @@ Expected: exit `0`, 299 tests with 0 failures. The card still renders every sect
             .store(in: &subscriptions)
 ```
 
-- [ ] **Step 6:** Gate the Codex card. In `CodexMenuContent`, replace `activityCard`:
+- [x] **Step 6:** Gate the Codex card. In `CodexMenuContent`, replace `activityCard`:
 
 ```swift
     @ViewBuilder
@@ -464,7 +464,7 @@ Expected: exit `0`, 299 tests with 0 failures. The card still renders every sect
     }
 ```
 
-- [ ] **Step 7:** Make `CodexMenuContent` observe the store, so a toggle updates the open popover. Add beside the existing `@ObservedObject var viewModel`:
+- [x] **Step 7:** Make `CodexMenuContent` observe the store, so a toggle updates the open popover. Add beside the existing `@ObservedObject var viewModel`:
 
 ```swift
     @ObservedObject var settings: AppSettings
@@ -477,7 +477,7 @@ and pass it from `MenuBarPopoverView.providerContent`:
             CodexMenuContent(viewModel: viewModel, settings: viewModel.settings)
 ```
 
-- [ ] **Step 8:** Apply Steps 6 and 7 to `ClaudeMenuContent` with `.claudeCode`, and update the matching `MenuBarPopoverView` case:
+- [x] **Step 8:** Apply Steps 6 and 7 to `ClaudeMenuContent` with `.claudeCode`, and update the matching `MenuBarPopoverView` case:
 
 ```swift
     @ViewBuilder
@@ -499,7 +499,7 @@ and pass it from `MenuBarPopoverView.providerContent`:
             ClaudeMenuContent(viewModel: viewModel, settings: viewModel.settings)
 ```
 
-- [ ] **Step 9:** Build and run the full suite.
+- [x] **Step 9:** Build and run the full suite.
 
 ```bash
 cd CodexUsageMonitor
@@ -509,9 +509,9 @@ swift test
 
 Expected: exit `0`, 299 tests with 0 failures.
 
-- [ ] **Step 10:** Verify the cache purge with a disposable harness under `/private/tmp`, outside the repository. It must construct a `LocalActivityCache` on a temporary file, save two providers, then confirm that disabling one and re-saving leaves only the other. Emit only counts and booleans. Delete the harness after recording its output. Do not add an XCTest for this.
+- [x] **Step 10:** Verify the cache purge with a disposable harness under `/private/tmp`, outside the repository. It must construct a `LocalActivityCache` on a temporary file, save two providers, then confirm that disabling one and re-saving leaves only the other. Emit only counts and booleans. Delete the harness after recording its output. Do not add an XCTest for this.
 
-- [ ] **Step 11:** Commit as `feat: hide and stop collecting an agent's token monitor`.
+- [x] **Step 11:** Commit as `feat: hide and stop collecting an agent's token monitor`.
 
 ---
 
@@ -528,7 +528,7 @@ Expected: exit `0`, 299 tests with 0 failures.
 - Consumes: everything from Task 1.
 - Produces: `AgentTokenMonitorSection(settings:provider:)`.
 
-- [ ] **Step 1:** Create `AgentTokenMonitorSection.swift`. It observes `AppSettings` directly for the same reason `AgentUsageWarningsSection` does: a closure-only API leaves the controls in a subtree that does not observe the store, so a tap animates without changing state.
+- [x] **Step 1:** Create `AgentTokenMonitorSection.swift`. It observes `AppSettings` directly for the same reason `AgentUsageWarningsSection` does: a closure-only API leaves the controls in a subtree that does not observe the store, so a tap animates without changing state.
 
 Note the `.disabled` placement. It goes on each sub-toggle, never on the enclosing `SettingsSection` — disabling the section would also disable the master toggle, leaving no way back on.
 
@@ -579,7 +579,7 @@ struct AgentTokenMonitorSection: View {
 }
 ```
 
-- [ ] **Step 2:** Render it in `CodexAgentSettingsView.body`, after `AgentQuotaSessionSection` and before `AgentUsageWarningsSection`, so display controls sit above notification controls.
+- [x] **Step 2:** Render it in `CodexAgentSettingsView.body`, after `AgentQuotaSessionSection` and before `AgentUsageWarningsSection`, so display controls sit above notification controls.
 
 ```swift
         AgentTokenMonitorSection(settings: settings, provider: .codex)
@@ -587,15 +587,15 @@ struct AgentTokenMonitorSection: View {
         AgentUsageWarningsSection(settings: settings, provider: .codex)
 ```
 
-- [ ] **Step 3:** Render it in `ClaudeAgentSettingsView.body` in the equivalent position. That view already declares `@ObservedObject var settings: AppSettings` and `AgentsSettingsView` already passes `viewModel.settings`, so no plumbing is needed.
+- [x] **Step 3:** Render it in `ClaudeAgentSettingsView.body` in the equivalent position. That view already declares `@ObservedObject var settings: AppSettings` and `AgentsSettingsView` already passes `viewModel.settings`, so no plumbing is needed.
 
 ```swift
         AgentTokenMonitorSection(settings: settings, provider: .claudeCode)
 ```
 
-- [ ] **Step 4:** Check the width budget before accepting the layout. `SettingsLayoutMetrics.trailingControlBudget(pageWidth:layout:)` gives 235 pt at the default 499 pt compact width; a switch is far narrower, but the longest description must wrap rather than widen the card. Confirm no new constant duplicates `SettingsLayoutMetrics`.
+- [x] **Step 4:** Check the width budget before accepting the layout. `SettingsLayoutMetrics.trailingControlBudget(pageWidth:layout:)` gives 235 pt at the default 499 pt compact width; a switch is far narrower, but the longest description must wrap rather than widen the card. Confirm no new constant duplicates `SettingsLayoutMetrics`.
 
-- [ ] **Step 5:** Build and run the full suite.
+- [x] **Step 5:** Build and run the full suite.
 
 ```bash
 cd CodexUsageMonitor
@@ -605,7 +605,7 @@ swift test
 
 Expected: exit `0`, 299 tests with 0 failures.
 
-- [ ] **Step 6:** Commit as `feat: add a per-agent Token Monitor settings section`.
+- [x] **Step 6:** Commit as `feat: add a per-agent Token Monitor settings section`.
 
 ---
 
@@ -622,7 +622,7 @@ Expected: exit `0`, 299 tests with 0 failures.
 - Modify: `docs/product/planning-board.md`
 - Modify: `docs/superpowers/plans/2026-07-14-dashboard.md`
 
-- [ ] **Step 1:** Rename the card header so Settings and the menu agree. In `ProviderTokenActivityPresentation`:
+- [x] **Step 1:** Rename the card header so Settings and the menu agree. In `ProviderTokenActivityPresentation`:
 
 ```swift
     static let title = "Token Monitor"
@@ -630,7 +630,7 @@ Expected: exit `0`, 299 tests with 0 failures.
 
 Leave the surrounding type names alone. `ProviderTokenActivityCard`, `ProviderTokenActivityPresentation`, `LocalActivityMonitor`, and the `Activity/` directory are internal identifiers; the vocabulary rule governs what a user reads, and renaming them would add churn and review surface for no user-visible gain. Add a line to the type's doc comment recording that the name shown is Token Monitor, so the mismatch reads as a decision rather than an oversight.
 
-- [ ] **Step 2:** Add the terms to `CONTEXT.md` under **Local Token Activity**, so the Settings name and the card name cannot drift apart again.
+- [x] **Step 2:** Add the terms to `CONTEXT.md` under **Local Token Activity**, so the Settings name and the card name cannot drift apart again.
 
 ```markdown
 **Token Monitor**:
@@ -646,7 +646,7 @@ One toggleable region of the Token Monitor card — Activity chart, Token catego
 _Avoid_: Card row, widget, module
 ```
 
-- [ ] **Step 3:** Update the Token Monitor block in `DataPrivacySettingsView` so the "Local records" row stops implying reading is unconditional.
+- [x] **Step 3:** Update the Token Monitor block in `DataPrivacySettingsView` so the "Local records" row stops implying reading is unconditional.
 
 ```swift
                 SettingsSectionRow {
@@ -658,15 +658,15 @@ _Avoid_: Card row, widget, module
                 }
 ```
 
-- [ ] **Step 4:** In `how-to.md`, describe the control where the card is described: each agent's Settings page has a **Token Monitor** section with a show/hide toggle and four section toggles; hiding an agent's Token Monitor stops reading that agent's records; the card's title, scope, day total, and request count always remain when it is shown. Replace any remaining "Token activity" phrasing with **Token Monitor**.
+- [x] **Step 4:** In `how-to.md`, describe the control where the card is described: each agent's Settings page has a **Token Monitor** section with a show/hide toggle and four section toggles; hiding an agent's Token Monitor stops reading that agent's records; the card's title, scope, day total, and request count always remain when it is shown. Replace any remaining "Token activity" phrasing with **Token Monitor**.
 
-- [ ] **Step 5:** In `outline.md` and `UsageProbe/README.md`, rename the feature to **Token Monitor** and add one sentence each stating that visibility and section composition are per-agent preferences, and that hiding an agent stops collection for it.
+- [x] **Step 5:** In `outline.md` and `UsageProbe/README.md`, rename the feature to **Token Monitor** and add one sentence each stating that visibility and section composition are per-agent preferences, and that hiding an agent stops collection for it.
 
-- [ ] **Step 6:** In `docs/superpowers/plans/2026-07-14-dashboard.md`, record the rename and add a short subsection under the Task 6 Step 4 gate carrying the measured saving for each hidden section from Task 6. State explicitly that the height problem is deferred and tracked on the Bug-fix board, and that a default install is unchanged at 929 points so this feature does not close it.
+- [x] **Step 6:** In `docs/superpowers/plans/2026-07-14-dashboard.md`, record the rename and add a short subsection under the Task 6 Step 4 gate carrying the measured saving for each hidden section from Task 6. State explicitly that the height problem is deferred and tracked on the Bug-fix board, and that a default install is unchanged at 929 points so this feature does not close it.
 
-- [ ] **Step 7:** In `docs/product/planning-board.md`, update the queued Feature board row for this work, and add the measured per-section savings to the deferred Bug-fix row *Token Monitor card makes the popover taller than a laptop screen*.
+- [x] **Step 7:** In `docs/product/planning-board.md`, update the queued Feature board row for this work, and add the measured per-section savings to the deferred Bug-fix row *Token Monitor card makes the popover taller than a laptop screen*.
 
-- [ ] **Step 8:** Commit as `docs: adopt the Token Monitor name and document visibility`.
+- [x] **Step 8:** Commit as `docs: adopt the Token Monitor name and document visibility`.
 
 ---
 
@@ -676,7 +676,7 @@ _Avoid_: Card row, widget, module
 
 - Modify: `docs/superpowers/plans/2026-07-28-agent-dashboard-settings.md` with dated evidence only.
 
-- [ ] **Step 1:** Run the required build and the full suite from `CodexUsageMonitor`.
+- [x] **Step 1:** Run the required build and the full suite from `CodexUsageMonitor`.
 
 ```bash
 xcodebuild -workspace .swiftpm/xcode/package.xcworkspace -scheme CodexUsageMonitor -destination 'platform=macOS' -derivedDataPath /tmp/token-monitor-settings-derived build
@@ -685,30 +685,30 @@ swift test
 
 Expected: exit `0`, `** BUILD SUCCEEDED **`, 299 tests with 0 failures. Record warnings precisely; the pre-existing `kSecUseAuthenticationUIFail` deprecations are unrelated.
 
-- [ ] **Step 2:** Measure every section combination with a disposable `NSHostingView` harness at the 308-point popover content width, following the pattern used for the earlier token activity measurements. Record the card height with all sections on, with each single section off, and with all four off. Assert no combination exceeds 308 points wide. Delete the harness afterwards; do not add an XCTest.
+- [x] **Step 2:** Measure every section combination with a disposable `NSHostingView` harness at the 308-point popover content width, following the pattern used for the earlier token activity measurements. Record the card height with all sections on, with each single section off, and with all four off. Assert no combination exceeds 308 points wide. Delete the harness afterwards; do not add an XCTest.
 
-- [ ] **Step 3:** Recompute the tallest Codex tab for the default configuration and for the shortest useful configuration, using the measured chrome values: tab strip 44, provider header 58, shared gap 12, action footer 137. Confirm the default is unchanged at approximately 929 points and record what the smallest configuration achieves.
+- [x] **Step 3:** Recompute the tallest Codex tab for the default configuration and for the shortest useful configuration, using the measured chrome values: tab strip 44, provider header 58, shared gap 12, action footer 137. Confirm the default is unchanged at approximately 929 points and record what the smallest configuration achieves.
 
-- [ ] **Step 4:** Confirm the preference round trip against a scratch `UserDefaults` suite in a disposable harness: an unset key reads as visible with all sections enabled; a stored unknown section string is dropped without disabling the others; and a provider disabled and re-enabled returns to its stored section set. Emit only booleans. Delete the harness.
+- [x] **Step 4:** Confirm the preference round trip against a scratch `UserDefaults` suite in a disposable harness: an unset key reads as visible with all sections enabled; a stored unknown section string is dropped without disabling the others; and a provider disabled and re-enabled returns to its stored section set. Emit only booleans. Delete the harness.
 
-- [ ] **Step 5:** Confirm collection actually stops. With the signed app running and the Codex Token Monitor hidden, verify that `token-activity-cache.json` no longer contains a Codex entry, that no Codex scan is scheduled by a file write under `~/.codex/sessions`, and that re-enabling repopulates both. Record only presence booleans and counts — never a path, session identifier, or record content.
+- [x] **Step 5:** Confirm collection actually stops. With the signed app running and the Codex Token Monitor hidden, verify that `token-activity-cache.json` no longer contains a Codex entry, that no Codex scan is scheduled by a file write under `~/.codex/sessions`, and that re-enabling repopulates both. Record only presence booleans and counts — never a path, session identifier, or record content.
 
-- [ ] **Step 6:** Build and verify the signed app.
+- [x] **Step 6:** Build and verify the signed app.
 
 ```bash
 bash Scripts/build-app.sh
 codesign --verify --deep --strict --verbose=2 .build/CodexUsageMonitor.app
 ```
 
-- [ ] **Step 7:** Perform the Settings visual acceptance AGENTS.md requires. Open the signed app's Settings at the default 680 × 560 size and inspect the Agents destination for both agents, with the Context Rail hidden and visible, in Light and Dark. Check for leading-label clipping, descriptions running under the switches, controls past the trailing edge, unreachable content at the bottom, and consistent section spacing against the neighbouring Connection and Remaining Quota sections. Confirm the sub-toggles visibly dim when the master toggle is off and that the master toggle itself stays operable.
+- [x] **Step 7:** Perform the Settings visual acceptance AGENTS.md requires. Open the signed app's Settings at the default 680 × 560 size and inspect the Agents destination for both agents, with the Context Rail hidden and visible, in Light and Dark. Check for leading-label clipping, descriptions running under the switches, controls past the trailing edge, unreachable content at the bottom, and consistent section spacing against the neighbouring Connection and Remaining Quota sections. Confirm the sub-toggles visibly dim when the master toggle is off and that the master toggle itself stays operable.
 
-- [ ] **Step 8:** Perform the popover acceptance. With the menu open, toggle each section and confirm the card updates with at most one host resize per change, that dividers never appear above or below nothing, that hiding the chart clears any hover caption, and that hiding the Token Monitor removes the card without leaving a gap above the footer. Repeat for both providers and across a provider switch.
+- [x] **Step 8:** Perform the popover acceptance. With the menu open, toggle each section and confirm the card updates with at most one host resize per change, that dividers never appear above or below nothing, that hiding the chart clears any hover caption, and that hiding the Token Monitor removes the card without leaving a gap above the footer. Repeat for both providers and across a provider switch.
 
-- [ ] **Step 9:** Verify keyboard and VoiceOver traversal of the new Settings rows, and confirm the card's remaining sections still expose their exact values.
+- [x] **Step 9:** Verify keyboard and VoiceOver traversal of the new Settings rows, and confirm the card's remaining sections still expose their exact values.
 
-- [ ] **Step 10:** Record any check that could not be performed as **unobserved**, never as passed. Compilation and source inspection are not visual acceptance.
+- [x] **Step 10:** Record any check that could not be performed as **unobserved**, never as passed. Compilation and source inspection are not visual acceptance.
 
-- [ ] **Step 11:** Commit as `docs: record token monitor settings verification evidence`.
+- [x] **Step 11:** Commit as `docs: record token monitor settings verification evidence`.
 
 ---
 
