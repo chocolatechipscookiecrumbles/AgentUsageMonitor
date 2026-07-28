@@ -12,6 +12,12 @@ final class AppSettings: ObservableObject {
         static func enabledQuotaThresholds(for provider: AgentProvider) -> String {
             "notification.enabledQuotaThresholds.\(provider.rawValue)"
         }
+        static func tokenMonitorVisible(for provider: AgentProvider) -> String {
+            "tokenMonitor.visible.\(provider.rawValue)"
+        }
+        static func tokenMonitorSections(for provider: AgentProvider) -> String {
+            "tokenMonitor.sections.\(provider.rawValue)"
+        }
         static let forecastWarnings = "notification.forecastWarnings"
         static let resetCreditWarnings = "notification.resetCreditWarnings"
         static let resetWarnings = "notification.resetWarnings"
@@ -40,6 +46,15 @@ final class AppSettings: ObservableObject {
     /// own set so a user can, e.g., alert at 25% for Codex but 10% for Claude.
     @Published private(set) var enabledQuotaThresholdsByProvider: [AgentProvider: Set<RemainingQuotaThreshold>] {
         didSet { persistQuotaThresholds() }
+    }
+    /// Whether each agent contributes a Token Monitor card. This gates
+    /// collection as well as display, so it is read by `LocalActivityMonitor`
+    /// and not only by the menu.
+    @Published private(set) var tokenMonitorVisibilityByProvider: [AgentProvider: Bool] {
+        didSet { persistTokenMonitorVisibility() }
+    }
+    @Published private(set) var tokenMonitorSectionsByProvider: [AgentProvider: Set<TokenMonitorSection>] {
+        didSet { persistTokenMonitorSections() }
     }
     @Published var forecastWarningsEnabled: Bool { didSet { defaults.set(forecastWarningsEnabled, forKey: Key.forecastWarnings) } }
     @Published var resetCreditWarningsEnabled: Bool { didSet { defaults.set(resetCreditWarningsEnabled, forKey: Key.resetCreditWarnings) } }
@@ -93,6 +108,11 @@ final class AppSettings: ObservableObject {
             defaults.set(true, forKey: Key.claudeSetupHistory)
         }
         enabledQuotaThresholdsByProvider = Self.quotaThresholdsByProvider(defaults: defaults)
+        // Deliberately not persisted here: an absent key means the user has
+        // never touched these, and writing the defaults on first launch would
+        // record a preference they never expressed.
+        tokenMonitorVisibilityByProvider = Self.tokenMonitorVisibility(defaults: defaults)
+        tokenMonitorSectionsByProvider = Self.tokenMonitorSections(defaults: defaults)
         forecastWarningsEnabled = Self.value(for: Key.forecastWarnings, defaults: defaults, defaultValue: true)
         resetCreditWarningsEnabled = Self.value(for: Key.resetCreditWarnings, defaults: defaults, defaultValue: true)
         resetWarningsEnabled = Self.value(for: Key.resetWarnings, defaults: defaults, defaultValue: true)
@@ -131,6 +151,44 @@ final class AppSettings: ObservableObject {
 
     /// Loads each provider's thresholds, migrating any pre-existing global set
     /// into every supported provider so an upgrade loses no user choice.
+    private static func tokenMonitorVisibility(defaults: UserDefaults) -> [AgentProvider: Bool] {
+        var result: [AgentProvider: Bool] = [:]
+        for provider in AgentProvider.allCases {
+            let key = Key.tokenMonitorVisible(for: provider)
+            result[provider] = defaults.object(forKey: key) == nil
+                ? true
+                : defaults.bool(forKey: key)
+        }
+        return result
+    }
+
+    private static func tokenMonitorSections(defaults: UserDefaults) -> [AgentProvider: Set<TokenMonitorSection>] {
+        var result: [AgentProvider: Set<TokenMonitorSection>] = [:]
+        for provider in AgentProvider.allCases {
+            let key = Key.tokenMonitorSections(for: provider)
+            guard let stored = defaults.array(forKey: key) as? [String] else {
+                result[provider] = Set(TokenMonitorSection.allCases)
+                continue
+            }
+            // An unknown stored value is a section this build no longer has;
+            // dropping it is correct and must not disable the rest.
+            result[provider] = Set(stored.compactMap(TokenMonitorSection.init(rawValue:)))
+        }
+        return result
+    }
+
+    private func persistTokenMonitorVisibility() {
+        for (provider, visible) in tokenMonitorVisibilityByProvider {
+            defaults.set(visible, forKey: Key.tokenMonitorVisible(for: provider))
+        }
+    }
+
+    private func persistTokenMonitorSections() {
+        for (provider, sections) in tokenMonitorSectionsByProvider {
+            defaults.set(sections.map(\.rawValue).sorted(), forKey: Key.tokenMonitorSections(for: provider))
+        }
+    }
+
     private static func quotaThresholdsByProvider(defaults: UserDefaults) -> [AgentProvider: Set<RemainingQuotaThreshold>] {
         let legacyGlobal = legacyGlobalThresholds(defaults: defaults)
         var result: [AgentProvider: Set<RemainingQuotaThreshold>] = [:]
@@ -168,6 +226,32 @@ final class AppSettings: ObservableObject {
                 forKey: Key.enabledQuotaThresholds(for: provider)
             )
         }
+    }
+
+    func isTokenMonitorVisible(for provider: AgentProvider) -> Bool {
+        tokenMonitorVisibilityByProvider[provider] ?? true
+    }
+
+    func setTokenMonitorVisible(_ visible: Bool, for provider: AgentProvider) {
+        tokenMonitorVisibilityByProvider[provider] = visible
+    }
+
+    func isTokenMonitorSectionEnabled(_ section: TokenMonitorSection, for provider: AgentProvider) -> Bool {
+        tokenMonitorSectionsByProvider[provider]?.contains(section) ?? true
+    }
+
+    func setTokenMonitorSection(_ section: TokenMonitorSection, enabled: Bool, for provider: AgentProvider) {
+        var sections = tokenMonitorSectionsByProvider[provider] ?? Set(TokenMonitorSection.allCases)
+        if enabled {
+            sections.insert(section)
+        } else {
+            sections.remove(section)
+        }
+        tokenMonitorSectionsByProvider[provider] = sections
+    }
+
+    func enabledTokenMonitorSections(for provider: AgentProvider) -> Set<TokenMonitorSection> {
+        tokenMonitorSectionsByProvider[provider] ?? Set(TokenMonitorSection.allCases)
     }
 
     func isQuotaThresholdEnabled(_ threshold: RemainingQuotaThreshold, for provider: AgentProvider) -> Bool {
