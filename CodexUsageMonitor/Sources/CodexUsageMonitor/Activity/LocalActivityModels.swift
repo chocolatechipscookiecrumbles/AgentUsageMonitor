@@ -375,26 +375,49 @@ enum LocalActivityModelName {
         let normalized = rawModelID.lowercased()
         guard !normalized.isEmpty else { return unknown }
 
-        if let version = version(in: normalized, pattern: "gpt[-_ ]?(\\d+)[-_ .]?(\\d+)") {
+        if let version = version(in: normalized, family: "gpt") {
             return "GPT-\(version)"
         }
         for family in ["sonnet", "opus", "haiku"] {
-            if let version = version(in: normalized, pattern: "\(family)[-_ ]?(\\d+)[-_ .]?(\\d+)") {
+            if let version = version(in: normalized, family: family) {
                 return "\(family.capitalized) \(version)"
             }
         }
         return unknown
     }
 
-    private static func version(in value: String, pattern: String) -> String? {
+    /// One or two digits not followed by another digit. Bounding the run is what
+    /// keeps a dated build suffix such as `-20251001` from being read as a
+    /// version component, while still allowing a minor of `10` or above.
+    private static let versionComponent = "(\\d{1,2})(?![0-9])"
+
+    private static func version(in value: String, family: String) -> String? {
+        // Current identifiers put the version after the family, and the minor
+        // component is genuinely optional: `sonnet-4-5`, `gpt-5.6`, `opus-5`.
+        if let version = firstVersion(
+            in: value,
+            pattern: "\(family)[-_ ]?\(versionComponent)(?:[-_ .]\(versionComponent))?"
+        ) {
+            return version
+        }
+        // Earlier identifiers put it before the family: `claude-3-5-sonnet`.
+        return firstVersion(
+            in: value,
+            pattern: "\(versionComponent)(?:[-_ .]\(versionComponent))?[-_ ]?\(family)"
+        )
+    }
+
+    private static func firstVersion(in value: String, pattern: String) -> String? {
         guard let expression = try? NSRegularExpression(pattern: pattern),
               let match = expression.firstMatch(
                 in: value,
                 range: NSRange(value.startIndex..., in: value)
               ),
-              let majorRange = Range(match.range(at: 1), in: value),
-              let minorRange = Range(match.range(at: 2), in: value)
+              let majorRange = Range(match.range(at: 1), in: value)
         else { return nil }
+        guard let minorRange = Range(match.range(at: 2), in: value) else {
+            return String(value[majorRange])
+        }
         return "\(value[majorRange]).\(value[minorRange])"
     }
 }

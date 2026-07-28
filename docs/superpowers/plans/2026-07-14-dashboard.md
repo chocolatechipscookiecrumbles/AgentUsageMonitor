@@ -373,14 +373,67 @@ Recorded limitation: the 7.23-second cold live scan is a full-history rebuild. T
 
 **Consumes:** `~/.claude/projects/**/*.jsonl`, `~/.config/claude/projects/**/*.jsonl`, and valid comma-separated `CLAUDE_CONFIG_DIR` project roots.
 
-- [ ] **Step 1:** Recursively enumerate regular `.jsonl` files without following symbolic links. Reuse the bounded reader; do not derive or publish a project name from the directory.
-- [ ] **Step 2:** Decode only assistant timestamp, message ID, request ID, session ID, model, `isSidechain`, and input/output/cache creation/cache read fields. Recognize usage-bearing nested agent-progress envelopes without decoding message content.
-- [ ] **Step 3:** Within a file, key streaming chunks by `(messageID, requestID)` and keep the newest/more complete cumulative usage record. Across files, prefer a non-sidechain parent record over a replayed sidechain copy of the same message.
-- [ ] **Step 4:** Preserve a distinct sidechain response when it has its own message ID. For same-role duplicates, prefer the non-negative record with the larger complete token total, then the newer timestamp.
-- [ ] **Step 5:** Normalize total as input + cache creation + cache read + output. Keep all four categories separate for rows and accessibility.
-- [ ] **Step 6:** Unknown advisor/iteration usage is ignored for the first card and recorded as a limitation. Do not add nested counts to the parent without a stable identity and model rule.
-- [ ] **Step 7:** Run fabricated streaming/replay/sidechain/malformed corpus probes and the sanitized live diagnostic. Require graph-total equality and output containing no content, path, project, session/account identifier, or credential.
-- [ ] **Step 8:** Commit as `feat: reconcile local Claude activity`.
+- [x] **Step 1:** Recursively enumerate regular `.jsonl` files without following symbolic links. Reuse the bounded reader; do not derive or publish a project name from the directory.
+- [x] **Step 2:** Decode only assistant timestamp, message ID, request ID, session ID, model, `isSidechain`, and input/output/cache creation/cache read fields. Recognize usage-bearing nested agent-progress envelopes without decoding message content.
+- [x] **Step 3:** Within a file, key streaming chunks by `(messageID, requestID)` and keep the newest/more complete cumulative usage record. Across files, prefer a non-sidechain parent record over a replayed sidechain copy of the same message.
+- [x] **Step 4:** Preserve a distinct sidechain response when it has its own message ID. For same-role duplicates, prefer the non-negative record with the larger complete token total, then the newer timestamp.
+- [x] **Step 5:** Normalize total as input + cache creation + cache read + output. Keep all four categories separate for rows and accessibility.
+- [x] **Step 6:** Unknown advisor/iteration usage is ignored for the first card and recorded as a limitation. Do not add nested counts to the parent without a stable identity and model rule.
+- [x] **Step 7:** Run fabricated streaming/replay/sidechain/malformed corpus probes and the sanitized live diagnostic. Require graph-total equality and output containing no content, path, project, session/account identifier, or credential.
+- [x] **Step 8:** Commit as `feat: reconcile local Claude activity`.
+
+#### Task 3 evidence — 2026-07-28
+
+A field-scoped survey of the local Claude roots preceded implementation and shaped the reconciliation rules. Only key names, presence flags, relationship classifications, and counts were recorded:
+
+- Every assistant usage record carries a top-level `type`, a `message.id`, a `requestId`, a `timestamp`, `isSidechain`, and all four usage components. No line failed to parse and no record lacked a type, so no shape required guessing.
+- Repeated `(message id, request id)` pairs occur up to six times. In all 1,220 repeated pairs, `output_tokens` was non-decreasing and the other three components never varied, confirming these are cumulative streaming chunks rather than separate requests.
+- `usage.iterations` is present as a nested one-element list. Per Step 6 it is not decoded and not added to the parent; that remains a recorded limitation.
+- The local corpus contained no cross-file or sidechain replay of the same message. Those rules are therefore exercised only by the fabricated corpus, not by live evidence.
+
+Because Anthropic message identifiers are unique per response, the published request identity is the SHA-256 of the provider tag plus the message identifier alone. That keeps one stable identity per logical request across rescans no matter which copy of a message wins reconciliation, which is what makes repeated file events converge instead of accumulating.
+
+The source decodes strictly less than the plan's Step 2 allowlist permits: session identifiers are never decoded, because message identity alone is sufficient to reconcile. Working directories, git branches, project names, tool payloads, and message content have no corresponding fields on the `Decodable` types at all.
+
+Sanitized disposable-harness output:
+
+```text
+streaming accepted count: 1
+streaming total tokens: 170
+sidechain replay accepted count: 1
+sidechain replay total tokens: 180
+distinct sidechain accepted count: 2
+distinct sidechain total tokens: 380
+replay winner prefers parent over larger sidechain: true
+repeated scan identity stable: true
+missing cache component unsafeToRead: true
+mixed transcript readable: true
+mixed transcript accepted count: 1
+synthetic readable: true
+synthetic accepted count: 0
+absent roots localRecordsMissing: true
+live status readable: true
+live accepted-request count: 1899
+live cold-scan seconds: 0.18
+live identities unique: true
+live graph-total equality: true
+live category math matches today: true
+live model shares sum to one: true
+live model-presence flag: true
+live today request count: 60
+live last request is newest accepted: true
+```
+
+The fabricated corpus deliberately embedded a working directory, a git branch, a session identifier, and message content; none reached published state, and the harness emitted only aggregates. The harness, corpus, and staged source copies were removed after the run.
+
+Two shared defects were found and corrected while validating against live records:
+
+- **Short Model Name required a minor version.** `claude-sonnet-5` and `claude-opus-5` — 728 of 3,864 live assistant records, and the newest models in use — resolved to **Unknown model**. The rule now accepts a single-component version, still recognizes the version when it precedes the family (`claude-3-5-sonnet`), and bounds each version component to one or two digits so a dated build suffix such as `-20251001` is never read as a minor version. Verified: `claude-sonnet-5=Sonnet 5`, `claude-opus-5=Opus 5`, `claude-opus-4-8=Opus 4.8`, `claude-haiku-4-5-20251001=Haiku 4.5`, `claude-sonnet-4-5-20250929=Sonnet 4.5`, `gpt-5.6-codex=GPT-5.6`, `gpt-5-codex=GPT-5`, `claude-3-5-sonnet-20241022=Sonnet 3.5`, `<synthetic>=Unknown model`.
+- **A blank line failed a whole provider.** Both sources treat an undecodable complete line as unsafe evidence, so a single stray newline anywhere under a provider root would have made that provider permanently unavailable. The bounded reader now skips empty lines, which carry no record, before selective decoding sees them.
+
+Zero-token assistant messages (Claude writes them for synthetic entries) are not observed requests and are excluded, matching the Codex source's treatment of a zero reconciled delta. This keeps them out of Requests and out of Model Usage.
+
+Limitation: nested `usage.iterations` advisor/iteration usage remains un-ingested, and cross-file/sidechain replay handling is backed by fabricated corpus evidence only, because the live corpus contains no such replay.
 
 ### Task 4: Own incremental scans and semantic updates
 

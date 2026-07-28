@@ -204,24 +204,11 @@ struct CodexLocalActivitySource: LocalActivitySource {
     }
 
     fileprivate static func digest(_ fields: [String]) -> String {
-        var framed = Data()
-        var fieldCount = UInt64(fields.count).bigEndian
-        withUnsafeBytes(of: &fieldCount) { framed.append(contentsOf: $0) }
-        for field in fields {
-            let bytes = Data(field.utf8)
-            var byteCount = UInt64(bytes.count).bigEndian
-            withUnsafeBytes(of: &byteCount) { framed.append(contentsOf: $0) }
-            framed.append(bytes)
-        }
-        return SHA256.hash(data: framed).map { String(format: "%02x", $0) }.joined()
+        LocalActivityIdentity.digest(fields)
     }
 
     fileprivate static func date(_ value: String?) -> Date? {
-        guard let value else { return nil }
-        if let parsed = try? Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(value) {
-            return parsed
-        }
-        return try? Date.ISO8601FormatStyle(includingFractionalSeconds: false).parse(value)
+        LocalActivityTimestamp.date(value)
     }
 }
 

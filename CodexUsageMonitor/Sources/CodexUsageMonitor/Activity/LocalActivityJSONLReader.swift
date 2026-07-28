@@ -149,14 +149,7 @@ struct LocalActivityFileTraversal: Sendable {
     }
 
     private static func opaqueFileID(device: dev_t, inode: ino_t) -> String {
-        var framed = Data()
-        for field in ["device", String(device), "inode", String(inode)] {
-            let bytes = Data(field.utf8)
-            var byteCount = UInt64(bytes.count).bigEndian
-            withUnsafeBytes(of: &byteCount) { framed.append(contentsOf: $0) }
-            framed.append(bytes)
-        }
-        return SHA256.hash(data: framed).map { String(format: "%02x", $0) }.joined()
+        LocalActivityIdentity.digest(["device", String(device), "inode", String(inode)])
     }
 }
 
@@ -237,10 +230,14 @@ struct LocalActivityJSONLReader: Sendable {
                     if lineBuffer.last == 0x0D {
                         lineBuffer.removeLast()
                     }
-                    try consume(
-                        &state,
-                        Line(bytes: lineBuffer, startOffset: lineStart, endOffset: streamOffset)
-                    )
+                    // A blank line carries no record, so it must not reach a
+                    // source that treats an undecodable line as unsafe evidence.
+                    if !lineBuffer.isEmpty {
+                        try consume(
+                            &state,
+                            Line(bytes: lineBuffer, startOffset: lineStart, endOffset: streamOffset)
+                        )
+                    }
                 }
 
                 lineBuffer.removeAll(keepingCapacity: true)
