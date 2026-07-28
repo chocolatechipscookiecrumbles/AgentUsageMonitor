@@ -197,7 +197,7 @@ The current interface uses native SwiftUI. A separate Dashboard page or window i
 
 Reading is automatic and needs no setup: if you use Codex or Claude Code on this Mac, activity appears on its own. Only the figures the card shows are cached — never file paths, agent session identifiers, or record contents. Records that cannot be read safely are shown as unavailable rather than counted as zero, so an empty day and an unreadable one never look alike.
 
-**Known limitation before release:** the card's tallest state makes the Codex tab about 944 points tall, which still exceeds the usable height of a typical laptop screen. The popover is deliberately non-scrolling, so this needs a layout decision before the card ships enabled by default. See the implementation plan for the measurements.
+**Known limitation before release:** the card's tallest state makes the Codex tab about 929 points tall, which only just fits a 13.6-inch laptop and still exceeds smaller screens. The popover is deliberately non-scrolling, so this needs a layout decision before the card ships enabled by default. See the implementation plan for the measurements.
 
 The notification settings also control:
 

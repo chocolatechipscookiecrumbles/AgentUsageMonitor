@@ -56,11 +56,19 @@ struct ProviderTokenActivityCard: View {
             Spacer(minLength: 0)
 
             if case .expanded(let expanded) = presentation.content {
-                Text(expanded.todayTokens)
-                    .font(.title3.weight(.bold))
-                    .foregroundStyle(theme.primaryText)
-                    .accessibilityLabel("Tokens today")
-                    .accessibilityValue(expanded.todayExactTokens)
+                VStack(alignment: .trailing, spacing: MenuPopoverTheme.activityHeaderTextSpacing) {
+                    Text(expanded.todayTokens)
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(theme.primaryText)
+                        .accessibilityLabel("Tokens today")
+                        .accessibilityValue(expanded.todayExactTokens)
+
+                    Text(expanded.requestsSummary)
+                        .font(.caption)
+                        .foregroundStyle(theme.secondaryText)
+                        .accessibilityLabel(expanded.requests.label)
+                        .accessibilityValue(expanded.requests.accessibilityValue)
+                }
             }
         }
         .accessibilityElement(children: .contain)
@@ -248,12 +256,12 @@ struct ProviderTokenActivityCard: View {
 
     // MARK: - Rows
 
-    /// The four categories and Requests are paired into two columns, which
-    /// costs three rows instead of five and puts the popover's spare width to
-    /// work. Columns are filled top-down so each provider's input-side and
-    /// output-side categories stay together.
+    /// The four categories form a two-by-two grid filled top-down, so each
+    /// provider's input-side categories sit together on the left and its
+    /// output-side categories on the right. Requests is not a token category
+    /// and reads as a caption under the day's total instead.
     private func metricColumns(_ expanded: ProviderTokenActivityPresentation.Expanded) -> some View {
-        let cells = expanded.categories + [expanded.requests]
+        let cells = expanded.categories
         let split = (cells.count + 1) / 2
 
         return HStack(alignment: .top, spacing: MenuPopoverTheme.activityMetricColumnSpacing) {

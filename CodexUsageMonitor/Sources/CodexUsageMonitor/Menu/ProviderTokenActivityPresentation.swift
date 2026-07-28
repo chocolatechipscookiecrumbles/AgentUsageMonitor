@@ -30,6 +30,10 @@ struct ProviderTokenActivityPresentation: Equatable {
         let hasObservedActivity: Bool
         let categories: [Row]
         let requests: Row
+        /// The request count reads as a caption under the day's total rather
+        /// than as a fifth metric cell, which keeps the categories a clean
+        /// two-by-two grid.
+        let requestsSummary: String
         let modelUsage: [ModelRow]
         let lastRequest: LastRequest?
         let chartAccessibilityValue: String
@@ -139,6 +143,9 @@ struct ProviderTokenActivityPresentation: Equatable {
                 value: requestCount.formatted(.number),
                 accessibilityValue: requestCount.formatted(.number)
             ),
+            requestsSummary: requestCount == 1
+                ? "1 request"
+                : "\(requestCount.formatted(.number)) requests",
             modelUsage: modelUsage.map { share in
                 let percent = Int((share.fraction * 100).rounded())
                 return ModelRow(

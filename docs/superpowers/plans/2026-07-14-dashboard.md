@@ -664,21 +664,26 @@ Completed: `xcodebuild` on the main macOS scheme exited `0` with `** BUILD SUCCE
 
 Two changes were requested after reviewing the rendered card.
 
-#### Two-column metrics
+#### Two-column metrics, and Requests as a header caption
 
-The four token categories and Requests were five full-width rows whose values sat far right of short labels, spending vertical space the popover cannot afford and leaving the middle empty. They are now paired into two columns filled top-down, which keeps each provider's input-side categories together (Codex: Input/Cached input left, Output/Reasoning right; Claude: Input/Cache creation left, Cache read/Output right) with Requests at the bottom left. Three rows replace five.
+The four token categories and Requests were five full-width rows whose values sat far right of short labels, spending vertical space the popover cannot afford and leaving the middle empty.
 
-Re-measured at the 308-point content width, with no horizontal overflow:
+Pairing them into two columns was the first step, but five cells split three-and-two, which put Output beneath Cached input on the left and stranded Reasoning at the top right — the input/output pairing the split was meant to preserve. Moving Requests out of the grid fixed both problems at once: it is a count of interactions rather than a token category, so it belongs with the day's total, and removing it leaves a clean two-by-two.
+
+Requests now reads as a caption directly under the headline total (`599 requests`, singular `1 request`, grouped by locale). The categories form a two-by-two grid filled top-down, so Codex shows Input/Cached input left and Output/Reasoning right, and Claude shows Input/Cache creation left and Cache read/Output right. Its exact count stays in accessibility under the `Requests` label.
+
+Re-measured at the 308-point content width, with no horizontal overflow in either provider:
 
 ```text
-card, 4 model rows:   422.0 → 384.0
-card, 1 model row:    365.0 → 327.0
-card, no activity:    282.0 → 244.0
-composed Codex content: 731.0 → 693.0
-total Codex popover:    982.0 → 944.0
+                        original   two columns   Requests moved
+card, 4 model rows         422.0         384.0            369.0
+card, 1 model row          365.0         327.0            312.0
+card, no activity          282.0         244.0            229.0
+composed Codex content     731.0         693.0            678.0
+total Codex popover        982.0         944.0            929.0
 ```
 
-The Task 6 Step 4 gate is improved but **still open**: 944 points still exceeds roughly 931 usable points on a 13.6-inch MacBook Air and far exceeds the ~775 points available at 1280×800. Applying the same two-column treatment to Model Usage is the next obvious lever and would recover a similar amount; it was not done because it was not part of the request.
+The Task 6 Step 4 gate is now **marginal rather than clearly failing**. 929 points fits within roughly 931 usable points on a 13.6-inch MacBook Air at default scaling — with nothing to spare — and still exceeds the ~775 points available at 1280×800. A longer provider header, a cached-quota warning strip, a connection-recovery card, or the notification-permission strip each add height on top of this, so the tallest *real* state can still exceed a 13.6-inch screen. Applying the same two-column treatment to Model Usage remains the next lever and would recover roughly 40 more points; it was not done because it was not requested. Signed-app verification at the smallest supported screen is still required before this gate can be called closed.
 
 #### Cached activity across launches
 
