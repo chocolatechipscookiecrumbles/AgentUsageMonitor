@@ -149,8 +149,8 @@ struct ClaudeAgentSettingsView: View {
     /// Prefers the plan proven by the connection; falls back to the plan hint
     /// carried on the usage snapshot.
     private func planName(_ model: ClaudeUsageDisplayModel?) -> String? {
-        if case .connected(let account) = connectionState, let plan = account.planType {
-            return plan.capitalized
+        if let plan = AgentPlanName.display(connectionState.accountPlanType) {
+            return plan
         }
         return model?.planText
     }

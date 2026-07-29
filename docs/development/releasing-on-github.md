@@ -4,14 +4,15 @@ A practical, project-specific walkthrough for cutting the first downloadable
 release of **Codex Usage Monitor** (`com.david.codex-usage-monitor`). It teaches
 the *why* behind each step, not just the commands, so you can repeat it.
 
-> **Read this first — personal-build caveat.** The README and the finalization
-> plan record this as a **personal, non-commercial** build whose Claude path
-> reuses Claude Code's Keychain credential, which Anthropic's ToS prohibits in
-> absolute terms. A public GitHub Release *distributes* the app to anyone. Decide
-> deliberately whether to publish it publicly. Safer options: mark the release
-> clearly as a personal build, publish it in a **private** repo, or ship a
-> **source-only** tag (no binary). The rest of this guide works the same either
-> way — you choose what to attach.
+> **Read this first — the Claude credential caveat.** The Claude path reuses the
+> OAuth credential Claude Code stores in the user's Keychain. Anthropic's Terms
+> of Service do not permit a third-party application to do that. **Decided
+> 2026-07-29: publish anyway, with the caveat disclosed rather than buried** —
+> it is stated in the README, in the app's Data & Privacy page, and in the
+> release notes, so nobody installs it without knowing. Replacing this with a
+> first-party OAuth client is the first work planned after this release; until
+> then, do not remove the disclosure from any of those three places. Codex usage
+> is read from the local Codex CLI app-server and carries no such caveat.
 
 ## The mental model: what a macOS release actually needs
 
@@ -68,23 +69,34 @@ both paths.
 
 macOS apps carry two version strings in `Info.plist`:
 
-- `CFBundleShortVersionString` — the **marketing** version users see (e.g. `0.1.0`).
+- `CFBundleShortVersionString` — the **marketing** version users see (e.g. `1.0.0`).
   Match this to your git tag.
 - `CFBundleVersion` — a **monotonic build number** that must increase every time
   you notarize (Apple rejects a re-used build number). Bump it on every release.
 
-Currently: `CFBundleShortVersionString = 0.1.0`, `CFBundleVersion = 1`.
+Currently: `CFBundleShortVersionString = 1.0.0`, `CFBundleVersion = 254`.
 
-For the first release, `0.1.0` / `1` is fine. For the next one, bump both (e.g.
-`0.1.1` / `2`). Edit them in `CodexUsageMonitor/Resources/Info.plist`, then commit:
+**Set 2026-07-29 for the first release.** `1.0.0` reflects a feature-complete
+build: both providers ship, the reliability observation passed, and the icon and
+release binary are in place. The build number is the repository's commit count
+at the time of the bump, which keeps it monotonic without a second thing to
+remember — regenerate it with:
+
+```sh
+git rev-list --count HEAD
+```
+
+Bump both on every release; Apple rejects a re-used build number at
+notarization. Edit them in `CodexUsageMonitor/Resources/Info.plist`, then commit:
 
 ```sh
 git add CodexUsageMonitor/Resources/Info.plist
-git commit -m "Release 0.1.0"
+git commit -m "Release 1.0.0"
 ```
 
-Use **SemVer** (`MAJOR.MINOR.PATCH`) and, while pre-1.0, treat `0.x` as "anything
-may change." Given the personal-build status, staying on `0.x` is honest.
+Use **SemVer** (`MAJOR.MINOR.PATCH`). Being at `1.0.0` is a statement about the
+feature set, not a promise that the Claude path is contractually settled — see
+the terms caveat in the release notes below.
 
 ## Step 2 — Build the release `.app`
 
@@ -183,7 +195,7 @@ bundle structure and metadata that a plain `zip` can mangle:
 
 ```sh
 cd CodexUsageMonitor/.build
-ditto -c -k --keepParent CodexUsageMonitor.app CodexUsageMonitor-0.1.0.zip
+ditto -c -k --keepParent CodexUsageMonitor.app CodexUsageMonitor-1.0.0.zip
 ```
 
 A `.zip` is perfectly good for a menu-bar app. A `.dmg` (drag-to-Applications
@@ -195,8 +207,8 @@ The tag is the immutable marker the GitHub Release is built from. Match it to
 `CFBundleShortVersionString`, prefixed with `v`:
 
 ```sh
-git tag -a v0.1.0 -m "Codex Usage Monitor 0.1.0"
-git push origin v0.1.0
+git tag -a v1.0.0 -m "Codex Usage Monitor 1.0.0"
+git push origin v1.0.0
 ```
 
 (Tag the commit that produced the binary you're shipping — usually `main` after the
@@ -215,33 +227,32 @@ gh auth login          # choose GitHub.com → HTTPS → follow the browser prom
 Then create the release and attach the zip in one command:
 
 ```sh
-gh release create v0.1.0 \
-  "CodexUsageMonitor/.build/CodexUsageMonitor-0.1.0.zip" \
-  --title "Codex Usage Monitor 0.1.0" \
-  --notes-file docs/release-notes/0.1.0.md \
-  --prerelease        # honest for a 0.x personal build; drop for a stable public release
+gh release create v1.0.0 \
+  "CodexUsageMonitor/.build/CodexUsageMonitor-1.0.0.zip" \
+  --title "Codex Usage Monitor 1.0.0" \
+  --notes-file docs/release-notes/1.0.0.md
 ```
 
 ### Option 2 — Web UI
 
 1. Go to **Releases → Draft a new release** in the repo.
-2. Choose the tag `v0.1.0` (or create it there).
+2. Choose the tag `v1.0.0` (or create it there).
 3. Title + notes (paste the notes below).
-4. **Attach binaries** → drop in `CodexUsageMonitor-0.1.0.zip`.
-5. Tick **Set as a pre-release** for a `0.x` build; **Publish**.
+4. **Attach binaries** → drop in `CodexUsageMonitor-1.0.0.zip`.
+5. **Publish** (no pre-release tick — this is a `1.x` build).
 
 ### What to put in the release notes
 
 Keep it a short, honest index. Suggested skeleton (save as
-`docs/release-notes/0.1.0.md` if you use `--notes-file`):
+`docs/release-notes/1.0.0.md` if you use `--notes-file`):
 
 ```markdown
-# Codex Usage Monitor 0.1.0
+# Codex Usage Monitor 1.0.0
 
-Personal, non-commercial build. Menu-bar usage monitor for Codex and Claude.
+Menu-bar usage monitor for OpenAI Codex and Claude Code. Non-commercial.
 
 ## Install
-1. Download and unzip `CodexUsageMonitor-0.1.0.zip`.
+1. Download and unzip `CodexUsageMonitor-1.0.0.zip`.
 2. Move `CodexUsageMonitor.app` to /Applications.
 3. Launch it — it lives in the **menu bar** (no Dock icon).
    - *Unsigned build only:* if macOS blocks it, right-click the app → Open, or run
@@ -251,9 +262,24 @@ Personal, non-commercial build. Menu-bar usage monitor for Codex and Claude.
 - macOS 14 (Sonoma) or later.
 - No Python or other runtime required — the Claude usage bridge is native.
 
+## How Claude usage is read — please read before installing
+This app reads Claude usage using the OAuth credential **Claude Code already
+stored in your Keychain**. macOS asks your permission the first time. Nothing is
+uploaded, and no prompt or response content is ever read.
+
+Anthropic's Terms of Service do not permit reusing that credential from a
+third-party application. This build does it anyway, disclosed here rather than
+buried. Installing it is your decision, and using it may put your Anthropic
+account at risk of enforcement. Replacing this with a first-party OAuth client
+is the first thing planned after this release.
+
+Codex usage is read from your local Codex CLI's app-server and carries no such
+caveat.
+
 ## Known limitations
-- No custom app icon yet.
-- Claude usage reuses Claude Code's local credential (personal use only).
+- The Token Monitor card can make the popover taller than a small laptop screen;
+  turn off sections you don't need in Settings → Agents.
+- GitHub Copilot is not supported — no personal quota API has been verified.
 ```
 
 ## Step 7 — Verify the download like a stranger would
@@ -300,12 +326,12 @@ cd .build && ditto -c -k --keepParent CodexUsageMonitor.app notarize.zip
 xcrun notarytool submit notarize.zip --keychain-profile "notary-codexmon" --wait
 xcrun stapler staple CodexUsageMonitor.app
 # 4. package
-ditto -c -k --keepParent CodexUsageMonitor.app CodexUsageMonitor-0.1.0.zip
+ditto -c -k --keepParent CodexUsageMonitor.app CodexUsageMonitor-1.0.0.zip
 # 5. tag
-cd ../.. && git tag -a v0.1.0 -m "0.1.0" && git push origin v0.1.0
+cd ../.. && git tag -a v1.0.0 -m "1.0.0" && git push origin v1.0.0
 # 6. release
-gh release create v0.1.0 CodexUsageMonitor/.build/CodexUsageMonitor-0.1.0.zip \
-  --title "Codex Usage Monitor 0.1.0" --notes-file docs/release-notes/0.1.0.md --prerelease
+gh release create v1.0.0 CodexUsageMonitor/.build/CodexUsageMonitor-1.0.0.zip \
+  --title "Codex Usage Monitor 1.0.0" --notes-file docs/release-notes/1.0.0.md
 ```
 
 ## Where this can grow later

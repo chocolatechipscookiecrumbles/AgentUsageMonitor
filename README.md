@@ -8,7 +8,10 @@ AI coding usage is left — the five-hour and weekly limits for **OpenAI Codex**
 notifications. It reads sessions you already have on your machine; it never asks for
 a password and never sends your prompts, responses, or code anywhere.
 
-> Requirements: macOS 14+. Personal, non-commercial use only (see [Scope & caveats](#scope--caveats)).
+> Requirements: macOS 14+. Non-commercial. **Claude support reuses Claude Code's own
+> Keychain credential, which Anthropic's Terms of Service do not permit** — read
+> [how Claude usage is read](#how-claude-usage-is-read-and-the-terms-caveat) before
+> installing.
 
 ## Why
 
@@ -49,7 +52,9 @@ The app adds no new account, network login, or credential of its own.
 
 ## Install
 
-There is no packaged release yet. Build it from source:
+Download the `.app` from the [latest release](../../releases/latest), unzip it, and
+move it to `/Applications`. It launches into the **menu bar** — there is no Dock
+icon. Or build it from source:
 
 ```sh
 # Build and run the checks
@@ -102,10 +107,29 @@ Privacy** Settings page for specifics.
   "Other Warnings" toggle does and how it fires.
 - [Implementation plans](docs/superpowers/plans/) — the design and evidence trail.
 
-## Scope & caveats
+## How Claude usage is read, and the terms caveat
 
-This is a **personal, non-commercial** build. The Claude path reuses Claude Code's
-own Keychain credential, which is accepted **for this personal build only** —
-Anthropic's Terms of Service still prohibit it in absolute terms. Do not distribute
-or use this commercially. GitHub Copilot and other providers remain gated behind
-their own capability reviews.
+Read this before installing.
+
+Claude usage is read from the **OAuth credential Claude Code already stored in your
+Keychain**. macOS asks your permission the first time; background refreshes never
+prompt again. Nothing is uploaded, and no prompt, response, or file content is ever
+read — only usage percentages and reset times.
+
+**Anthropic's Terms of Service do not permit a third-party application to reuse that
+credential.** This build does it anyway. That is disclosed here, in the app's **Data
+& Privacy** Settings page, and in the release notes rather than buried, so the choice
+to install is an informed one. Using it may put your Anthropic account at risk of
+enforcement; that risk is yours to weigh.
+
+Replacing this with a **first-party OAuth client** — the app requesting its own
+authorization instead of borrowing Claude Code's — is the first work planned after
+this release. The [credential-methods plan](docs/superpowers/plans/2026-07-21-claude-oauth-web-login-provider.md)
+and its [spike findings](docs/superpowers/plans/2026-07-21-claude-oauth-web-login-spike-findings.md)
+record what was already tried.
+
+Codex usage is read from your local Codex CLI's app-server and carries no such
+caveat. GitHub Copilot is unsupported: no personal-quota API has been verified, and
+it stays gated behind its own capability review.
+
+This build is **non-commercial**.

@@ -63,8 +63,18 @@ struct DataPrivacySettingsView: View {
                         description: "Quota collection reads only percentages, reset times, and plan type."
                     )
                 }
-                SettingsSectionRow(showsDivider: false) {
+                SettingsSectionRow {
                     SettingsDescription(ClaudeUsageDisplayModel.weeklyScopeCaveat)
+                }
+                // The read itself is described above; that it is not permitted
+                // is a separate fact, and the page would be misleading without
+                // it. It is stated wherever a user could act on it — here, the
+                // README, and the release notes — so installing or continuing
+                // to use Claude support is an informed choice.
+                SettingsSectionRow(showsDivider: false) {
+                    SettingsDescription(
+                        "Anthropic's Terms of Service do not permit another application to reuse Claude Code's credential. This app does it anyway, which may put your Anthropic account at risk of enforcement. Turning off Claude in Agents stops the read entirely. A first-party sign-in that would remove this caveat is planned."
+                    )
                 }
             }
 

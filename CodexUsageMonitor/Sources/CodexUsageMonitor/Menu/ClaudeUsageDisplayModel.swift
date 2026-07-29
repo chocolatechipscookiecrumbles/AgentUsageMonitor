@@ -55,7 +55,7 @@ struct ClaudeUsageDisplayModel {
 
     init(presentation: ClaudeUsagePresentation, now: Date = .now) {
         let snapshot = presentation.snapshot
-        planText = snapshot.planHint.map { $0.prefix(1).uppercased() + $0.dropFirst() }
+        planText = AgentPlanName.display(snapshot.planHint)
         fiveHour = Self.window(snapshot.fiveHour, now: now)
         sevenDay = Self.window(snapshot.sevenDay, now: now)
         sourceLabel = Self.sourceLabel(delivery: presentation.delivery, source: snapshot.source)

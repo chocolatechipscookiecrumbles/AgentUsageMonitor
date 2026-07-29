@@ -108,7 +108,7 @@ struct SettingsStatus: Sendable {
             appVersion: bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Development",
             buildNumber: bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "Local",
             codexStatus: codexStatus,
-            planName: presentation.planType?.capitalized,
+            planName: AgentPlanName.display(presentation.planType),
             displayMode: displayState.mode,
             pauseReason: displayState.pauseReason,
             lastAttemptAt: displayState.lastAttemptAt,

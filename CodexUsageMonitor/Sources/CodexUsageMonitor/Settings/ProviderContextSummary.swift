@@ -86,18 +86,18 @@ struct ProviderContextSummary: Identifiable, Equatable {
     }
 
     private static func planText(connectionState: AgentConnectionState, fallback: String?) -> String {
-        if case .connected(let account) = connectionState, let plan = account.planType {
-            return plan.capitalized
+        if let plan = AgentPlanName.display(connectionState.accountPlanType) {
+            return plan
         }
-        return fallback?.capitalized ?? placeholder
+        return AgentPlanName.display(fallback) ?? placeholder
     }
 
     private static func claudePlanText(
         connectionState: ClaudeConnectionState,
         model: ClaudeUsageDisplayModel?
     ) -> String {
-        if case .connected(let account) = connectionState, let plan = account.planType {
-            return plan.capitalized
+        if let plan = AgentPlanName.display(connectionState.accountPlanType) {
+            return plan
         }
         return model?.planText ?? placeholder
     }

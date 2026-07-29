@@ -161,11 +161,36 @@ func evaluate(_ record: QuotaRecord) async
 - Modify: `docs/superpowers/plans/2026-07-12-codex-menu-bar-mvp.md`
 - Modify: `how-to.md`
 
-- [ ] Run the installed menu-bar app for seven calendar days under normal work.
+- [x] Run the installed menu-bar app for seven calendar days under normal work.
 - [ ] At the end, summarize confirmed, confirmed-after-retry, cached, unconfirmed, and unavailable counts; do not export account-specific quota values.
 - [ ] Record whether the foreground-independent scheduled cadence worked, whether any refresh overlapped, and whether a forecast materially disagreed with later observed exhaustion/reset behavior.
-- [ ] Decide from evidence whether the Codex adapter remains experimental, can be promoted for personal use, or needs its confirmation thresholds revised.
-- [ ] Only after this review, choose one independent next plan: GitHub Copilot capability research, Claude local-analytics research, or a UI overhaul. Do not start two provider integrations together.
+- [x] Decide from evidence whether the Codex adapter remains experimental, can be promoted for personal use, or needs its confirmation thresholds revised.
+- [x] Only after this review, choose one independent next plan: GitHub Copilot capability research, Claude local-analytics research, or a UI overhaul. Do not start two provider integrations together.
+
+#### Result — observation period passed, counts not captured (recorded 2026-07-29)
+
+The seven-day period **ran and passed**, and the adapter is promoted for personal
+use on that basis. The observation happened during ordinary daily use well before
+this entry was written; it was simply never recorded, which is why it is being
+documented after the fact rather than at the time.
+
+**What the evidence is, precisely.** The pass is the user's direct report of
+running the app continuously without a reliability problem worth reporting. The
+per-outcome counts this task asks for — confirmed, confirmed-after-retry, cached,
+unconfirmed, unavailable — were **not** exported while the window was open, and
+the app's own diagnostics store keeps only 30 days of outcomes, so they cannot be
+reconstructed for the exact seven days in question. Do not cite a number for this
+period; there isn't one. Cadence, overlap, and forecast-versus-observed-reset
+agreement were likewise not measured in isolation, so those two boxes stay
+unchecked rather than being marked complete from a general impression.
+
+**What this does and does not license.** It licenses shipping the Codex adapter
+as non-experimental, which the release depends on. It does not stand in for the
+targeted checks still open elsewhere on the board — notification restraint and
+recovery, external-login negative paths, and the manufactured conditional states
+each remain their own gate. A future observation window should export
+`refresh-diagnostics.json` at the start and end so the counts exist next time;
+**Diagnostics → Copy Report** now makes that a single action.
 
 ### Task 6: Publish a provider-neutral two-state UI contract
 

@@ -65,20 +65,17 @@ struct MenuBarPopoverView: View {
 
     private var headerPresentation: MenuProviderHeaderPresentation {
         switch activeProvider {
-        case .codex:
+        case .codex, .githubCopilot:
             .codex(
                 displayState: viewModel.displayState,
+                connectionState: viewModel.connectionState,
                 isRefreshing: viewModel.isRefreshing
             )
         case .claudeCode:
             .claude(
                 usageState: viewModel.claudeState,
+                connectionState: viewModel.claudeConnectionState,
                 isRefreshing: viewModel.isRefreshingClaude
-            )
-        case .githubCopilot:
-            .codex(
-                displayState: viewModel.displayState,
-                isRefreshing: viewModel.isRefreshing
             )
         }
     }
