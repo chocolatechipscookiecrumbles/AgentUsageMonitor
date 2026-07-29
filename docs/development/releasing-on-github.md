@@ -51,8 +51,13 @@ both paths.
 3. **Bump the version** in `CodexUsageMonitor/Resources/Info.plist`
    (see [Step 1](#step-1--pick-and-set-the-version)).
 4. **Know the known gaps** so your release notes are honest:
-   - **No app icon yet** (Workstream F is pending artwork) — the app ships with a
-     generic icon until you add `AppIcon.appiconset`.
+   - ~~**No app icon yet.**~~ **Resolved 2026-07-29:** `AppIcon.appiconset`
+     ships all ten macOS representations (16 through 512 at 1x and 2x), and
+     `build-app.sh` builds the bundle's `AppIcon.icns` from those same PNGs with
+     `iconutil` — actool's convenience `.icns` carries only four sizes, which
+     left Get Info upscaling a 256. Because the app is `LSUIElement`, Finder,
+     Get Info, and notification banners are the only places the icon is ever
+     seen; the build fails if the `.icns` is missing.
    - ~~**The Claude bridge needs `python3`.**~~ **Resolved:** the bridge is now a
      native Swift executable bundled and signed inside the app, so a clean Mac no
      longer needs Python.

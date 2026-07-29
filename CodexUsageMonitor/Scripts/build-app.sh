@@ -16,11 +16,31 @@ DEVELOPER_DIR="$developer_dir" "$swift_tool" build -c "$configuration" --package
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 install -m 755 "$products/CodexUsageMonitor" "$app/Contents/MacOS/CodexUsageMonitor"
 install -m 644 "$root/Resources/Info.plist" "$app/Contents/Info.plist"
+# `--app-icon` tags AppIcon as the icon inside the compiled catalog, which is
+# what CFBundleIconName resolves through.
 xcrun actool "$root/Resources/Assets.xcassets" \
   --compile "$app/Contents/Resources" \
   --platform macosx \
   --minimum-deployment-target 14.0 \
+  --app-icon AppIcon \
   --output-partial-info-plist "$app/Contents/Resources/AssetCatalogInfo.plist"
+
+# Build the .icns from the same PNGs rather than keeping the one actool writes.
+#
+# Finder, Get Info, and notification banners read the file CFBundleIconFile
+# names, not the catalog — and this app is LSUIElement, so those surfaces are
+# the *only* places its icon is ever seen. actool's convenience .icns carries
+# only 16, 32, 128, and 256 pixel representations, which leaves Get Info
+# upscaling a 256 into a 512-point well. iconutil round-trips all ten.
+iconset="$(mktemp -d)/AppIcon.iconset"
+mkdir -p "$iconset"
+cp "$root/Resources/Assets.xcassets/AppIcon.appiconset/"*.png "$iconset"
+iconutil -c icns "$iconset" -o "$app/Contents/Resources/AppIcon.icns"
+rm -rf "$(dirname "$iconset")"
+
+# A menu-bar-only app shows no Dock icon, so a missing or generic icon stays
+# invisible until a user opens Get Info. Fail the build instead.
+test -s "$app/Contents/Resources/AppIcon.icns"
 
 # Bundle the native Claude usage bridge as an app resource. This replaces the
 # former Python bridge, so a shipped build no longer depends on the user having
