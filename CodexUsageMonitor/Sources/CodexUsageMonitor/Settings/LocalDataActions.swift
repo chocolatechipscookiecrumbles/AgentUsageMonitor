@@ -85,7 +85,7 @@ enum LocalDataActions {
         let snapshot: [String: Any] = [
             "exportedAt": now.formatted(.iso8601),
             "application": [
-                "name": "Codex Usage Monitor",
+                "name": "Agent Monitor",
                 "version": bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Development",
                 "build": bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "Local",
             ],

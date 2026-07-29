@@ -40,7 +40,7 @@ struct SettingsStatus: Sendable {
     /// provider error text or quota values.
     func diagnosticsReport(now: Date = .now) -> String {
         var lines = [
-            "Codex Usage Monitor diagnostics",
+            "Agent Monitor diagnostics",
             "Copied: \(now.formatted(date: .abbreviated, time: .shortened))",
             "Version: \(appVersion) (\(buildNumber))",
             "",

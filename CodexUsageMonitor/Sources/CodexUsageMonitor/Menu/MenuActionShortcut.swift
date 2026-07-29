@@ -20,7 +20,7 @@ enum MenuActionShortcut: String, CaseIterable, Identifiable, Sendable {
         case .refresh: "Refresh Now"
         case .notificationSettings: "Notification Settings"
         case .preferences: "Preferences…"
-        case .quit: "Quit Codex Usage Monitor"
+        case .quit: "Quit Agent Monitor"
         }
     }
 

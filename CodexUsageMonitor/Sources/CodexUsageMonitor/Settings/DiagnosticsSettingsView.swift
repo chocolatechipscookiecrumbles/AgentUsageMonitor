@@ -95,7 +95,7 @@ struct DiagnosticsSettingsView: View {
 
             SettingsSection("Application") {
                 SettingsSectionRow {
-                    SettingsLabeledRow("Name") { Text("Codex Usage Monitor") }
+                    SettingsLabeledRow("Name") { Text("Agent Monitor") }
                 }
                 SettingsSectionRow {
                     SettingsLabeledRow("Version") { Text(status.appVersion) }

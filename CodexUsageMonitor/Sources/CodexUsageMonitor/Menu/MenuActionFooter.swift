@@ -40,7 +40,7 @@ struct MenuActionFooter: View {
                 )
 
                 MenuActionRow(
-                    "Quit Codex Usage Monitor",
+                    "Quit Agent Monitor",
                     systemImage: "xmark",
                     shortcut: shortcut(.quit),
                     action: quit
