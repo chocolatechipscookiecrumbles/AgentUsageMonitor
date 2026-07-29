@@ -76,12 +76,22 @@ final class MenuBarProviderGlyphTests: XCTestCase {
     /// catalog is compiled into the `.app` by `Scripts/build-app.sh` rather than
     /// declared as a SwiftPM resource, so there is no test bundle to read it
     /// from; locate it relative to this source file instead.
+    ///
+    /// The catalog is deliberately untracked — this repository keeps binary and
+    /// design assets out of version control — so a clean clone does not have it.
+    /// Skip rather than fail there: the check is meaningful only where the
+    /// artwork exists, which is any machine that can build the `.app` at all.
     private func artworkURL(for assetName: String) throws -> URL {
         let imageset = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()  // CodexUsageMonitorTests
             .deletingLastPathComponent()  // Tests
             .deletingLastPathComponent()  // CodexUsageMonitor
             .appendingPathComponent("Resources/Assets.xcassets/\(assetName).imageset")
+
+        try XCTSkipUnless(
+            FileManager.default.fileExists(atPath: imageset.path),
+            "\(assetName).imageset is absent; the asset catalog is not tracked in git"
+        )
 
         let contents = try Data(contentsOf: imageset.appendingPathComponent("Contents.json"))
         let decoded = try XCTUnwrap(
