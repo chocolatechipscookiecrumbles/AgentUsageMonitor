@@ -4,14 +4,15 @@ import XCTest
 final class ClaudeStatusLineInstallerTests: XCTestCase {
     private var tempDirectory: URL!
     private var settingsURL: URL!
-    private var bridgeDirectory: URL!
+    private var bridgeExecutable: URL!
 
     override func setUpWithError() throws {
         tempDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent("ClaudeStatusLineInstallerTests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
         settingsURL = tempDirectory.appendingPathComponent("settings.json")
-        bridgeDirectory = tempDirectory.appendingPathComponent("ClaudeUsageBridge")
+        bridgeExecutable = tempDirectory
+            .appendingPathComponent("ClaudeBridge/claude-usage-bridge")
     }
 
     override func tearDownWithError() throws {
@@ -19,7 +20,7 @@ final class ClaudeStatusLineInstallerTests: XCTestCase {
     }
 
     func testInstallCreatesSettingsFileWhenMissing() throws {
-        let installer = ClaudeStatusLineInstaller(settingsURL: settingsURL, bridgeDirectory: bridgeDirectory)
+        let installer = ClaudeStatusLineInstaller(settingsURL: settingsURL, bridgeExecutable: bridgeExecutable)
 
         let result = installer.install()
 
@@ -27,16 +28,14 @@ final class ClaudeStatusLineInstallerTests: XCTestCase {
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: try Data(contentsOf: settingsURL)) as? [String: Any])
         let statusLine = try XCTUnwrap(json["statusLine"] as? [String: Any])
         XCTAssertEqual(statusLine["type"] as? String, "command")
-        XCTAssertEqual(statusLine["command"] as? String, "cd '\(bridgeDirectory.path)' && python3 -m claude_usage_bridge --quiet")
+        XCTAssertEqual(statusLine["command"] as? String, "'\(bridgeExecutable.path)' --quiet")
     }
 
-    func testPrepareBridgeCopiesBundledModuleToDeterministicApplicationSupportPath() throws {
+    func testPrepareBridgeCopiesBundledBinaryToDeterministicApplicationSupportPath() throws {
         let bundledBridge = tempDirectory.appendingPathComponent("BundledClaudeUsageBridge")
-        let bundledModule = bundledBridge.appendingPathComponent("claude_usage_bridge")
-        try FileManager.default.createDirectory(at: bundledModule, withIntermediateDirectories: true)
-        try Data("# bridge entry point".utf8).write(
-            to: bundledModule.appendingPathComponent("__main__.py")
-        )
+        try FileManager.default.createDirectory(at: bundledBridge, withIntermediateDirectories: true)
+        let bundledBinary = bundledBridge.appendingPathComponent("claude-usage-bridge")
+        try Data("binary-v1".utf8).write(to: bundledBinary)
         let applicationSupport = tempDirectory.appendingPathComponent("Application Support")
 
         let resolved = try ClaudeStatusLineInstaller.prepareBridgeDirectory(
@@ -47,15 +46,14 @@ final class ClaudeStatusLineInstallerTests: XCTestCase {
         let expected = applicationSupport
             .appendingPathComponent("CodexUsageMonitor/ClaudeBridge")
         XCTAssertEqual(resolved, expected)
-        XCTAssertEqual(
-            try Data(contentsOf: expected.appendingPathComponent("claude_usage_bridge/__main__.py")),
-            Data("# bridge entry point".utf8)
-        )
+        let copiedBinary = expected.appendingPathComponent("claude-usage-bridge")
+        XCTAssertEqual(try Data(contentsOf: copiedBinary), Data("binary-v1".utf8))
+        // The copied helper must be executable.
+        let perms = try FileManager.default.attributesOfItem(atPath: copiedBinary.path)[.posixPermissions] as? Int
+        XCTAssertEqual(perms, 0o755)
 
-        try Data("# updated bridge entry point".utf8).write(
-            to: bundledModule.appendingPathComponent("__main__.py")
-        )
-
+        // A second prepare replaces the directory in place (app update path).
+        try Data("binary-v2".utf8).write(to: bundledBinary)
         XCTAssertEqual(
             try ClaudeStatusLineInstaller.prepareBridgeDirectory(
                 bundledBridgeDirectory: bundledBridge,
@@ -63,10 +61,7 @@ final class ClaudeStatusLineInstallerTests: XCTestCase {
             ),
             expected
         )
-        XCTAssertEqual(
-            try Data(contentsOf: expected.appendingPathComponent("claude_usage_bridge/__main__.py")),
-            Data("# updated bridge entry point".utf8)
-        )
+        XCTAssertEqual(try Data(contentsOf: copiedBinary), Data("binary-v2".utf8))
         XCTAssertFalse(
             try FileManager.default.contentsOfDirectory(
                 at: expected.deletingLastPathComponent(),
@@ -75,27 +70,28 @@ final class ClaudeStatusLineInstallerTests: XCTestCase {
         )
     }
 
-    /// Regression test: an earlier version left `bridgeDirectory.path`
-    /// unquoted, so a directory literally named "agent usage" (a space in
-    /// the path) split into two shell words and `cd` failed with
-    /// "No such file or directory". This runs the produced command through
-    /// a real shell against such a path and proves it now succeeds.
+    /// Regression test: an earlier version left the bridge path unquoted, so a
+    /// directory literally named "agent usage" (a space in the path) split into
+    /// two shell words and the command failed with "No such file or directory".
+    /// This runs the produced command through a real shell against such a path
+    /// and proves the quoted executable path is exec'd as a single word.
     func testInstalledCommandSurvivesAPathContainingASpace() throws {
-        let spacedBridgeDirectory = tempDirectory.appendingPathComponent("agent usage/ClaudeUsageBridge")
-        try FileManager.default.createDirectory(at: spacedBridgeDirectory, withIntermediateDirectories: true)
-        let installer = ClaudeStatusLineInstaller(settingsURL: settingsURL, bridgeDirectory: spacedBridgeDirectory)
+        let spacedDirectory = tempDirectory.appendingPathComponent("agent usage/ClaudeBridge")
+        try FileManager.default.createDirectory(at: spacedDirectory, withIntermediateDirectories: true)
+        let spacedExecutable = spacedDirectory.appendingPathComponent("claude-usage-bridge")
+        // A stand-in executable that ignores args and prints a known token.
+        try Data("#!/bin/bash\necho bridge-ran\n".utf8).write(to: spacedExecutable)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: spacedExecutable.path)
+
+        let installer = ClaudeStatusLineInstaller(settingsURL: settingsURL, bridgeExecutable: spacedExecutable)
         XCTAssertEqual(installer.install(), .installed)
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: try Data(contentsOf: settingsURL)) as? [String: Any])
         let statusLine = try XCTUnwrap(json["statusLine"] as? [String: Any])
         let command = try XCTUnwrap(statusLine["command"] as? String)
-        let smokeCommand = command.replacingOccurrences(
-            of: "python3 -m claude_usage_bridge --quiet",
-            with: "pwd"
-        )
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/bash")
-        process.arguments = ["-c", smokeCommand]
+        process.arguments = ["-c", command]
         let outputPipe = Pipe()
         process.standardOutput = outputPipe
         try process.run()
@@ -104,13 +100,13 @@ final class ClaudeStatusLineInstallerTests: XCTestCase {
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         XCTAssertEqual(process.terminationStatus, 0)
-        XCTAssertEqual(output?.hasSuffix("agent usage/ClaudeUsageBridge"), true)
+        XCTAssertEqual(output, "bridge-ran")
     }
 
     func testInstallPreservesExistingUnrelatedKeys() throws {
         let existing = try JSONSerialization.data(withJSONObject: ["theme": "dark", "hooks": ["SessionStart": []]])
         try existing.write(to: settingsURL)
-        let installer = ClaudeStatusLineInstaller(settingsURL: settingsURL, bridgeDirectory: bridgeDirectory)
+        let installer = ClaudeStatusLineInstaller(settingsURL: settingsURL, bridgeExecutable: bridgeExecutable)
 
         let result = installer.install()
 
@@ -122,7 +118,7 @@ final class ClaudeStatusLineInstallerTests: XCTestCase {
     }
 
     func testInstallIsIdempotentWhenAlreadyInstalled() {
-        let installer = ClaudeStatusLineInstaller(settingsURL: settingsURL, bridgeDirectory: bridgeDirectory)
+        let installer = ClaudeStatusLineInstaller(settingsURL: settingsURL, bridgeExecutable: bridgeExecutable)
         XCTAssertEqual(installer.install(), .installed)
 
         XCTAssertEqual(installer.install(), .alreadyInstalled)
@@ -131,7 +127,7 @@ final class ClaudeStatusLineInstallerTests: XCTestCase {
     func testInstallRefusesToReplaceExistingCustomStatusLine() throws {
         let existing = try JSONSerialization.data(withJSONObject: ["statusLine": ["type": "command", "command": "my-custom-script.sh"]])
         try existing.write(to: settingsURL)
-        let installer = ClaudeStatusLineInstaller(settingsURL: settingsURL, bridgeDirectory: bridgeDirectory)
+        let installer = ClaudeStatusLineInstaller(settingsURL: settingsURL, bridgeExecutable: bridgeExecutable)
         let before = try Data(contentsOf: settingsURL)
 
         let result = installer.install()
@@ -142,7 +138,7 @@ final class ClaudeStatusLineInstallerTests: XCTestCase {
 
     func testInstallReturnsUnableToUpdateSettingsForMalformedJSONAndLeavesFileUntouched() throws {
         try Data("not json".utf8).write(to: settingsURL)
-        let installer = ClaudeStatusLineInstaller(settingsURL: settingsURL, bridgeDirectory: bridgeDirectory)
+        let installer = ClaudeStatusLineInstaller(settingsURL: settingsURL, bridgeExecutable: bridgeExecutable)
         let before = try Data(contentsOf: settingsURL)
 
         let result = installer.install()

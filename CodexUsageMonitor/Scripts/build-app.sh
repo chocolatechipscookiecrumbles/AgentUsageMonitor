@@ -16,17 +16,16 @@ xcrun actool "$root/Resources/Assets.xcassets" \
   --minimum-deployment-target 14.0 \
   --output-partial-info-plist "$app/Contents/Resources/AssetCatalogInfo.plist"
 
-# Bundle the existing Python bridge as an app resource. The installer copies
-# this read-only signed resource into Application Support before using it, so
-# Python can create bytecode caches without modifying the app signature.
-bridge_source="$root/../ClaudeUsageBridge/claude_usage_bridge"
-bridge_resource="$app/Contents/Resources/ClaudeUsageBridge/claude_usage_bridge"
-test -f "$bridge_source/__main__.py"
-rm -rf "$app/Contents/Resources/ClaudeUsageBridge"
+# Bundle the native Claude usage bridge as an app resource. This replaces the
+# former Python bridge, so a shipped build no longer depends on the user having
+# python3 installed. The installer copies this signed executable out to
+# Application Support (stripping quarantine) before Claude Code execs it.
+bridge_binary="$root/.build/debug/claude-usage-bridge"
+bridge_resource="$app/Contents/Resources/ClaudeUsageBridge"
+test -f "$bridge_binary"
+rm -rf "$bridge_resource"
 mkdir -p "$bridge_resource"
-for bridge_file in __init__.py __main__.py cli.py models.py writer.py; do
-  install -m 644 "$bridge_source/$bridge_file" "$bridge_resource/$bridge_file"
-done
+install -m 755 "$bridge_binary" "$bridge_resource/claude-usage-bridge"
 
 # Sign with a stable identity, not ad-hoc.
 #
@@ -42,14 +41,22 @@ done
 # Attempt the real signature directly rather than probing with
 # `security find-identity` first — that call can block on its own Keychain
 # prompt, which would make a present identity look absent.
+#
+# Nested code (the bundled bridge helper) must be signed BEFORE the app —
+# code signing is applied inside-out, and notarization rejects an unsigned
+# nested Mach-O.
 identity="${CODESIGN_IDENTITY:-Developer ID Application}"
+bridge_executable="$bridge_resource/claude-usage-bridge"
 if codesign --force --options runtime --sign "$identity" \
+     --identifier com.david.codex-usage-monitor.bridge "$bridge_executable" 2>/dev/null \
+   && codesign --force --options runtime --sign "$identity" \
      --identifier com.david.codex-usage-monitor "$app" 2>/dev/null; then
   echo "Signed with: $identity"
 else
   echo "WARNING: could not sign with '$identity'; falling back to ad-hoc." >&2
   echo "         Keychain 'Always Allow' will NOT survive rebuilds." >&2
   echo "         Set CODESIGN_IDENTITY to a valid identity to fix this." >&2
+  codesign --force --sign - --identifier com.david.codex-usage-monitor.bridge "$bridge_executable"
   codesign --force --sign - --identifier com.david.codex-usage-monitor "$app"
 fi
 
