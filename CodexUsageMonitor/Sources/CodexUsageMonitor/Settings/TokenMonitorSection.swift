@@ -22,14 +22,17 @@ enum TokenMonitorSection: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    /// Deliberately range-neutral: the same rows describe 30-minute bars in the
+    /// day view and one bar per day in the week view, so naming either window
+    /// here would be wrong half the time.
     var settingsDescription: String {
         switch self {
         case .activityChart:
-            "The 30-minute bars from midnight through the current interval."
+            "The bars for each interval elapsed in the selected range."
         case .tokenCategories:
-            "Today's totals for each token category this agent reports."
+            "The range's totals for each token category this agent reports."
         case .modelUsage:
-            "The largest model groups and their share of today's tokens."
+            "The largest model groups and their share of the range's tokens."
         case .lastRequest:
             "The most recent request observed on this Mac, with its model."
         }

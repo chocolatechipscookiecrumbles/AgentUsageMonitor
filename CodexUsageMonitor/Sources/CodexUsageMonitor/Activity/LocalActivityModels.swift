@@ -98,9 +98,13 @@ struct LocalActivityRequest: Sendable, Equatable, Identifiable, Codable {
     let tokens: LocalActivityTokenBreakdown
 }
 
+/// One chart bar. It carries its own end because the bar's width is a calendar
+/// step, not a constant: a 30-minute interval and a daylight-saving day are
+/// both exactly one bucket.
 struct LocalActivityBucket: Sendable, Equatable, Identifiable {
     let id: Date
     let startedAt: Date
+    let endedAt: Date
     let totalTokens: Int64
 }
 
@@ -113,9 +117,10 @@ struct LocalActivityModelShare: Sendable, Equatable {
 
 struct ProviderLocalActivitySnapshot: Sendable, Equatable {
     let provider: AgentProvider
-    let dayStartedAt: Date
+    let range: TokenMonitorRange
+    let rangeStartedAt: Date
     let generatedAt: Date
-    let todayTokens: LocalActivityTokenBreakdown
+    let rangeTokens: LocalActivityTokenBreakdown
     let requestCount: Int
     let buckets: [LocalActivityBucket]
     let modelUsage: [LocalActivityModelShare]
@@ -130,7 +135,11 @@ enum ProviderLocalActivityUnavailability: Sendable, Equatable {
 enum ProviderLocalActivityState: Sendable, Equatable {
     case loading
     case available(ProviderLocalActivitySnapshot)
-    case noActivity(dayStartedAt: Date, lastRequest: LocalActivityRequest?)
+    case noActivity(
+        range: TokenMonitorRange,
+        rangeStartedAt: Date,
+        lastRequest: LocalActivityRequest?
+    )
     case unavailable(ProviderLocalActivityUnavailability)
 }
 
@@ -142,19 +151,22 @@ enum LocalActivityAggregation {
     static func state(
         provider: AgentProvider,
         requests: [LocalActivityRequest],
+        range: TokenMonitorRange = .day,
         generatedAt: Date = .now,
         calendar: Calendar = .autoupdatingCurrent
     ) -> ProviderLocalActivityState? {
         guard let snapshot = snapshot(
             provider: provider,
             requests: requests,
+            range: range,
             generatedAt: generatedAt,
             calendar: calendar
         ) else { return nil }
 
-        if snapshot.todayTokens.totalTokens == 0 {
+        if snapshot.rangeTokens.totalTokens == 0 {
             return .noActivity(
-                dayStartedAt: snapshot.dayStartedAt,
+                range: range,
+                rangeStartedAt: snapshot.rangeStartedAt,
                 lastRequest: snapshot.lastRequest
             )
         }
@@ -164,61 +176,52 @@ enum LocalActivityAggregation {
     static func snapshot(
         provider: AgentProvider,
         requests: [LocalActivityRequest],
+        range: TokenMonitorRange = .day,
         generatedAt: Date = .now,
         calendar: Calendar = .autoupdatingCurrent
     ) -> ProviderLocalActivitySnapshot? {
         guard requests.allSatisfy({ $0.provider == provider }),
               Set(requests.map(\.id)).count == requests.count,
-              let dayStartedAt = calendar.dateInterval(of: .day, for: generatedAt)?.start,
-              let dayEndedAt = calendar.date(byAdding: .day, value: 1, to: dayStartedAt),
-              let todayTokens = aggregateTokens(provider: provider, requests: todayRequests(
-                requests,
-                dayStartedAt: dayStartedAt,
-                dayEndedAt: dayEndedAt,
-                generatedAt: generatedAt
-              )),
+              let interval = calendar.dateInterval(of: range.intervalComponent, for: generatedAt)
+        else { return nil }
+
+        let inRange = requestsInRange(requests, interval: interval, generatedAt: generatedAt)
+
+        guard let rangeTokens = aggregateTokens(provider: provider, requests: inRange),
               let buckets = buckets(
-                requests: todayRequests(
-                    requests,
-                    dayStartedAt: dayStartedAt,
-                    dayEndedAt: dayEndedAt,
-                    generatedAt: generatedAt
-                ),
-                dayStartedAt: dayStartedAt,
+                requests: inRange,
+                rangeStartedAt: interval.start,
+                range: range,
                 generatedAt: generatedAt,
                 calendar: calendar
               ),
               let bucketTotal = sum(buckets.map(\.totalTokens)),
-              bucketTotal == todayTokens.totalTokens
+              bucketTotal == rangeTokens.totalTokens
         else { return nil }
-
-        let today = todayRequests(
-            requests,
-            dayStartedAt: dayStartedAt,
-            dayEndedAt: dayEndedAt,
-            generatedAt: generatedAt
-        )
 
         return ProviderLocalActivitySnapshot(
             provider: provider,
-            dayStartedAt: dayStartedAt,
+            range: range,
+            rangeStartedAt: interval.start,
             generatedAt: generatedAt,
-            todayTokens: todayTokens,
-            requestCount: today.count,
+            rangeTokens: rangeTokens,
+            requestCount: inRange.count,
             buckets: buckets,
-            modelUsage: modelUsage(for: today, todayTotal: todayTokens.totalTokens),
+            modelUsage: modelUsage(for: inRange, rangeTotal: rangeTokens.totalTokens),
             lastRequest: lastRequest(in: requests)
         )
     }
 
-    private static func todayRequests(
+    /// Last Request is deliberately drawn from *every* observed request rather
+    /// than from this set, so a quiet day or week still names the most recent
+    /// activity instead of reading as if none was ever seen.
+    private static func requestsInRange(
         _ requests: [LocalActivityRequest],
-        dayStartedAt: Date,
-        dayEndedAt: Date,
+        interval: DateInterval,
         generatedAt: Date
     ) -> [LocalActivityRequest] {
         requests.filter {
-            $0.occurredAt >= dayStartedAt && $0.occurredAt < dayEndedAt && $0.occurredAt <= generatedAt
+            $0.occurredAt >= interval.start && $0.occurredAt < interval.end && $0.occurredAt <= generatedAt
         }
     }
 
@@ -262,19 +265,20 @@ enum LocalActivityAggregation {
 
     private static func buckets(
         requests: [LocalActivityRequest],
-        dayStartedAt: Date,
+        rangeStartedAt: Date,
+        range: TokenMonitorRange,
         generatedAt: Date,
         calendar: Calendar
     ) -> [LocalActivityBucket]? {
         var starts: [Date] = []
-        var nextStart = dayStartedAt
+        var endsByStart: [Date: Date] = [:]
+        var nextStart = rangeStartedAt
 
         while nextStart <= generatedAt {
+            guard let end = range.bucketEnd(after: nextStart, calendar: calendar) else { return nil }
             starts.append(nextStart)
-            guard let followingStart = calendar.date(byAdding: .minute, value: 30, to: nextStart) else {
-                return nil
-            }
-            nextStart = followingStart
+            endsByStart[nextStart] = end
+            nextStart = end
         }
 
         var totalsByStart = Dictionary(uniqueKeysWithValues: starts.map { ($0, Int64.zero) })
@@ -289,17 +293,21 @@ enum LocalActivityAggregation {
         }
 
         return starts.compactMap { start in
-            totalsByStart[start].map {
-                LocalActivityBucket(id: start, startedAt: start, totalTokens: $0)
-            }
+            guard let total = totalsByStart[start], let end = endsByStart[start] else { return nil }
+            return LocalActivityBucket(
+                id: start,
+                startedAt: start,
+                endedAt: end,
+                totalTokens: total
+            )
         }
     }
 
     private static func modelUsage(
         for requests: [LocalActivityRequest],
-        todayTotal: Int64
+        rangeTotal: Int64
     ) -> [LocalActivityModelShare] {
-        guard todayTotal > 0 else { return [] }
+        guard rangeTotal > 0 else { return [] }
 
         struct Group {
             var sourceModelIDs: Set<String> = []
@@ -335,7 +343,7 @@ enum LocalActivityAggregation {
                 shortName: $0.shortName,
                 sourceModelIDs: $0.group.sourceModelIDs.sorted(),
                 totalTokens: $0.group.totalTokens,
-                fraction: Double($0.group.totalTokens) / Double(todayTotal)
+                fraction: Double($0.group.totalTokens) / Double(rangeTotal)
             )
         }
         let remainder = ranked.dropFirst(3)
@@ -346,7 +354,7 @@ enum LocalActivityAggregation {
                     shortName: "Other · \(remainder.count) models",
                     sourceModelIDs: remainder.flatMap { $0.group.sourceModelIDs }.sorted(),
                     totalTokens: totalTokens,
-                    fraction: Double(totalTokens) / Double(todayTotal)
+                    fraction: Double(totalTokens) / Double(rangeTotal)
                 )
             )
         }

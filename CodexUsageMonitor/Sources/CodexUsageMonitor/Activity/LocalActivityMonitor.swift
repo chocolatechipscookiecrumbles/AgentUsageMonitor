@@ -34,6 +34,10 @@ final class LocalActivityMonitor: ObservableObject {
     /// read at all, so hiding a card is a collection decision rather than a
     /// display filter.
     private var collectionEnabled: [AgentProvider: Bool] = [:]
+    /// Which window each provider's card reports. It changes only how the
+    /// already-reconciled requests are aggregated, so switching it republishes
+    /// without rereading a single file.
+    private var ranges: [AgentProvider: TokenMonitorRange] = [:]
 
     init(
         sources: [AgentProvider: any LocalActivitySource],
@@ -130,6 +134,16 @@ final class LocalActivityMonitor: ObservableObject {
         cache.update(provider, requests: nil)
     }
 
+    /// Switches one provider between the day and week views. No file is read
+    /// and no scan is scheduled: the same reconciled requests are re-aggregated
+    /// against the new window, so the card can never show a number the current
+    /// scan did not observe.
+    func setRange(_ range: TokenMonitorRange, for provider: AgentProvider) {
+        guard (ranges[provider] ?? .day) != range else { return }
+        ranges[provider] = range
+        publish(provider)
+    }
+
     private func startObserver(for provider: AgentProvider) {
         // Watching a root that does not exist would watch its future parents,
         // so absent roots are retried on activation instead.
@@ -196,6 +210,7 @@ final class LocalActivityMonitor: ObservableObject {
         guard let state = LocalActivityAggregation.state(
             provider: provider,
             requests: requests,
+            range: ranges[provider] ?? .day,
             calendar: calendar()
         ) else {
             // Aggregation only fails when the reconciled set cannot be trusted,

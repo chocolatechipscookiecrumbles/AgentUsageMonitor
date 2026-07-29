@@ -13,12 +13,19 @@ import Foundation
 /// change whose value is entirely in the copy.
 struct ProviderTokenActivityPresentation: Equatable {
     static let title = "Token Monitor"
-    static let scope = "This Mac · observed"
     static let hoverResting = "Hover over a bar for details"
-    static let emptyDay = "No activity observed today"
 
     let provider: AgentProvider
+    /// The window the card reports. Every piece of range-dependent copy and
+    /// formatting below reads it, so the header line, the chart labels, the
+    /// empty state, and the spoken values can never describe different windows.
+    let range: TokenMonitorRange
     let content: Content
+
+    /// The line under the title. It names the window rather than the source,
+    /// so the card has to keep saying "observed on this Mac" elsewhere — the
+    /// totals are local records, never account or quota usage.
+    var scope: String { range.scope }
 
     enum Content: Equatable {
         /// Loading and unavailable states stay compact: no chart, no rows.
@@ -27,11 +34,14 @@ struct ProviderTokenActivityPresentation: Equatable {
     }
 
     struct Expanded: Equatable {
-        let todayTokens: String
-        let todayExactTokens: String
-        let dayStartedAt: Date
+        let rangeTokens: String
+        let rangeExactTokens: String
+        let rangeStartedAt: Date
         let domainEndsAt: Date
         let buckets: [LocalActivityBucket]
+        /// The dates the chart labels, chosen here because which labels fit is
+        /// a property of the range rather than of the view drawing them.
+        let axisDates: [Date]
         let hasObservedActivity: Bool
         let categories: [Row]
         let requests: Row
@@ -66,8 +76,25 @@ struct ProviderTokenActivityPresentation: Equatable {
         let accessibilityValue: String
     }
 
-    init(provider: AgentProvider, state: ProviderLocalActivityState, now: Date = .now) {
+    init(
+        provider: AgentProvider,
+        state: ProviderLocalActivityState,
+        range: TokenMonitorRange = .day,
+        now: Date = .now,
+        calendar: Calendar = .autoupdatingCurrent
+    ) {
         self.provider = provider
+        // The state carries the range it was aggregated with. Trusting that
+        // over the caller's preference is what keeps the header, the chart, and
+        // the totals describing one window while a range change is in flight.
+        switch state {
+        case .available(let snapshot):
+            self.range = snapshot.range
+        case .noActivity(let stateRange, _, _):
+            self.range = stateRange
+        case .loading, .unavailable:
+            self.range = range
+        }
 
         switch state {
         case .loading:
@@ -89,30 +116,34 @@ struct ProviderTokenActivityPresentation: Equatable {
             content = .expanded(
                 Self.expanded(
                     provider: provider,
-                    tokens: snapshot.todayTokens,
-                    dayStartedAt: snapshot.dayStartedAt,
+                    range: snapshot.range,
+                    tokens: snapshot.rangeTokens,
+                    rangeStartedAt: snapshot.rangeStartedAt,
                     buckets: snapshot.buckets,
                     requestCount: snapshot.requestCount,
                     modelUsage: snapshot.modelUsage,
                     lastRequest: snapshot.lastRequest,
-                    now: snapshot.generatedAt
+                    now: snapshot.generatedAt,
+                    calendar: calendar
                 )
             )
 
-        case .noActivity(let dayStartedAt, let lastRequest):
-            // The source is readable and the day is genuinely empty, so zeros
-            // are observed values rather than missing evidence. No bar is
+        case .noActivity(let stateRange, let rangeStartedAt, let lastRequest):
+            // The source is readable and the window is genuinely empty, so
+            // zeros are observed values rather than missing evidence. No bar is
             // synthesized; the plot keeps its frame and reads as empty.
             content = .expanded(
                 Self.expanded(
                     provider: provider,
+                    range: stateRange,
                     tokens: LocalActivityTokenBreakdown.zero(for: provider),
-                    dayStartedAt: dayStartedAt,
+                    rangeStartedAt: rangeStartedAt,
                     buckets: [],
                     requestCount: 0,
                     modelUsage: [],
                     lastRequest: lastRequest,
-                    now: now
+                    now: now,
+                    calendar: calendar
                 )
             )
         }
@@ -120,26 +151,34 @@ struct ProviderTokenActivityPresentation: Equatable {
 
     private static func expanded(
         provider: AgentProvider,
+        range: TokenMonitorRange,
         tokens: LocalActivityTokenBreakdown?,
-        dayStartedAt: Date,
+        rangeStartedAt: Date,
         buckets: [LocalActivityBucket],
         requestCount: Int,
         modelUsage: [LocalActivityModelShare],
         lastRequest: LocalActivityRequest?,
-        now: Date
+        now: Date,
+        calendar: Calendar
     ) -> Expanded {
         let total = tokens?.totalTokens ?? 0
-        // The domain always ends at the close of the interval in progress, so
-        // the plot spans the elapsed day rather than only the observed part.
-        let domainEndsAt = buckets.last.map { $0.startedAt.addingTimeInterval(1800) }
-            ?? max(dayStartedAt.addingTimeInterval(1800), currentIntervalEnd(dayStartedAt: dayStartedAt, now: now))
+        // The domain always ends at the close of the bucket in progress, so the
+        // plot spans the elapsed window rather than only the observed part.
+        let domainEndsAt = buckets.last?.endedAt
+            ?? currentBucketEnd(range: range, rangeStartedAt: rangeStartedAt, now: now, calendar: calendar)
 
         return Expanded(
-            todayTokens: compactTokens(total),
-            todayExactTokens: exactTokens(total),
-            dayStartedAt: dayStartedAt,
+            rangeTokens: compactTokens(total),
+            rangeExactTokens: exactTokens(total),
+            rangeStartedAt: rangeStartedAt,
             domainEndsAt: domainEndsAt,
             buckets: buckets,
+            axisDates: axisDates(
+                range: range,
+                rangeStartedAt: rangeStartedAt,
+                domainEndsAt: domainEndsAt,
+                buckets: buckets
+            ),
             hasObservedActivity: total > 0,
             categories: categories(provider: provider, tokens: tokens),
             requests: Row(
@@ -168,16 +207,50 @@ struct ProviderTokenActivityPresentation: Equatable {
             },
             lastRequest: lastRequest.map { lastRequestRow(from: $0, now: now) },
             chartAccessibilityValue: chartAccessibilityValue(
+                range: range,
                 buckets: buckets,
                 total: total
             )
         )
     }
 
-    private static func currentIntervalEnd(dayStartedAt: Date, now: Date) -> Date {
-        let elapsed = max(0, now.timeIntervalSince(dayStartedAt))
-        let completedIntervals = (elapsed / 1800).rounded(.down)
-        return dayStartedAt.addingTimeInterval((completedIntervals + 1) * 1800)
+    /// Walks the range's own bucket rule forward to the bar in progress, so an
+    /// empty window's plot spans exactly the same domain a populated one would.
+    /// A calendar that refuses to advance falls back to one bucket wide rather
+    /// than to a zero-width domain the chart cannot scale.
+    private static func currentBucketEnd(
+        range: TokenMonitorRange,
+        rangeStartedAt: Date,
+        now: Date,
+        calendar: Calendar
+    ) -> Date {
+        var end = range.bucketEnd(after: rangeStartedAt, calendar: calendar)
+            ?? rangeStartedAt.addingTimeInterval(1800)
+        while end <= now, let next = range.bucketEnd(after: end, calendar: calendar) {
+            end = next
+        }
+        return end
+    }
+
+    /// The day view labels the start, the midpoint, and the end of the elapsed
+    /// span: more than three times cannot be read at 340 points. The week view
+    /// labels each day, because seven weekday initials fit where seven
+    /// timestamps would not.
+    private static func axisDates(
+        range: TokenMonitorRange,
+        rangeStartedAt: Date,
+        domainEndsAt: Date,
+        buckets: [LocalActivityBucket]
+    ) -> [Date] {
+        switch range {
+        case .day:
+            let midpoint = rangeStartedAt.addingTimeInterval(
+                domainEndsAt.timeIntervalSince(rangeStartedAt) / 2
+            )
+            return [rangeStartedAt, midpoint, domainEndsAt]
+        case .week:
+            return buckets.isEmpty ? [rangeStartedAt] : buckets.map(\.startedAt)
+        }
     }
 
     private static func categories(
@@ -245,26 +318,50 @@ struct ProviderTokenActivityPresentation: Equatable {
     }
 
     private static func chartAccessibilityValue(
+        range: TokenMonitorRange,
         buckets: [LocalActivityBucket],
         total: Int64
     ) -> String {
+        let window = range.scope.lowercased()
         guard !buckets.isEmpty else {
-            return "\(emptyDay). \(exactTokens(total)) tokens today."
+            return "\(range.emptyMessage). \(exactTokens(total)) tokens \(window)."
         }
         let intervals = buckets.map {
-            let end = $0.startedAt.addingTimeInterval(1800)
-            return "\(intervalRange(start: $0.startedAt, end: end)), \(exactTokens($0.totalTokens)) tokens"
+            "\(bucketLabel(for: $0, range: range)), \(exactTokens($0.totalTokens)) tokens"
         }
-        return "\(exactTokens(total)) tokens today. " + intervals.joined(separator: ". ") + "."
+        return "\(exactTokens(total)) tokens \(window). " + intervals.joined(separator: ". ") + "."
+    }
+
+    /// What one bar covers, in the terms its range measures: a clock interval
+    /// for the day view, a calendar date for the week view.
+    static func bucketLabel(for bucket: LocalActivityBucket, range: TokenMonitorRange) -> String {
+        switch range {
+        case .day:
+            return intervalRange(start: bucket.startedAt, end: bucket.endedAt)
+        case .week:
+            return bucket.startedAt.formatted(
+                .dateTime.weekday(.abbreviated).month(.abbreviated).day()
+            )
+        }
     }
 
     static func intervalRange(start: Date, end: Date) -> String {
         "\(start.formatted(date: .omitted, time: .shortened))–\(end.formatted(date: .omitted, time: .shortened))"
     }
 
-    static func hoverDetail(for bucket: LocalActivityBucket) -> String {
-        let end = bucket.startedAt.addingTimeInterval(1800)
-        return "\(intervalRange(start: bucket.startedAt, end: end)) · \(compactTokens(bucket.totalTokens)) tokens"
+    /// The label under a chart tick. Seven full timestamps do not fit at 340
+    /// points, so the week view narrows each day to its weekday initial.
+    func axisLabel(for date: Date) -> String {
+        switch range {
+        case .day:
+            return date.formatted(date: .omitted, time: .shortened)
+        case .week:
+            return date.formatted(.dateTime.weekday(.narrow))
+        }
+    }
+
+    func hoverDetail(for bucket: LocalActivityBucket) -> String {
+        "\(Self.bucketLabel(for: bucket, range: range)) · \(Self.compactTokens(bucket.totalTokens)) tokens"
     }
 
     /// Compact notation that keeps one decimal, because a menu-bar card that

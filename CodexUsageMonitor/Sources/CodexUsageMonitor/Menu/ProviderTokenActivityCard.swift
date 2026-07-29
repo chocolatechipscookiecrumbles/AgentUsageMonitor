@@ -49,7 +49,7 @@ struct ProviderTokenActivityCard: View {
                     .font(.callout.weight(.semibold))
                     .foregroundStyle(theme.primaryText)
 
-                Text(ProviderTokenActivityPresentation.scope)
+                Text(presentation.scope)
                     .font(.caption)
                     .foregroundStyle(theme.secondaryText)
             }
@@ -58,11 +58,11 @@ struct ProviderTokenActivityCard: View {
 
             if case .expanded(let expanded) = presentation.content {
                 VStack(alignment: .trailing, spacing: MenuPopoverTheme.activityHeaderTextSpacing) {
-                    Text(expanded.todayTokens)
+                    Text(expanded.rangeTokens)
                         .font(.title3.weight(.bold))
                         .foregroundStyle(theme.primaryText)
-                        .accessibilityLabel("Tokens today")
-                        .accessibilityValue(expanded.todayExactTokens)
+                        .accessibilityLabel(presentation.range.totalAccessibilityLabel)
+                        .accessibilityValue(expanded.rangeExactTokens)
 
                     Text(expanded.requestsSummary)
                         .font(.caption)
@@ -183,12 +183,12 @@ struct ProviderTokenActivityCard: View {
             .foregroundStyle(barTint(for: bucket))
         }
         .chartLegend(.hidden)
-        .chartXScale(domain: expanded.dayStartedAt...expanded.domainEndsAt)
+        .chartXScale(domain: expanded.rangeStartedAt...expanded.domainEndsAt)
         .chartXAxis {
-            AxisMarks(values: axisDates(expanded)) { value in
+            AxisMarks(values: expanded.axisDates) { value in
                 AxisValueLabel {
                     if let date = value.as(Date.self) {
-                        Text(date.formatted(date: .omitted, time: .shortened))
+                        Text(presentation.axisLabel(for: date))
                             .font(.caption2)
                             .foregroundStyle(theme.secondaryText)
                     }
@@ -223,7 +223,7 @@ struct ProviderTokenActivityCard: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Activity chart, 30-minute intervals since midnight")
+        .accessibilityLabel(presentation.range.chartAccessibilityLabel)
         .accessibilityValue(expanded.chartAccessibilityValue)
     }
 
@@ -234,7 +234,7 @@ struct ProviderTokenActivityCard: View {
             .fill(theme.progressTrack.opacity(0.5))
             .frame(height: MenuPopoverTheme.activityChartHeight)
             .overlay {
-                Text(ProviderTokenActivityPresentation.emptyDay)
+                Text(presentation.range.emptyMessage)
                     .font(.caption)
                     .foregroundStyle(theme.secondaryText)
             }
@@ -246,7 +246,7 @@ struct ProviderTokenActivityCard: View {
     private func hoverDetailText(_ expanded: ProviderTokenActivityPresentation.Expanded) -> String {
         guard expanded.hasObservedActivity else { return " " }
         guard let hoveredBucket else { return ProviderTokenActivityPresentation.hoverResting }
-        return ProviderTokenActivityPresentation.hoverDetail(for: hoveredBucket)
+        return presentation.hoverDetail(for: hoveredBucket)
     }
 
     private func barTint(for bucket: LocalActivityBucket) -> Color {
@@ -265,15 +265,6 @@ struct ProviderTokenActivityCard: View {
         let origin = geometry[plotFrame].origin
         guard let date: Date = proxy.value(atX: location.x - origin.x) else { return nil }
         return expanded.buckets.last { $0.startedAt <= date }
-    }
-
-    /// At most three labels: the day's start, its midpoint, and the end of the
-    /// interval in progress. More than that cannot be read at 340 points.
-    private func axisDates(_ expanded: ProviderTokenActivityPresentation.Expanded) -> [Date] {
-        let start = expanded.dayStartedAt
-        let end = expanded.domainEndsAt
-        let midpoint = start.addingTimeInterval(end.timeIntervalSince(start) / 2)
-        return [start, midpoint, end]
     }
 
     private func yAxisValues(_ expanded: ProviderTokenActivityPresentation.Expanded) -> [Double] {

@@ -18,6 +18,9 @@ final class AppSettings: ObservableObject {
         static func tokenMonitorSections(for provider: AgentProvider) -> String {
             "tokenMonitor.sections.\(provider.rawValue)"
         }
+        static func tokenMonitorRange(for provider: AgentProvider) -> String {
+            "tokenMonitor.range.\(provider.rawValue)"
+        }
         static let forecastWarnings = "notification.forecastWarnings"
         static let resetCreditWarnings = "notification.resetCreditWarnings"
         static let resetWarnings = "notification.resetWarnings"
@@ -55,6 +58,13 @@ final class AppSettings: ObservableObject {
     }
     @Published private(set) var tokenMonitorSectionsByProvider: [AgentProvider: Set<TokenMonitorSection>] {
         didSet { persistTokenMonitorSections() }
+    }
+    /// Whether each agent's card reports the current day or the current week.
+    /// Per-provider because the useful window differs by how an agent is used,
+    /// and read by `LocalActivityMonitor` because the range decides how the
+    /// same reconciled requests are aggregated.
+    @Published private(set) var tokenMonitorRangeByProvider: [AgentProvider: TokenMonitorRange] {
+        didSet { persistTokenMonitorRanges() }
     }
     @Published var forecastWarningsEnabled: Bool { didSet { defaults.set(forecastWarningsEnabled, forKey: Key.forecastWarnings) } }
     @Published var resetCreditWarningsEnabled: Bool { didSet { defaults.set(resetCreditWarningsEnabled, forKey: Key.resetCreditWarnings) } }
@@ -113,6 +123,7 @@ final class AppSettings: ObservableObject {
         // record a preference they never expressed.
         tokenMonitorVisibilityByProvider = Self.tokenMonitorVisibility(defaults: defaults)
         tokenMonitorSectionsByProvider = Self.tokenMonitorSections(defaults: defaults)
+        tokenMonitorRangeByProvider = Self.tokenMonitorRanges(defaults: defaults)
         forecastWarningsEnabled = Self.value(for: Key.forecastWarnings, defaults: defaults, defaultValue: true)
         resetCreditWarningsEnabled = Self.value(for: Key.resetCreditWarnings, defaults: defaults, defaultValue: true)
         resetWarningsEnabled = Self.value(for: Key.resetWarnings, defaults: defaults, defaultValue: true)
@@ -180,6 +191,24 @@ final class AppSettings: ObservableObject {
     private func persistTokenMonitorVisibility() {
         for (provider, visible) in tokenMonitorVisibilityByProvider {
             defaults.set(visible, forKey: Key.tokenMonitorVisible(for: provider))
+        }
+    }
+
+    /// Absent or unreadable means the day view, which is the default and the
+    /// narrower of the two: an upgrade never silently widens what the card
+    /// reports.
+    private static func tokenMonitorRanges(defaults: UserDefaults) -> [AgentProvider: TokenMonitorRange] {
+        var result: [AgentProvider: TokenMonitorRange] = [:]
+        for provider in AgentProvider.allCases {
+            let stored = defaults.string(forKey: Key.tokenMonitorRange(for: provider))
+            result[provider] = stored.flatMap(TokenMonitorRange.init(rawValue:)) ?? .day
+        }
+        return result
+    }
+
+    private func persistTokenMonitorRanges() {
+        for (provider, range) in tokenMonitorRangeByProvider {
+            defaults.set(range.rawValue, forKey: Key.tokenMonitorRange(for: provider))
         }
     }
 
@@ -252,6 +281,14 @@ final class AppSettings: ObservableObject {
 
     func enabledTokenMonitorSections(for provider: AgentProvider) -> Set<TokenMonitorSection> {
         tokenMonitorSectionsByProvider[provider] ?? Set(TokenMonitorSection.allCases)
+    }
+
+    func tokenMonitorRange(for provider: AgentProvider) -> TokenMonitorRange {
+        tokenMonitorRangeByProvider[provider] ?? .day
+    }
+
+    func setTokenMonitorRange(_ range: TokenMonitorRange, for provider: AgentProvider) {
+        tokenMonitorRangeByProvider[provider] = range
     }
 
     func isQuotaThresholdEnabled(_ threshold: RemainingQuotaThreshold, for provider: AgentProvider) -> Bool {

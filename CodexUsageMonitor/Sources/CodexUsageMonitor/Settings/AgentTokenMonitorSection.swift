@@ -31,6 +31,26 @@ struct AgentTokenMonitorSection: View {
                 )
             }
 
+            SettingsSectionRow {
+                SettingsPreferenceControlRow(
+                    "Range",
+                    description: "Whether the card reports today or the current week. Both are read from the same local records on this Mac."
+                ) {
+                    Picker("Range", selection: Binding(
+                        get: { settings.tokenMonitorRange(for: provider) },
+                        set: { settings.setTokenMonitorRange($0, for: provider) }
+                    )) {
+                        ForEach(TokenMonitorRange.allCases) { range in
+                            Text(range.settingsTitle).tag(range)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(width: SettingsLayoutMetrics.compactSegmentedControlWidth)
+                }
+                .disabled(!isVisible)
+            }
+
             ForEach(Array(TokenMonitorSection.allCases.enumerated()), id: \.element) { index, section in
                 SettingsSectionRow(showsDivider: index < TokenMonitorSection.allCases.count - 1) {
                     SettingsPreferenceToggle(

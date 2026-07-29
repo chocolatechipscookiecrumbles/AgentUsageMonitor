@@ -67,7 +67,8 @@ struct CodexMenuContent: View {
             ProviderTokenActivityCard(
                 presentation: ProviderTokenActivityPresentation(
                     provider: .codex,
-                    state: viewModel.localActivityState(for: .codex)
+                    state: viewModel.localActivityState(for: .codex),
+                    range: settings.tokenMonitorRange(for: .codex)
                 ),
                 visibleSections: settings.enabledTokenMonitorSections(for: .codex)
             )

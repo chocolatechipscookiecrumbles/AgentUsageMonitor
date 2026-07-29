@@ -187,6 +187,17 @@ final class QuotaViewModel: ObservableObject {
                     )
                 }
             }.store(in: &subscriptions)
+        // The day/week choice decides how the monitor aggregates, so it has to
+        // reach the monitor too. Nothing is reread; the reconciled requests are
+        // republished against the new window.
+        settings.$tokenMonitorRangeByProvider
+            .removeDuplicates()
+            .sink { [weak self] ranges in
+                guard let self else { return }
+                for provider in AgentProvider.allCases {
+                    self.activityMonitor.setRange(ranges[provider] ?? .day, for: provider)
+                }
+            }.store(in: &subscriptions)
         if Self.shouldStartProviderMonitoring(arguments: CommandLine.arguments) {
             start()
         }

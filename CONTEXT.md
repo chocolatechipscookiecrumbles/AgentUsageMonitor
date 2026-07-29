@@ -189,8 +189,12 @@ The per-agent preference deciding whether that agent contributes a Token Monitor
 _Avoid_: Hide card, disable activity, pause monitoring
 
 **Token Monitor Section**:
-One toggleable region of the Token Monitor card — Activity chart, Token categories, Model usage, or Last request. Section toggles change only what is rendered; every section is derived from the same reconciled request set. The card's title, **This Mac · observed**, day total, and request count are not sections and always remain.
+One toggleable region of the Token Monitor card — Activity chart, Token categories, Model usage, or Last request. Section toggles change only what is rendered; every section is derived from the same reconciled request set. The card's title, range line, range total, and request count are not sections and always remain.
 _Avoid_: Card row, widget, module
+
+**Token Monitor Range**:
+The per-agent preference deciding whether a card reports the current local day (**Today**) or the current local week (**This week**), shown as the line under the card's title. It defaults to **Today**. The range decides which observed requests are in scope and how wide one chart bar is — 30-minute intervals for a day, one bar per day for a week — and nothing else: both views are aggregated from the same reconciled request set, and switching rereads no file.
+_Avoid_: Time filter, period, rolling week, last 7 days
 
 **Activity Interval**:
 A 30-minute local-calendar segment whose value is the Observed Tokens attributed to provider-recorded completion times in that interval, not the cumulative total since midnight.

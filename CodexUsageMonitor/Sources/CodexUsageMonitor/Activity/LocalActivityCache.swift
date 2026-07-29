@@ -21,9 +21,12 @@ struct LocalActivityCachedRequests: Codable, Equatable {
 }
 
 struct LocalActivityCache {
-    /// Enough history to survive a day rollover and a time-zone change without
-    /// carrying months of requests that no longer affect anything on screen.
-    static let retention: TimeInterval = 3 * 24 * 60 * 60
+    /// Enough history for the widest window the card can report — the current
+    /// local week — plus room for a week rollover and a time-zone change,
+    /// without carrying months of requests that no longer affect anything on
+    /// screen. A scan still rebuilds the real set from local records; this only
+    /// bounds what the previous launch may hand forward.
+    static let retention: TimeInterval = 14 * 24 * 60 * 60
 
     private let fileURL: URL
 

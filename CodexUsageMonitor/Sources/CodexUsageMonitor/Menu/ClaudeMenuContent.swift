@@ -77,7 +77,8 @@ struct ClaudeMenuContent: View {
             ProviderTokenActivityCard(
                 presentation: ProviderTokenActivityPresentation(
                     provider: .claudeCode,
-                    state: viewModel.localActivityState(for: .claudeCode)
+                    state: viewModel.localActivityState(for: .claudeCode),
+                    range: settings.tokenMonitorRange(for: .claudeCode)
                 ),
                 visibleSections: settings.enabledTokenMonitorSections(for: .claudeCode)
             )
