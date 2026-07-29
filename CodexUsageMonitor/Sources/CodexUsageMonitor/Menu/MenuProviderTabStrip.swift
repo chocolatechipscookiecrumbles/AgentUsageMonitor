@@ -15,13 +15,30 @@ struct MenuProviderTabStrip: View {
                 } label: {
                     // The frame and content shape live inside the label so the
                     // plain button owns the whole equal-width column as its hit
-                    // target, not just the text. `maxWidth: .infinity` also lets
-                    // each button divide the strip width equally.
-                    Text(provider.tabTitle)
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(selection == provider ? theme.accent : theme.secondaryText)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .contentShape(.rect)
+                    // target, not just the icon and text. `maxWidth: .infinity`
+                    // also lets each button divide the strip width equally.
+                    HStack(spacing: MenuPopoverTheme.tabItemSpacing) {
+                        // The menu-bar artwork, not the settings artwork: it is
+                        // the variant guaranteed transparent enough to tint
+                        // (`MenuBarProviderGlyphTests`), so tinting it to the
+                        // tab's label color can never paint a solid block the
+                        // way Codex's full-bleed colored mark would.
+                        Image(provider.menuBarAssetName, bundle: .main)
+                            .resizable()
+                            .renderingMode(.template)
+                            .scaledToFit()
+                            .frame(
+                                width: MenuPopoverTheme.tabIconSize,
+                                height: MenuPopoverTheme.tabIconSize
+                            )
+                            .accessibilityHidden(true)
+
+                        Text(provider.tabTitle)
+                    }
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(selection == provider ? theme.accent : theme.secondaryText)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
                 .background(hoveredProvider == provider ? theme.hoverBackground : .clear)
