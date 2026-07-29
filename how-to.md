@@ -98,7 +98,7 @@ Only use it intentionally, because other Codex surfaces sharing that login may r
 After authentication, run:
 
 ```bash
-cd "<USER_HOME>/Desktop/agent usage/UsageProbe"
+cd "<repo-root>/UsageProbe"
 python3 -m codex_probe
 ```
 
@@ -148,7 +148,7 @@ sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
 The current MVP is a local Swift package that builds a menu-bar-only app bundle. It does not package or call the Codex `UsageProbe`. It does bundle the separate, zero-cost Claude status-line bridge described below.
 
 ```sh
-cd "<USER_HOME>/Desktop/agent usage/CodexUsageMonitor"
+cd "<repo-root>/CodexUsageMonitor"
 bash Scripts/build-app.sh
 open .build/CodexUsageMonitor.app
 ```

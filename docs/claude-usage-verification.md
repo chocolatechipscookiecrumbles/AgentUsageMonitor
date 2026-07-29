@@ -2,7 +2,8 @@
 
 Runnable commands to verify each layer of the Claude usage monitor against a **real machine and account**. This is deployment/smoke verification, not the unit suite.
 
-All paths are relative to the repo root: `<USER_HOME>/Desktop/agent usage`.
+All paths are relative to the repo root. Where a command needs an absolute path,
+`<repo-root>` stands for wherever you cloned this repository.
 
 **Source hierarchy under test:**
 
@@ -231,7 +232,7 @@ python3 -c "import json,os; d=json.load(open(os.path.expanduser('~/.claude/setti
 **Expected:**
 ```json
 {
-  "command": "cd '<USER_HOME>/Desktop/agent usage/ClaudeUsageBridge' && python3 -m claude_usage_bridge --quiet",
+  "command": "cd '<repo-root>/ClaudeUsageBridge' && python3 -m claude_usage_bridge --quiet",
   "type": "command"
 }
 ```
@@ -340,7 +341,7 @@ Tier 1 is `unavailable: unauthorized`, `tier1Method` is null (nothing served it)
 Force everything to fail (temporarily move the local files aside):
 ```bash
 cd ~/Library/Application\ Support/CodexUsageMonitor && mv claude-rate-limits.json claude-rate-limits.json.bak && mv claude-usage-cache.json claude-usage-cache.json.bak
-cd "<USER_HOME>/Desktop/agent usage/CodexUsageMonitor" && CLAUDE_CODE_OAUTH_TOKEN='sk-ant-oat01-invalid' .build/debug/CodexUsageMonitor --claude-live-read-once | tail -20
+cd "<repo-root>/CodexUsageMonitor" && CLAUDE_CODE_OAUTH_TOKEN='sk-ant-oat01-invalid' .build/debug/CodexUsageMonitor --claude-live-read-once | tail -20
 ```
 **Expected:** a warning `"No Claude usage source is currently available."` and **no fabricated percentages**.
 
