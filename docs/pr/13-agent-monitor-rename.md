@@ -91,7 +91,7 @@ the running app is.
 | Check | State | Result |
 |---|---|---|
 | `swift build` at this branch tip | Run | Build complete |
-| `swift test` at this branch tip | Run | 316 tests, 0 failures — but see above: the suite does not cover this copy |
+| `swift test` at this branch tip | Run | 316 tests, 1 skipped, 0 failures across two clean re-runs — but see above: the suite does not cover this copy. One earlier run showed a single failure matching the documented `testReconnectResumesReading` flake |
 | `plutil -p Info.plist` | Run | `CFBundleDisplayName = Agent Monitor`, `CFBundleShortVersionString = 0.0.1`, identifier unchanged |
 | `git grep "Codex Usage Monitor" -- CodexUsageMonitor/` | Run | No matches |
 | Get Info, popover Quit row, Diagnostics **Name**, Copy Report paste, export file | **Not run** | |

@@ -76,7 +76,8 @@ The `XCTSkipUnless` guard is verified in both directions:
 - **With the catalog present** (this working tree): `swift test --filter
   MenuBarProviderGlyphTests` → 1 test, 0 failures. It runs, it does not skip.
 - **Without it** (clean worktree at this branch): the suite went from
-  `316 tests, 1 failure (1 unexpected)` to green.
+  `316 tests, 1 failure (1 unexpected)` to
+  `316 tests, 1 test skipped and 0 failures`.
 
 ## Verification
 

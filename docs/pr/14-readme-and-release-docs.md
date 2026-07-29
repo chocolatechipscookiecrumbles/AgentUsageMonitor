@@ -78,13 +78,22 @@ scratch, so these are clean-clone results rather than working-tree results:
 | 9 | `feature/release-binary-and-ui-fixes` | ✅ | 300, 0 failures |
 | 10 | `feature/token-monitor-day-week` | ✅ | 309, 0 failures |
 | 11 | `feature/app-icon-and-plan-name` | ✅ | 316, 0 failures |
-| 12 | `feature/repo-asset-hygiene` | ✅ | 316, 0 failures **after** the skip guard |
-| 13 | `feature/agent-monitor-rename` | ✅ | 316, 0 failures |
-| 14 | `feature/release-readiness` | ✅ | 316, 0 failures |
+| 12 | `feature/repo-asset-hygiene` | ✅ | 316, **1 skipped**, 0 failures |
+| 13 | `feature/agent-monitor-rename` | ✅ | 316, **1 skipped**, 0 failures (see flake note) |
+| 14 | `feature/release-readiness` | ✅ | 316, **1 skipped**, 0 failures |
 
 Branches 12–14 initially failed with `316 tests, 1 failure (1 unexpected)` in a
 clean worktree. That is what surfaced the `MenuBarProviderGlyphTests` problem fixed
-in PR 12; the table above reflects the state after that fix.
+in PR 12. From 12 onward the one skip is that test, absent its untracked artwork —
+expected, not a failure.
+
+**Flake note.** Branch 13 reported one failure on its first clean run and passed on
+two immediate re-runs of the same worktree. Branch 7 showed the same pattern. Both
+match the known flake documented in the release guide:
+`ClaudeUsageMonitorTests.testReconnectResumesReading` spins on a bounded
+`Task.yield()` count and failed twice in roughly 25 runs. Neither occurrence was
+captured by name, so the attribution is inference from the pattern — re-run before
+concluding anything is broken.
 
 | Other check | State | Result |
 |---|---|---|
