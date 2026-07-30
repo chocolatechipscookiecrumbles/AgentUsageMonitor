@@ -52,10 +52,11 @@ changes that hash, so the accepted ticket cannot apply to the shipping bundle. T
 approval is easy to mistake for "the app is notarized"; what it establishes is that
 the *signing setup* satisfies the notary, which is a different and lesser claim.
 
-**The trap to avoid.** The stapled, approved `.app` still sits in `.build` from the
-2026-07-29 run. Publishing it would ship a build that calls itself Codex Usage
-Monitor `1.0.0` under a release tagged `v0.0.1` for Agent Monitor. Rebuild before
-you package anything.
+**The trap to avoid.** The final verification replaced `.build` with an ad-hoc
+`Agent Monitor` / `0.0.1` / `266` candidate. It is not the earlier accepted
+Developer ID build and is not a shipping artifact. Rebuild with the Developer ID
+identity before you submit or package anything, and do not reuse any surviving
+`Codex Usage Monitor` / `1.0.0` archive from the 2026-07-29 run.
 
 **The fix.** `CFBundleVersion` is already `266` in the repository (`254` is
 permanently consumed — Apple tracks build numbers per bundle identifier, which the
@@ -67,8 +68,8 @@ workaround.
 - [x] `CFBundleVersion` bumped to `266`
 - [ ] Rebuilt — `plutil` confirms `Agent Monitor` / `0.0.1` / `266` inside the bundle
 - [ ] Notary returned `Accepted`, ticket stapled, `spctl` verdict re-checked
-- [ ] The superseded `1.0.0` bundle and its zip removed from `.build`, so it cannot
-      be uploaded by accident
+- [ ] No superseded `1.0.0` bundle or zip remains, and the release zip was created
+      only from the stapled `Agent Monitor` / `0.0.1` / `266` app
 
 ### 3. The Claude ToS disclosure is load-bearing — keep it in all three places
 
