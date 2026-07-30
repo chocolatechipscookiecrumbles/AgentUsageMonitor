@@ -1,8 +1,11 @@
 # Shipping your first macOS release on GitHub
 
 A practical, project-specific walkthrough for cutting the first downloadable
-release of **Codex Usage Monitor** (`com.david.codex-usage-monitor`). It teaches
-the *why* behind each step, not just the commands, so you can repeat it.
+release of **Agent Monitor** — the product formerly called Codex Usage Monitor,
+renamed once it supported Claude Code as well. The bundle, target, and identifier
+are still `CodexUsageMonitor` / `com.david.codex-usage-monitor`; only the
+user-facing name changed. This guide teaches the *why* behind each step, not just
+the commands, so you can repeat it.
 
 > **Read this first — the Claude credential caveat.** The Claude path reuses the
 > OAuth credential Claude Code stores in the user's Keychain. Anthropic's Terms
@@ -16,31 +19,79 @@ the *why* behind each step, not just the commands, so you can repeat it.
 
 ## Where this stands right now (2026-07-29)
 
-Everything that does not require an Apple Developer account is done. Resume at
-**Step 3**.
+**The app is signed with a real Developer ID identity and a notarization submission
+is in flight** — but that submission is for the superseded `1.0.0` build. The
+version has since been set to **`0.0.1`**, so the artifact you publish must be
+rebuilt and re-notarized with a fresh build number. See
+[The remaining sequence](#the-remaining-sequence).
 
 | Prerequisite | State |
 |---|---|
 | Build and tests green | ✅ 316 tests, 0 failures |
 | Optimized release binary | ✅ `build-app.sh` builds `-c release` |
 | App icon | ✅ `AppIcon.appiconset`, all ten sizes; bundle `.icns` built by `iconutil` |
-| Version and build number | ✅ `1.0.0` / `254` in `Info.plist` |
+| Version and build number | ⚠️ `Info.plist` now reads `0.0.1` / `254`. The signed bundle was built at `1.0.0` / `254`, so a **rebuild with a fresh `CFBundleVersion`** is required before publishing — see [Step 1](#step-1--pick-and-set-the-version) |
 | Seven-day reliability observation | ✅ Passed — see the caveat in [reliability Task 5](../superpowers/plans/2026-07-13-codex-reliability-hardening.md#task-5-run-and-review-the-one-week-hardening-period) |
 | Claude credential disclosure | ✅ README, app Data & Privacy page, release notes |
-| Release notes | ✅ Drafted at [`docs/release-notes/1.0.0.md`](../release-notes/1.0.0.md) |
+| Release notes | ✅ Drafted at [`docs/release-notes/0.0.1.md`](../release-notes/0.0.1.md) |
 | Git remote | ✅ `origin` → `chocolatechipscookiecrumbles/agent-usage` |
-| **Apple Developer membership** | ❌ **Not yet — this is the blocker** |
-| **Developer ID certificate** | ❌ Follows from the membership |
-| **Notarization** | ❌ Never run |
+| **Apple Developer membership** | ✅ Active |
+| **Developer ID certificate** | ✅ `Developer ID Application: Project maintainer (<APPLE_TEAM_ID>)`, installed with its private key |
+| **Signed, notarization-ready bundle** | ✅ Verified 2026-07-29 — see the evidence below |
+| **Notarization** | ⏳ **Submitted for the `1.0.0` / `254` build, awaiting the notary result.** No ticket is stapled, and this submission is now superseded by the version change |
 | `gh` CLI authenticated | ❌ `gh auth login` still needed (or use the web UI) |
 
-So the remaining sequence is: buy the membership → create and install a
-**Developer ID Application** certificate → rebuild so the app is signed with it
-→ Step 3 (notarize + staple) → Steps 4–7.
+### Signing evidence (2026-07-29)
 
-Until the certificate exists, `build-app.sh` falls back to ad-hoc signing and
-says so. That build is fine for your own use and is what every check above was
-run against; it is **not** what you should upload.
+Read back from `CodexUsageMonitor/.build/CodexUsageMonitor.app`, built at 18:09:
+
+```
+Authority=Developer ID Application: Project maintainer (<APPLE_TEAM_ID>)
+Authority=Developer ID Certification Authority
+Authority=Apple Root CA
+TeamIdentifier=<APPLE_TEAM_ID>
+CodeDirectory ... flags=0x10000(runtime)
+Timestamp=Jul 29, 2026 at 18:09:56
+```
+
+`codesign -d --entitlements -` returns none, so there is no `get-task-allow`.
+`spctl -a -vv` prints `rejected … source=Unnotarized Developer ID` — which is the
+**expected** verdict at this point: the signature is right and notarization is the
+only thing missing. `xcrun stapler validate` correspondingly reports
+"does not have a ticket stapled to it."
+
+`CodexUsageMonitor-notarize.zip` was produced at 19:28 and submitted.
+
+### The remaining sequence
+
+The in-flight submission is still worth watching — an `Accepted` result proves the
+signing setup is correct end to end — but it is **not the artifact you will ship**,
+because the version has since changed to `0.0.1`.
+
+1. Wait for the notary result on the `1.0.0` build. If it comes back `Invalid`, fix
+   the cause before doing anything else.
+2. Set a fresh `CFBundleVersion` (`git rev-list --count HEAD`) and rebuild
+   (Steps 1–2). The bundle now reports `0.0.1`.
+3. Zip, submit, and **staple and validate** the new build (Step 3).
+4. Re-run `spctl -a -vv` — it must flip to `accepted … source=Notarized Developer ID`.
+5. Package the stapled app (Step 4), tag `v0.0.1` (Step 5), authenticate `gh` and
+   publish (Step 6), then verify the uploaded artifact like a stranger would
+   (Step 7).
+
+Check on a submission at any time:
+
+```sh
+xcrun notarytool history --keychain-profile "notary-codexmon"
+xcrun notarytool log <submission-id> --keychain-profile "notary-codexmon"
+```
+
+Run those in **your own Terminal**. Like `security find-identity`, they can block on
+a Keychain prompt and must not be run non-interactively or by an agent.
+
+> **Do not staple, package, or tag until the notary says `Accepted`.** A rejected
+> submission usually means a missing hardened runtime (already set), a nested
+> unsigned Mach-O (the script signs the bridge first), or a re-used build number —
+> the log command above names the actual cause.
 
 ## The mental model: what a macOS release actually needs
 
@@ -80,8 +131,10 @@ both paths.
    `build-app.sh` builds `-c release` and installs the app executable and the
    bundled bridge from `.build/release/`. Override with `BUILD_CONFIGURATION=debug`
    only for local iteration — never for a release.
-3. ~~**Bump the version.**~~ **Set 2026-07-29** to `1.0.0` / `254` — see
-   [Step 1](#step-1--pick-and-set-the-version). Bump again for the *next* release.
+3. **Set the version.** `CFBundleShortVersionString` is `0.0.1` as of 2026-07-29.
+   `CFBundleVersion` is still `254`, which was already used by the superseded
+   submission — **set it to `git rev-list --count HEAD` before you notarize again.**
+   See [Step 1](#step-1--pick-and-set-the-version).
 4. **Know the known gaps** so your release notes are honest:
    - ~~**No app icon yet.**~~ **Resolved 2026-07-29:** `AppIcon.appiconset`
      ships all ten macOS representations (16 through 512 at 1x and 2x), and
@@ -110,18 +163,21 @@ both paths.
 
 macOS apps carry two version strings in `Info.plist`:
 
-- `CFBundleShortVersionString` — the **marketing** version users see (e.g. `1.0.0`).
+- `CFBundleShortVersionString` — the **marketing** version users see (e.g. `0.0.1`).
   Match this to your git tag.
 - `CFBundleVersion` — a **monotonic build number** that must increase every time
   you notarize (Apple rejects a re-used build number). Bump it on every release.
 
-Currently: `CFBundleShortVersionString = 1.0.0`, `CFBundleVersion = 254`.
+Currently: `CFBundleShortVersionString = 0.0.1`, `CFBundleVersion = 254`.
 
-**Set 2026-07-29 for the first release.** `1.0.0` reflects a feature-complete
-build: both providers ship, the reliability observation passed, and the icon and
-release binary are in place. The build number is the repository's commit count
-at the time of the bump, which keeps it monotonic without a second thing to
-remember — regenerate it with:
+**Set to `0.0.1` on 2026-07-29** (revised down from an earlier `1.0.0`). The build
+is feature-complete — both providers ship, the reliability observation passed, and
+the icon and release binary are in place — but `0.0.1` says the *distribution* is
+new: nobody outside this machine has run it, several surfaces are implemented
+without signed-app acceptance, and the Claude credential path is expected to be
+replaced. Save `1.0.0` for the build you would defend to a stranger. The build
+number is the repository's commit count at the time of the bump, which keeps it
+monotonic without a second thing to remember — regenerate it with:
 
 ```sh
 git rev-list --count HEAD
@@ -132,12 +188,18 @@ notarization. Edit them in `CodexUsageMonitor/Resources/Info.plist`, then commit
 
 ```sh
 git add CodexUsageMonitor/Resources/Info.plist
-git commit -m "Release 1.0.0"
+git commit -m "Release 0.0.1"
 ```
 
-Use **SemVer** (`MAJOR.MINOR.PATCH`). Being at `1.0.0` is a statement about the
-feature set, not a promise that the Claude path is contractually settled — see
+Use **SemVer** (`MAJOR.MINOR.PATCH`). A `0.x` version signals that the public
+interface — and specifically the Claude credential path — may still change; see
 the terms caveat in the release notes below.
+
+> **The signed bundle in `.build` was built at `1.0.0` / `254`, before this change,
+> and the in-flight notarization is for that build.** Whatever the notary returns,
+> the artifact you actually publish must be rebuilt at `0.0.1` and **re-notarized
+> with a fresh `CFBundleVersion`** — Apple rejects a re-used build number.
+> `git rev-list --count HEAD` currently returns `256`.
 
 ## Step 2 — Build the release `.app`
 
@@ -234,9 +296,10 @@ security find-identity -v -p codesigning
   ```sh
   CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" ./Scripts/build-app.sh
   ```
-  Then re-run the notarization-readiness checks above: the current `.build`
-  bundle was signed **ad-hoc**, and only a rebuild with the real identity will
-  print `Authority=Developer ID Application` and a `Timestamp=`.
+  Then re-run the notarization-readiness checks above. **On this machine that is
+  already done:** `Developer ID Application: Project maintainer (<APPLE_TEAM_ID>)` exists and the
+  current `.build` bundle is signed with it, with the hardened runtime and a secure
+  timestamp.
 - If you see nothing usable → Path B (ad-hoc). The script warns and continues; skip
   the notarization step and read [Path B](#path-b--no-paid-account-unsignedad-hoc).
 
@@ -244,6 +307,11 @@ security find-identity -v -p codesigning
 
 Notarization = Apple scans your signed app and issues a ticket; **stapling**
 attaches that ticket so it works offline.
+
+> **Status 2026-07-29:** the credential profile is stored and a submission for the
+> old `1.0.0` build is **in flight**. The one-time setup below is done; the submit,
+> staple, and validate commands are what you will run again against the rebuilt
+> `0.0.1` bundle.
 
 **One-time setup:** store an app-specific password (make one at
 appleid.apple.com → Sign-In & Security → App-Specific Passwords) in the keychain:
@@ -281,7 +349,7 @@ bundle structure and metadata that a plain `zip` can mangle:
 
 ```sh
 cd CodexUsageMonitor/.build
-ditto -c -k --keepParent CodexUsageMonitor.app CodexUsageMonitor-1.0.0.zip
+ditto -c -k --keepParent CodexUsageMonitor.app CodexUsageMonitor-0.0.1.zip
 ```
 
 A `.zip` is perfectly good for a menu-bar app. A `.dmg` (drag-to-Applications
@@ -293,8 +361,8 @@ The tag is the immutable marker the GitHub Release is built from. Match it to
 `CFBundleShortVersionString`, prefixed with `v`:
 
 ```sh
-git tag -a v1.0.0 -m "Codex Usage Monitor 1.0.0"
-git push origin v1.0.0
+git tag -a v0.0.1 -m "Agent Monitor 0.0.1"
+git push origin v0.0.1
 ```
 
 (Tag the commit that produced the binary you're shipping — usually `main` after the
@@ -315,23 +383,24 @@ gh auth login          # choose GitHub.com → HTTPS → follow the browser prom
 Then create the release and attach the zip in one command:
 
 ```sh
-gh release create v1.0.0 \
-  "CodexUsageMonitor/.build/CodexUsageMonitor-1.0.0.zip" \
-  --title "Codex Usage Monitor 1.0.0" \
-  --notes-file docs/release-notes/1.0.0.md
+gh release create v0.0.1 \
+  "CodexUsageMonitor/.build/CodexUsageMonitor-0.0.1.zip" \
+  --title "Agent Monitor 0.0.1" \
+  --notes-file docs/release-notes/0.0.1.md
 ```
 
 ### Option 2 — Web UI
 
 1. Go to **Releases → Draft a new release** in the repo.
-2. Choose the tag `v1.0.0` (or create it there).
+2. Choose the tag `v0.0.1` (or create it there).
 3. Title + notes (paste the notes below).
-4. **Attach binaries** → drop in `CodexUsageMonitor-1.0.0.zip`.
-5. **Publish** (no pre-release tick — this is a `1.x` build).
+4. **Attach binaries** → drop in `CodexUsageMonitor-0.0.1.zip`.
+5. **Publish.** Ticking **pre-release** is a reasonable call at `0.0.1`: it is a
+   first distribution of a build nobody outside this machine has run.
 
 ### The release notes
 
-Already written: **[`docs/release-notes/1.0.0.md`](../release-notes/1.0.0.md)**.
+Already written: **[`docs/release-notes/0.0.1.md`](../release-notes/0.0.1.md)**.
 Read it before publishing and adjust anything that has since changed. It is what
 `--notes-file` points at in the commands above.
 
@@ -369,9 +438,9 @@ You can still ship, with a worse first-run experience:
 
 1. Build normally; the script falls back to ad-hoc and warns you.
 2. Skip notarization and stapling entirely.
-3. Zip and release as above. Tick **pre-release** on the GitHub Release —
-   not because `1.0.0` is unfinished, but because an unsigned build is not
-   something to hand the public unqualified.
+3. Zip and release as above. Tick **pre-release** on the GitHub Release — an
+   unsigned build is not something to hand the public unqualified, quite apart
+   from what the version number says.
 4. **Be explicit in the notes** that macOS will say the app "is damaged" or
    "cannot be opened," and give users the fix:
    ```sh
@@ -392,10 +461,12 @@ difference between the two paths, not just a Gatekeeper one.
 
 ## Quick reference — the whole flow (Path A)
 
-Version, icon, and notes are already in place for `1.0.0`, so from a working
-Developer ID certificate this is the whole thing:
+Icon and notes are in place and `CFBundleShortVersionString` is `0.0.1`, so from a
+working Developer ID certificate this is the whole thing:
 
 ```sh
+# 0. set CFBundleVersion to a number never notarized before
+git rev-list --count HEAD    # write the result into Resources/Info.plist
 # 1. build + sign (script handles release config, assets, icns, nested signing)
 cd CodexUsageMonitor && swift test && ./Scripts/build-app.sh
 ./Scripts/verify-signed-app-resources.sh
@@ -405,12 +476,12 @@ xcrun notarytool submit notarize.zip --keychain-profile "notary-codexmon" --wait
 xcrun stapler staple CodexUsageMonitor.app
 xcrun stapler validate CodexUsageMonitor.app
 # 3. package
-ditto -c -k --keepParent CodexUsageMonitor.app CodexUsageMonitor-1.0.0.zip
+ditto -c -k --keepParent CodexUsageMonitor.app CodexUsageMonitor-0.0.1.zip
 # 4. tag
-cd ../.. && git tag -a v1.0.0 -m "Codex Usage Monitor 1.0.0" && git push origin v1.0.0
+cd ../.. && git tag -a v0.0.1 -m "Agent Monitor 0.0.1" && git push origin v0.0.1
 # 5. release
-gh release create v1.0.0 CodexUsageMonitor/.build/CodexUsageMonitor-1.0.0.zip \
-  --title "Codex Usage Monitor 1.0.0" --notes-file docs/release-notes/1.0.0.md
+gh release create v0.0.1 CodexUsageMonitor/.build/CodexUsageMonitor-0.0.1.zip \
+  --title "Agent Monitor 0.0.1" --notes-file docs/release-notes/0.0.1.md
 ```
 
 For a **later** release, add a step 0: bump `CFBundleShortVersionString` and set
