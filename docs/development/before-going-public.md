@@ -57,15 +57,15 @@ the *signing setup* satisfies the notary, which is a different and lesser claim.
 Monitor `1.0.0` under a release tagged `v0.0.1` for Agent Monitor. Rebuild before
 you package anything.
 
-**The fix.** `CFBundleVersion` is already `265` in the repository (`254` is
+**The fix.** `CFBundleVersion` is already `266` in the repository (`254` is
 permanently consumed — Apple tracks build numbers per bundle identifier, which the
 rename did not change). Rebuild, submit, staple, and confirm `spctl -a -vv` prints
 `accepted … source=Notarized Developer ID`. Publish nothing before that. If you end
 up shipping Path B instead, rewrite that Install paragraph and add the `xattr`
 workaround.
 
-- [x] `CFBundleVersion` bumped to `265`
-- [ ] Rebuilt — `plutil` confirms `Agent Monitor` / `0.0.1` / `265` inside the bundle
+- [x] `CFBundleVersion` bumped to `266`
+- [ ] Rebuilt — `plutil` confirms `Agent Monitor` / `0.0.1` / `266` inside the bundle
 - [ ] Notary returned `Accepted`, ticket stapled, `spctl` verdict re-checked
 - [ ] The superseded `1.0.0` bundle and its zip removed from `.build`, so it cannot
       be uploaded by accident

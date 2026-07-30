@@ -2,6 +2,15 @@
 
 > **Status (2026-07-28): Implemented; signed-app visual acceptance unobserved.** Adds a per-agent **Token Monitor** section to the Agents Settings Destination that shows or hides the menu-popover Token Monitor card and chooses which of its parts appear. It also renames the card itself to Token Monitor so one feature carries one name.
 
+> **Release-readiness correction (2026-07-30):** collection-off now purges the
+> provider cache even before monitoring starts, resets the source actor's decoded
+> per-file state, cancels traversal and bounded reads cooperatively, and uses a
+> provider generation so an interrupted scan cannot publish after a rapid off/on
+> transition. Prior-schema provider entries are removed from the physical cache
+> rather than only filtered from `load()`; an unreadable cache is deleted wholesale
+> because one provider cannot be removed safely. Narrow regressions cover those
+> previously reproducible privacy/correctness failures.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` (recommended) or `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Give each supported agent its own **Token Monitor** section in Settings with one master show/hide toggle plus four section toggles (Activity chart, Token categories, Model usage, Last request), so a user can remove the card entirely for an agent or trim it to the parts they care about. Adopt **Token Monitor** as the single name for the feature in Settings, in the card, and in the vocabulary.
@@ -790,6 +799,12 @@ Steps 5 and 7 through 9 were **not performed** and must not be recorded as passe
 - keyboard and VoiceOver traversal of the new rows;
 - the live check that a file write under `~/.codex/sessions` schedules no scan while Codex is hidden.
 
+The 2026-07-30 regressions now establish the programmatic boundaries: a
+persisted-off cold launch purges current, prior-schema, and unreadable disk entries,
+the source reset is invoked, cancellation stops the reader before its next record,
+and a cancelled pre-disable scan cannot publish after re-enable. The signed-app
+file-event and UI observations above remain required.
+
 Two reasons, unchanged from the card's own acceptance: the popover height problem is deferred, so visual acceptance should follow its resolution rather than precede it; and launching the bundle to drive Settings and the popover can raise a Keychain/SecurityAgent prompt, which is not an acceptable side effect of an automated audit. The geometry evidence above comes from an isolated hosting harness, which the repository's rules correctly treat as insufficient for final visual acceptance.
 
 ## Explicitly Deferred
@@ -799,7 +814,9 @@ Two reasons, unchanged from the card's own acceptance: the popover height proble
 - A separate preference for the request count or the day total. The card's header is its identity and stays.
 - Per-agent retention or scan-frequency controls.
 - Restoring collection for a hidden agent in the background so re-enabling is instant. Re-reading from scratch is the honest behavior and matches the stated privacy boundary.
-- Any change to the reconciliation sources, the monitor's incremental scanning, or the activity cache format.
+- Any further change to reconciliation sources, incremental scanning, or the
+  activity cache format beyond the release-readiness reset/generation correction
+  recorded above.
 
 ## Completion Criteria
 
@@ -815,7 +832,9 @@ Two reasons, unchanged from the card's own acceptance: the popover height proble
 
 - **Requested surface:** a Settings section named Token Monitor inside Agents, a per-agent show/hide toggle, and several toggles for what the card shows. All four section toggles map to a region a user can actually point at in the card.
 - **Naming:** **Token Monitor** was chosen on direction and is applied to every user-facing surface, including the existing card header, so one feature carries one name. Internal type names are deliberately left alone and that choice is recorded rather than left to look like an oversight.
-- **Scope discipline:** no change to reconciliation, the monitor's incremental scanning, or the cache format. The only behavioral change outside Settings is that a hidden provider is not read.
+- **Scope discipline:** the original feature did not change reconciliation or cache
+  format. The release-readiness correction changes only transition sequencing and
+  source-cache reset so the documented collection-off boundary is actually true.
 - **Privacy:** hiding is a collection decision, not a display filter, and the cache is purged rather than orphaned. The Data & Privacy copy is corrected in the same change rather than left describing unconditional reading.
 - **Repository test policy:** no feature-presence or toggle round-trip tests are added. Verification uses disposable harnesses, the existing suite, builds, and signed-app acceptance, with a regression test reserved for a reproducible defect.
 - **Honest limits:** the popover height problem is deferred by direction and tracked on the Bug-fix board. This plan states plainly that it does not fix it and that a default install is unchanged, rather than letting the section toggles read as a resolution.

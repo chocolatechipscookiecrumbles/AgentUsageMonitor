@@ -57,8 +57,9 @@ asks for a password, and no prompt, response, or file content ever leaves your M
 3. Launch it. **It lives in the menu bar** — there is no Dock icon and no window on
    first launch. Look at the right end of the menu bar.
 
-Releases are signed with an Apple **Developer ID** certificate and notarized by
-Apple, so macOS opens the app normally instead of warning that it cannot be checked.
+The 0.0.1 download must be signed with an Apple **Developer ID** certificate,
+notarized, and stapled before it is published. The earlier accepted ticket belongs
+to a superseded pre-rename build and does not cover the shipping artifact.
 
 ### Build from source
 
@@ -130,8 +131,8 @@ provider's credential store, never signs you out, and never sends a prompt.
 
 Click the menu-bar item for a per-provider panel:
 
-- **Provider tabs** — Codex and Claude, each with its own glyph. Only connected
-  providers get a tab.
+- **Provider tabs** — Codex and Claude are always available, each with its own
+  glyph, so a disconnected provider can show setup or recovery guidance.
 - **Plan in the header** — **Pro**, **Plus**, **Max 20x**, resolved from the
   connected account first and the usage record's plan hint second. It survives
   refreshes and unavailable states because it is account identity, not a property
@@ -219,9 +220,10 @@ Six destinations, reachable with `⌘,`:
 
 ## Privacy and data
 
-- **No prompt, response, source code, or file content is read or transmitted.** The
-  app reads usage and limit numbers, reset times, and — for the Token Monitor —
-  token counts and model names.
+- **No prompt, response, source code, or file content is decoded, retained,
+  exported, or transmitted.** The Token Monitor reads each bounded JSONL record
+  into memory, selectively decodes only usage, model, timestamp, and opaque
+  reconciliation fields, then discards the raw bytes.
 - **Nothing is uploaded. There is no analytics or telemetry.**
 - **Codex** is read from your local Codex CLI's app-server. Choosing "Codex CLI
   sign-in" opens Terminal only when you ask it to. The app never reads `auth.json`,
@@ -251,8 +253,9 @@ how each path was checked.
 
 Claude usage is read from the **OAuth credential Claude Code already stored in your
 Keychain**. macOS asks your permission the first time; background refreshes never
-prompt again. Nothing is uploaded, and no prompt, response, or file content is ever
-read — only usage percentages and reset times.
+prompt again. Nothing is uploaded. The quota path reads only usage percentages and
+reset times; the separate Token Monitor selectively decodes usage metadata from
+Claude Code's local records without retaining or transmitting record content.
 
 **Anthropic's Terms of Service do not permit a third-party application to reuse that
 credential.** This build does it anyway. That is disclosed here, in the app's **Data

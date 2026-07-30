@@ -35,9 +35,8 @@ func adaptStatusLineSnapshot(_ snapshot: ClaudeRateLimitSnapshot) -> ClaudeUsage
 
 /// Single entry point implementing the four-tier fallback order:
 /// OAuth (1) -> CLI /usage probe (2) -> statusLine (3) -> cache (4).
-/// Tier 2 is not implemented here (its own dedicated plan), so the runtime
-/// order is currently OAuth -> statusLine -> cache. statusLine ranks below a
-/// live CLI probe because it is passive and can be stale.
+/// Tier 2 is deliberately manual-only and therefore stays outside this automatic
+/// collector. The automatic runtime order is OAuth -> statusLine -> cache.
 actor ClaudeUsageCollector {
     private let oauthSource: ClaudeOAuthUsageSource
     private let statusLineReader: ClaudeRateLimitSnapshotReader

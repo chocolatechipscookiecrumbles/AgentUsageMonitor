@@ -9,15 +9,35 @@ import Foundation
 /// header, the Settings pages, and the context rail cannot disagree about how
 /// the same account is named.
 enum AgentPlanName {
+    /// Provider values are external input. Only identifiers observed in the
+    /// supported Codex/Claude account contracts are safe to present as plan
+    /// names; an unknown value falls back to the provider name at the caller.
+    private static let supportedIdentifiers: Set<String> = [
+        "free",
+        "pro",
+        "plus",
+        "team",
+        "business",
+        "enterprise",
+        "max",
+        "max_5x",
+        "max_20x",
+        "chatgpt_plus",
+        "chatgpt_pro",
+        "chatgpt_team",
+    ]
+
     static func display(_ rawPlanType: String?) -> String? {
         guard let rawPlanType else { return nil }
         let words = rawPlanType
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
             .split(whereSeparator: { $0 == "_" || $0 == "-" || $0 == " " })
-            .map(capitalize)
         guard !words.isEmpty else { return nil }
-        return words.joined(separator: " ")
+        guard supportedIdentifiers.contains(words.joined(separator: "_")) else {
+            return nil
+        }
+        return words.map(capitalize).joined(separator: " ")
     }
 
     /// A multiplier component keeps its lowercase `x` — `Max 20x`, not

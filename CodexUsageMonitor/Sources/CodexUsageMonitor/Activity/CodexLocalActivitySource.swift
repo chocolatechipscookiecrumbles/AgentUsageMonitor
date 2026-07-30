@@ -24,13 +24,20 @@ actor CodexLocalActivitySource: LocalActivitySource {
             let cache = parseCache
             let parsedFiles = try await traversal.parseJSONLFiles(
                 root: sessionsRoot,
-                resume: { LocalActivityResumePoint.decide(fingerprint: $0, cached: cache[$0.opaqueFileID]) },
+                resume: { fingerprint, fileDescriptor in
+                    LocalActivityResumePoint.decide(
+                        fingerprint: fingerprint,
+                        cached: cache[fingerprint.opaqueFileID],
+                        fileDescriptor: fileDescriptor
+                    )
+                },
                 makeState: { FileParseState(opaqueFileID: $0) },
                 consume: { state, line in try state.consume(line) },
                 finish: { fingerprint, state, nextOffset in
                     state.finished(fingerprint: fingerprint, nextOffset: nextOffset)
                 }
             )
+            try Task.checkCancellation()
             // Rebuilding rather than merging drops files that no longer exist.
             parseCache = Dictionary(
                 parsedFiles.map { ($0.opaqueFileID, $0) },
@@ -60,6 +67,10 @@ actor CodexLocalActivitySource: LocalActivitySource {
         } catch {
             return LocalActivityScanResult(requests: [], cursors: [], status: .unsafeToRead)
         }
+    }
+
+    func reset() {
+        parseCache.removeAll(keepingCapacity: false)
     }
 
     private func parentBaselines(in files: [ParsedFile]) throws -> [ParentBaselineKey: Totals] {

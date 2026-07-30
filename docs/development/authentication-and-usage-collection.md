@@ -2,7 +2,11 @@
 
 This document explains, per provider, **how the app authenticates** and **how it reads usage**. The two providers are deliberately different because Codex and Claude expose their account and quota data through entirely different mechanisms.
 
-The guiding principle for both is the same: **this app never runs its own token exchange and never stores a provider password.** It reuses credentials the official CLIs already own, and — where it issues a token at all (Claude's browser method) — it delegates the OAuth exchange to Anthropic's own CLI. Every automatic refresh is designed so it can never interrupt the user with a system prompt.
+The guiding principle for both is the same: **this app never runs its own token
+exchange and never stores a provider password.** It reuses credentials the official
+CLIs already own. The shipped Claude flow does not issue a token of its own, and
+every automatic refresh is designed so it can never interrupt the user with a
+system prompt.
 
 ---
 
@@ -62,7 +66,11 @@ Claude is the opposite shape: authentication produces (or borrows) a **bearer to
 
 ### 2.1 How we authenticate with Claude
 
-There are **two co-equal credential methods** ([ClaudeConnectionController](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Connection/ClaudeConnectionController.swift)), plus an environment-variable shortcut.
+The shipped UI exposes one connection action: **Use Claude Code credentials**.
+Browser/setup-token sign-in remains shelved as unverified and is not presented as
+working. The underlying self-issued-token store remains for compatibility with
+earlier experiments, and `CLAUDE_CODE_OAUTH_TOKEN` is still recognized at read
+time, but neither is a second advertised sign-in path.
 
 **Method (b): borrow Claude Code's own credential** *(the default)*
 [ClaudeKeychainCredentialStore](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Connection/ClaudeOAuthCredential.swift#L49) reads Claude Code's existing login-Keychain item, service **`Claude Code-credentials`**, and decodes its `claudeAiOauth` JSON (access token, optional refresh token, `expiresAt` in ms, scopes, `subscriptionType`). We never run a sign-in flow and never copy the token elsewhere.
@@ -73,12 +81,7 @@ Reading another app's Keychain item is an **ACL-gated cross-app access** that *c
 
 The mapping from refresh reason to policy lives in [ClaudeRefreshReason](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeUsageCollector.swift#L3): only `.userInitiated` may prompt; `appLaunch` / `scheduled` / `menuOpened` never can.
 
-**Method (a): browser sign-in via `claude setup-token`**
-[ClaudeSetupTokenService](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Connection/ClaudeSetupTokenService.swift#L58) delegates the entire browser OAuth flow to Anthropic's own CLI (`claude setup-token`), scrapes the resulting `sk-ant-oat01-…` long-lived token from its output, **validates it against the live usage endpoint before persisting**, and only then stores it in **our own** Keychain item (service `AgentUsageMonitor-ClaudeOAuth`, `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`, never iCloud-synced) via [ClaudeSelfIssuedCredentialStore](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Connection/ClaudeSelfIssuedCredentialStore.swift#L12). Because *we* created that item, our later reads **never raise the cross-app prompt**, and because the CLI did the token exchange we **never call `/v1/oauth/token`** (avoiding that endpoint's IP rate-limiting). A bad/revoked token is never written.
-
-**Environment shortcut** — both stores honour `CLAUDE_CODE_OAUTH_TOKEN` at read time, so a `setup-token` value can drive the app on a machine without the CLI installed.
-
-**Composite resolution & degrade** — [ClaudeCompositeCredentialStore](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Connection/ClaudeCompositeCredentialStore.swift#L38) tries the **selected** method first, then automatically falls back to the other, so a broken method downgrades rather than dead-ends. A [ClaudeEffectiveMethodRecorder](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Connection/ClaudeCompositeCredentialStore.swift#L21) makes any such degrade visible in the UI rather than silently masking it. The default selected method is `.claudeCodeCredentials` — the one proven to return authoritative usage.
+**Compatibility fallback.** [ClaudeCompositeCredentialStore](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Connection/ClaudeCompositeCredentialStore.swift#L38) resolves Claude Code's credential first, then may read an already-existing app-owned self-issued credential or `CLAUDE_CODE_OAUTH_TOKEN`. The app does not create a new setup-token credential through the shipped UI. A [ClaudeEffectiveMethodRecorder](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Connection/ClaudeCompositeCredentialStore.swift#L21) keeps any fallback visible in diagnostics.
 
 > The credential itself ([ClaudeOAuthCredential](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Connection/ClaudeOAuthCredential.swift#L7)) is intentionally **not** `Codable`, `CustomStringConvertible`, or `CustomDebugStringConvertible` — nothing about the token should be persistable or printable by accident. It lives in Keychain only.
 
@@ -119,10 +122,10 @@ Claude Code renders a status line on every turn. We install a native helper, **`
 
 | | **Codex** | **Claude** |
 |---|---|---|
-| Credential ownership | Codex CLI owns it; we store nothing | (b) borrow Claude Code's Keychain item · (a) issue our own via `setup-token` |
-| Our token storage | none | our own Keychain item only (method a); never for method b |
-| Auth transport | `codex app-server` JSON-RPC over stdio | Keychain read / `claude setup-token` CLI |
-| Sign-in methods | browser (`account/login/start`) · CLI (`codex login`) | browser (`claude setup-token`) · borrow Claude Code credential |
+| Credential ownership | Codex CLI owns it; we store nothing | Claude Code owns the active credential; an older app-owned item may be read as a compatibility fallback |
+| Our token storage | none | no new token is stored by the shipped connection flow |
+| Auth transport | `codex app-server` JSON-RPC over stdio | Keychain read |
+| Sign-in methods | browser (`account/login/start`) · CLI (`codex login`) | use Claude Code credentials; browser/setup-token is shelved |
 | Usage source | app-server `rateLimits/read` + `usage/read` | OAuth `GET /api/oauth/usage` (+ 3 local fallbacks) |
 | Networked read of ours? | **No** — all local subprocess | **Yes** — tier 1 only; tiers 2–4 are local |
 | Reliability strategy | 3 samples, confirm on agreement, else last-known-good | 4-tier degrade: OAuth → CLI probe → statusLine → cache |
@@ -131,8 +134,7 @@ Claude Code renders a status line on every turn. We install a native helper, **`
 ## Part 4 — Cross-cutting safeguards
 
 - **No background prompts.** Codex reads are local subprocess calls; Claude background reads use `kSecUseAuthenticationUIFail`. Only an explicit user action can ever surface a system dialog.
-- **No token exchange of ours.** Codex login and Claude's `setup-token` exchange are both performed by the official CLIs. We never hit `/v1/oauth/token`.
-- **Validate before persisting.** A Claude `setup-token` is proven against the live usage endpoint before it is written to the Keychain; a rejected token is never stored.
+- **No token exchange of ours.** Codex login is performed by the official CLI. The shipped Claude flow reads an existing Claude Code credential and never hits `/v1/oauth/token`.
 - **Degrade, don't dead-end.** Both providers prefer a labelled, older-but-real reading over a blank one — Codex via last-known-good, Claude via the tier ladder and cross-app method fallback — and every degrade is surfaced, never silently masked.
 - **Minimal identity retention.** Codex account emails are fingerprinted, not stored; Claude tokens live only in Keychain and are kept out of logs by design.
 

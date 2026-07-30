@@ -8,7 +8,7 @@ import Foundation
 ///
 /// Layer order (claude_probe_plan four-tier hierarchy):
 ///   1. OAuth live fetch          (ClaudeOAuthUsageSource)
-///   2. CLI /usage PTY probe      — deferred, not implemented
+///   2. CLI /usage probe          — manual-only, outside the automatic collector
 ///   3. statusLine passive snapshot (ClaudeRateLimitSnapshotReader)
 ///   4. cached last-known-good    (ClaudeUsageCache)
 enum ClaudeUsageProbeCommand {
@@ -79,7 +79,7 @@ enum ClaudeUsageProbeCommand {
         layers.append(.init(tier: 2, name: "CLI /usage probe", available: false,
                             detail: "manual only — costs tokens, so never part of an automatic refresh"))
 
-        // Tier 3: statusLine passive snapshot (written by the Python bridge).
+        // Tier 3: statusLine passive snapshot (written by the bundled native bridge).
         if let snap = statusLineReader.readSnapshot() {
             let five = snap.fiveHour.map { String(format: "%.1f%%", $0.usedPercentage) } ?? "—"
             let seven = snap.sevenDay.map { String(format: "%.1f%%", $0.usedPercentage) } ?? "—"

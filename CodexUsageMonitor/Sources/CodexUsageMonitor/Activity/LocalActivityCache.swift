@@ -12,7 +12,7 @@ import Foundation
 struct LocalActivityCachedRequests: Codable, Equatable {
     /// Bumped when the reconciliation contract changes, so a build that counts
     /// differently never renders another build's numbers.
-    static let currentSchemaVersion = 1
+    static let currentSchemaVersion = 2
 
     let schemaVersion: Int
     let provider: AgentProvider
@@ -42,7 +42,7 @@ struct LocalActivityCache {
 
     func load() -> [AgentProvider: [LocalActivityRequest]] {
         guard let data = try? Data(contentsOf: fileURL),
-              let entries = try? JSONDecoder().decode([LocalActivityCachedRequests].self, from: data)
+              let entries = decode(data)
         else { return [:] }
 
         var result: [AgentProvider: [LocalActivityRequest]] = [:]
@@ -63,14 +63,48 @@ struct LocalActivityCache {
     /// alone, so rewriting the file from in-memory state would erase exactly
     /// the entry that was meant to survive.
     func update(_ provider: AgentProvider, requests: [LocalActivityRequest]?, now: Date = .now) {
-        var entries = load()
-        if let requests {
-            entries[provider] = requests
-        } else {
-            guard entries[provider] != nil else { return }
-            entries[provider] = nil
+        var entries: [LocalActivityCachedRequests]
+        guard let data = try? Data(contentsOf: fileURL) else {
+            // A collection-off decision is a privacy boundary. A missing file
+            // makes this a no-op; any other read failure still gets a best-effort
+            // unlink rather than being mistaken for an empty cache.
+            clear()
+            if let requests {
+                save([provider: requests], now: now)
+            }
+            return
         }
-        save(entries, now: now)
+        guard let decoded = decode(data) else {
+            // If the existing cache cannot be decoded safely enough to remove
+            // one provider, discard the whole best-effort cache.
+            clear()
+            if let requests {
+                save([provider: requests], now: now)
+            }
+            return
+        }
+        entries = decoded
+
+        let originalCount = entries.count
+        entries.removeAll { $0.provider == provider }
+        if let requests {
+            entries.append(
+                LocalActivityCachedRequests(
+                    schemaVersion: LocalActivityCachedRequests.currentSchemaVersion,
+                    provider: provider,
+                    savedAt: now,
+                    requests: retained(requests, now: now)
+                )
+            )
+        } else {
+            guard entries.count != originalCount else { return }
+        }
+
+        guard !entries.isEmpty else {
+            clear()
+            return
+        }
+        write(entries)
     }
 
     func save(_ requestsByProvider: [AgentProvider: [LocalActivityRequest]], now: Date = .now) {
@@ -84,11 +118,21 @@ struct LocalActivityCache {
         }
         .sorted { $0.provider.rawValue < $1.provider.rawValue }
 
+        write(entries)
+    }
+
+    private func decode(_ data: Data) -> [LocalActivityCachedRequests]? {
+        try? JSONDecoder().decode([LocalActivityCachedRequests].self, from: data)
+    }
+
+    private func write(_ entries: [LocalActivityCachedRequests]) {
         let directory = fileURL.deletingLastPathComponent()
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
-            let data = try JSONEncoder().encode(entries)
+            let data = try JSONEncoder().encode(
+                entries.sorted { $0.provider.rawValue < $1.provider.rawValue }
+            )
             try data.write(to: fileURL, options: .atomic)
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
         } catch {

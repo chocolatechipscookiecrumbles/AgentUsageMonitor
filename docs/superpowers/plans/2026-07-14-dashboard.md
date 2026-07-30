@@ -114,7 +114,12 @@ Research was performed against repository source on 2026-07-28, not screenshots 
 #### CodexBar patterns to adopt
 
 - CodexBar reads known Codex/Claude JSONL roots on device and labels those totals as local-log estimates.
-- Its cache tracks file size, modification time, parsed byte offset, per-file rows, and a producer/schema version. Unchanged files are skipped; appended bytes are read incrementally; parser changes invalidate stale caches.
+- Its in-memory source cache tracks file size, modification time, a streaming
+  full-file digest, parsed byte offset, per-file rows, and a producer/schema
+  version. Unchanged files are skipped by metadata; growth resumes only when a
+  bounded-memory SHA-256 pass proves the entire previously parsed prefix is
+  unchanged. Changed, truncated, or rewritten files rebuild; parser changes
+  invalidate stale caches.
 - Its Codex scanner does not trust cumulative totals blindly. It keeps a monotonic watermark, suppresses exact re-emissions, detects component decreases/interleaving, contains deltas after a drop, and resolves inherited fork baselines where possible.
 - Its Claude scanner keeps the final cumulative chunk for a `(messageId, requestId)` pair, reconciles duplicates across files, prefers a non-sidechain parent copy, and tracks cache creation/read separately.
 - Its menu chart uses Swift Charts with fixed geometry, sparse axes, semantic colors, bounded hover selection, and an explicit accessibility label/value.
@@ -393,7 +398,11 @@ A field-scoped survey of the local Claude roots preceded implementation and shap
 - `usage.iterations` is present as a nested one-element list. Per Step 6 it is not decoded and not added to the parent; that remains a recorded limitation.
 - The local corpus contained no cross-file or sidechain replay of the same message. Those rules are therefore exercised only by the fabricated corpus, not by live evidence.
 
-Because Anthropic message identifiers are unique per response, the published request identity is the SHA-256 of the provider tag plus the message identifier alone. That keeps one stable identity per logical request across rescans no matter which copy of a message wins reconciliation, which is what makes repeated file events converge instead of accumulating.
+Published Claude request identity hashes both the message and request identifiers.
+Streaming chunks reconcile by that pair. A parent/sidechain cross-file replay is
+collapsed only when the file and sidechain evidence establishes that replay shape;
+two distinct request IDs are not collapsed merely because an external record reuses
+a message identifier.
 
 The source decodes strictly less than the plan's Step 2 allowlist permits: session identifiers are never decoded, because message identity alone is sufficient to reconcile. Working directories, git branches, project names, tool payloads, and message content have no corresponding fields on the `Decodable` types at all.
 
@@ -437,6 +446,22 @@ Zero-token assistant messages (Claude writes them for synthetic entries) are not
 
 Limitation: nested `usage.iterations` advisor/iteration usage remains un-ingested, and cross-file/sidechain replay handling is backed by fabricated corpus evidence only, because the live corpus contains no such replay.
 
+#### Release-readiness reconciliation correction — 2026-07-30
+
+The merge-readiness review found that the implementation did not match Steps 2 and
+3 even though they were checked above: it decoded only top-level assistant records
+and keyed every winner by message ID alone. Narrow regressions reproduced both
+failures. The source now recognizes usage-bearing `progress → agent_progress →
+assistant` envelopes, keys streaming chunks by `(messageID, requestID)`, preserves
+  distinct pairs, and applies the parent/sidechain rule only across files. A follow-up
+regression also proves that a replay removes only the sidechain candidate and does
+not collapse multiple distinct parent pairs. The sanitized request-cache schema is
+bumped to 2 because the published Claude request identity changed; collection-off
+removes even physically stored schema-1 or unreadable cache files rather than
+letting filtered/untrusted data survive on disk. The live corpus still contains no
+agent-progress or cross-file replay evidence, so those shapes remain fixture-backed
+rather than live-verified.
+
 ### Task 4: Own incremental scans and semantic updates
 
 **Files:**
@@ -461,7 +486,7 @@ Ownership deviates from Step 2 in one respect, deliberately. The monitor owns wh
 
 The monitor replaces a provider's whole reconciled request set on every scan instead of merging per-file contributions. Whole-set replacement is what makes repeated file events idempotent, and it is strictly safer than assembling incremental suffixes across two providers whose identity strategies differ. Scan bounds and cursors remain on the source seam for a future incremental publisher; the monitor passes empty bounds.
 
-Incremental reuse lives in the traversal, which now fingerprints each file by opaque ID, size, and modification time and asks the source whether to skip it, resume from a cached parser state and byte offset, or rebuild. Only growth beyond the bytes already parsed counts as an append; anything shorter rebuilds, so a truncated or replaced file cannot resume past its own end.
+Incremental reuse lives in the traversal, which now fingerprints each file by opaque ID, size, and modification time and asks the source whether to skip it, resume from a cached parser state and byte offset, or rebuild. Only strict growth beyond the prior size counts as an append. A changed file at the same size rebuilds from zero, preventing an in-place rewrite from retaining stale activity; anything shorter also rebuilds. Provider transcripts are treated as append-only only for the strict-growth path.
 
 Two performance defects were found while measuring, both of which made the cache nearly worthless:
 
@@ -695,7 +720,8 @@ Design points that keep this inside the privacy boundary:
 
 - Only values the card already displays are written: hashed request identities, timestamps, model identifiers, and token counts. No path, provider session/turn/event identifier, per-file parser state, or raw record is persisted, so the cache cannot reconstruct a conversation or name a project.
 - Requests, not snapshots, are cached, and they are re-aggregated against the current day at load. A cache written yesterday therefore reads as no activity today rather than as stale totals — the day boundary needs no special handling.
-- Retention is three days plus the single newest request, so Last Request still has an answer after a long gap without storing history that no longer affects the card.
+- Retention is fourteen days plus the single newest request, so the current-week
+  view survives a relaunch and Last Request still has an answer after a long gap.
 - Synthesized `Codable` decoding bypasses the validating initializer, so every loaded request is re-validated by re-deriving its provider-normalized total. A tampered, corrupt, or foreign-schema cache is discarded rather than rendered.
 - An `.unsafeToRead` scan leaves the cached history alone instead of erasing it, because an unreadable scan says nothing about what was previously observed.
 - A full rescan still runs at launch and on file events and replaces the cached set when it lands. The cache is a head start, not a source of truth, so it does not weaken the "never fabricate a zero" rule.
@@ -730,11 +756,15 @@ This supersedes the original in-memory-only constraint. The first *scan* of a la
 - The graph is built from reconciled 30-minute request increments; its sum and every displayed category reconcile to Today.
 - Codex cumulative/fork replay and Claude streaming/sidechain replay are restrained before aggregation.
 - Source reads emit only allowlisted fields and cost no tokens.
-- Field-scoped scans begin automatically while the app runs, remain independent of quota availability, and create no persistent activity index.
+- Field-scoped scans begin automatically while the app runs and remain independent
+  of quota availability. The app persists only the sanitized fourteen-day request
+  cache described above; it does not persist paths or per-file parser state.
 - Missing or unsupported evidence is unavailable/no activity, never a fabricated zero.
 - The popover remains 340 points wide and non-scrolling, grows or shrinks to bounded natural content height with the shared footer gap, and remains usable across provider switches/file events with pointer, keyboard, and VoiceOver.
 - Data & Privacy and operating documentation accurately describe the local read boundary.
-- `xcodebuild`, relevant existing tests, signed-app build/signature, reconciliation corpus, privacy audit, performance check, and required visual acceptance have recorded successful evidence.
+- `xcodebuild`, relevant tests, signed-app build/signature, reconciliation corpus,
+  privacy audit, and performance checks have recorded evidence. Required visual
+  checks remain explicitly unobserved until run in the signed app.
 
 ## Self-Review
 
@@ -743,4 +773,7 @@ This supersedes the original in-memory-only constraint. The first *scan* of a la
 - **Research adoption:** Incremental byte-offset scans, producer-key invalidation, cumulative containment, streaming replacement, and sidechain preference come from current CodexBar/ccusage source patterns. Their costs, pricing, long-range reports, and interactive details remain out of scope.
 - **Privacy:** Domain values, source results, errors, storage, UI, and diagnostics exclude content and paths. Opaque lineage fields exist only to prevent duplicate counts.
 - **Geometry:** The chart, provider-native categories, bounded Model Usage list, and Last Request have explicit envelopes, absolute time, no timer, and a smallest-screen signed-app gate.
-- **Repository test policy:** No broad feature-presence or happy-path tests are added. Evidence uses temporary fabricated reconciliation corpora, existing tests, builds, source audit, and signed-app inspection.
+- **Repository test policy:** Narrow regressions cover only reproduced
+  reconciliation, changed-prefix rewrite, collection reset/cancellation,
+  prior-schema purge, and export-boundary defects. Feature acceptance remains
+  manual.

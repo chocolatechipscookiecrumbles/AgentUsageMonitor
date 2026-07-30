@@ -23,6 +23,11 @@ final class LocalActivityMonitor: ObservableObject {
     private let cache: LocalActivityCache
     private var observers: [AgentProvider: LocalActivityFileObserver] = [:]
     private var scanTasks: [AgentProvider: Task<Void, Never>] = [:]
+    /// Serializes source-cache resets across rapid off/on transitions. A
+    /// provider generation also prevents an older scan from publishing after
+    /// the user has changed the collection decision.
+    private var collectionTransitionTasks: [AgentProvider: Task<Void, Never>] = [:]
+    private var collectionGenerations: [AgentProvider: UInt64] = [:]
     /// Providers whose records changed while their scan was already running.
     private var rescanRequested: Set<AgentProvider> = []
     /// The reconciled request set behind each published snapshot, kept so a
@@ -82,6 +87,13 @@ final class LocalActivityMonitor: ObservableObject {
         let cached = cache.load()
         for provider in sources.keys {
             guard collectionEnabled[provider] ?? true else { continue }
+            // A pre-start off/on transition is still resetting decoded source
+            // state. Its completion will schedule the first scan now that the
+            // monitor is running; starting one here could race ahead of reset.
+            if collectionTransitionTasks[provider] != nil {
+                states[provider] = .loading
+                continue
+            }
             if let requests = cached[provider] {
                 reconciledRequests[provider] = requests
                 publish(provider)
@@ -113,25 +125,44 @@ final class LocalActivityMonitor: ObservableObject {
     func setCollectionEnabled(_ enabled: Bool, for provider: AgentProvider) {
         guard (collectionEnabled[provider] ?? true) != enabled else { return }
         collectionEnabled[provider] = enabled
-        guard isRunning, sources[provider] != nil else { return }
+        let generation = (collectionGenerations[provider] ?? 0) &+ 1
+        collectionGenerations[provider] = generation
 
-        if enabled {
-            states[provider] = .loading
-            startObserver(for: provider)
-            scheduleScan(for: provider)
-            return
-        }
-
-        scanTasks[provider]?.cancel()
+        let interruptedScan = scanTasks[provider]
+        interruptedScan?.cancel()
         scanTasks[provider] = nil
         rescanRequested.remove(provider)
-        observers[provider]?.stop()
-        observers[provider] = nil
-        reconciledRequests[provider] = nil
-        states[provider] = nil
-        // Removing only this provider's entry, so an agent whose scan was
-        // unsafe to read keeps the history that was deliberately left alone.
-        cache.update(provider, requests: nil)
+
+        if enabled {
+            if isRunning { states[provider] = .loading }
+        } else {
+            observers[provider]?.stop()
+            observers[provider] = nil
+            reconciledRequests[provider] = nil
+            states[provider] = nil
+            // Purge even before `start()`: a persisted-off launch must not keep
+            // a cache entry merely because no observer or scan exists yet.
+            cache.update(provider, requests: nil)
+        }
+
+        guard let source = sources[provider] else { return }
+        let priorTransition = collectionTransitionTasks[provider]
+        collectionTransitionTasks[provider] = Task { [weak self] in
+            // A cancelled caller still awaits its actor scan to return. Reset
+            // only after that completion, or the in-flight scan could repopulate
+            // its source cache after the privacy purge.
+            await priorTransition?.value
+            await interruptedScan?.value
+            await source.reset()
+
+            guard let self,
+                  self.collectionGenerations[provider] == generation
+            else { return }
+            self.collectionTransitionTasks[provider] = nil
+            guard enabled, self.isRunning else { return }
+            self.startObserver(for: provider)
+            self.scheduleScan(for: provider)
+        }
     }
 
     /// Switches one provider between the day and week views. No file is read
@@ -170,16 +201,25 @@ final class LocalActivityMonitor: ObservableObject {
             return
         }
 
+        let generation = collectionGenerations[provider] ?? 0
         scanTasks[provider] = Task { [weak self] in
             // The source is an actor, so the read and reconciliation run off
             // the main actor while the menu stays responsive.
             let result = await source.scan(bounds: LocalActivityScanBounds())
             guard !Task.isCancelled else { return }
-            self?.apply(result, for: provider)
+            self?.apply(result, for: provider, generation: generation)
         }
     }
 
-    private func apply(_ result: LocalActivityScanResult, for provider: AgentProvider) {
+    private func apply(
+        _ result: LocalActivityScanResult,
+        for provider: AgentProvider,
+        generation: UInt64
+    ) {
+        guard isRunning,
+              collectionEnabled[provider] ?? true,
+              (collectionGenerations[provider] ?? 0) == generation
+        else { return }
         scanTasks[provider] = nil
 
         switch result.status {

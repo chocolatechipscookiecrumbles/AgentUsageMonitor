@@ -122,8 +122,16 @@ CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsStatus.swift
 - [x] **Step 4.** Add `RefreshDiagnosticsStore.clear()`, a `QuotaMonitor.clearDiagnostics()` that clears the file and publishes an empty summary, and a `QuotaViewModel` passthrough.
 - [x] **Step 5.** Add `SettingsStatus.diagnosticsReport` — a plain-text rendering of exactly what the page shows, so a copied report cannot disagree with the visible page.
 - [x] **Step 6.** Add a Diagnostics **Actions** section with **Copy Report** (with a transient copied confirmation), **Reveal Diagnostics File**, and **Clear History…** behind a confirmation dialog naming what is removed. Route the clear closure through `SettingsDetailView`.
+- [x] **Release-readiness hardening (2026-07-30).** Open the app-owned directory
+  and each allowlisted inventory file descriptor-relatively with `O_NOFOLLOW`,
+  require a regular file, and read through the validated descriptor. A planted
+  inventory-name symlink is marked unsafe and cannot export a readable JSON target
+  outside Application Support.
 
-**Regression boundary (manual).** Reveal with the folder present and absent. Export to a chosen location and confirm the JSON parses, names every store, and marks absent files as unavailable. Copy the report and confirm it matches the page. Clear the history, confirm the page falls to its empty states, and confirm the next refresh records a new outcome.
+**Regression boundary.** A narrow automated regression proves an inventory-name
+symlink is rejected without exporting its target. Manual acceptance still covers
+the save panel, a normal export, reveal/copy, report copy, clear confirmation, and
+the next refresh repopulating diagnostics.
 
 ---
 
@@ -133,7 +141,7 @@ CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsStatus.swift
 - [x] `swift test --package-path CodexUsageMonitor` — full suite green, including the new glyph regression.
 - [x] `CODESIGN_IDENTITY=- zsh CodexUsageMonitor/Scripts/build-app.sh` succeeds and compiles the new imageset.
 - [x] `git diff --check` clean.
-- [x] Signed-app visual acceptance per AGENTS.md: General, Data & Privacy, and Diagnostics at 680 × 560 with the Context Rail hidden and visible, Light and Dark; the popover footer with shortcuts on and off; the menu-bar glyph in both appearances.
+- [ ] Signed-app visual acceptance per AGENTS.md: General, Data & Privacy, and Diagnostics at 680 × 560 with the Context Rail hidden and visible, Light and Dark; the popover footer with shortcuts on and off; the menu-bar glyph in both appearances.
 
 **Recorded limitation.** Signed-app visual, keyboard, and VoiceOver acceptance is recorded as **unobserved** until directly inspected. Do not claim it passed. The waiver in the multi-provider popover branch does not extend to this branch.
 
@@ -154,3 +162,15 @@ CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsStatus.swift
 - the General shortcut list at both Settings widths, Context Rail hidden and visible;
 - the export save panel, the written JSON, the copied diagnostics report, and the cleared empty states;
 - keyboard and VoiceOver navigation of every new control.
+
+## Release integration re-verification — 2026-07-30
+
+- The main macOS `xcodebuild` exited `0` with `** BUILD SUCCEEDED **`.
+- The full SwiftPM suite executed 329 tests with 0 failures.
+- `CODESIGN_IDENTITY=- zsh Scripts/build-app.sh` produced the optimized
+  `0.0.1` / `266` candidate; the asset-catalog check passed, and strict signature
+  verification passed for both the app and bundled Claude bridge. This was an
+  ad-hoc verification build, not the Developer ID shipping artifact.
+- `git diff --check` reported no whitespace errors.
+- Signed-app visual, keyboard, VoiceOver, normal-export, and file-event acceptance
+  remains unobserved and is still required before merge/tagging.

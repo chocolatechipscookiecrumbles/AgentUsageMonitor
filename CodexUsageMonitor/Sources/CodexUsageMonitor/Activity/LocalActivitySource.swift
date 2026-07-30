@@ -73,4 +73,7 @@ protocol LocalActivitySource: Actor {
     nonisolated var provider: AgentProvider { get }
 
     func scan(bounds: LocalActivityScanBounds) async -> LocalActivityScanResult
+    /// Removes all decoded per-file state. Turning collection off is a privacy
+    /// boundary, so a later enable must rebuild from provider records.
+    func reset()
 }

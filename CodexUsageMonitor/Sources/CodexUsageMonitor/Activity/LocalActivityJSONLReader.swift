@@ -19,6 +19,16 @@ struct LocalActivityFileFingerprint: Sendable, Equatable, Hashable {
     let byteSize: Int64
     let modifiedAtSeconds: Int64
     let modifiedAtNanoseconds: Int64
+    /// Hash of this complete file version. It never leaves the source cache and
+    /// lets a later growth verify every byte of the previously parsed prefix.
+    let contentDigest: String
+
+    func hasSameMetadata(as other: Self) -> Bool {
+        opaqueFileID == other.opaqueFileID
+            && byteSize == other.byteSize
+            && modifiedAtSeconds == other.modifiedAtSeconds
+            && modifiedAtNanoseconds == other.modifiedAtNanoseconds
+    }
 }
 
 /// How much of a file a caller already holds parsed.
@@ -44,14 +54,29 @@ protocol LocalActivityParsedFile: Sendable {
 
 extension LocalActivityResumePoint where Parsed: LocalActivityParsedFile, Parsed.ParserState == State {
     /// Picks the cheapest safe way to bring a cached file up to date.
-    static func decide(fingerprint: LocalActivityFileFingerprint, cached: Parsed?) -> Self {
+    static func decide(
+        fingerprint: LocalActivityFileFingerprint,
+        cached: Parsed?,
+        fileDescriptor: Int32
+    ) -> Self {
         guard let cached else { return .rebuild }
-        if cached.fingerprint == fingerprint { return .unchanged(cached) }
+        if cached.fingerprint.hasSameMetadata(as: fingerprint) {
+            return .unchanged(cached)
+        }
         // Only growth beyond the bytes already parsed can be a pure append.
         // Anything shorter may have rewritten records that were already
         // counted, and resuming past the end would silently read nothing.
-        guard fingerprint.byteSize >= cached.fingerprint.byteSize,
-              cached.nextOffset <= fingerprint.byteSize
+        // A changed file at exactly the same size was rewritten in place, not
+        // appended. Rebuild it so an editor/provider rewrite cannot leave the
+        // old parsed requests resident for the rest of this process.
+        guard fingerprint.byteSize > cached.fingerprint.byteSize,
+              cached.nextOffset == cached.fingerprint.byteSize,
+              !cached.fingerprint.contentDigest.isEmpty,
+              let currentPrefixDigest = try? LocalActivityFileContentDigest.digest(
+                  fileDescriptor: fileDescriptor,
+                  byteCount: cached.fingerprint.byteSize
+              ),
+              currentPrefixDigest == cached.fingerprint.contentDigest
         else { return .rebuild }
         return .resume(cached.parserState, offset: cached.nextOffset)
     }
@@ -74,11 +99,15 @@ struct LocalActivityFileTraversal: Sendable {
     /// a single appended record.
     func parseJSONLFiles<State: Sendable, Parsed: Sendable>(
         root: URL,
-        resume: @Sendable (LocalActivityFileFingerprint) -> LocalActivityResumePoint<State, Parsed>,
+        resume: @Sendable (
+            LocalActivityFileFingerprint,
+            Int32
+        ) -> LocalActivityResumePoint<State, Parsed>,
         makeState: @Sendable (String) -> State,
         consume: @Sendable (inout State, LocalActivityJSONLReader.Line) throws -> Void,
         finish: @Sendable (LocalActivityFileFingerprint, State, Int64) -> Parsed
     ) async throws -> [Parsed] {
+        try Task.checkCancellation()
         let rootDescriptor = try Self.openRootDirectory(root)
         defer { _ = Darwin.close(rootDescriptor) }
         return try await parse(
@@ -94,11 +123,15 @@ struct LocalActivityFileTraversal: Sendable {
     private func parse<State: Sendable, Parsed: Sendable>(
         directoryDescriptor: Int32,
         seenFileIDs: Set<String>,
-        resume: @Sendable (LocalActivityFileFingerprint) -> LocalActivityResumePoint<State, Parsed>,
+        resume: @Sendable (
+            LocalActivityFileFingerprint,
+            Int32
+        ) -> LocalActivityResumePoint<State, Parsed>,
         makeState: @Sendable (String) -> State,
         consume: @Sendable (inout State, LocalActivityJSONLReader.Line) throws -> Void,
         finish: @Sendable (LocalActivityFileFingerprint, State, Int64) -> Parsed
     ) async throws -> (parsed: [Parsed], seenFileIDs: Set<String>) {
+        try Task.checkCancellation()
         let duplicate = dup(directoryDescriptor)
         guard duplicate >= 0, let directory = fdopendir(duplicate) else {
             if duplicate >= 0 { _ = Darwin.close(duplicate) }
@@ -110,6 +143,7 @@ struct LocalActivityFileTraversal: Sendable {
         var seenFileIDs = seenFileIDs
 
         while true {
+            try Task.checkCancellation()
             // `readdir` reports end-of-directory and failure the same way, so
             // errno must be cleared immediately before every call rather than
             // once per successful iteration.
@@ -155,11 +189,12 @@ struct LocalActivityFileTraversal: Sendable {
                         opaqueFileID: fileID,
                         byteSize: Int64(childStat.st_size),
                         modifiedAtSeconds: Int64(childStat.st_mtimespec.tv_sec),
-                        modifiedAtNanoseconds: Int64(childStat.st_mtimespec.tv_nsec)
+                        modifiedAtNanoseconds: Int64(childStat.st_mtimespec.tv_nsec),
+                        contentDigest: ""
                     )
 
                     let start: (state: State, offset: Int64)?
-                    switch resume(fingerprint) {
+                    switch resume(fingerprint, childDescriptor) {
                     case .unchanged(let previous):
                         parsed.append(previous)
                         start = nil
@@ -176,7 +211,20 @@ struct LocalActivityFileTraversal: Sendable {
                             initialState: start.state,
                             consume: consume
                         )
-                        parsed.append(finish(fingerprint, result.state, result.nextOffset))
+                        try Task.checkCancellation()
+                        let completedFingerprint = LocalActivityFileFingerprint(
+                            opaqueFileID: fingerprint.opaqueFileID,
+                            byteSize: fingerprint.byteSize,
+                            modifiedAtSeconds: fingerprint.modifiedAtSeconds,
+                            modifiedAtNanoseconds: fingerprint.modifiedAtNanoseconds,
+                            contentDigest: try LocalActivityFileContentDigest.digest(
+                                fileDescriptor: childDescriptor,
+                                byteCount: fingerprint.byteSize
+                            )
+                        )
+                        parsed.append(
+                            finish(completedFingerprint, result.state, result.nextOffset)
+                        )
                     }
 
                 default:
@@ -261,6 +309,7 @@ struct LocalActivityJSONLReader: Sendable {
         initialState: State,
         consume: @Sendable (inout State, Line) throws -> Void
     ) async throws -> Result<State> {
+        try Task.checkCancellation()
         guard offset >= 0, lseek(fileDescriptor, offset, SEEK_SET) == offset else {
             throw ReaderFailure.invalidOffset
         }
@@ -274,6 +323,7 @@ struct LocalActivityJSONLReader: Sendable {
         var discardingOversizedLine = false
 
         while true {
+            try Task.checkCancellation()
             let byteCount = Darwin.read(fileDescriptor, &chunk, chunk.count)
             if byteCount < 0 {
                 if errno == EINTR { continue }
@@ -284,6 +334,7 @@ struct LocalActivityJSONLReader: Sendable {
             var segmentStart = 0
             let count = Int(byteCount)
             while segmentStart < count {
+                try Task.checkCancellation()
                 let newline = chunk[segmentStart..<count].firstIndex(of: 0x0A)
                 let segmentEnd = newline ?? count
                 let segmentCount = segmentEnd - segmentStart
@@ -314,6 +365,7 @@ struct LocalActivityJSONLReader: Sendable {
                             &state,
                             Line(bytes: lineBuffer, startOffset: lineStart, endOffset: streamOffset)
                         )
+                        try Task.checkCancellation()
                     }
                 }
 
@@ -326,5 +378,40 @@ struct LocalActivityJSONLReader: Sendable {
         }
 
         return Result(state: state, nextOffset: nextOffset)
+    }
+}
+
+private enum LocalActivityFileContentDigest {
+    private static let chunkSize = 64 * 1024
+
+    enum Failure: Error {
+        case invalidSize
+        case readFailed
+    }
+
+    static func digest(fileDescriptor: Int32, byteCount: Int64) throws -> String {
+        guard byteCount >= 0 else { throw Failure.invalidSize }
+
+        var hasher = SHA256()
+        var bytes = [UInt8](repeating: 0, count: chunkSize)
+        var offset: Int64 = 0
+        while offset < byteCount {
+            try Task.checkCancellation()
+            let requested = Int(min(Int64(chunkSize), byteCount - offset))
+            let readCount = bytes.withUnsafeMutableBytes { buffer in
+                pread(fileDescriptor, buffer.baseAddress, requested, offset)
+            }
+            if readCount < 0 {
+                if errno == EINTR { continue }
+                throw Failure.readFailed
+            }
+            guard readCount > 0 else { throw Failure.readFailed }
+            hasher.update(data: Data(bytes[0..<readCount]))
+            offset += Int64(readCount)
+        }
+
+        return hasher.finalize()
+            .map { String(format: "%02x", $0) }
+            .joined()
     }
 }

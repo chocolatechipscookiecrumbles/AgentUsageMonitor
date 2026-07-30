@@ -22,6 +22,10 @@ final class AgentPlanNameTests: XCTestCase {
         XCTAssertNil(AgentPlanName.display(""))
         XCTAssertNil(AgentPlanName.display("   "))
     }
+
+    func testUnrecognizedPlanFallsBackInsteadOfInventingAName() {
+        XCTAssertNil(AgentPlanName.display("enterprise_custom"))
+    }
 }
 
 /// The popover header names the account, because the tab directly above it

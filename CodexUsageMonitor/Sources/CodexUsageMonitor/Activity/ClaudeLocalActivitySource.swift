@@ -59,10 +59,11 @@ actor ClaudeLocalActivitySource: LocalActivitySource {
                 do {
                     files = try await traversal.parseJSONLFiles(
                         root: root,
-                        resume: {
+                        resume: { fingerprint, fileDescriptor in
                             LocalActivityResumePoint.decide(
-                                fingerprint: $0,
-                                cached: cache[$0.opaqueFileID]
+                                fingerprint: fingerprint,
+                                cached: cache[fingerprint.opaqueFileID],
+                                fileDescriptor: fileDescriptor
                             )
                         },
                         makeState: { ClaudeFileParseState(opaqueFileID: $0) },
@@ -82,6 +83,7 @@ actor ClaudeLocalActivitySource: LocalActivitySource {
                 )
             }
 
+            try Task.checkCancellation()
             // Rebuilding rather than merging drops files that no longer exist.
             parseCache = Dictionary(
                 parsedFiles.map { ($0.opaqueFileID, $0) },
@@ -106,29 +108,60 @@ actor ClaudeLocalActivitySource: LocalActivitySource {
         }
     }
 
+    func reset() {
+        parseCache.removeAll(keepingCapacity: false)
+    }
+
     private func reconcile(
         _ files: [ParsedClaudeFile],
         priorOffsets: [String: Int64]
     ) throws -> [LocalActivityRequest] {
-        // One assistant message is one request no matter how many chunks or
-        // transcripts repeat it, so the message identity is the reconciliation
-        // key both within and across files.
-        var winners: [String: (file: ParsedClaudeFile, event: ClaudeUsageEvent)] = [:]
+        struct StreamingKey: Hashable {
+            let messageID: String
+            let requestID: String
+        }
+
+        // Streaming chunks are cumulative only within one message/request pair.
+        // Treating the message alone as the key can collapse two distinct
+        // requests when an external record reuses a message identifier.
+        var pairWinners: [
+            StreamingKey: (file: ParsedClaudeFile, event: ClaudeUsageEvent)
+        ] = [:]
         for file in files {
             for event in file.events {
-                guard let incumbent = winners[event.messageID] else {
-                    winners[event.messageID] = (file, event)
+                let key = StreamingKey(
+                    messageID: event.messageID,
+                    requestID: event.requestID
+                )
+                guard let incumbent = pairWinners[key] else {
+                    pairWinners[key] = (file, event)
                     continue
                 }
                 if Self.prefers(event, over: incumbent.event) {
-                    winners[event.messageID] = (file, event)
+                    pairWinners[key] = (file, event)
                 }
+            }
+        }
+
+        // A sidechain transcript can replay a parent response under a different
+        // request ID. In the cross-file parent/sidechain shape, every distinct
+        // parent pair remains observed and only the sidechain replay candidates
+        // are removed. Distinct pairs in one file remain distinct.
+        var winners: [(file: ParsedClaudeFile, event: ClaudeUsageEvent)] = []
+        for group in Dictionary(grouping: pairWinners.values, by: \.event.messageID).values {
+            let fileIDs = Set(group.map(\.file.opaqueFileID))
+            let parents = group.filter { !$0.event.isSidechain }
+            let hasSidechain = group.contains { $0.event.isSidechain }
+            if fileIDs.count > 1, !parents.isEmpty, hasSidechain {
+                winners.append(contentsOf: parents)
+            } else {
+                winners.append(contentsOf: group)
             }
         }
 
         var requests: [LocalActivityRequest] = []
         requests.reserveCapacity(winners.count)
-        for (messageID, winner) in winners {
+        for winner in winners {
             guard let tokens = LocalActivityTokenBreakdown(
                 provider: .claudeCode,
                 inputTokens: winner.event.tokens.input,
@@ -148,10 +181,11 @@ actor ClaudeLocalActivitySource: LocalActivitySource {
             }
 
             requests.append(LocalActivityRequest(
-                // Anthropic message identifiers are unique per response, so
-                // hashing the message alone keeps one stable published identity
-                // across rescans no matter which copy of it wins.
-                id: LocalActivityIdentity.digest(["provider", "claude-code", "message", messageID]),
+                id: LocalActivityIdentity.digest([
+                    "provider", "claude-code",
+                    "message", winner.event.messageID,
+                    "request", winner.event.requestID,
+                ]),
                 provider: .claudeCode,
                 occurredAt: winner.event.timestamp,
                 modelID: winner.event.modelID,
@@ -207,18 +241,36 @@ private struct ClaudeFileParseState: Sendable {
         let recordType = record.type.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !recordType.isEmpty else { throw ClaudeLocalActivityFailure.malformedRecord }
 
-        // Transcripts hold many record kinds. Only an assistant record carrying
-        // a usage object claims tokens; everything else is ignorable rather than
-        // missing evidence.
-        guard recordType == "assistant",
-              let message = record.message,
-              let usage = message.usage
-        else { return }
+        let assistant: ClaudeAssistantEnvelope
+        switch recordType {
+        case "assistant":
+            assistant = ClaudeAssistantEnvelope(
+                timestamp: record.timestamp,
+                isSidechain: record.isSidechain,
+                message: record.message,
+                requestIdentifier: record.requestIdentifier
+            )
+        case "progress":
+            guard record.progress?.type?.nonemptyTrimmed == "agent_progress",
+                  let nested = record.progress?.message,
+                  nested.type.nonemptyTrimmed == "assistant"
+            else { return }
+            assistant = ClaudeAssistantEnvelope(
+                timestamp: nested.timestamp ?? record.timestamp,
+                isSidechain: nested.isSidechain ?? record.isSidechain,
+                message: nested.message,
+                requestIdentifier: nested.requestIdentifier
+            )
+        default:
+            return
+        }
 
-        guard let messageID = message.identifier,
-              let rawTimestamp = record.timestamp,
+        guard let message = assistant.message,
+              let usage = message.usage,
+              let messageID = message.identifier,
+              let rawTimestamp = assistant.timestamp,
               let timestamp = LocalActivityTimestamp.date(rawTimestamp),
-              let requestID = record.requestIdentifier
+              let requestID = assistant.requestIdentifier
         else {
             throw ClaudeLocalActivityFailure.malformedUsage
         }
@@ -229,7 +281,7 @@ private struct ClaudeFileParseState: Sendable {
             timestamp: timestamp,
             timestampIdentity: rawTimestamp,
             lineOffset: line.startOffset,
-            isSidechain: record.isSidechain ?? false,
+            isSidechain: assistant.isSidechain ?? false,
             modelID: message.modelIdentifier,
             tokens: try ClaudeTokens(usage)
         ))
@@ -306,6 +358,32 @@ private struct ClaudeRecord: Decodable {
     let timestamp: String?
     let isSidechain: Bool?
     let message: ClaudeMessage?
+    let progress: ClaudeAgentProgress?
+    private let requestIDCamel: String?
+    private let requestIDSnake: String?
+
+    var requestIdentifier: String? {
+        requestIDCamel?.nonemptyTrimmed ?? requestIDSnake?.nonemptyTrimmed
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case type, timestamp, isSidechain, message
+        case progress = "data"
+        case requestIDCamel = "requestId"
+        case requestIDSnake = "request_id"
+    }
+}
+
+private struct ClaudeAgentProgress: Decodable {
+    let type: String?
+    let message: ClaudeNestedRecord?
+}
+
+private struct ClaudeNestedRecord: Decodable {
+    let type: String
+    let timestamp: String?
+    let isSidechain: Bool?
+    let message: ClaudeMessage?
     private let requestIDCamel: String?
     private let requestIDSnake: String?
 
@@ -318,6 +396,13 @@ private struct ClaudeRecord: Decodable {
         case requestIDCamel = "requestId"
         case requestIDSnake = "request_id"
     }
+}
+
+private struct ClaudeAssistantEnvelope {
+    let timestamp: String?
+    let isSidechain: Bool?
+    let message: ClaudeMessage?
+    let requestIdentifier: String?
 }
 
 private struct ClaudeMessage: Decodable {

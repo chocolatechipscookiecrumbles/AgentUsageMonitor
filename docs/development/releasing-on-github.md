@@ -46,7 +46,7 @@ strings and a build number. The first submission is where the risk was.
 | Build and tests green | ✅ 316 tests, 1 skipped, 0 failures |
 | Optimized release binary | ✅ `build-app.sh` builds `-c release` |
 | App icon | ✅ `AppIcon.appiconset`, all ten sizes; bundle `.icns` built by `iconutil` |
-| Version and build number | ✅ `0.0.1` / `265` in `Info.plist`. `254` is spent — the notary has already seen it, and Apple rejects a re-used build number |
+| Version and build number | ✅ `0.0.1` / `266` in `Info.plist`. `254` is spent — the notary has already seen it, and Apple rejects a re-used build number |
 | Product name | ✅ `Agent Monitor` in every user-visible string; identity stays `CodexUsageMonitor` |
 | Seven-day reliability observation | ✅ Passed — see the caveat in [reliability Task 5](../superpowers/plans/2026-07-13-codex-reliability-hardening.md#task-5-run-and-review-the-one-week-hardening-period) |
 | Claude credential disclosure | ✅ README, app Data & Privacy page, release notes |
@@ -55,7 +55,7 @@ strings and a build number. The first submission is where the risk was.
 | **Apple Developer membership** | ✅ Active |
 | **Developer ID certificate** | ✅ `Developer ID Application: Project maintainer (<APPLE_TEAM_ID>)`, installed with its private key |
 | **Notarization of the pre-rename build** | ✅ **Accepted** — `Codex Usage Monitor` / `1.0.0` / `254`. Superseded; do not publish it |
-| **Notarization of the shipping build** | ❌ **Not started.** `Agent Monitor` / `0.0.1` / `265` has not been built, submitted, or stapled |
+| **Notarization of the shipping build** | ❌ **Not started.** `Agent Monitor` / `0.0.1` / `266` has not been submitted or stapled |
 | `gh` CLI authenticated | ❌ `gh auth login` still needed (or use the web UI) |
 
 ### Signing evidence — the pre-rename build (2026-07-29)
@@ -83,14 +83,14 @@ only thing missing. `xcrun stapler validate` correspondingly reports
 
 ### The remaining sequence
 
-`CFBundleVersion` is already set to `265` in this branch, so nothing needs editing
+`CFBundleVersion` is already set to `266` in this branch, so nothing needs editing
 first. Run this in **your own Terminal** — every step below either signs, reaches
 the Keychain, or talks to Apple, and none of it should be run by an agent:
 
 ```sh
 cd CodexUsageMonitor
 
-# 1. Rebuild. The bundle now reports Agent Monitor / 0.0.1 / 265.
+# 1. Rebuild. The bundle now reports Agent Monitor / 0.0.1 / 266.
 swift test && ./Scripts/build-app.sh
 ./Scripts/verify-signed-app-resources.sh
 
@@ -98,7 +98,7 @@ swift test && ./Scripts/build-app.sh
 app=.build/CodexUsageMonitor.app
 plutil -extract CFBundleDisplayName raw "$app/Contents/Info.plist"        # Agent Monitor
 plutil -extract CFBundleShortVersionString raw "$app/Contents/Info.plist" # 0.0.1
-plutil -extract CFBundleVersion raw "$app/Contents/Info.plist"            # 265
+plutil -extract CFBundleVersion raw "$app/Contents/Info.plist"            # 266
 codesign -dvv "$app" 2>&1 | grep -E "Authority=Developer ID|Timestamp|flags"
 
 # 3. Notarize and staple.
@@ -171,7 +171,7 @@ both paths.
    `build-app.sh` builds `-c release` and installs the app executable and the
    bundled bridge from `.build/release/`. Override with `BUILD_CONFIGURATION=debug`
    only for local iteration — never for a release.
-3. ~~**Set the version.**~~ **Done 2026-07-30:** `0.0.1` / `265`. `254` was consumed
+3. ~~**Set the version.**~~ **Done 2026-07-30:** `0.0.1` / `266`. `254` was consumed
    by the pre-rename submission and cannot be reused. Bump again for the *next*
    release. See [Step 1](#step-1--pick-and-set-the-version).
 4. **Know the known gaps** so your release notes are honest:
@@ -207,7 +207,7 @@ macOS apps carry two version strings in `Info.plist`:
 - `CFBundleVersion` — a **monotonic build number** that must increase every time
   you notarize (Apple rejects a re-used build number). Bump it on every release.
 
-Currently: `CFBundleShortVersionString = 0.0.1`, `CFBundleVersion = 265`.
+Currently: `CFBundleShortVersionString = 0.0.1`, `CFBundleVersion = 266`.
 
 **Set to `0.0.1` on 2026-07-29** (revised down from an earlier `1.0.0`). The build
 is feature-complete — both providers ship, the reliability observation passed, and
@@ -234,12 +234,12 @@ Use **SemVer** (`MAJOR.MINOR.PATCH`). A `0.x` version signals that the public
 interface — and specifically the Claude credential path — may still change; see
 the terms caveat in the release notes below.
 
-> **Why `265` and not `255`.** `254` was submitted to the notary as
+> **Why `266` and not `255`.** `254` was submitted to the notary as
 > `Codex Usage Monitor` / `1.0.0` and accepted. Apple keeps build numbers per
 > bundle identifier, and the identifier did not change with the rename — so from
-> the notary's point of view `254` is used, permanently. `265` is the commit count
-> at the point this was set, which keeps the number monotonic without a second
-> thing to remember.
+> the notary's point of view `254` is used, permanently. `266` is the next release
+> build after the merge-readiness corrections, keeping the number monotonic without
+> a second thing to remember.
 
 ## Step 2 — Build the release `.app`
 
@@ -351,7 +351,7 @@ attaches that ticket so it works offline.
 > **Status 2026-07-30:** the credential profile is stored and the pre-rename
 > `1.0.0` / `254` build was **accepted**. The one-time setup below is done. The
 > submit, staple, and validate commands are what you run against the rebuilt
-> `Agent Monitor` / `0.0.1` / `265` bundle — the accepted ticket does not carry
+> `Agent Monitor` / `0.0.1` / `266` bundle — the accepted ticket does not carry
 > over to it.
 
 **One-time setup:** store an app-specific password (make one at

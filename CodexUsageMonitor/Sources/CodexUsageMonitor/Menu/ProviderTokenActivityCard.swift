@@ -239,7 +239,7 @@ struct ProviderTokenActivityCard: View {
                     .foregroundStyle(theme.secondaryText)
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Activity chart, 30-minute intervals since midnight")
+            .accessibilityLabel(presentation.range.chartAccessibilityLabel)
             .accessibilityValue(expanded.chartAccessibilityValue)
     }
 
