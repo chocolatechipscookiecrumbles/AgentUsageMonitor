@@ -2,8 +2,8 @@
 
 **Branch:** `feature/release-0.0.1-notarization` → `main`
 **Compare:** historical private-repository comparison (branch not published)
-**State: Draft.** Automated merge gates are being refreshed; signed-app acceptance,
-Developer ID notarization, and stapling remain manual release gates.
+**State: Draft.** Automated merge gates pass; signed-app acceptance, Developer ID
+notarization, and stapling remain manual release gates.
 
 ## Summary
 
