@@ -22,16 +22,17 @@ struct MenuPopoverTheme {
     static let providerIconTileSize: CGFloat = 28
     static let providerIconTileCornerRadius: CGFloat = 8
     static let providerIconArtworkSize: CGFloat = 18
-    static let tabStripHeight: CGFloat = 44
+    static let tabStripHeight: CGFloat = 30
     static let tabIndicatorHeight: CGFloat = 1.5
+    static let tabItemSpacing: CGFloat = 5
+    static let tabIconSize: CGFloat = 12
     static let dividerHeight: CGFloat = 1
     static let headerHorizontalPadding: CGFloat = 16
     static let headerVerticalPadding: CGFloat = 14
     static let headerSpacing: CGFloat = 10
     static let headerTextSpacing: CGFloat = 2
     static let contentHorizontalPadding: CGFloat = 16
-    static let contentBottomPadding: CGFloat = 12
-    static let providerContentMinimumHeight: CGFloat = 288
+    static let providerContentFooterSpacing: CGFloat = 12
     static let contentPlaceholderHeight: CGFloat = 72
     static let contentSpacing: CGFloat = 12
     static let cardHorizontalPadding: CGFloat = 16
@@ -64,6 +65,22 @@ struct MenuPopoverTheme {
     static let actionRowIconSize: CGFloat = 13
     static let actionRowIconWidth: CGFloat = 16
     static let actionRowSpacing: CGFloat = 10
+    // Token Monitor card. The chart and its hover line are fixed-height so a
+    // semantic update can resize the card but hovering a bar never can.
+    static let activityHeaderSpacing: CGFloat = 10
+    static let activityHeaderTextSpacing: CGFloat = 2
+    static let activitySectionSpacing: CGFloat = 10
+    static let activityChartHeight: CGFloat = 84
+    static let activityHoverDetailHeight: CGFloat = 14
+    static let activityChartTopSpacing: CGFloat = 6
+    static let activityRowSpacing: CGFloat = 6
+    static let activityRowDividerInset: CGFloat = 0
+    /// Token totals are short, so pairing them into two columns spends the
+    /// popover's horizontal space instead of five nearly empty full-width rows.
+    static let activityMetricColumnSpacing: CGFloat = 14
+    static let activityMetricLabelSpacing: CGFloat = 6
+    static let activityModelShareWidth: CGFloat = 40
+    static let activityLastRequestSpacing: CGFloat = 2
 
     let windowBackground: Color
     let tabStripBackground: Color
@@ -85,6 +102,12 @@ struct MenuPopoverTheme {
     let neutral: Color
 
     static func resolve(for colorScheme: ColorScheme) -> Self {
+        // The Settings window is the primary palette. Surface and divider tokens
+        // are pulled from it so the popover shell, tab strip, cards, and
+        // hairlines match the Settings window exactly in both appearances.
+        // Text, icon, shadow, and severity accents stay popover-owned because
+        // Settings does not define them.
+        let settings = SettingsAppearancePalette.resolve(for: colorScheme)
         let accent = rgb(10, 132, 255)
         let success = rgb(48, 209, 88)
         let warning = rgb(255, 159, 10)
@@ -93,11 +116,11 @@ struct MenuPopoverTheme {
 
         if colorScheme == .dark {
             return Self(
-                windowBackground: rgb(36, 36, 36),
-                tabStripBackground: rgb(30, 30, 30),
-                cardBackground: .white.opacity(0.055),
+                windowBackground: settings.windowBackground,
+                tabStripBackground: settings.sidebarBackground,
+                cardBackground: settings.sectionSurface,
                 border: .white.opacity(0.07),
-                divider: .white.opacity(0.06),
+                divider: settings.divider,
                 progressTrack: .white.opacity(0.09),
                 primaryText: .white,
                 secondaryText: .white.opacity(0.40),
@@ -115,11 +138,11 @@ struct MenuPopoverTheme {
         }
 
         return Self(
-            windowBackground: rgb(245, 245, 247),
-            tabStripBackground: rgb(235, 235, 235),
-            cardBackground: .white,
+            windowBackground: settings.windowBackground,
+            tabStripBackground: settings.sidebarBackground,
+            cardBackground: settings.sectionSurface,
             border: .black.opacity(0.07),
-            divider: .black.opacity(0.06),
+            divider: settings.divider,
             progressTrack: .black.opacity(0.07),
             primaryText: rgb(28, 28, 30),
             secondaryText: .black.opacity(0.38),

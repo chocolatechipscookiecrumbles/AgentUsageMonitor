@@ -36,12 +36,10 @@ struct MenuBarPopoverView: View {
 
                 providerContent
                     .fixedSize(horizontal: false, vertical: true)
-                    .frame(
-                        minHeight: MenuPopoverTheme.providerContentMinimumHeight,
-                        alignment: .top
-                    )
+                    .padding(.bottom, MenuPopoverTheme.providerContentFooterSpacing)
 
                 MenuActionFooter(
+                    settings: viewModel.settings,
                     isRefreshing: isRefreshing,
                     refresh: refresh,
                     openNotificationSettings: showNotificationSettings,
@@ -67,20 +65,17 @@ struct MenuBarPopoverView: View {
 
     private var headerPresentation: MenuProviderHeaderPresentation {
         switch activeProvider {
-        case .codex:
+        case .codex, .githubCopilot:
             .codex(
                 displayState: viewModel.displayState,
+                connectionState: viewModel.connectionState,
                 isRefreshing: viewModel.isRefreshing
             )
         case .claudeCode:
             .claude(
                 usageState: viewModel.claudeState,
+                connectionState: viewModel.claudeConnectionState,
                 isRefreshing: viewModel.isRefreshingClaude
-            )
-        case .githubCopilot:
-            .codex(
-                displayState: viewModel.displayState,
-                isRefreshing: viewModel.isRefreshing
             )
         }
     }
@@ -100,13 +95,12 @@ struct MenuBarPopoverView: View {
     private var providerContent: some View {
         switch activeProvider {
         case .codex:
-            CodexMenuContent(viewModel: viewModel)
+            CodexMenuContent(viewModel: viewModel, settings: viewModel.settings)
         case .claudeCode:
-            ClaudeMenuContent(viewModel: viewModel)
+            ClaudeMenuContent(viewModel: viewModel, settings: viewModel.settings)
         case .githubCopilot:
             MenuProviderContentPlaceholder()
                 .padding(.horizontal, MenuPopoverTheme.contentHorizontalPadding)
-                .padding(.bottom, MenuPopoverTheme.contentBottomPadding)
         }
     }
 

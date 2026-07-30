@@ -31,7 +31,10 @@ struct SettingsDetailView: View {
         case .dataPrivacy:
             DataPrivacySettingsView()
         case .diagnostics:
-            DiagnosticsSettingsView(status: viewModel.settingsStatus)
+            DiagnosticsSettingsView(
+                status: viewModel.settingsStatus,
+                clearDiagnostics: viewModel.clearRefreshDiagnostics
+            )
         }
     }
 }

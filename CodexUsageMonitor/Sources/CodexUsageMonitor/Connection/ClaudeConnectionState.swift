@@ -63,6 +63,14 @@ enum ClaudeConnectionState: Equatable, Sendable {
     case connected(ClaudeAccountSummary)
     case failed(ClaudeConnectionFailure)
 
+    /// The plan a live connection proves, as Anthropic spells it. Only a
+    /// connected state has one; a usage snapshot's plan hint is a separate,
+    /// weaker claim and stays with that snapshot.
+    var accountPlanType: String? {
+        if case .connected(let account) = self { return account.planType }
+        return nil
+    }
+
     var isConnected: Bool {
         if case .connected = self { return true }
         return false

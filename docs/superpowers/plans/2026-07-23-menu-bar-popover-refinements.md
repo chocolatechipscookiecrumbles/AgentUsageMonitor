@@ -105,3 +105,49 @@ These are GUI changes under the branch's waiver — build/tests confirm they
 compile and don't regress the suite. Corner/shadow, Light/Dark, keyboard,
 VoiceOver, and rendered-height checks remain unobserved; the corner artifact is
 still user-observed and explicitly deferred rather than claimed fixed.
+
+## Round 3 — intrinsic provider height (2026-07-26, requested)
+
+Direct screenshot feedback showed that the shared 288-point provider-content
+floor leaves a large empty region between shorter Claude content and the action
+footer. This round intentionally supersedes that equal-height layout:
+
+1. Remove the shared minimum height from the active provider-content slot.
+   Codex and Claude now report their natural vertical size, and the existing
+   shell measurement plus `MenuPopoverWindowConfigurator` resizes the host to
+   match.
+2. Move the 12-point content-to-footer gap out of the individual provider
+   branches and onto the shared provider-content slot. Every available,
+   unavailable, warning, and recovery state therefore receives the same fixed
+   separation before the footer divider.
+3. Keep the popover 340 points wide and non-scrolling. Longer conditional states
+   continue to grow naturally rather than drawing beneath the footer.
+
+This reintroduces host-height changes during Codex/Claude selection and therefore
+supersedes the earlier accepted stable-height provider-switch workaround.
+Acceptance must exercise repeated pointer and keyboard switching in the signed
+app, plus short and long content states, before claiming the prior
+duplicated/displaced-content defect remains resolved. The private
+`MenuBarExtra(.window)` geometry is not covered by an automated test; the
+regression boundary remains signed-app visual and interaction verification.
+
+### Round 3 verification evidence
+
+- `swift build` completed successfully.
+- `swift test` passed all 298 tests with 0 failures.
+- `Scripts/build-app.sh` produced a Developer ID-signed
+  `.build/CodexUsageMonitor.app`.
+- In the signed app with live provider data, the Claude state measured
+  `340 × 465` points and the longer Codex state measured `340 × 514` points.
+  Both were directly inspected: neither clipped or overlapped the footer, and
+  both kept the same compact content-to-divider gap.
+- An Accessibility-driven loop completed 14 consecutive provider transitions.
+  Every observed Codex selection measured `340 × 514`; every observed Claude
+  selection measured `340 × 465`. The duplicate audit status item was parked in
+  macOS's offscreen menu-bar overflow, and its private popover dismissed before
+  transition 15. The app remained running and no crash report was written.
+- Light/Dark comparison, keyboard switching, VoiceOver, and a complete 20-cycle
+  visible-status-item loop remain unobserved. Foreground coordinate control
+  became unreliable during cleanup, so the GUI audit stopped without attempting
+  further session control. The tracked audit PID was terminated; the
+  pre-existing user-owned app PID was preserved.

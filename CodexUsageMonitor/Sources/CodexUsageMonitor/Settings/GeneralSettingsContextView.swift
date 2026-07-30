@@ -51,7 +51,7 @@ struct GeneralSettingsContextView: View {
             SettingsContextValueRow(
                 value: SettingsContextValue(
                     label: "Plan",
-                    value: presentation?.planType?.capitalized ?? "Unavailable"
+                    value: AgentPlanName.display(presentation?.planType) ?? "Unavailable"
                 )
             )
 

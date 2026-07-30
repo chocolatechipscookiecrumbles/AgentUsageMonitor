@@ -50,6 +50,14 @@ enum AgentConnectionState: Equatable, Sendable {
     case connected(AgentAccountSummary)
     case failed(AgentConnectionFailure)
 
+    /// The plan a live connection proves, as the provider spells it. Only a
+    /// connected state has one — a cached quota record's plan is a separate,
+    /// weaker claim and stays with that record.
+    var accountPlanType: String? {
+        if case .connected(let account) = self { return account.planType }
+        return nil
+    }
+
     var isConnected: Bool {
         if case .connected = self { return true }
         return false

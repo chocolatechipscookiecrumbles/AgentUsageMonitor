@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct MenuActionFooter: View {
+    @ObservedObject var settings: AppSettings
     let isRefreshing: Bool
     let refresh: () -> Void
     let openNotificationSettings: () -> Void
@@ -19,6 +20,7 @@ struct MenuActionFooter: View {
                 MenuActionRow(
                     isRefreshing ? "Refreshing…" : "Refresh Now",
                     systemImage: "arrow.clockwise",
+                    shortcut: shortcut(.refresh),
                     action: refresh
                 )
                 .disabled(isRefreshing)
@@ -26,22 +28,31 @@ struct MenuActionFooter: View {
                 MenuActionRow(
                     "Notification Settings",
                     systemImage: "bell",
+                    shortcut: shortcut(.notificationSettings),
                     action: openNotificationSettings
                 )
 
                 MenuActionRow(
                     "Preferences…",
                     systemImage: "gearshape",
+                    shortcut: shortcut(.preferences),
                     action: openPreferences
                 )
 
                 MenuActionRow(
-                    "Quit Codex Usage Monitor",
+                    "Quit Agent Monitor",
                     systemImage: "xmark",
+                    shortcut: shortcut(.quit),
                     action: quit
                 )
             }
         }
+    }
+
+    /// The preference governs registration as well as display, so an unlisted
+    /// shortcut is also an unbound one.
+    private func shortcut(_ shortcut: MenuActionShortcut) -> MenuActionShortcut? {
+        settings.keyboardShortcutsEnabled ? shortcut : nil
     }
 
     private var theme: MenuPopoverTheme {

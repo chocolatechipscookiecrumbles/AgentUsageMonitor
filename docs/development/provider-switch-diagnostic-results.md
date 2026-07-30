@@ -228,6 +228,37 @@ surfaces:
 
 Stable intrinsic host geometry is the confirmed root cause and fix for both.
 
+### Superseded menu geometry — 2026-07-26
+
+Direct user feedback rejected the menu's resulting fixed-height visual treatment:
+shorter provider content left a large empty region above the footer. The shared
+288-point menu floor is therefore removed by explicit direction, while the
+Settings Agents envelope remains unchanged. The menu now uses each provider's
+natural content height and one shared 12-point content-to-footer gap.
+
+This supersedes the menu portion of the accepted equal-height resolution above.
+Because the private `MenuBarExtra(.window)` host will resize on provider
+selection again, repeated signed-app pointer and keyboard switching is required
+to determine whether the historical duplicated/displaced-content symptom
+returns. Source builds and automated tests cannot prove that compositing
+boundary.
+
+Signed-app evidence from the requested replacement:
+
+- Claude live content: `340 × 465` points.
+- Codex live content with the credit card present: `340 × 514` points.
+- Fourteen consecutive Accessibility-driven transitions alternated exactly
+  between those two sizes with no clipping, overlap, ignored selection, or
+  crash.
+
+The duplicate audit instance's status item was parked in macOS's offscreen menu
+bar overflow and its private popover dismissed before transition 15. Therefore
+this run does not close the historical 20-cycle visual-compositing boundary;
+keyboard, VoiceOver, and Light/Dark loops also remain unobserved. The layout
+change is visually confirmed for the two live final states, while extended
+selection-host acceptance remains limited by the hidden duplicate-instance
+audit setup.
+
 The separately tracked too-small provider-tab **hit area** was then corrected
 under [its own plan](../superpowers/plans/2026-07-24-provider-tab-hit-area.md):
 `MenuProviderTabStrip` moves its fill frame and `contentShape` inside the button

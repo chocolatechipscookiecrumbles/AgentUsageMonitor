@@ -29,12 +29,25 @@ struct GeneralSettingsView: View {
                         }
                     }
                 }
-                SettingsSectionRow(showsDivider: false) {
+                SettingsSectionRow(showsDivider: settings.keyboardShortcutsEnabled) {
                     SettingsPreferenceToggle(
                         "Enable keyboard shortcuts",
-                        description: "Allows app shortcuts such as ⌘R for Refresh now.",
+                        description: "Adds a key equivalent to each command in the menu bar popover.",
                         isOn: $settings.keyboardShortcutsEnabled
                     )
+                }
+
+                // Listed only while the shortcuts are live, because with the
+                // toggle off none of them is registered.
+                if settings.keyboardShortcutsEnabled {
+                    ForEach(MenuActionShortcut.allCases) { shortcut in
+                        SettingsSectionRow {
+                            SettingsValueRow(shortcut.commandTitle, value: shortcut.displayString)
+                        }
+                    }
+                    SettingsSectionRow(showsDivider: false) {
+                        SettingsDescription("These shortcuts are fixed for now. Editing them is planned.")
+                    }
                 }
             }
 

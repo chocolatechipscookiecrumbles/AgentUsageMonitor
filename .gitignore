@@ -48,4 +48,65 @@ skills-lock.json
 # design is preserved as tracked spec + source in docs/design/menu-bar-popover/.
 High-fidelity macOS menu UI*/
 High-fidelity macOS menu UI*.zip
+
+# Assets stay local. GitHub carries code, docs, and plan files only, so every
+# binary and design source is ignored — including the app's own icon catalog.
+# Consequence: a fresh clone can `swift build`, but CodexUsageMonitor/Scripts/
+# build-app.sh cannot package a .app until Resources/Assets.xcassets is
+# supplied out of band, and MenuBarProviderGlyphTests skips instead of running
+# because it probes that catalog's artwork directly.
+# course.css is the exception: it is a stylesheet, and the tracked pages in
+# lessons/ and reference/ link to it.
+assets/*
+!assets/course.css
+CodexUsageMonitor/Resources/Assets.xcassets/
+
+# Images, icons, and rendered documents
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.tif
+*.tiff
+*.webp
+*.avif
+*.heic
+*.ico
+*.icns
+*.iconset
+*.svg
+*.pdf
+
+# Design sources
+*.sketch
+*.fig
+*.psd
+*.ai
+*.eps
+*.xd
+*.afdesign
+*.afphoto
+
+# Fonts
+*.otf
+*.ttf
+*.woff
+*.woff2
+
+# Audio, video, and archives
 *.mov
+*.mp4
+*.m4v
+*.webm
+*.avi
+*.mp3
+*.m4a
+*.wav
+*.aiff
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.dmg
+*.pkg

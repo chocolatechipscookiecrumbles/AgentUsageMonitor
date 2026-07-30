@@ -4,9 +4,9 @@
 
 **Implementation status (2026-07-12):** The first native MVP is implemented as a Swift package plus local app-bundle script, rather than a hand-authored `.xcodeproj`. It compiles with Xcode 26.3 and produced a confirmed live snapshot matching the Python reference. The user must still run the one-time `sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer` command to make Xcode 26.3 the system default.
 
-**Functional follow-on (2026-07-13):** [Quota History Foundation](<USER_HOME>/Desktop/agent%20usage/docs/superpowers/plans/2026-07-13-quota-history-foundation.md) is implemented. `QuotaRepository` now shields application state from Codex collection/storage details, retains bounded confirmed history, and supplies forecasts to the existing quota rows.
+**Functional follow-on (2026-07-13):** [Quota History Foundation](2026-07-13-quota-history-foundation.md) is implemented. `QuotaRepository` now shields application state from Codex collection/storage details, retains bounded confirmed history, and supplies forecasts to the existing quota rows.
 
-**Next decision-gated phase:** [Codex Reliability Hardening](<USER_HOME>/Desktop/agent%20usage/docs/superpowers/plans/2026-07-13-codex-reliability-hardening.md) is planned, not yet implemented. It addresses refresh cadence, sanitized diagnostics, conservative forecast confidence, and a one-week evidence review before any provider expansion or UI overhaul.
+**Next decision-gated phase:** [Codex Reliability Hardening](2026-07-13-codex-reliability-hardening.md) is planned, not yet implemented. It addresses refresh cadence, sanitized diagnostics, conservative forecast confidence, and a one-week evidence review before any provider expansion or UI overhaul.
 
 **Goal:** Build a native macOS menu-bar application that shows the currently confirmed Codex plan, credit balance, earned reset-credit expiries, five-hour quota, weekly quota, reset times, freshness, and confirmation state.
 

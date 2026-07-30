@@ -96,6 +96,14 @@ _Avoid_: Settings Agent selector, active-agent selector, provider filter
 The persisted Single-Agent Menu Bar Mode choice governing connection loss: Stay Selected keeps the Preferred Menu Bar Agent effective while showing its disconnected state, while Switch Automatically temporarily chooses another Connected Agent. Stay Selected is the default.
 _Avoid_: Disconnect toggle, fallback agent, active-agent switching
 
+**Command Shortcut**:
+The key equivalent for one menu popover footer command, shown right-aligned on its row and listed in General's Startup & Shortcuts section. Display and binding come from one catalog, so a listed shortcut is always the one that fires. Enable keyboard shortcuts governs both: with it off, nothing is shown and nothing is bound. The assignments are fixed; editing them is deferred.
+_Avoid_: Hotkey, global shortcut, accelerator
+
+**Menu Bar Glyph**:
+The provider mark drawn beside the menu bar's text label, shown only when more than one agent is eligible. It renders as a template, so its artwork is monochrome with transparent knockouts and is named separately from the colored artwork used on Settings tiles.
+_Avoid_: Provider icon, menu bar logo, status icon
+
 ## Usage Warnings
 
 **Shared Refresh Cadence**:
@@ -169,6 +177,68 @@ _Avoid_: Default icon mode, selected-agent view
 **Multi-Agent Menu Bar Mode**:
 A planned menu-bar presentation that renders progress for multiple agents. Single-agent selection and failover rules do not govern this mode; their controls are provisionally disabled while their stored values are preserved.
 _Avoid_: Dual quota view, automatic failover view
+
+## Local Token Activity
+
+**Token Monitor**:
+The menu-popover card showing token usage observed from an agent's local records on this Mac, distinct from provider-reported quota, billing, and account-wide usage. This name supersedes both **Dashboard** and **Token Activity** in everything a user reads; internal Swift type names still say `TokenActivity` and are deliberately not renamed.
+_Avoid_: Dashboard, Token Activity, local quota, account usage, billing usage
+
+**Token Monitor Visibility**:
+The per-agent preference deciding whether that agent contributes a Token Monitor card. Turning it off also stops reading that agent's local records and discards its cached observations, so it is a collection decision rather than a display filter.
+_Avoid_: Hide card, disable activity, pause monitoring
+
+**Token Monitor Section**:
+One toggleable region of the Token Monitor card — Activity chart, Token categories, Model usage, or Last request. Section toggles change only what is rendered; every section is derived from the same reconciled request set. The card's title, range line, range total, and request count are not sections and always remain.
+_Avoid_: Card row, widget, module
+
+**Token Monitor Range**:
+The per-agent preference deciding whether a card reports the current local day (**Today**) or the current local week (**This week**), shown as the line under the card's title. It defaults to **Today**. The range decides which observed requests are in scope and how wide one chart bar is — 30-minute intervals for a day, one bar per day for a week — and nothing else: both views are aggregated from the same reconciled request set, and switching rereads no file.
+_Avoid_: Time filter, period, rolling week, last 7 days
+
+**Activity Interval**:
+A 30-minute local-calendar segment whose value is the Observed Tokens attributed to provider-recorded completion times in that interval, not the cumulative total since midnight.
+_Avoid_: Chart point, rolling window, cumulative interval
+
+**Activity Chart**:
+The bar chart of Activity Intervals from local midnight through the current interval. Hover identifies one interval without changing the card's summary rows.
+_Avoid_: Line graph, cumulative chart, quota chart
+
+**Observed Tokens**:
+A provider-native token total derived from reconciled local records. Codex and Claude components retain their provider meanings and are not a cross-provider comparison.
+_Avoid_: Account tokens, quota tokens, comparable tokens
+
+**Model Usage**:
+Observed Token Activity grouped by Short Model Name and ordered by contribution. The popover names the top three groups and combines the remainder as Other.
+_Avoid_: Top model, model quota, model allowance
+
+**Short Model Name**:
+A compact model family and number such as GPT-5.6 or Sonnet 4.5; provider prefixes, product suffixes, and dated build identifiers are omitted.
+_Avoid_: Raw model identifier, model alias, display label
+
+**Last Request**:
+The most recent reconciled local agent interaction for which token usage is observable.
+_Avoid_: Latest request, latest response, last prompt
+
+**Other**:
+The combined Observed Tokens from models outside the three largest Model Usage groups for the current local day.
+_Avoid_: Unknown model, hidden models, remaining usage
+
+**Unknown Model**:
+The Model Usage group for reconciled local requests that contain token evidence but no usable model identifier.
+_Avoid_: Other, omitted model, invalid request
+
+**No Activity**:
+A readable local source with no Observed Tokens in the current local calendar day.
+_Avoid_: Activity unavailable, zero quota, disconnected
+
+**Activity Unavailable**:
+The state in which local Token Activity cannot be read or reconciled safely; it does not mean that no activity occurred.
+_Avoid_: No Activity, zero tokens, disconnected
+
+**Local Records Missing**:
+The state in which the provider's known local activity roots contain no readable session records yet.
+_Avoid_: Activity Unavailable, No Activity, provider disconnected
 
 **Paused Menu Bar State**:
 The menu-bar presentation for an inactive Effective Menu Bar Agent, identified by a pause symbol before its usage statistics.

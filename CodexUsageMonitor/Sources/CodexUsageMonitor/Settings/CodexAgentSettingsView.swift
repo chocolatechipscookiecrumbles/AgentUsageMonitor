@@ -41,6 +41,8 @@ struct CodexAgentSettingsView: View {
             )
         )
 
+        AgentTokenMonitorSection(settings: settings, provider: .codex)
+
         AgentUsageWarningsSection(settings: settings, provider: .codex)
 
     }
@@ -81,7 +83,7 @@ struct CodexAgentSettingsView: View {
 
     private var planName: String? {
         guard case .connected(let account) = connectionState else { return nil }
-        return account.planType?.capitalized ?? status.planName
+        return AgentPlanName.display(account.planType) ?? status.planName
     }
 
     @ViewBuilder

@@ -47,5 +47,14 @@ enum LocalDataInventory {
             retention: "Overwritten each time Claude Code renders its status line",
             contents: "Rate-limit percentages and reset times, written by the Claude usage bridge and only read here"
         ),
+        // Only the reconciled values the card already shows are written, so the
+        // next launch can display them before re-reading anything.
+        LocalDataStoreDescriptor(
+            id: "token-activity",
+            title: "Token Monitor",
+            fileName: "token-activity-cache.json",
+            retention: "Fourteen days plus the most recent request, replaced by each completed scan",
+            contents: "Hashed request identities, timestamps, models, and token counts; no file paths, agent session identifiers, or record contents"
+        ),
     ]
 }

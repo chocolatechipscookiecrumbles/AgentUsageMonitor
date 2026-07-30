@@ -4,9 +4,9 @@ Centralized status and file links: [Product Planning Board](../../product/planni
 
 > **For agentic workers:** Implement one branch at a time with `executing-plans`. Add focused automated coverage for deterministic seams and use compilation, read-only live collection, schema inspection, signed-app inspection, and manual UI acceptance in proportion to the claim. Update `outline.md`, `how-to.md`, `UsageProbe/README.md`, and the active plan whenever behavior changes.
 
-**Goal:** Turn the proven Codex quota monitor into a dependable daily-driver with configurable warnings, adaptive refresh, safe account connection, separate Settings and Dashboard windows, and launch at login before adding another provider.
+**Goal:** Turn the proven quota monitor into a dependable daily-driver with configurable warnings, adaptive refresh, safe account connection, a separate Settings window, a compact multi-provider menu popover, and launch at login.
 
-**Architecture:** Keep `QuotaRepository.refresh() -> QuotaRecord` as the collection seam and `QuotaMonitor` as the scheduling seam. Add small persisted settings and analytics interfaces consumed by the menu, Settings, Dashboard, notifier, and scheduler; provider-specific authentication remains behind a Codex connection module. No later UI calls Codex or reads persistence directly.
+**Architecture:** Keep provider quota collection separate from presentation and scheduling. Add small settings and local-activity interfaces consumed by the menu and Settings; provider-specific authentication remains behind provider connection modules. No view calls a provider CLI, reads provider session records, or owns persistence directly.
 
 ### Cross-cutting quota presentation state
 
@@ -39,9 +39,9 @@ The two user-facing modes are:
 - **Confirmed / completed:** the most recent refresh completed and produced a trusted live result (`confirmed` or `confirmed-after-retry`). Render the current record normally and identify the successful refresh time.
 - **Cached / paused:** the most recent refresh did not produce a trusted live result. Preserve and visibly label the last confirmed record when one exists, show both the last attempt and last successful refresh, and explain the normalized pause reason. Never present cached values as current. If no last-confirmed record exists, render the same mode with an unavailable state rather than inventing zero usage.
 
-`QuotaMonitor` owns transitions and timestamps. `QuotaViewModel` remains a shallow UI adapter. The menu popover, Dashboard, future widgets, Watch surfaces, exports, and additional provider adapters must render this same contract so a later UI redesign cannot silently reinterpret stale data.
+`QuotaMonitor` owns transitions and timestamps. `QuotaViewModel` remains a shallow UI adapter. The menu popover, future widgets, Watch surfaces, exports, and additional provider adapters must render this same contract so a later UI redesign cannot silently reinterpret stale data. Local activity is a separate **This Mac** observation and must never be substituted for this provider-reported quota state.
 
-**Tech Stack:** Swift 6.2, SwiftUI, AppKit, Charts, ServiceManagement, UserNotifications, Foundation JSON persistence, Codex app-server/CLI; no third-party dependencies or proprietary backend.
+**Tech Stack:** Swift 6.2, SwiftUI, AppKit, ServiceManagement, UserNotifications, Foundation JSON persistence, provider-owned CLI/session sources; no third-party dependencies or proprietary backend.
 
 ## Authoritative plan status — reconciled 2026-07-17
 
@@ -57,7 +57,7 @@ The two user-facing modes are:
 | Codex connection | Implemented; isolated external-login interval and activation acceptance observed | Complete the remaining bounded [external Provider Session detection plan](2026-07-17-external-codex-login-detection.md) checks |
 | Menu-bar display and placement | Implemented | Immediate preview, missing/cached lane, width, and VoiceOver checks |
 | Interruption backoff | Implemented with one delivery-durability follow-up | Retry the same stable event after failed submission, then controlled outage/recovery and signed-out/missing-CLI acceptance |
-| Dashboard | Deferred by user; partial historical checklist retained | Resume the recovered [Dashboard plan](2026-07-14-dashboard.md) only on explicit direction and after revalidating it against current `main` |
+| Menu-popover token activity card (formerly Dashboard) | Implemented through Task 7 on 2026-07-28; popover height decision open | Sources, monitor, card, and documentation are done per the [token activity card plan](2026-07-14-dashboard.md). The tallest state clips the non-scrolling popover on a typical laptop screen, so a layout decision precedes signed-app visual acceptance |
 | Figma Settings global sidebar | Implemented; signed Light/Dark appearance-transition acceptance complete | Inspect remaining manufactured conditional states in `2026-07-15-settings-system-appearance-transition.md` |
 | Settings and multi-agent follow-ups | Planned; documentation only | Split and revalidate the recovered [Settings and multi-agent follow-ups plan](2026-07-14-settings-provider-followups.md) after explicit direction and applicable provider capability work |
 | Settings section sidebars | Implemented historical stage; superseded by the global sidebar | Retain the recovered [section-sidebars plan](2026-07-14-settings-section-sidebars.md) as provenance; do not resume its old geometry without re-scoping |
@@ -72,8 +72,8 @@ The two user-facing modes are:
 - Keep fixed remaining-quota thresholds at 50%, 25%, 10%, and 5%.
 - Manual refresh choices are 1 minute 30 seconds, 2 minutes (default), 5 minutes, and 10 minutes. A persisted legacy one-minute selection migrates to 1 minute 30 seconds.
 - Automatic refresh may use 30 seconds only around an imminent threshold, qualified exhaustion, or reset verification.
-- Keep credits and earned reset-credit details in the menu popover, not the Dashboard.
-- Dashboard ranges are 24 hours, 7 days (default), 30 days, and 90 days; never draw a continuous series across reset windows.
+- Keep credits and earned reset-credit details in the existing provider popover content.
+- Keep local activity explicitly scoped to this Mac and separate from provider-reported quota, credits, and notifications.
 - Export and destructive data-management controls are deferred.
 - Each feature branch includes documentation changes and a fresh Swift build.
 
@@ -113,7 +113,7 @@ External-login follow-up implemented on 2026-07-17: while explicitly disconnecte
 
 ### 5. `feature/menu-bar-display` — implemented; manual UI acceptance pending (stacked on Codex Connection)
 
-Implement the dynamic General-controlled menu-bar display described below before returning to the remaining Settings and Dashboard sequence.
+Implement the dynamic General-controlled menu-bar display described below before returning to the remaining Settings and menu-popover sequence.
 
 Detailed plan: `docs/superpowers/plans/2026-07-13-menu-bar-display.md`.
 
@@ -151,7 +151,7 @@ Implementation status on 2026-07-13: persisted Appearance and Show preferences, 
 
 ### 6. `feature/settings-ui-followups` — implemented; manual UI acceptance pending (stacked on Menu Bar Display)
 
-Refine the existing Settings window before adding Dashboard. Replace the combined remaining-quota warning switch with separate 50%/25%/10%/5% choices that apply to both quota lanes. Turning off **Enable quota notifications** must grey every subordinate notification control without erasing choices. Expand General with working **Launch at login**, **System/Light/Dark** appearance, and app-local keyboard-shortcut enablement. Rebuild the Agents tab as a lower-content-only split so its provider sidebar begins below, and never takes space from, the unchanged full-width top Settings tab bar.
+Refine the existing Settings window before adding local activity to the popover. Replace the combined remaining-quota warning switch with separate 50%/25%/10%/5% choices that apply to both quota lanes. Turning off **Enable quota notifications** must grey every subordinate notification control without erasing choices. Expand General with working **Launch at login**, **System/Light/Dark** appearance, and app-local keyboard-shortcut enablement. Rebuild the Agents tab as a lower-content-only split so its provider sidebar begins below, and never takes space from, the unchanged full-width top Settings tab bar.
 
 Acceptance: threshold choices persist and filter delivery independently; the notification master switch gates and greys the checklist while permission recovery remains active; Launch at Login reflects real `SMAppService` state; appearance updates app-owned windows; disabling shortcuts removes the custom `Command-R` refresh binding but not standard Settings/Quit commands; and switching tabs never moves or narrows the top tab bar.
 
@@ -161,17 +161,17 @@ Implementation status on 2026-07-13: typed per-threshold persistence and confirm
 
 ### 7. `feature/dashboard`
 
-Add one separate Dashboard window using Swift Charts and a read-only analytics module. Include current five-hour/weekly percentages, reset countdowns, reset-separated usage charts, consumption per hour, forecast/confidence/observation count, sustainable pace, 15-minute/1-hour/24-hour changes, refresh outcome rates, data age, and inferred reset history. Exclude credit balance and earned reset credits.
+**Revised 2026-07-28: the branch name is historical; no Dashboard page or window will be added.**
 
-Acceptance: ranges are 24h/7d/30d/90d with 7d default; no account fingerprint is displayed; missing evidence produces an unavailable explanation rather than zero; repeated opens focus one window.
+Add one dynamic-height **Token activity** card to the existing Codex and Claude provider tabs. Automatic field-scoped reads build an in-memory-only reconciled index while the app runs, independent of quota availability. The card reports the current local day with hoverable 30-minute token bars from midnight through the current interval, provider-native input/output/cache-or-reasoning rows, Requests, the top three Short Model Name groups plus counted Other, and Last Request across all observed dates. Codex places it between quota and credits; Claude places it below quota.
 
-Dashboard acceptance also requires rendering `QuotaDisplayState` directly: cached/paused data must remain visually distinguishable from the latest confirmed history and must show its last-successful timestamp.
+Acceptance: the card always says **This Mac · observed**; its chart sum and line items equal the same reconciled Today total; unique main/subagent/sidechain requests are included while replays are removed; it creates no separate route, window, range selector, refresh schedule, network call, model turn, or persistent activity history; missing evidence is unavailable rather than zero; and the 340-point non-scrolling popover grows/shrinks naturally with its shared footer gap while remaining stable through provider switches and semantic file updates.
 
 ### 8. `feature/figma-ui-overhaul`
 
-Run a frontend-only Figma-to-SwiftUI overhaul after the functional Settings, Dashboard, General preferences, and menu-bar display branches have stable interfaces. Entry requires an approved Figma `/design/` URL with specific screen nodes or an explicit Figma Desktop selection. Use Figma MCP design context, screenshots, variables, asset inventory, and Code Connect mappings; perform an element-by-element adaptation audit before changing existing SwiftUI.
+Run any future frontend-only Figma-to-SwiftUI overhaul after the functional Settings, menu popover, General preferences, and menu-bar display surfaces have stable interfaces. Entry requires an approved Figma `/design/` URL with specific screen nodes or an explicit Figma Desktop selection. Use Figma MCP design context, screenshots, variables, asset inventory, and Code Connect mappings; perform an element-by-element adaptation audit before changing existing SwiftUI.
 
-Scope the overhaul to app-owned windows and reusable presentation components. Settings and Dashboard may adopt the Figma layout, tokens, typography, and exported assets while continuing to consume the existing provider-neutral state and action interfaces. Keep the menu-bar extra in native menu presentation unless a separate decision explicitly approves window style; a Figma mockup must not silently turn inline menu commands into panel buttons.
+Scope the overhaul to app-owned windows and reusable presentation components. Settings and the menu popover may adopt approved layout, tokens, typography, and exported assets while continuing to consume the existing provider-neutral state and action interfaces. Visual work must not change collection, privacy, scheduling, or authentication behavior.
 
 Acceptance: every implemented screen has a recorded Figma node and source screenshot; light and dark appearances, Dynamic Type, VoiceOver labels, confirmed/completed, cached/paused, unavailable, loading, and error states are represented; no view reads provider services or persistence directly; all existing working controls retain behavior; exported assets are validated and documented; manual side-by-side visual review is recorded. This branch must not change quota collection, scheduling, authentication, notification policy, or storage schemas.
 

@@ -7,26 +7,28 @@ struct MenuProviderHeaderPresentation {
 
     static func codex(
         displayState: QuotaDisplayState,
+        connectionState: AgentConnectionState,
         isRefreshing: Bool
     ) -> Self {
+        let presentation = displayState.displayedRecord?.presentation
+        // The plan a live connection proves outranks the one carried on a quota
+        // record, which may have been cached under an earlier subscription.
+        let title = self.title(
+            provider: .codex,
+            connectionPlan: connectionState.accountPlanType,
+            usagePlan: presentation?.planType
+        )
+
         if isRefreshing {
-            return Self(
-                title: "Codex",
-                subtitle: "Refreshing…",
-                status: .refreshing
-            )
+            return Self(title: title, subtitle: "Refreshing…", status: .refreshing)
         }
 
-        guard let presentation = displayState.displayedRecord?.presentation else {
-            return Self(
-                title: "Codex",
-                subtitle: "Usage unavailable",
-                status: .unavailable
-            )
+        guard let presentation else {
+            return Self(title: title, subtitle: "Usage unavailable", status: .unavailable)
         }
 
         return Self(
-            title: "Codex",
+            title: title,
             subtitle: updatedText(for: presentation.collectedAt),
             status: displayState.mode == .confirmedCompleted ? .confirmed : .cached
         )
@@ -34,31 +36,47 @@ struct MenuProviderHeaderPresentation {
 
     static func claude(
         usageState: ClaudeUsageState,
+        connectionState: ClaudeConnectionState,
         isRefreshing: Bool
     ) -> Self {
+        let presentation = usageState.presentation
+        let title = self.title(
+            provider: .claudeCode,
+            connectionPlan: connectionState.accountPlanType,
+            usagePlan: presentation?.snapshot.planHint
+        )
+
         if isRefreshing {
-            return Self(
-                title: "Claude",
-                subtitle: "Refreshing…",
-                status: .refreshing
-            )
+            return Self(title: title, subtitle: "Refreshing…", status: .refreshing)
         }
 
-        guard let presentation = usageState.presentation else {
-            return Self(
-                title: "Claude",
-                subtitle: "Usage unavailable",
-                status: .unavailable
-            )
+        guard let presentation else {
+            return Self(title: title, subtitle: "Usage unavailable", status: .unavailable)
         }
 
         // The Claude source label rides in the content caption, not here — the
         // header freshness line is identical across providers.
         return Self(
-            title: "Claude",
+            title: title,
             subtitle: updatedText(for: presentation.snapshot.capturedAt),
             status: presentation.delivery == .live ? .confirmed : .cached
         )
+    }
+
+    /// The header names the *account*, because the tab directly above it
+    /// already names the provider and repeating it says nothing.
+    ///
+    /// An unknown plan falls back to the provider name rather than to an empty
+    /// line or a guess: not knowing the tier is a normal state before the first
+    /// reading lands, and a blank header would read as a rendering fault.
+    private static func title(
+        provider: AgentProvider,
+        connectionPlan: String?,
+        usagePlan: String?
+    ) -> String {
+        AgentPlanName.display(connectionPlan)
+            ?? AgentPlanName.display(usagePlan)
+            ?? provider.tabTitle
     }
 
     /// The one freshness line every provider shares: an absolute timestamp and

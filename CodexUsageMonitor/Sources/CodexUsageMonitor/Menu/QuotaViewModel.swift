@@ -26,6 +26,11 @@ final class QuotaViewModel: ObservableObject {
     @Published private(set) var isRefreshingClaude = false
     @Published private(set) var claudeSetupState: ClaudeSetupState
 
+    /// Local Token Activity observed on this Mac. It is deliberately separate
+    /// from the quota pipeline: it starts with app monitoring, not with a
+    /// connection, and it stays readable while a provider's quota is not.
+    @Published private(set) var localActivityStates: [AgentProvider: ProviderLocalActivityState] = [:]
+
     let settings: AppSettings
 
     /// Providers currently connected enough to show a menu-bar reading, in
@@ -50,6 +55,7 @@ final class QuotaViewModel: ObservableObject {
 
     private let monitor: QuotaMonitor
     private let claudeMonitor: ClaudeUsageMonitor
+    private let activityMonitor: LocalActivityMonitor
     /// App-level notifier for things `QuotaMonitor` (Codex) does not own: Claude
     /// threshold alerts and quota-setting confirmations. Shares the same
     /// authorization gate and UserDefaults dedup, so it cannot double-fire.
@@ -91,6 +97,8 @@ final class QuotaViewModel: ObservableObject {
             }
         )
         self.claudeMonitor = claudeMonitor
+        let activityMonitor = LocalActivityMonitor()
+        self.activityMonitor = activityMonitor
         // Same `.app`-only gate the Codex notifier uses, so tests and previews
         // never touch the notification center.
         self.appNotifier = Bundle.main.bundleURL.pathExtension == "app"
@@ -163,6 +171,33 @@ final class QuotaViewModel: ObservableObject {
             // rather than waiting for the next scheduled refresh.
             if state.isConnected { self?.refreshClaude() }
         }.store(in: &subscriptions)
+        activityMonitor.$states.sink { [weak self] states in
+            self?.localActivityStates = states
+        }.store(in: &subscriptions)
+        // Hiding an agent's Token Monitor stops reading that agent's records,
+        // so visibility has to reach the monitor and not only the menu.
+        settings.$tokenMonitorVisibilityByProvider
+            .removeDuplicates()
+            .sink { [weak self] visibility in
+                guard let self else { return }
+                for provider in AgentProvider.allCases {
+                    self.activityMonitor.setCollectionEnabled(
+                        visibility[provider] ?? true,
+                        for: provider
+                    )
+                }
+            }.store(in: &subscriptions)
+        // The day/week choice decides how the monitor aggregates, so it has to
+        // reach the monitor too. Nothing is reread; the reconciled requests are
+        // republished against the new window.
+        settings.$tokenMonitorRangeByProvider
+            .removeDuplicates()
+            .sink { [weak self] ranges in
+                guard let self else { return }
+                for provider in AgentProvider.allCases {
+                    self.activityMonitor.setRange(ranges[provider] ?? .day, for: provider)
+                }
+            }.store(in: &subscriptions)
         if Self.shouldStartProviderMonitoring(arguments: CommandLine.arguments) {
             start()
         }
@@ -172,6 +207,10 @@ final class QuotaViewModel: ObservableObject {
         !arguments.contains("--live-read-once")
             && !arguments.contains(ClaudeUsageProbeCommand.flag)
             && !arguments.contains(MenuPopoverViabilityGate.launchArgument)
+    }
+
+    func localActivityState(for provider: AgentProvider) -> ProviderLocalActivityState {
+        localActivityStates[provider] ?? .loading
     }
 
     var settingsStatus: SettingsStatus {
@@ -185,6 +224,9 @@ final class QuotaViewModel: ObservableObject {
     func start() {
         connectionController.start()
         monitor.start()
+        // Activity collection is local and costs no tokens, so it follows app
+        // monitoring rather than any provider's connection state.
+        activityMonitor.start()
         // Respect a persisted Claude disconnect: show disconnected without
         // reading, rather than resuming passive capture.
         if settings.claudeDisconnected {
@@ -200,6 +242,11 @@ final class QuotaViewModel: ObservableObject {
 
     func refresh() {
         monitor.refresh(reason: .manual)
+    }
+
+    /// User-initiated from Diagnostics: drop the recorded refresh history.
+    func clearRefreshDiagnostics() {
+        monitor.clearDiagnostics()
     }
 
     func checkCodexConnection() {

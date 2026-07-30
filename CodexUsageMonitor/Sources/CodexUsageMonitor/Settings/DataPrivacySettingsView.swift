@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct DataPrivacySettingsView: View {
+    @State private var exportError: String?
+    @State private var exportedFileName: String?
+
     var body: some View {
         SettingsPage {
             SettingsSection("Local storage") {
@@ -14,8 +17,14 @@ struct DataPrivacySettingsView: View {
                 SettingsSectionRow {
                     SettingsLabeledRow("Directory permissions") { Text("Owner only (0700)") }
                 }
-                SettingsSectionRow(showsDivider: false) {
+                SettingsSectionRow {
                     SettingsLabeledRow("File permissions") { Text("Owner only (0600)") }
+                }
+                SettingsSectionRow(showsDivider: false) {
+                    HStack(spacing: SettingsLayoutMetrics.rowSpacing) {
+                        Button("Reveal in Finder", action: LocalDataActions.revealInFinder)
+                        Button("Copy Path", action: LocalDataActions.copyDirectoryPath)
+                    }
                 }
             }
 
@@ -49,24 +58,97 @@ struct DataPrivacySettingsView: View {
                 }
                 SettingsSectionRow {
                     SettingsValueRow(
-                        "Conversations",
-                        value: "Never read",
-                        description: "Only quota percentages, reset times, and plan type are collected."
+                        "Conversation content",
+                        value: "Never collected",
+                        description: "Quota collection reads only percentages, reset times, and plan type."
+                    )
+                }
+                SettingsSectionRow {
+                    SettingsDescription(ClaudeUsageDisplayModel.weeklyScopeCaveat)
+                }
+                // The read itself is described above; that it is not permitted
+                // is a separate fact, and the page would be misleading without
+                // it. It is stated wherever a user could act on it — here, the
+                // README, and the release notes — so installing or continuing
+                // to use Claude support is an informed choice.
+                SettingsSectionRow(showsDivider: false) {
+                    SettingsDescription(
+                        "Anthropic's Terms of Service do not permit another application to reuse Claude Code's credential. This app does it anyway, which may put your Anthropic account at risk of enforcement. Turning off Claude in Agents stops the read entirely. A first-party sign-in that would remove this caveat is planned."
+                    )
+                }
+            }
+
+            // The Token Monitor reads files the agents own, automatically and
+            // without asking, so the exact boundary belongs in Settings rather
+            // than only in the plan.
+            SettingsSection("Token Monitor") {
+                SettingsSectionRow {
+                    SettingsValueRow(
+                        "Local records",
+                        value: "Read automatically",
+                        description: "For each agent whose Token Monitor is shown, this app reads the session records that agent already writes on this Mac, so the menu can show tokens observed today. This starts on its own, keeps working when an agent is disconnected, makes no network request, and costs no tokens. Turning an agent's Token Monitor off in Agents stops reading that agent's records and removes what was cached for it."
+                    )
+                }
+                SettingsSectionRow {
+                    SettingsValueRow(
+                        "What is read",
+                        value: "Timestamps, models, tokens",
+                        description: "Only timestamps, model identifiers, token counts, and opaque identifiers needed to avoid counting the same request twice. Prompts, responses, reasoning, tool activity, file paths, and project names are never decoded."
+                    )
+                }
+                SettingsSectionRow {
+                    SettingsValueRow(
+                        "Where it is kept",
+                        value: "Cached on this Mac",
+                        description: "Recent totals are cached in this app's own folder so the menu can show them immediately at the next launch instead of rebuilding first. Only the figures shown on the card are cached — never file paths, agent session identifiers, or record contents. The records themselves stay owned by the agents and are never modified."
                     )
                 }
                 SettingsSectionRow(showsDivider: false) {
-                    SettingsDescription(ClaudeUsageDisplayModel.weeklyScopeCaveat)
+                    SettingsDescription("These totals describe what this Mac observed, not an account. Records that cannot be read safely are reported as unavailable rather than counted as zero.")
                 }
             }
 
             SettingsSection("Excluded data") {
-                SettingsSectionRow {
+                SettingsSectionRow(showsDivider: false) {
                     SettingsDescription("The app does not store passwords, OAuth tokens, email addresses, prompts, source code, raw provider responses, or raw provider errors.")
                 }
+            }
+
+            SettingsSection("Export") {
+                SettingsSectionRow {
+                    SettingsDescription("Writes every store listed above to one JSON file you choose. A store this Mac has not written yet is named and marked unavailable rather than left out. Nothing outside this app's own folder is included — not Claude Code's Keychain item, and not the agents' own records.")
+                }
+                SettingsSectionRow {
+                    VStack(alignment: .leading, spacing: SettingsLayoutMetrics.preferenceTitleDescriptionSpacing) {
+                        Button("Export Local Data…", action: exportLocalData)
+                        if let exportedFileName {
+                            Text("Exported to \(exportedFileName).")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                        }
+                        if let exportError {
+                            Text(exportError)
+                                .font(.callout)
+                                .foregroundStyle(.orange)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
                 SettingsSectionRow(showsDivider: false) {
-                    SettingsDescription("Export and deletion controls are intentionally deferred.")
+                    SettingsDescription("The exported file leaves this app's owner-only folder. It is protected by wherever you save it. Deletion controls remain deferred; remove the files in Finder to clear this data today.")
                 }
             }
+        }
+    }
+
+    private func exportLocalData() {
+        exportError = nil
+        exportedFileName = nil
+        do {
+            guard let url = try LocalDataActions.runExportPanel() else { return }
+            exportedFileName = url.lastPathComponent
+        } catch {
+            exportError = "Could not write the export: \(error.localizedDescription)"
         }
     }
 }

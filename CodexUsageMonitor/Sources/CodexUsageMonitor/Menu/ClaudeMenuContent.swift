@@ -9,6 +9,9 @@ import SwiftUI
 /// repeated here. No Codex credit/collector furniture appears on this tab.
 struct ClaudeMenuContent: View {
     @ObservedObject var viewModel: QuotaViewModel
+    /// Observed separately from the view model so a Token Monitor preference
+    /// change redraws an open popover.
+    @ObservedObject var settings: AppSettings
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -24,6 +27,8 @@ struct ClaudeMenuContent: View {
                 }
 
                 ClaudeUsageWindowCard(model: model)
+
+                activityCard
 
                 // Provenance lives here rather than the header so the freshness
                 // line stays identical across providers; it names where the
@@ -46,6 +51,11 @@ struct ClaudeMenuContent: View {
                     )
                 }
             } else {
+                // Activity is read locally and does not depend on quota, so it
+                // stays above the recovery content rather than disappearing
+                // with the quota reading.
+                activityCard
+
                 ClaudeUnavailableContent(
                     connectionState: viewModel.claudeConnectionState,
                     connectWithCredentials: viewModel.connectClaudeWithCredentials
@@ -59,7 +69,20 @@ struct ClaudeMenuContent: View {
             }
         }
         .padding(.horizontal, MenuPopoverTheme.contentHorizontalPadding)
-        .padding(.bottom, MenuPopoverTheme.contentBottomPadding)
+    }
+
+    @ViewBuilder
+    private var activityCard: some View {
+        if settings.isTokenMonitorVisible(for: .claudeCode) {
+            ProviderTokenActivityCard(
+                presentation: ProviderTokenActivityPresentation(
+                    provider: .claudeCode,
+                    state: viewModel.localActivityState(for: .claudeCode),
+                    range: settings.tokenMonitorRange(for: .claudeCode)
+                ),
+                visibleSections: settings.enabledTokenMonitorSections(for: .claudeCode)
+            )
+        }
     }
 
     private var theme: MenuPopoverTheme {

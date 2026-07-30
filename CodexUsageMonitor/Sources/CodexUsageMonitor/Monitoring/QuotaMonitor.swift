@@ -119,6 +119,15 @@ final class QuotaMonitor: ObservableObject {
         refreshState = .idle
     }
 
+    /// Discards the recorded refresh history at the user's request. Only the
+    /// diagnostics record is affected: quota state, cached readings, and the
+    /// refresh schedule are untouched, and the next completed refresh starts a
+    /// new history.
+    func clearDiagnostics() {
+        diagnostics.clear()
+        diagnosticSummary = .empty
+    }
+
     func refresh(reason: RefreshReason) {
         // App-local disconnect hides Codex usage without reading the CLI.
         guard !settings.codexDisconnected else {
