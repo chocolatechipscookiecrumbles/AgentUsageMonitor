@@ -39,26 +39,36 @@ README's License section to point at it instead of at this file.
 
 - [ ] Licence chosen and `LICENSE` committed
 
-### 2. The README claims a notarized download, and the signed build is now stale
+### 2. The notarized build is not the build being shipped
 
-The Install section says releases "are signed with an Apple **Developer ID**
-certificate and notarized by Apple." The signature is real and verified, but **no
-ticket is stapled** — and the submission in flight is for the superseded `1.0.0`
-build, from before the version was set to `0.0.1`.
+The README's Install section says releases "are signed with an Apple **Developer
+ID** certificate and notarized by Apple." Apple did notarize the app on
+2026-07-29 — but that submission was `Codex Usage Monitor` / `1.0.0` / build `254`,
+made before the rename and the version change.
 
-**Why it matters.** If notarization is rejected, or if the old bundle is published
-by mistake, the README is telling users something false about a Gatekeeper prompt
-they *will* hit — and the app would report a version the repository no longer
-claims.
+**Why it matters.** A notarization ticket binds to the submitted binary's
+code-directory hash. Editing `CFBundleDisplayName` and `CFBundleShortVersionString`
+changes that hash, so the accepted ticket cannot apply to the shipping bundle. The
+approval is easy to mistake for "the app is notarized"; what it establishes is that
+the *signing setup* satisfies the notary, which is a different and lesser claim.
 
-**The fix.** Bump `CFBundleVersion` (`git rev-list --count HEAD`; `254` is already
-spent), rebuild, re-notarize, staple, and confirm `spctl -a -vv` prints
+**The trap to avoid.** The stapled, approved `.app` still sits in `.build` from the
+2026-07-29 run. Publishing it would ship a build that calls itself Codex Usage
+Monitor `1.0.0` under a release tagged `v0.0.1` for Agent Monitor. Rebuild before
+you package anything.
+
+**The fix.** `CFBundleVersion` is already `265` in the repository (`254` is
+permanently consumed — Apple tracks build numbers per bundle identifier, which the
+rename did not change). Rebuild, submit, staple, and confirm `spctl -a -vv` prints
 `accepted … source=Notarized Developer ID`. Publish nothing before that. If you end
 up shipping Path B instead, rewrite that Install paragraph and add the `xattr`
 workaround.
 
-- [ ] Rebuilt at `0.0.1` with a fresh build number
+- [x] `CFBundleVersion` bumped to `265`
+- [ ] Rebuilt — `plutil` confirms `Agent Monitor` / `0.0.1` / `265` inside the bundle
 - [ ] Notary returned `Accepted`, ticket stapled, `spctl` verdict re-checked
+- [ ] The superseded `1.0.0` bundle and its zip removed from `.build`, so it cannot
+      be uploaded by accident
 
 ### 3. The Claude ToS disclosure is load-bearing — keep it in all three places
 

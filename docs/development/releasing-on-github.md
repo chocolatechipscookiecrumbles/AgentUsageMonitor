@@ -17,33 +17,52 @@ the commands, so you can repeat it.
 > then, do not remove the disclosure from any of those three places. Codex usage
 > is read from the local Codex CLI app-server and carries no such caveat.
 
-## Where this stands right now (2026-07-29)
+## Where this stands right now (2026-07-30)
 
-**The app is signed with a real Developer ID identity and a notarization submission
-is in flight** — but that submission is for the superseded `1.0.0` build. The
-version has since been set to **`0.0.1`**, so the artifact you publish must be
-rebuilt and re-notarized with a fresh build number. See
-[The remaining sequence](#the-remaining-sequence).
+**Apple notarized the app — but not the app you are going to ship.** The approved
+submission was built *before* the rename and the version change: it reports
+`Codex Usage Monitor` / `1.0.0` / build `254`. The source now says
+`Agent Monitor` / `0.0.1`.
+
+**A notarization ticket is bound to the exact binary that was submitted**, by its
+code-directory hash. Changing `CFBundleDisplayName` or `CFBundleShortVersionString`
+rewrites `Info.plist`, which changes the hash, which makes the approved ticket
+inapplicable. There is no way to carry it across — the ticket is not a licence for
+the project, it is a receipt for one binary.
+
+So the approval is worth something, just not the thing it looks like:
+
+| The approval **does** prove | It **does not** give you |
+|---|---|
+| The Developer ID certificate and its private key work for distribution signing | A shippable artifact |
+| The hardened runtime, secure timestamp, and absence of `get-task-allow` all satisfy the notary | Any standing that transfers to a rebuilt bundle |
+| The nested bridge is signed correctly — the usual cause of a rejected submission | Permission to skip resubmitting |
+
+Expect the resubmission to pass: nothing about the *signing* changed, only two
+strings and a build number. The first submission is where the risk was.
 
 | Prerequisite | State |
 |---|---|
-| Build and tests green | ✅ 316 tests, 0 failures |
+| Build and tests green | ✅ 316 tests, 1 skipped, 0 failures |
 | Optimized release binary | ✅ `build-app.sh` builds `-c release` |
 | App icon | ✅ `AppIcon.appiconset`, all ten sizes; bundle `.icns` built by `iconutil` |
-| Version and build number | ⚠️ `Info.plist` now reads `0.0.1` / `254`. The signed bundle was built at `1.0.0` / `254`, so a **rebuild with a fresh `CFBundleVersion`** is required before publishing — see [Step 1](#step-1--pick-and-set-the-version) |
+| Version and build number | ✅ `0.0.1` / `265` in `Info.plist`. `254` is spent — the notary has already seen it, and Apple rejects a re-used build number |
+| Product name | ✅ `Agent Monitor` in every user-visible string; identity stays `CodexUsageMonitor` |
 | Seven-day reliability observation | ✅ Passed — see the caveat in [reliability Task 5](../superpowers/plans/2026-07-13-codex-reliability-hardening.md#task-5-run-and-review-the-one-week-hardening-period) |
 | Claude credential disclosure | ✅ README, app Data & Privacy page, release notes |
 | Release notes | ✅ Drafted at [`docs/release-notes/0.0.1.md`](../release-notes/0.0.1.md) |
 | Git remote | ✅ `origin` → `chocolatechipscookiecrumbles/agent-usage` |
 | **Apple Developer membership** | ✅ Active |
 | **Developer ID certificate** | ✅ `Developer ID Application: Project maintainer (<APPLE_TEAM_ID>)`, installed with its private key |
-| **Signed, notarization-ready bundle** | ✅ Verified 2026-07-29 — see the evidence below |
-| **Notarization** | ⏳ **Submitted for the `1.0.0` / `254` build, awaiting the notary result.** No ticket is stapled, and this submission is now superseded by the version change |
+| **Notarization of the pre-rename build** | ✅ **Accepted** — `Codex Usage Monitor` / `1.0.0` / `254`. Superseded; do not publish it |
+| **Notarization of the shipping build** | ❌ **Not started.** `Agent Monitor` / `0.0.1` / `265` has not been built, submitted, or stapled |
 | `gh` CLI authenticated | ❌ `gh auth login` still needed (or use the web UI) |
 
-### Signing evidence (2026-07-29)
+### Signing evidence — the pre-rename build (2026-07-29)
 
-Read back from `CodexUsageMonitor/.build/CodexUsageMonitor.app`, built at 18:09:
+Kept because it is the evidence that the signing setup is sound; it describes the
+**approved but superseded** bundle, not the one you will publish. Read back from
+`CodexUsageMonitor/.build/CodexUsageMonitor.app`, built at 18:09:
 
 ```
 Authority=Developer ID Application: Project maintainer (<APPLE_TEAM_ID>)
@@ -64,19 +83,40 @@ only thing missing. `xcrun stapler validate` correspondingly reports
 
 ### The remaining sequence
 
-The in-flight submission is still worth watching — an `Accepted` result proves the
-signing setup is correct end to end — but it is **not the artifact you will ship**,
-because the version has since changed to `0.0.1`.
+`CFBundleVersion` is already set to `265` in this branch, so nothing needs editing
+first. Run this in **your own Terminal** — every step below either signs, reaches
+the Keychain, or talks to Apple, and none of it should be run by an agent:
 
-1. Wait for the notary result on the `1.0.0` build. If it comes back `Invalid`, fix
-   the cause before doing anything else.
-2. Set a fresh `CFBundleVersion` (`git rev-list --count HEAD`) and rebuild
-   (Steps 1–2). The bundle now reports `0.0.1`.
-3. Zip, submit, and **staple and validate** the new build (Step 3).
-4. Re-run `spctl -a -vv` — it must flip to `accepted … source=Notarized Developer ID`.
-5. Package the stapled app (Step 4), tag `v0.0.1` (Step 5), authenticate `gh` and
-   publish (Step 6), then verify the uploaded artifact like a stranger would
-   (Step 7).
+```sh
+cd CodexUsageMonitor
+
+# 1. Rebuild. The bundle now reports Agent Monitor / 0.0.1 / 265.
+swift test && ./Scripts/build-app.sh
+./Scripts/verify-signed-app-resources.sh
+
+# 2. Confirm the rename actually reached the bundle before spending a submission.
+app=.build/CodexUsageMonitor.app
+plutil -extract CFBundleDisplayName raw "$app/Contents/Info.plist"        # Agent Monitor
+plutil -extract CFBundleShortVersionString raw "$app/Contents/Info.plist" # 0.0.1
+plutil -extract CFBundleVersion raw "$app/Contents/Info.plist"            # 265
+codesign -dvv "$app" 2>&1 | grep -E "Authority=Developer ID|Timestamp|flags"
+
+# 3. Notarize and staple.
+cd .build
+ditto -c -k --keepParent CodexUsageMonitor.app CodexUsageMonitor-notarize.zip
+xcrun notarytool submit CodexUsageMonitor-notarize.zip \
+  --keychain-profile "notary-codexmon" --wait
+xcrun stapler staple CodexUsageMonitor.app
+xcrun stapler validate CodexUsageMonitor.app     # "The validate action worked!"
+spctl -a -vv CodexUsageMonitor.app               # accepted … source=Notarized Developer ID
+```
+
+Then package (Step 4), tag `v0.0.1` (Step 5), authenticate `gh` and publish
+(Step 6), and verify the uploaded artifact like a stranger would (Step 7).
+
+**Step 2 is not ceremony.** The rename lives entirely in `Info.plist` and five
+Swift strings; if the build picked up a stale plist you would notarize a bundle
+still calling itself Codex Usage Monitor, and only find out after publishing.
 
 Check on a submission at any time:
 
@@ -131,10 +171,9 @@ both paths.
    `build-app.sh` builds `-c release` and installs the app executable and the
    bundled bridge from `.build/release/`. Override with `BUILD_CONFIGURATION=debug`
    only for local iteration — never for a release.
-3. **Set the version.** `CFBundleShortVersionString` is `0.0.1` as of 2026-07-29.
-   `CFBundleVersion` is still `254`, which was already used by the superseded
-   submission — **set it to `git rev-list --count HEAD` before you notarize again.**
-   See [Step 1](#step-1--pick-and-set-the-version).
+3. ~~**Set the version.**~~ **Done 2026-07-30:** `0.0.1` / `265`. `254` was consumed
+   by the pre-rename submission and cannot be reused. Bump again for the *next*
+   release. See [Step 1](#step-1--pick-and-set-the-version).
 4. **Know the known gaps** so your release notes are honest:
    - ~~**No app icon yet.**~~ **Resolved 2026-07-29:** `AppIcon.appiconset`
      ships all ten macOS representations (16 through 512 at 1x and 2x), and
@@ -168,7 +207,7 @@ macOS apps carry two version strings in `Info.plist`:
 - `CFBundleVersion` — a **monotonic build number** that must increase every time
   you notarize (Apple rejects a re-used build number). Bump it on every release.
 
-Currently: `CFBundleShortVersionString = 0.0.1`, `CFBundleVersion = 254`.
+Currently: `CFBundleShortVersionString = 0.0.1`, `CFBundleVersion = 265`.
 
 **Set to `0.0.1` on 2026-07-29** (revised down from an earlier `1.0.0`). The build
 is feature-complete — both providers ship, the reliability observation passed, and
@@ -195,11 +234,12 @@ Use **SemVer** (`MAJOR.MINOR.PATCH`). A `0.x` version signals that the public
 interface — and specifically the Claude credential path — may still change; see
 the terms caveat in the release notes below.
 
-> **The signed bundle in `.build` was built at `1.0.0` / `254`, before this change,
-> and the in-flight notarization is for that build.** Whatever the notary returns,
-> the artifact you actually publish must be rebuilt at `0.0.1` and **re-notarized
-> with a fresh `CFBundleVersion`** — Apple rejects a re-used build number.
-> `git rev-list --count HEAD` currently returns `256`.
+> **Why `265` and not `255`.** `254` was submitted to the notary as
+> `Codex Usage Monitor` / `1.0.0` and accepted. Apple keeps build numbers per
+> bundle identifier, and the identifier did not change with the rename — so from
+> the notary's point of view `254` is used, permanently. `265` is the commit count
+> at the point this was set, which keeps the number monotonic without a second
+> thing to remember.
 
 ## Step 2 — Build the release `.app`
 
@@ -308,10 +348,11 @@ security find-identity -v -p codesigning
 Notarization = Apple scans your signed app and issues a ticket; **stapling**
 attaches that ticket so it works offline.
 
-> **Status 2026-07-29:** the credential profile is stored and a submission for the
-> old `1.0.0` build is **in flight**. The one-time setup below is done; the submit,
-> staple, and validate commands are what you will run again against the rebuilt
-> `0.0.1` bundle.
+> **Status 2026-07-30:** the credential profile is stored and the pre-rename
+> `1.0.0` / `254` build was **accepted**. The one-time setup below is done. The
+> submit, staple, and validate commands are what you run against the rebuilt
+> `Agent Monitor` / `0.0.1` / `265` bundle — the accepted ticket does not carry
+> over to it.
 
 **One-time setup:** store an app-specific password (make one at
 appleid.apple.com → Sign-In & Security → App-Specific Passwords) in the keychain:
