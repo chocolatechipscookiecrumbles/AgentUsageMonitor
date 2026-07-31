@@ -52,8 +52,8 @@ asks for a password, and no prompt, response, or file content ever leaves your M
 
 ### Download
 
-1. Grab `CodexUsageMonitor-0.0.1.zip` from the [latest release](../../releases/latest).
-2. Unzip it and move **CodexUsageMonitor.app** to `/Applications`.
+1. Grab `AgentUsageMonitor-0.0.1.zip` from the [latest release](../../releases/latest).
+2. Unzip it and move **AgentUsageMonitor.app** to `/Applications`.
 3. Launch it. **It lives in the menu bar** — there is no Dock icon and no window on
    first launch. Look at the right end of the menu bar.
 
