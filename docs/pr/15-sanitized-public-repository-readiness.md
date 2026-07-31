@@ -83,6 +83,7 @@ local Markdown/HTML paths and anchors resolve.
 | TruffleHog 3.96.0 edited-tree scan | Run | 0 candidates |
 | Gitleaks 8.30.1 pre-rewrite full-history scan | Run | 1 redacted instructional shell-variable placeholder; no credential |
 | TruffleHog 3.96.0 pre-rewrite full-history scan | Run | 0 candidates |
+| Targeted pre-rewrite PII/URL inventory | Run | Metadata, blobs, messages, and annotated tag inventoried with counts only; rewrite required |
 | Full-history workflow-path inspection | Run | No `.github/workflows` path was ever committed |
 | Current-tree prohibited identity/path searches | Run | 0 matches |
 | Published archive and contained `.app` name | Not run | Requires maintainer inspection of the private release |

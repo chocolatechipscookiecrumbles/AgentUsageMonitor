@@ -41,6 +41,12 @@ private and retains its pull requests, Actions, branches, stashes, and audit tra
   confirmed it is the documented `$CLAUDE_ACCESS_TOKEN` shell-variable
   placeholder. TruffleHog 3.96.0, with verification and auto-update disabled,
   reported zero candidates. Raw reports remain mode `0600` outside the repository.
+- [x] Inventory targeted rewrite material without recording raw values. The
+  pre-rewrite mirror contains 525 institutional-email author/committer metadata
+  fields; 59 legal-name, 185 Team-ID, 1,225 user-home-path, and 193 canonical
+  old-repository-URL blob commit/file matches; one Team-ID commit-message line;
+  and one annotated tag whose tagger/message require rewriting. The institutional
+  domain does not appear in historical text blobs.
 - [ ] Rewrite author, committer, tagger, message, path, identity, and canonical
   repository-URL history in the disposable mirror.
 - [ ] Re-run secret, PII, object-size, and repository-integrity checks against the
