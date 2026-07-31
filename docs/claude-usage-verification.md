@@ -3,6 +3,12 @@
 This guide verifies the Claude paths that ship in Agent Monitor 0.0.1. It is a
 real-machine smoke check, not a substitute for the automated suite.
 
+> **Known 0.0.1 setup defect:** Claude setup has required unclear extra recovery
+> in the published app. The exact failing boundary has not been reproduced, so
+> record whether failure occurs during credential discovery, Keychain permission,
+> passive status-line setup, or explicit CLI recovery instead of treating those
+> paths as one generic “connection” failure.
+
 ## Current source hierarchy
 
 | Tier | Source | Runtime status |
@@ -53,9 +59,10 @@ Scripts/verify-signed-app-resources.sh
 codesign --verify --deep --strict --verbose=2 .build/CodexUsageMonitor.app
 ```
 
-Before release, use the Developer ID identity and complete notarization/stapling.
-Ad-hoc signing is only a local development check and can cause Keychain approval
-to reappear after rebuilds.
+The published 0.0.1 artifact used the Developer ID identity and completed
+notarization/stapling. Future release candidates must repeat those steps; ad-hoc
+signing remains only a local development check and can cause Keychain approval to
+reappear after rebuilds.
 
 ## 3. Explicit Claude Code credential connection
 

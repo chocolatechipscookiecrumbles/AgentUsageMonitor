@@ -1,4 +1,4 @@
-# Agent Monitor
+# AgentUsageMonitor
 
 **Your Codex and Claude Code usage limits, in the macOS menu bar.**
 
@@ -11,11 +11,11 @@ asks for a password, and no prompt, response, or file content ever leaves your M
 `macOS 14+` · `Swift 6` · `menu-bar only (no Dock icon)` · `non-commercial` ·
 `version 0.0.1`
 
-> **Naming:** the app was called *Codex Usage Monitor* when it only read Codex. It
-> now covers Claude Code too, so the product is **Agent Monitor**. The bundle,
-> download, and source tree are still named `CodexUsageMonitor` — that rename is
-> tracked in [before going public](docs/development/before-going-public.md) and is
-> deliberately not being done mid-release.
+> **Naming:** the project and local clone name are now **AgentUsageMonitor**. The
+> published 0.0.1 app still displays **Agent Monitor**, while its bundle, download,
+> target, and source directory remain `CodexUsageMonitor` for compatibility. The
+> GitHub repository name and endpoint are still `agent-usage` until that remote
+> rename is completed, so the clone command below continues to use the working URL.
 
 ---
 
@@ -57,15 +57,20 @@ asks for a password, and no prompt, response, or file content ever leaves your M
 3. Launch it. **It lives in the menu bar** — there is no Dock icon and no window on
    first launch. Look at the right end of the menu bar.
 
-The 0.0.1 download must be signed with an Apple **Developer ID** certificate,
-notarized, and stapled before it is published. The earlier accepted ticket belongs
-to a superseded pre-rename build and does not cover the shipping artifact.
+The planned first-launch connection policy will start both providers app-locally
+disconnected and require separate, explicit Connect actions for Codex and Claude,
+even when their CLIs already have sessions. Version 0.0.1 does not yet enforce that
+consent boundary consistently.
+
+The published 0.0.1 download is signed with an Apple **Developer ID** certificate,
+notarized, and stapled. On 2026-07-31 the uploaded archive was downloaded again,
+accepted by Gatekeeper, launched, and observed working as intended.
 
 ### Build from source
 
 ```sh
-git clone https://github.com/chocolatechipscookiecrumbles/AgentUsageMonitor.git
-cd "agent-usage/CodexUsageMonitor"
+git clone https://github.com/chocolatechipscookiecrumbles/AgentUsageMonitor.git AgentUsageMonitor
+cd "AgentUsageMonitor/CodexUsageMonitor"
 
 swift build          # compile
 swift test           # run the test suite
@@ -91,7 +96,7 @@ ad-hoc signing and warns you — fine for local use, but see
 | **OS** | macOS 14 (Sonoma) or later |
 | **Codex support** | The Codex CLI, already signed in |
 | **Claude support** | Claude Code, already signed in |
-| **Runtime** | None. The Claude usage bridge is a native Swift executable bundled and signed inside the app — no Python needed |
+| **Runtime** | None. The Claude usage bridge is currently a second native Swift executable bundled and signed inside the app — no Python needed |
 | **Accounts** | None. The app adds no account, network login, or credential of its own |
 
 You need at least one of the two providers; neither is required for the other to
@@ -339,6 +344,19 @@ explicit direction.
 - **Claude's weekly window is shared** with Claude chat, not Claude Code alone.
 - **Keyboard shortcuts are not editable yet.** The four assignments are listed in
   **General**.
+- **Codex Token Monitor may show no local usage.** This was observed in the
+  published release even though Codex had been used locally. The discovery,
+  permission, record-schema, and reconciliation paths have not yet been isolated,
+  so no cause or workaround is claimed.
+- **Claude setup is not yet a dependable first-run flow.** The released setup can
+  require extra connection or recovery actions, and the exact failing boundary
+  between credential access, passive status-line capture, and explicit CLI recovery
+  has not yet been reproduced deterministically.
+- **First-launch connection consent is not explicit enough.** A future connection
+  change will deliberately start both providers app-locally disconnected on a fresh
+  installation and require separate Connect actions before quota collection. It
+  must not silently adopt an existing CLI session or let one provider's action
+  alter the other.
 - **No Dock icon.** It is an `LSUIElement` app; the menu bar is the whole surface.
 - **Ad-hoc source builds re-prompt for the Keychain.** An ad-hoc signature's
   designated requirement is pinned to the binary's hash and changes on every build,
@@ -388,7 +406,12 @@ requests may not be merged.
 - **`ClaudeUsageBridge`** is a separate native executable, bundled and signed inside
   the app, that turns a Claude Code statusLine payload into the snapshot the app
   reads. `ClaudeUsageBridgeCore` holds its pure, dependency-free logic so it can be
-  tested directly.
+  tested directly. This works in 0.0.1, but it creates a second nested code object
+  that must be built, signed, verified, and notarized with the app.
+  [Product Follow-up 10](docs/product/follow-ups.md#10-consolidate-the-claude-usage-bridge-into-the-app-executable)
+  plans to give the main app executable a non-UI status-line bridge mode so the
+  bundle ships one executable binary while preserving the same stdin, privacy,
+  installation, and failure contracts.
 - **`AppSettings`** persists preferences; **`LocalDataInventory`** is the single
   declaration of every file the app writes, and both the Data & Privacy page and the
   export action read from it.
@@ -437,6 +460,27 @@ and pull requests follow the
 | [Popover spec](docs/design/menu-bar-popover/SPEC.md) | The menu-bar popover design contract |
 | [Implementation plans](docs/superpowers/plans/) | The full design and evidence trail |
 | [how-to.md](how-to.md) | Operating notes for the login flow, the usage probe, and running the app from source |
+
+## Acknowledgements
+
+AgentUsageMonitor's product ideas, provider research, and local-usage architecture
+were informed by these open-source GitHub projects:
+
+- [CodexBar](https://github.com/steipete/CodexBar) — native macOS menu-bar,
+  provider-separation, packaging, and quota-retrieval reference.
+- [ccusage](https://github.com/ccusage/ccusage) — local usage parsing, fixtures,
+  reporting, and adapter-boundary reference.
+- [Token Monitor](https://github.com/Javis603/token-monitor) — local collector,
+  aggregation, privacy, performance, and product-surface reference.
+- [Tokscale](https://github.com/junhoyeo/tokscale) — multi-agent source discovery,
+  token scanning, and structured-output comparison reference.
+
+Thank you to their maintainers and contributors for publishing work that helped
+shape this project's ideas and provided independent comparison points. These
+projects are credited as inspiration and research references; they are not bundled
+runtime dependencies, and this acknowledgement does not imply their endorsement
+or a direct code contribution. The detailed research links remain in
+[RESOURCES.md](RESOURCES.md).
 
 ## License
 

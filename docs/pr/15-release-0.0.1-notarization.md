@@ -2,8 +2,14 @@
 
 **Branch:** `feature/release-0.0.1-notarization` → `main`
 **Compare:** historical private-repository comparison (branch not published)
-**State: Draft.** Automated merge gates pass; signed-app acceptance, Developer ID
-notarization, and stapling remain manual release gates.
+**State: Merged and released.** GitHub PR #40 merged the branch into `main`; the
+source branch was deleted after `v0.0.1` build `266` was Developer ID signed,
+notarized, stapled, published, downloaded, and observed working as intended on
+2026-07-31.
+
+The scope and pre-merge evidence below are retained as the review record. The
+post-release rows distinguish the user's published-artifact observation from
+exhaustive states that were not individually recorded.
 
 ## Summary
 
@@ -62,9 +68,9 @@ notarization state honestly; the reviewed privacy/correctness fixes and their na
 regressions; and reconciliation of the README, release notes, Claude verification,
 active plans, operating guide, and PR evidence.
 
-**Not included:** the final Developer ID rebuild, the resubmission, the staple, the
-tag, and the release. Every one of those signs, reaches the Keychain, or talks to
-Apple, so they are run by hand — the release guide carries the exact sequence.
+**Not included in the code review:** the final Developer ID rebuild, resubmission,
+staple, tag, and release. Those steps were run manually after review and completed
+on 2026-07-31; the release guide carries the repeatable sequence.
 
 ## Design and ownership
 
@@ -122,36 +128,38 @@ visual acceptance stays manual per repository policy.
 |---|---|---|
 | `xcodebuild` main macOS scheme | Run | `** BUILD SUCCEEDED **` for the macOS destination |
 | Full `swift test` | Run | 329 tests, 0 failures |
-| Release `.app` resource/signature checks | Run | Ad-hoc build `0.0.1` / `266`; asset catalog present; app and nested bridge pass strict signature checks. Developer ID rebuild remains manual |
+| Release `.app` resource/signature checks | Run | Pre-merge ad-hoc build `0.0.1` / `266`; asset catalog present; app and nested bridge passed strict signature checks |
 | `plutil -p Resources/Info.plist` | Run | `Agent Monitor` / `0.0.1` / `266` |
 | Stack content containment | Run | Every non-merge content commit from the ten stack branches is present |
 | No content lost in the partial cascade | Run | No non-merge commit exists on any remote branch that is absent here |
-| Rebuild, resubmission, staple | **Not run** | By design — run by hand, see the release guide |
-| Signed-app acceptance of the renamed copy | **Not run** | Still open from PR 13 |
+| Developer ID rebuild, notarization, staple, tag, publish | Observed | User completed the manual release sequence for build `266`; `v0.0.1` is published |
+| Uploaded artifact verification | Observed | User downloaded the published archive and reported the app works as intended |
+| Exhaustive VoiceOver/permission/conditional-state matrix | **Not run** | The release smoke test does not identify every individual matrix state |
 
 ## Risks, rollback, and limitations
 
-**Risk — the specific one to watch.** The local `.build` bundle is now the verified
-ad-hoc `0.0.1` / `266` candidate, not the prior notarized build. It is still not the
-shipping artifact: rebuild it with the Developer ID identity immediately before
-submission and re-check the embedded plist, rather than packaging any pre-existing
-bundle from `.build`.
+**Risk — the specific one that was controlled.** The pre-release `.build` bundle
+was an ad-hoc `0.0.1` / `266` candidate, not the shipping artifact. The published
+archive was produced only after the Developer ID rebuild, notarization, and staple,
+then downloaded again for verification.
 
-**Second risk.** If the resubmission is rejected, the cause is almost certainly not
-the signing setup — that is now proven — but a re-used build number or a stale
-`Info.plist` picked up by the build. `xcrun notarytool log <id>` names the actual
-cause.
+**Second risk considered before submission.** A rejection would most likely have
+pointed to a re-used build number or stale `Info.plist`, because the signing setup
+was already proven. The build was accepted, so this risk did not materialize.
 
-**Rollback.** Revert the release-readiness commit before submission. Once `266` is
-submitted, any replacement must use another fresh build number.
+**Historical rollback boundary.** Before submission the release-readiness commit
+could be reverted. Build `266` has now been submitted and published, so any future
+replacement must use a fresh build number rather than rewriting this release.
 
 **Limitations.** The untracked asset catalog means a clean clone can compile and
 test but cannot package the shipping `.app`; the release machine must supply the
 approved local assets. The non-scrolling Token Monitor can exceed a 1280×800
 screen; that is an explicit accepted 0.0.1 limitation, not a closed visual finding.
-The signed-app Light/Dark, keyboard, VoiceOver, export, shortcut, provider-switch,
-and file-event matrix remains a human gate. Public-repository cleanup remains
-tracked in `before-going-public.md`.
+The published app passed the user's release smoke test. Exhaustive Light/Dark,
+keyboard, VoiceOver, export, shortcut, provider-switch, file-event, and manufactured
+conditional-state combinations remain useful ongoing verification where they were
+not individually recorded. Public-repository cleanup remains tracked in
+`before-going-public.md`.
 
 ## Documentation and review focus
 
@@ -163,3 +171,18 @@ Focus on the **merge strategy**. Merging this branch into `main` is intended to 
 the single action that lands PRs 6–14; confirm that reading of the branch graph
 before merging, because the alternative — re-merging nine branches bottom-up —
 produces the same content by a much longer route.
+
+## Post-release branch cleanup — 2026-07-31
+
+After PR #40 and publication, every remaining remote feature branch was audited
+against `origin/main` with both ancestry and patch-equivalence checks. The
+sideways stack branches were not all ancestors, but
+`git log --no-merges --cherry-pick --right-only origin/main...<branch>` returned no
+unique content commits for any of them. The obsolete GitHub and matching local
+branch refs were deleted.
+
+The durable prevention rule now lives in
+[Evidence-Rich Pull Requests](../development/evidence-rich-pull-requests.md#keep-stacked-pull-request-bases-moving-in-the-same-direction):
+merge a true stack deepest-first, or retarget each remaining child to current
+`main` after its parent merges. A green GitHub “Merged” badge proves only that the
+PR reached its configured base branch.

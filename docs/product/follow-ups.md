@@ -362,3 +362,231 @@ Acceptance
 * **Observed:** the user reported that rapid repeated activation after external login passed. The deterministic controller regression separately proves that a second activation does not invoke the callback again.
 * **Observed limitation:** after an in-app Browser sign-in was cancelled, the controller entered `.failed`; an independent external CLI login from that state was not detected. The watcher is intentionally scoped to `.disconnected`, and this is evidence for Product Follow-up 2 rather than accepted interrupted-sign-in recovery.
 * **Not run:** failed-read retryability, custom-home behavior beyond the observed independent-login paths, external logout, sleep/wake, controller teardown, and audit cleanup.
+
+⸻
+
+## 9. Claude refresh can recover usage without recovering plan identity
+
+**Status:** **Needs plan.** This is a user-observed intermittent defect recorded on 2026-07-30. No implementation change has started, and the trigger for the initial missing Keychain/Claude values has not yet been isolated.
+
+Problem
+
+At certain times, an ordinary Claude refresh does not have the Keychain credential or Claude values available for the app to read. The ordinary refresh is intentionally non-interactive, so it does not show a Keychain access prompt. The app instead reports that the Claude connection **Needs attention**.
+
+The explicit, user-authorized Claude CLI `/usage` check can then recover current usage windows. That result does not include the account's plan identity, however, so the app enters a partially recovered state:
+
+* quota usage is available
+* **Connection** shows a status and the **Connected account** action
+* the **Plan** row is absent
+
+A later ordinary refresh can restore the plan name. Requiring that extra refresh leaves connection identity and usage out of sync and is not accepted recovery behavior.
+
+Reproduction boundary
+
+1. Reach the intermittent state in which an ordinary Claude refresh cannot read the Keychain credential or Claude values.
+2. Confirm the refresh does not raise a Keychain prompt and the app shows **Needs attention**.
+3. In Claude Settings, run the explicit **Force a reading** CLI check, which uses Claude's `/usage` result.
+4. Confirm usage appears, while **Connection** shows status and **Connected account** but omits **Plan**.
+5. Run another ordinary refresh and observe that the plan may return.
+
+Known data boundary
+
+The Claude OAuth/Keychain path can supply the plan hint from the credential. The CLI `/usage` snapshot supplies quota windows but currently carries no plan hint. The missing plan after the CLI check is therefore a real source-reconciliation gap, not evidence that the account has no plan.
+
+Required outcome
+
+Plan the fix around one coherent Claude state transition. A successful recovery must not leave live usage, connection status, connected-account actions, and plan identity contradicting one another.
+
+The plan must:
+
+* preserve the rule that scheduled and ordinary refreshes do not unexpectedly open a Keychain prompt, unless a separately approved interaction design changes that policy
+* provide an explicit, understandable recovery path when credential access requires user interaction
+* define how a CLI usage result that lacks plan identity combines with the last confirmed account identity
+* avoid presenting an absent CLI plan field as proof that the plan is unavailable
+* avoid requiring a second refresh to make Connection internally consistent
+* keep the existing single-owner source hierarchy and avoid a parallel connection or refresh state
+
+Acceptance
+
+* reproduce the initial missing-Keychain/missing-Claude-values state deterministically, or capture enough diagnostics to identify its trigger
+* an ordinary refresh remains non-prompting
+* the user can recover through one clear action
+* after recovery, usage, status, connected-account actions, and Plan agree
+* the CLI-only path either retains a valid last-confirmed plan identity with accurate provenance or clearly represents the identity as unresolved without a contradictory connected state
+* another ordinary refresh is not required to restore the Plan row
+* relaunch, cached data, expired credential, denied Keychain access, CLI-only success, and later OAuth recovery are covered explicitly
+
+⸻
+
+## 10. Consolidate the Claude usage bridge into the app executable
+
+**Status:** **Needs plan.** The 0.0.1 implementation works and was signed,
+notarized, published, and verified, but its packaging boundary is more complex than
+the product needs.
+
+Problem
+
+`ClaudeUsageBridge` is not a passive resource. It is a separate native executable
+binary nested in the app bundle. `build-app.sh` builds and signs that helper first,
+then signs the containing app. The release verifier and notarization boundary must
+therefore account for two executable code objects. This is operationally correct,
+but it increases build, signing, verification, update, and failure surface.
+
+Required outcome
+
+Ship one executable binary in the app bundle. The main Agent Monitor executable
+should expose a dedicated non-UI bridge mode that can receive Claude Code's
+status-line JSON on stdin, extract the existing allowlisted rate-limit fields, write
+the same atomic owner-only snapshot, and exit without launching the menu-bar app.
+The release build should require one app signing operation rather than a separate
+nested-helper signing step followed by app signing.
+
+The plan must compare at least:
+
+* invoking the executable inside the installed app bundle with a bridge-mode
+  argument, including what happens when the app is moved or replaced
+* copying the already signed main executable to the deterministic app-owned
+  Application Support path, including update and code-signature behavior
+* eliminating passive status-line capture if neither single-binary route can meet
+  path stability, privacy, and reliability requirements
+
+Constraints
+
+* preserve the current stdin/stdout/exit contract expected by Claude Code
+* do not initialize SwiftUI, `NSApplication`, menu state, refresh scheduling,
+  Keychain access, or network collection in bridge mode
+* retain field-scoped extraction: never persist prompts, responses, paths, model
+  metadata, or other status-line fields
+* retain atomic writes and owner-only directory/file permissions
+* migrate existing `~/.claude/settings.json` status-line commands without
+  clobbering unrelated user configuration or leaving a broken helper path
+* define rollback and compatibility for existing 0.0.1 installations
+* keep `ClaudeUsageBridgeCore` reusable and directly testable even if the separate
+  executable target is removed
+
+Acceptance
+
+* the shipped app bundle contains one executable Mach-O binary
+* `build-app.sh` no longer builds, copies, or separately signs a nested bridge
+* the bundle, signing, and notarization verifiers expect one executable
+* passive capture produces the same sanitized snapshot from the same fixtures
+* invoking bridge mode cannot open UI or start the normal app lifecycle
+* a real Claude Code status-line invocation survives app upgrade, move, relaunch,
+  and rollback without manual repair
+
+⸻
+
+## 11. Codex Token Monitor can fail to read local usage
+
+**Status:** **Needs diagnosis.** Observed in the published 0.0.1 release. No cause
+or workaround is confirmed.
+
+Problem
+
+Codex has been used locally, but its Token Monitor can remain without local token
+usage instead of publishing observed requests. Provider quota and local token
+activity are separate paths, so a working quota connection does not prove that
+transcript discovery and reconciliation work.
+
+Unknown boundary
+
+The current report does not distinguish among an undiscovered/custom Codex home,
+file permissions, transcript-schema drift, unsafe-file rejection, incremental
+reader/cache state, file-event delivery, or reconciliation. These are investigation
+targets, not root-cause claims. Do not ask for or export raw prompts or responses to
+diagnose the failure.
+
+Required outcome
+
+Reproduce the released failure with sanitized diagnostics, identify the exact
+discovery/read/reconciliation boundary, and make the Token Monitor either publish
+the correct locally observed totals or name an evidence-supported unavailable
+reason and recovery action.
+
+Acceptance
+
+* test default and explicit `CODEX_HOME`, missing roots, unreadable roots, current
+  record schemas, app launch, file events, cache rebuild, disable/re-enable, and
+  relaunch
+* retain field-scoped decoding and never persist or export record content, paths,
+  session identifiers, prompts, or responses
+* a valid empty day remains distinguishable from failed discovery or reading
+* the released failure gets the smallest deterministic regression once reproduced
+
+⸻
+
+## 12. Claude setup is not a dependable first-run flow
+
+**Status:** **Needs diagnosis and interaction plan.** The user reported the
+published setup as problematic, but the exact failed step has not yet been captured
+well enough to claim a root cause.
+
+Problem
+
+Claude setup spans existing Claude Code credentials, a possible Keychain prompt,
+passive status-line capture, cached state, and the explicitly consented CLI
+`/usage` recovery. In the released experience these boundaries can require extra
+or unclear recovery actions rather than one understandable setup sequence.
+
+Required outcome
+
+Instrument and observe the first-run transitions before redesigning them. The app
+must clearly distinguish:
+
+* existing Claude Code credentials available without interaction
+* credential access requiring an explicit user action and possible Keychain prompt
+* passive status-line capture installed, absent, stale, or conflicting
+* CLI-only usage recovery that does not prove account/plan identity
+* setup failure with a safe, specific retry path
+
+Acceptance
+
+* one guided path reaches a coherent connected/usable state or names the exact
+  blocker without contradictory status
+* ordinary background refresh remains non-prompting
+* existing custom `~/.claude/settings.json` configuration is never overwritten
+* cancel, deny, retry, relaunch, stale snapshot, and later credential recovery are
+  explicit
+* Follow-up 9's usage/plan reconciliation and Follow-up 10's executable packaging
+  remain separate ownership boundaries rather than being hidden inside setup copy
+
+⸻
+
+## 13. First launch should require explicit connection for both providers
+
+**Status:** **Needs plan.** Requested connection-policy hardening after 0.0.1.
+
+Problem
+
+The 0.0.1 app can infer provider availability from existing CLI state before the
+user has explicitly connected that provider inside the app. That makes the consent
+boundary unclear, especially for Claude, where an intentional connection action is
+the appropriate place to explain and authorize a possible cross-app Keychain
+prompt.
+
+Required outcome
+
+On a fresh app installation, Codex and Claude both begin in app-local
+**Disconnected** states and require separate, explicit connection actions before
+quota collection starts. Connecting one provider must not connect or alter the
+other. The flow may perform non-interactive capability checks needed to explain the
+next action, but it must not silently adopt an existing CLI session as an
+app-level connection.
+
+Acceptance
+
+* test fresh app state with both CLIs signed in, only Codex signed in, only Claude
+  signed in, neither signed in, missing CLIs, denied interaction, and custom homes;
+  both app-level providers still begin disconnected
+* Codex and Claude expose independent Connect actions with provider-specific
+  disclosure and recovery
+* launch, scheduled refresh, wake refresh, and passive discovery never trigger a
+  Keychain prompt or silently convert a provider to connected
+* connecting one provider does not connect, sign in, sign out, or otherwise mutate
+  the other provider
+* reconnect after an app-local disconnect remains explicit, while upgrades preserve
+  a previously established app-level connection unless a migration plan says
+  otherwise
+* connection state and Token Monitor collection remain separate; whether local
+  activity should be visible before quota connection is an explicit product choice,
+  not an accidental authentication side effect

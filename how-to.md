@@ -157,6 +157,11 @@ By default, the gauge icon appears in the menu bar with the most-consumed quota 
 
 The **Claude** tab shows Claude's five-hour and weekly windows with the shared-pool caveat that weekly usage is shared with Claude chat, a `Read from: <source>` provenance caption beneath the cards (its capture time is the header's freshness line), and a staleness strip when the read is not live. When Claude has no reading, the tab shows an explicit unavailable state offering **Use Claude Code credentials…**; browser sign-in stays shelved as unverified, and no Codex credit or collector furniture appears on this tab.
 
+**Planned first-launch connection policy:** a future release will deliberately
+start Codex and Claude app-locally disconnected on a fresh installation and require
+a separate Connect action for each provider before quota collection. Version 0.0.1
+does not yet enforce this consent boundary consistently.
+
 When the app cannot confirm a Codex account, the Codex tab shows a connection card instead of quota controls:
 
 - **Sign in with browser** asks `codex app-server` for the official provider URL, opens it in the default browser, and waits for Codex to confirm completion.
@@ -178,6 +183,11 @@ Every completed menu-bar refresh also appends a privacy-safe outcome to `~/Libra
 The monitor refreshes at launch, on **Refresh now**, and at the selected foreground interval while its process is running. The Refresh tab offers Automatic, 1 minute 30 seconds, 2 minutes (the default), 5 minutes, and 10 minutes; a saved legacy one-minute selection migrates to 1 minute 30 seconds. **Refresh on wake** defaults on and can be disabled. Opening the native menu never starts a refresh, timer, or second scheduler. Automatic considers confirmed usage rate, remaining quota, reset proximity, forecast confidence, and recent failures. Only Automatic may temporarily use 30 seconds near a warning threshold, qualified exhaustion, or reset verification; that burst ends after ten minutes, after its trigger passes, or after unsuccessful live reads. After three consecutive unsuccessful refreshes, every mode temporarily changes to a 10-minute retry cadence. A confirmed update automatically restores the selected healthy-state schedule. Only one collection runs at a time, and the manual button is disabled during an active refresh.
 
 Open **Settings…** from the menu popover (or press `Command-,`) to use the separate Settings window. Its global `SettingsNavigationSidebar` selects General, Notifications, Refresh, Agents, Data & Privacy, and Diagnostics. It opens with the Context Rail hidden at 680 × 560 points. Use the page-header Context Rail button to show the 210-point rail; the window adds 211 points only at its right edge and the sidebar and Settings Page retain their width. Settings cards use consistent compact rows, dividers, native switches, and leading control descriptions. General groups **Launch at login** and **Enable keyboard shortcuts** together — with the shortcut on, the four popover commands and their key equivalents are listed beneath it, read-only for now — then presents a **Style** menu, a bounded **Show** segment, and the Settings-window **Appearance** segment. Appearance changes the Settings presentation only; the native menu remains controlled by macOS. Its one menu-bar preview is in the Context Rail; there is no page-level duplicate Preview, Current Label, or Current Scope. Diagnostics owns the app **Name**, **Version**, and **Build** rows. Launch at Login reflects the real macOS Login Items state and links to System Settings when approval is required. Disabling keyboard shortcuts removes the app-local `Command-R` binding and the four popover key equivalents, while leaving both **Refresh now** buttons and the standard Settings/Quit commands available. Menu-bar controls update the menu label immediately. Quota values update after each launch, enabled wake trigger, authentication, manual, or scheduled refresh; fixed intervals are 90, 120, 300, or 600 seconds, while Automatic may temporarily use 30 or 60 seconds. Agents contains the supported OpenAI Codex and Claude Code pages. Claude's regular page shows connection, current quota, source, and the optional token-consuming CLI check. If this app has never connected to Claude or held a Claude reading, the Claude tab shows **Set up Claude usage** instead: **Connect with credentials** reads the OAuth token Claude Code stored in Keychain and macOS asks permission; passive capture can instead use Claude Code's configured status line. The app bundle includes the passive-capture bridge and copies it to `~/Library/Application Support/CodexUsageMonitor/ClaudeBridge/` before use, but the one-click statusLine configuration/merge UI is still deferred. After any successful connection or reading, a later lapse keeps the regular status and recovery rows. Unsupported providers are omitted. Refresh contains the working interval selector, working wake switch, effective-policy explanation, timestamps, and **Refresh now**. Data & Privacy now offers **Reveal in Finder**, **Copy Path**, and **Export Local Data…**; deletion remains later roadmap work.
+
+**Known 0.0.1 Claude setup issue:** the setup sequence can require unclear extra
+recovery. The exact boundary between credential access, Keychain permission,
+passive status-line capture, and explicit CLI recovery has not yet been isolated,
+so this guide does not claim a universal workaround.
 
 A brief destination-switch text-compositing artifact is recorded as a deferred visual issue; it does not change settings values or monitoring behavior.
 
@@ -203,7 +213,16 @@ Each agent's Settings page has a **Token Monitor** section: one **Show token mon
 
 **Range** decides the window and the chart's resolution, per agent, and defaults to **Day**. The day view charts hoverable 30-minute completion-time bars from midnight through the interval in progress; the week view charts one bar per day from the start of the current local week through today. It is the calendar week your Mac uses, not a rolling seven days, so it resets on your week's first day. Both views are aggregated from the same reconciled records — switching between them rereads nothing and can never report a figure the current scan did not observe.
 
-Reading is automatic and needs no setup: if you use Codex or Claude Code on this Mac, activity appears on its own. Only the figures the card shows are cached — never file paths, agent session identifiers, or record contents — and the cache keeps fourteen days plus the most recent request, enough for the week view to survive a relaunch. Records that cannot be read safely are shown as unavailable rather than counted as zero, so an empty day and an unreadable one never look alike.
+Reading is designed to be automatic and need no separate setup: if you use Codex
+or Claude Code on this Mac, activity should appear on its own. In 0.0.1 the Codex
+Token Monitor can instead remain empty despite local Codex use. The discovery,
+permission, record-schema, and reconciliation boundary is still undiagnosed, so no
+cause or reliable workaround is claimed. Only the figures the card shows are
+cached — never file paths, agent session identifiers, or record contents — and the
+cache keeps fourteen days plus the most recent request, enough for the week view
+to survive a relaunch. Records that cannot be read safely are shown as unavailable
+rather than counted as zero, so an empty day and an unreadable one never look
+alike.
 
 **Accepted 0.0.1 limitation:** the card's tallest state makes the Codex tab about 929 points tall, which only just fits a 13.6-inch laptop and still exceeds smaller screens. The popover remains deliberately non-scrolling for this release; users on a small display can disable Token Monitor sections or the card in **Settings → Agents**. The implementation plan records the measurements and the deferred layout decision.
 

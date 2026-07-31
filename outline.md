@@ -14,7 +14,7 @@ The application should help users answer five practical questions:
 4. What caused a recent increase in usage?
 5. Which provider is best positioned for my next task?
 
-The first release will be a personal-use macOS application distributed outside the Mac App Store. Preserve clean provider boundaries so a later commercial release is possible, but treat Mac App Store compatibility as a separate feasibility gate after authentication and sandbox requirements are known.
+The first release is Agent Monitor 0.0.1 from the **AgentUsageMonitor** project, a personal-use macOS application published outside the Mac App Store on 2026-07-31. Its Developer ID-signed, notarized, and stapled archive was downloaded after publication and observed working as intended. Preserve clean provider boundaries so a later commercial release is possible, but treat Mac App Store compatibility as a separate feasibility gate after authentication and sandbox requirements are known.
 
 ⸻
 
@@ -24,8 +24,8 @@ Platform and distribution
 
 * Personal-use macOS application
 * Distributed outside the Mac App Store
-* Signed with Developer ID when shared beyond the developer's own Mac
-* Notarized by Apple when shared beyond the developer's own Mac
+* Signed with Developer ID when shared beyond the developer's own Mac; completed for 0.0.1
+* Notarized and stapled by Apple when shared beyond the developer's own Mac; completed for 0.0.1
 * Native SwiftUI interface
 * Menu-bar-first experience
 * Launch-at-login support
@@ -1170,7 +1170,15 @@ enum UsageCause: Codable {
 
 18. Development phases
 
-Current execution status (2026-07-13)
+Current release status (2026-07-31)
+
+* Agent Monitor 0.0.1 / build 266 is Developer ID signed, notarized, stapled, tagged `v0.0.1`, published, downloaded, and observed working as intended.
+* The release supports Codex and Claude Code. GitHub Copilot remains absent until a verified personal-quota capability exists.
+* Two Claude follow-ups are explicitly open: reconcile CLI-only usage recovery with plan identity, and consolidate the separately signed `ClaudeUsageBridge` executable into a non-UI mode of the main app executable so a future bundle ships one executable binary.
+* Two additional released-state bugs require diagnosis: Codex Token Monitor can fail to publish local usage, and Claude setup is not a dependable first-run flow. A separate requested connection-policy change will start both providers app-locally disconnected on a fresh installation and require explicit, independent Connect actions before quota collection.
+* The Product Planning Board is the current execution index. The dated status log below is retained as historical implementation provenance.
+
+Historical execution status (2026-07-13)
 
 * The Codex capability probe, menu-bar MVP, and quota-history foundation are implemented.
 * Reliability-hardening Tasks 1–4 are implemented; compilation is verified without adding or running tests.
@@ -1365,6 +1373,7 @@ Phase 7 — evaluate commercial release
 Consider:
 
 * Replacing external parsers with bundled or native implementations
+* Consolidating the Claude status-line helper into the main app executable so the bundle ships one executable binary
 * Replacing personal tokens with OAuth
 * Improving onboarding
 * Adding signed automatic updates
