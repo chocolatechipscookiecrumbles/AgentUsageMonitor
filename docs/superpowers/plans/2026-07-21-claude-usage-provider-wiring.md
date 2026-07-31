@@ -120,6 +120,12 @@ Two concrete gaps this plan closes, beyond "no UI":
 - **OAuth token refresh** (`claude_probe_plan` §4 "Credential refresh") — for now an expired access token surfaces as "unavailable, sign in through Claude Code," per the probe plan's own fallback allowance.
 - **Real-account parity verification** (`claude_probe_plan` Task 11) — run once the live surface exists.
 
+## Post-implementation defect record — 2026-07-30
+
+The user observed an intermittent state that this completed wiring scope does not recover coherently. An ordinary, non-prompting Claude refresh can lack both the Keychain credential and Claude values and report **Needs attention**. Running the explicit, user-authorized CLI `/usage` check can then restore the quota windows, but that snapshot has no plan hint. Claude Settings consequently shows status plus the **Connected account** action while omitting **Plan** until a later ordinary refresh restores the credential-derived identity.
+
+This is tracked as [Product Follow-up 9](../../product/follow-ups.md#9-claude-refresh-can-recover-usage-without-recovering-plan-identity), with status **Needs plan**. No code change is claimed here. The future plan must preserve non-prompting ordinary refreshes, identify the trigger for the missing credential/value state, define how CLI-only usage reconciles with last-confirmed account identity, and recover usage plus connection identity without requiring a second refresh.
+
 ## Completion criteria
 
 - The Claude Settings page shows a real read from the reconciled monitor (OAuth when available, statusLine/cache fallback), never the static preview.

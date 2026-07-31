@@ -362,3 +362,56 @@ Acceptance
 * **Observed:** the user reported that rapid repeated activation after external login passed. The deterministic controller regression separately proves that a second activation does not invoke the callback again.
 * **Observed limitation:** after an in-app Browser sign-in was cancelled, the controller entered `.failed`; an independent external CLI login from that state was not detected. The watcher is intentionally scoped to `.disconnected`, and this is evidence for Product Follow-up 2 rather than accepted interrupted-sign-in recovery.
 * **Not run:** failed-read retryability, custom-home behavior beyond the observed independent-login paths, external logout, sleep/wake, controller teardown, and audit cleanup.
+
+⸻
+
+## 9. Claude refresh can recover usage without recovering plan identity
+
+**Status:** **Needs plan.** This is a user-observed intermittent defect recorded on 2026-07-30. No implementation change has started, and the trigger for the initial missing Keychain/Claude values has not yet been isolated.
+
+Problem
+
+At certain times, an ordinary Claude refresh does not have the Keychain credential or Claude values available for the app to read. The ordinary refresh is intentionally non-interactive, so it does not show a Keychain access prompt. The app instead reports that the Claude connection **Needs attention**.
+
+The explicit, user-authorized Claude CLI `/usage` check can then recover current usage windows. That result does not include the account's plan identity, however, so the app enters a partially recovered state:
+
+* quota usage is available
+* **Connection** shows a status and the **Connected account** action
+* the **Plan** row is absent
+
+A later ordinary refresh can restore the plan name. Requiring that extra refresh leaves connection identity and usage out of sync and is not accepted recovery behavior.
+
+Reproduction boundary
+
+1. Reach the intermittent state in which an ordinary Claude refresh cannot read the Keychain credential or Claude values.
+2. Confirm the refresh does not raise a Keychain prompt and the app shows **Needs attention**.
+3. In Claude Settings, run the explicit **Force a reading** CLI check, which uses Claude's `/usage` result.
+4. Confirm usage appears, while **Connection** shows status and **Connected account** but omits **Plan**.
+5. Run another ordinary refresh and observe that the plan may return.
+
+Known data boundary
+
+The Claude OAuth/Keychain path can supply the plan hint from the credential. The CLI `/usage` snapshot supplies quota windows but currently carries no plan hint. The missing plan after the CLI check is therefore a real source-reconciliation gap, not evidence that the account has no plan.
+
+Required outcome
+
+Plan the fix around one coherent Claude state transition. A successful recovery must not leave live usage, connection status, connected-account actions, and plan identity contradicting one another.
+
+The plan must:
+
+* preserve the rule that scheduled and ordinary refreshes do not unexpectedly open a Keychain prompt, unless a separately approved interaction design changes that policy
+* provide an explicit, understandable recovery path when credential access requires user interaction
+* define how a CLI usage result that lacks plan identity combines with the last confirmed account identity
+* avoid presenting an absent CLI plan field as proof that the plan is unavailable
+* avoid requiring a second refresh to make Connection internally consistent
+* keep the existing single-owner source hierarchy and avoid a parallel connection or refresh state
+
+Acceptance
+
+* reproduce the initial missing-Keychain/missing-Claude-values state deterministically, or capture enough diagnostics to identify its trigger
+* an ordinary refresh remains non-prompting
+* the user can recover through one clear action
+* after recovery, usage, status, connected-account actions, and Plan agree
+* the CLI-only path either retains a valid last-confirmed plan identity with accurate provenance or clearly represents the identity as unresolved without a contradictory connected state
+* another ordinary refresh is not required to restore the Plan row
+* relaunch, cached data, expired credential, denied Keychain access, CLI-only success, and later OAuth recovery are covered explicitly
