@@ -77,7 +77,7 @@ struct SettingsSectionSidebar<Selection: Hashable, SidebarLabel: View, Detail: V
 **Files:**
 - Modify: `docs/superpowers/plans/2026-07-13-settings-ui-followups.md`
 - Modify: `UsageProbe/README.md`
-- Modify: `how-to.md`
+- Modify: `docs/development/operating-notes.md`
 
 - [x] Compile with warnings as errors.
 - [x] Build and sign the app with `CodexUsageMonitor/Scripts/build-app.sh`.

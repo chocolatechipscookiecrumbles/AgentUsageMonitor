@@ -66,7 +66,7 @@ Flow: `ClaudeUsageMonitor` → `ClaudeUsageCollector` → tier 1 `ClaudeOAuthUsa
 | Tier 1 live read | Observed | `plan pro · 5h 44% · 7d 28% · delivery live/oauth · via claudeCodeCredentials` |
 | Tier 3/4 degrade | Observed | Invalid token → `tier 1 unavailable: unauthorized`, delivery falls to `passiveSnapshot` |
 | Cache holds no secrets | Run | `grep 'sk-ant-'` over Application Support JSON → no match |
-| Signed `.app` build | Run | `TeamIdentifier=<APPLE_TEAM_ID>` (was `not set`) |
+| Signed `.app` build | Run | A Developer ID TeamIdentifier was present (value redacted for public source; previously `not set`) |
 | **Signed-app visual acceptance** | **Not run** | Settings page never opened by a human |
 | **Tier 2 against real CLI output** | **Not run** | Costs tokens; parser tested on synthetic fixtures only |
 

@@ -20,7 +20,7 @@
 - In cached/paused mode, retain the last confirmed values and show a visible pause marker plus an accessible freshness description.
 - Use the existing refresh policy as the only quota-update clock. Fixed modes update after refreshes scheduled at 60, 90, 120, 300, or 600 seconds; Automatic may schedule from 30 through 600 seconds. Do not add a second collection timer.
 - Update the label immediately after an accepted refresh completes, after a manual refresh completes, and whenever Appearance or Show changes.
-- Update `docs/superpowers/plans/2026-07-13-menu-bar-display.md`, the daily-driver roadmap, `outline.md`, `how-to.md`, and `UsageProbe/README.md` with implemented behavior and verification evidence.
+- Update `docs/superpowers/plans/2026-07-13-menu-bar-display.md`, the daily-driver roadmap, `outline.md`, `docs/development/operating-notes.md`, and `UsageProbe/README.md` with implemented behavior and verification evidence.
 
 ---
 
@@ -96,7 +96,7 @@
 - Modify: `docs/superpowers/plans/2026-07-13-menu-bar-display.md`
 - Modify: `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md`
 - Modify: `outline.md`
-- Modify: `how-to.md`
+- Modify: `docs/development/operating-notes.md`
 - Modify: `UsageProbe/README.md`
 
 **Interfaces:**

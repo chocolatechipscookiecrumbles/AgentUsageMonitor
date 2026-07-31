@@ -57,7 +57,7 @@
 - Modify: `docs/superpowers/plans/2026-07-13-settings-ui-followups.md`
 - Modify: `docs/superpowers/plans/2026-07-13-adaptive-refresh.md`
 - Modify: `UsageProbe/README.md`
-- Modify: `how-to.md`
+- Modify: `docs/development/operating-notes.md`
 
 - [x] Run `CodexUsageMonitor/Scripts/build-app.sh` and confirm a signed `.app` is produced.
 - [x] Retire the 680 × 520 full-tab visual gate in favor of `2026-07-14-figma-settings-port.md`. Its signed 820 × 580 Light pass opened all six tabs; Dark and complete conditional-state coverage remain manual there.

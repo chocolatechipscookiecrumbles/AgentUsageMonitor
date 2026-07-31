@@ -27,7 +27,7 @@ Skills live in `.agents/skills/`. Most are synced from a global source and are g
 ## Documentation discipline
 
 - Update the relevant implementation plan whenever behavior, scope, verification evidence, or a known limitation changes.
-- Update `UsageProbe/README.md` and `how-to.md` when a native-app change affects user-visible behavior or operating instructions.
+- Update `UsageProbe/README.md` and `docs/development/operating-notes.md` when a native-app change affects user-visible behavior or operating instructions.
 - Use `.agents/skills/preparing-evidence-rich-prs` and `docs/development/evidence-rich-pull-requests.md` when preparing or updating a pull request.
 - The user creates every GitHub pull request manually. For every approved push or planned-PR request, push only the approved scope and generate a filled draft from `.github/pull_request_template.md` (including the compare URL) for the user to submit. Never create a GitHub pull request.
 - For stacked pull requests, treat each PR's base branch as the only destination.

@@ -36,7 +36,7 @@ The implemented external-login feature is correct for a pre-existing `.disconnec
 - Modify `CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/QuotaMenuView.swift` and `CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/CodexDisconnectedMenuView.swift`: show the safe recovery notice while retaining normal disconnected actions.
 - Modify `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AgentsSettingsView.swift` and `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/CodexAgentSettingsView.swift`: show the same recovery notice using the shared Settings layout.
 - Modify `CodexUsageMonitor/Tests/CodexUsageMonitorTests/CodexConnectionControllerTests.swift`: add the one deterministic regression test.
-- Update `docs/product/follow-ups.md`, `docs/product/planning-board.md`, this plan, `how-to.md`, `UsageProbe/README.md`, and `outline.md` after implementation with verified scope and any unrun acceptance state.
+- Update `docs/product/follow-ups.md`, `docs/product/planning-board.md`, this plan, `docs/development/operating-notes.md`, `UsageProbe/README.md`, and `outline.md` after implementation with verified scope and any unrun acceptance state.
 
 ## Task 1: Add the focused regression before production changes
 
@@ -231,7 +231,7 @@ In an isolated Codex home/session where feasible:
 - Modify: `docs/superpowers/plans/2026-07-17-interrupted-signin-recovery.md`
 - Modify: `docs/product/follow-ups.md`
 - Modify: `docs/product/planning-board.md`
-- Modify: `how-to.md`, `UsageProbe/README.md`, and `outline.md`
+- Modify: `docs/development/operating-notes.md`, `UsageProbe/README.md`, and `outline.md`
 - Create: `.worktrees/interrupted-signin-recovery-PR.md` (filled manual PR draft only)
 
 - [ ] Record pre-change and post-change focused-test results, signed-build results, manual observations, and explicit unrun paths. Update Product Follow-up 2 and the planning board from **Deferred** only when implementation is explicitly resumed.

@@ -77,7 +77,7 @@
 - Modify: `docs/superpowers/plans/2026-07-14-figma-settings-global-sidebar.md`
 - Modify: `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md`
 - Modify: `UsageProbe/README.md`
-- Modify: `how-to.md`
+- Modify: `docs/development/operating-notes.md`
 - Modify: `outline.md`
 - Modify: `AGENTS.md`
 

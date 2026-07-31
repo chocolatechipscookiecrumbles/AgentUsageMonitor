@@ -27,7 +27,7 @@
 - Build preference rows with `SettingsPage`, `SettingsSection`, `SettingsSectionRow`, `SettingsLabeledRow`, `SettingsValueRow`, and `SettingsDescription`. Do not add a `Form`, a `LabeledContent` outside `SettingsLabeledRow`, or padding that duplicates `SettingsLayoutMetrics`. Rows whose trailing side is text use `SettingsValueRow` so a long value wraps instead of widening the card.
 - Do not add feature-presence, routing, happy-path, or implementation-detail tests. The Codex glyph defect is reproducible and gets the smallest deterministic regression test; the other two tasks record a manual regression boundary instead.
 - Production Swift changes require `swift build`, the full existing suite, and the signed `.app` from `CodexUsageMonitor/Scripts/build-app.sh`. Settings changes additionally require the AGENTS.md visual acceptance at the default 680 × 560 size with the Context Rail hidden and visible, in Light and Dark.
-- Update `docs/product/planning-board.md`, `how-to.md`, and `CONTEXT.md` when behavior, scope, or a limitation changes.
+- Update `docs/product/planning-board.md`, `docs/development/operating-notes.md`, and `CONTEXT.md` when behavior, scope, or a limitation changes.
 
 ---
 

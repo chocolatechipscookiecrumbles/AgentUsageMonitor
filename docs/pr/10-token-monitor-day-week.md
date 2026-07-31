@@ -94,7 +94,7 @@ having drifted.
 
 ## Documentation and review focus
 
-Changed: `CONTEXT.md`, the token-activity plan, the planning board, `how-to.md`.
+Changed: `CONTEXT.md`, the token-activity plan, the planning board, `docs/development/operating-notes.md`.
 
 Focus on the **calendar stepping** — specifically the week containing a
 daylight-saving transition, and the first and last buckets of a partially elapsed

@@ -67,7 +67,7 @@
 - Modify `docs/product/planning-board.md`
 - Modify `docs/superpowers/plans/2026-07-22-menu-bar-popover-figma-port.md`
 - Modify `docs/superpowers/plans/2026-07-23-menu-bar-popover-refinements.md`
-- Modify `how-to.md`
+- Modify `docs/development/operating-notes.md`
 - Modify `UsageProbe/README.md`
 
 ---
@@ -751,7 +751,7 @@ In `2026-07-23-menu-bar-popover-refinements.md`, mark the keep-open Refresh Now 
 
 - [ ] **Step 3: Update user-facing behavior**
 
-Update `how-to.md` and `UsageProbe/README.md` to state:
+Update `docs/development/operating-notes.md` and `UsageProbe/README.md` to state:
 
 - Refresh Now keeps the popover open and shows progress;
 - the popover intentionally does not scroll;
@@ -813,7 +813,7 @@ git add docs/superpowers/plans/2026-07-22-menu-bar-popover-figma-port.md \
   docs/design/menu-bar-popover/SPEC.md \
   docs/claude-usage-verification.md \
   docs/product/planning-board.md \
-  how-to.md \
+  docs/development/operating-notes.md \
   UsageProbe/README.md
 git commit -m "Document popover review follow-ups"
 ```

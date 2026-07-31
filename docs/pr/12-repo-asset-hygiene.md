@@ -37,7 +37,7 @@ files are still on disk locally.
 **Included:** the `.gitignore` rules, `git rm --cached` for 30 files, the
 `XCTSkipUnless` guard in `MenuBarProviderGlyphTests`, `chmod +x` on the two release
 scripts, and repo-relative paths in `docs/claude-usage-verification.md`,
-`how-to.md`, and the menu-bar MVP plan.
+`docs/development/operating-notes.md`, and the menu-bar MVP plan.
 
 **Not included:** deleting anything from disk; renaming or moving the assets; a
 screenshots exception for the README (see limitations).

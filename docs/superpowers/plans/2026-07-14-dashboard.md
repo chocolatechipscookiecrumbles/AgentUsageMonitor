@@ -30,7 +30,7 @@
 - Treat absent roots, malformed/unsupported records, or unsafe reconciliation as Activity unavailable with factual copy. No Activity is reserved for a readable source with a valid zero-activity local day. Never substitute `0` for missing evidence.
 - Follow the repository rule against feature-presence and happy-path tests. Verification uses sanitized corpus probes, source/privacy audits, existing tests, compilation, and signed-app acceptance.
 - Production Swift changes require the main macOS `xcodebuild`, the narrowest relevant existing tests, and the signed `.app` built by `CodexUsageMonitor/Scripts/build-app.sh`.
-- Update this plan, `docs/product/planning-board.md`, the daily-driver roadmap, `outline.md`, `how-to.md`, and `UsageProbe/README.md` whenever behavior, scope, evidence, or a limitation changes.
+- Update this plan, `docs/product/planning-board.md`, the daily-driver roadmap, `outline.md`, `docs/development/operating-notes.md`, and `UsageProbe/README.md` whenever behavior, scope, evidence, or a limitation changes.
 
 ---
 
@@ -199,7 +199,7 @@ Primary source:
 - `CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/MenuPopoverTheme.swift` — owns card/chart/row metrics.
 - `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/DataPrivacySettingsView.swift` — states the exact field-scoped read boundary.
 - `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/LocalDataInventory.swift` — documents the in-memory derived state.
-- `UsageProbe/README.md`, `how-to.md`, `outline.md`, `docs/product/planning-board.md`, and `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md` — synchronize product scope and privacy guidance.
+- `UsageProbe/README.md`, `docs/development/operating-notes.md`, `outline.md`, `docs/product/planning-board.md`, and `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md` — synchronize product scope and privacy guidance.
 
 ---
 
@@ -587,7 +587,7 @@ Limitations: the file observer holds an unretained reference to itself in its FS
 - Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/DataPrivacySettingsView.swift`
 - Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/LocalDataInventory.swift`
 - Modify: `UsageProbe/README.md`
-- Modify: `how-to.md`
+- Modify: `docs/development/operating-notes.md`
 - Modify: `outline.md`
 - Modify: `docs/product/planning-board.md`
 - Modify: `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md`

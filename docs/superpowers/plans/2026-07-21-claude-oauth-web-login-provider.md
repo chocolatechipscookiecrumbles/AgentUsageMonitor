@@ -24,7 +24,7 @@ Tier 1's two methods are peers *within* tier 1 — whichever the user connected 
 - **Tier 1 works today via method (b) only.** Against a real Pro account the collector's OAuth path returns `5h 10.0% · 7d 14.0% · plan pro` — verified via the `--claude-live-read-once` probe ([ClaudeUsageProbeCommand.swift](../../../CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeUsageProbeCommand.swift)).
 - **Method (b) is `ClaudeKeychainCredentialStore`** ([ClaudeOAuthCredential.swift:28](../../../CodexUsageMonitor/Sources/CodexUsageMonitor/Connection/ClaudeOAuthCredential.swift#L28)). It reads Claude Code's Keychain item from our process → macOS raises an ACL dialog; only "Always Allow" makes it durable, and on an unsigned debug binary the grant doesn't survive rebuilds (ACL is keyed to code signature). **This is why it must be a chosen method with an explanation, not a default side effect.**
 - **Method (a) does not exist yet.** This plan builds it.
-- **Codex's precedent to mirror:** `AgentSignInMethod{.browser,.cli}`, `AgentConnectionState{.checking,.disconnected,.signingIn(method),.connected,.failed,.missingCLI}`, `CodexConnectionController.signInWithBrowser()/signInWithCLI()`, and the two-button [CodexDisconnectedMenuView.swift:17-20](../../../CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/CodexDisconnectedMenuView.swift#L17-L20).
+- **Codex's precedent to mirror:** `AgentSignInMethod{.browser,.cli}`, `AgentConnectionState{.checking,.disconnected,.signingIn(method),.connected,.failed,.missingCLI}`, `CodexConnectionController.signInWithBrowser()/signInWithCLI()`, and the historical two-button `CodexDisconnectedMenuView.swift:17-20` implementation (later removed during the popover port).
 
 ## Why `claude setup-token` is method (a)'s mechanism
 
@@ -108,7 +108,7 @@ Mirrors the Codex connection layer one-for-one so Claude reads as part of the sa
 - [x] **Step 1: Failing tests** (`ClaudeConnectionControllerTests.swift`, fake service): `signInWithBrowser()` → `.signingIn(.browser)` then `.connected`; `useClaudeCodeCredentials()` → `.signingIn(.claudeCodeCredentials)` then `.connected`; a failure maps to the right `ClaudeConnectionFailure`; a second sign-in is ignored while one is in flight (`connectionTask` guard, as Codex does); the succeeding method is persisted.
 - [x] **Step 2: Run to verify they fail.**
 - [x] **Step 3: Implement** the controller mirroring `CodexConnectionController` (shared `beginSignIn(using:operation:)`, `applyState`, `mappedFailure`).
-- [x] **Step 4: Build the UI** in the Claude Settings surface from [the wiring plan](2026-07-21-claude-usage-provider-wiring.md): **two peer buttons — "Sign in with browser" and "Use Claude Code credentials…"** — mirroring [CodexDisconnectedMenuView.swift:17-20](../../../CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/CodexDisconnectedMenuView.swift#L17-L20), plus a "Sign out" action. The Keychain button carries the one-line disclosure of what it grants. Connected state shows plan + which method is active.
+- [x] **Step 4: Build the UI** in the Claude Settings surface from [the wiring plan](2026-07-21-claude-usage-provider-wiring.md): **two peer buttons — "Sign in with browser" and "Use Claude Code credentials…"** — mirroring the historical `CodexDisconnectedMenuView.swift:17-20` implementation, plus a "Sign out" action. The Keychain button carries the one-line disclosure of what it grants. Connected state shows plan + which method is active.
 - [x] **Step 5: Run the full suite. Commit.**
 
 ## Task 6 (LAST RESORT, optional): self-run PKCE `ClaudeOAuthLoginService`

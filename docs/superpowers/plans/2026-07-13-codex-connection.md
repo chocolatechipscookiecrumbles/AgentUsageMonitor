@@ -19,7 +19,7 @@
 - Keep the native inline `MenuBarExtra`; do not use `.menuBarExtraStyle(.window)` and do not reintroduce SwiftUI self-scheduling menu timers.
 - Keep Settings and Quit at the bottom of every menu stage. Keep credits and reset-credit details in the connected menu stage.
 - Do not add or run automated test cases. Verification is compilation, a signed app build, read-only CLI/status inspection, process-survival checks, and documented manual UI acceptance.
-- Update this plan, the daily-driver roadmap, `outline.md`, `how-to.md`, and `UsageProbe/README.md` with implemented behavior and verification evidence.
+- Update this plan, the daily-driver roadmap, `outline.md`, `docs/development/operating-notes.md`, and `UsageProbe/README.md` with implemented behavior and verification evidence.
 
 ---
 
@@ -114,7 +114,7 @@
 - Modify: `docs/superpowers/plans/2026-07-13-codex-connection.md`
 - Modify: `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md`
 - Modify: `outline.md`
-- Modify: `how-to.md`
+- Modify: `docs/development/operating-notes.md`
 - Modify: `UsageProbe/README.md`
 
 **Interfaces:**

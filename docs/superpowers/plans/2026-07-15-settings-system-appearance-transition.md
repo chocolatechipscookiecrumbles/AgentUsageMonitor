@@ -116,7 +116,7 @@ This remaining unchecked row limits conditional-state coverage but does not bloc
 
 - Modify: `AGENTS.md`
 - Modify: `UsageProbe/README.md`
-- Modify: `how-to.md`
+- Modify: `docs/development/operating-notes.md`
 - Modify: `outline.md`
 - Modify: `docs/superpowers/plans/2026-07-13-settings-ui-followups.md`
 - Modify: `docs/superpowers/plans/2026-07-14-figma-settings-global-sidebar.md`

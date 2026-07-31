@@ -22,7 +22,7 @@
 - Cached/paused mode never replaces the last confirmed display record with unconfirmed values. With no confirmed record, show unavailable rather than zero usage.
 - Launch always requests an immediate refresh; wake honors its persisted control. Scheduled work never overlaps an in-flight manual, launch, or wake refresh, and opening the native menu does not request work.
 - These short foreground intervals use a one-shot `Timer`; `NSBackgroundActivityScheduler` is intentionally excluded because macOS treats it as deferrable work suited to intervals of roughly ten minutes or more.
-- Update `outline.md`, `how-to.md`, `UsageProbe/README.md`, the roadmap, and this plan whenever behavior changes.
+- Update `outline.md`, `docs/development/operating-notes.md`, `UsageProbe/README.md`, the roadmap, and this plan whenever behavior changes.
 
 ---
 
@@ -183,7 +183,7 @@ Build and open the signed app only with user approval. Verify Settings mode chan
 **Files:**
 - Modify: `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md`
 - Modify: `outline.md`
-- Modify: `how-to.md`
+- Modify: `docs/development/operating-notes.md`
 - Modify: `UsageProbe/README.md`
 - Modify: `docs/superpowers/plans/2026-07-13-adaptive-refresh.md`
 

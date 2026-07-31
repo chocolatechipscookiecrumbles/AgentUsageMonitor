@@ -21,7 +21,7 @@ the commands, so you can repeat it.
 
 **Agent Monitor 0.0.1 is published.** The shipping `Agent Monitor` / `0.0.1` /
 build `266` app was Developer ID signed, notarized, stapled, tagged `v0.0.1`, and
-published. The uploaded archive was downloaded again after publication; the user
+published. The uploaded disk image was downloaded again after publication; the user
 verified the release artifact, launched it, and observed the app working as
 intended.
 
@@ -54,9 +54,9 @@ like:
 | Seven-day reliability observation | ✅ Passed — see the caveat in [reliability Task 5](../superpowers/plans/2026-07-13-codex-reliability-hardening.md#task-5-run-and-review-the-one-week-hardening-period) |
 | Claude credential disclosure | ✅ README, app Data & Privacy page, release notes |
 | Release notes | ✅ Published from [`docs/release-notes/0.0.1.md`](../release-notes/0.0.1.md) |
-| Project / Git remote | ⏳ Project name `AgentUsageMonitor`; working `origin` remains `chocolatechipscookiecrumbles/agent-usage` until the GitHub rename |
+| Project / Git remote | ⏳ Original private remote remains `chocolatechipscookiecrumbles/agent-usage`; sanitized publication targets the separate `chocolatechipscookiecrumbles/AgentUsageMonitor` repository |
 | **Apple Developer membership** | ✅ Active |
-| **Developer ID certificate** | ✅ `Developer ID Application: Project maintainer (<APPLE_TEAM_ID>)`, installed with its private key |
+| **Developer ID certificate** | ✅ Developer ID Application identity installed with its private key; certificate holder and Team ID redacted from public source |
 | **Notarization of the pre-rename build** | ✅ **Accepted** — `Codex Usage Monitor` / `1.0.0` / `254`. Superseded; do not publish it |
 | **Notarization of the shipping build** | ✅ **Accepted and stapled** — `Agent Monitor` / `0.0.1` / `266` |
 | Git tag and GitHub Release | ✅ `v0.0.1` published |
@@ -66,7 +66,7 @@ like:
 
 The final release completed the Developer ID build, resource verification,
 notarization, stapling, packaging, tagging, and publication sequence below. The
-user then downloaded the uploaded archive and verified the released app rather than
+user then downloaded the uploaded disk image and verified the released app rather than
 relying on the local build. This closes the 0.0.1 release gate. It does not
 retroactively claim that every possible VoiceOver, permission-denied, long-copy, or
 manufactured conditional state was exercised.
@@ -78,10 +78,10 @@ Kept because it is the evidence that the signing setup is sound; it describes th
 `CodexUsageMonitor/.build/CodexUsageMonitor.app`, built at 18:09:
 
 ```
-Authority=Developer ID Application: Project maintainer (<APPLE_TEAM_ID>)
+Authority=Developer ID Application: [certificate holder and Team ID redacted]
 Authority=Developer ID Certification Authority
 Authority=Apple Root CA
-TeamIdentifier=<APPLE_TEAM_ID>
+TeamIdentifier=[redacted]
 CodeDirectory ... flags=0x10000(runtime)
 Timestamp=Jul 29, 2026 at 18:09:56
 ```
@@ -342,15 +342,15 @@ security find-identity -v -p codesigning
 > the same reason `build-app.sh` attempts the real signature directly instead of
 > probing for an identity first.
 
-- If you see a **`Developer ID Application: … (TEAMID)`** line → Path A. The script
+- If you see a **`Developer ID Application: … (<APPLE_TEAM_ID>)`** line → Path A. The script
   picks it up automatically, or set it explicitly:
   ```sh
-  CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" ./Scripts/build-app.sh
+  CODESIGN_IDENTITY="Developer ID Application: Project maintainer (<APPLE_TEAM_ID>)" ./Scripts/build-app.sh
   ```
-  Then re-run the notarization-readiness checks above. **On this machine that is
-  already done:** `Developer ID Application: Project maintainer (<APPLE_TEAM_ID>)` exists and the
-  current `.build` bundle is signed with it, with the hardened runtime and a secure
-  timestamp.
+  Then re-run the notarization-readiness checks above. On the release machine,
+  confirm that the selected identity exists and that the current `.build` bundle
+  has the hardened runtime and a secure timestamp; the public documentation does
+  not record the certificate holder or Team ID.
 - If you see nothing usable → Path B (ad-hoc). The script warns and continues; skip
   the notarization step and read [Path B](#path-b--no-paid-account-unsignedad-hoc).
 
@@ -396,16 +396,25 @@ nested unsigned binary.
 
 ## Step 4 — Package the download
 
-Zip the **stapled** app (Path A) or the signed app (Path B). `ditto` preserves the
-bundle structure and metadata that a plain `zip` can mangle:
+The published 0.0.1 artifact is `AgentUsageMonitor-0.0.1.dmg`, containing
+`AgentUsageMonitor.app`. The build script still produces the internal compatibility
+name `.build/CodexUsageMonitor.app`; copy that signed bundle to the distribution
+name in a staging directory before creating the disk image. The exact historical
+DMG command was not retained; this is the repeatable packaging baseline:
 
 ```sh
 cd CodexUsageMonitor/.build
-ditto -c -k --keepParent CodexUsageMonitor.app CodexUsageMonitor-0.0.1.zip
+dmg_stage=$(mktemp -d)
+ditto CodexUsageMonitor.app "$dmg_stage/AgentUsageMonitor.app"
+ln -s /Applications "$dmg_stage/Applications"
+codesign --verify --deep --strict --verbose=2 "$dmg_stage/AgentUsageMonitor.app"
+hdiutil create -volname AgentUsageMonitor \
+  -srcfolder "$dmg_stage" \
+  -ov -format UDZO AgentUsageMonitor-0.0.1.dmg
 ```
 
-A `.zip` is perfectly good for a menu-bar app. A `.dmg` (drag-to-Applications
-window) is nicer polish but optional — you can add one later with `create-dmg`.
+Renaming the outer bundle directory does not modify its signed contents. Verify the
+copied app before packaging, then verify the mounted copy again after download.
 
 ## Step 5 — Tag the release
 
@@ -424,19 +433,18 @@ PR merged.)
 
 ### Option 1 — `gh` CLI (fastest, once authenticated)
 
-`gh` is **not logged in**; authenticate first. The remote is already set to
-`origin` → `github.com/chocolatechipscookiecrumbles/AgentUsageMonitor`, so `gh` picks
-the repo up from the working tree.
+Authenticate in the maintainer's terminal and target the sanitized repository
+explicitly:
 
 ```sh
 gh auth login          # choose GitHub.com → HTTPS → follow the browser prompt
 ```
 
-Then create the release and attach the zip in one command:
+Then create the release and attach the disk image:
 
 ```sh
-gh release create v0.0.1 \
-  "CodexUsageMonitor/.build/CodexUsageMonitor-0.0.1.zip" \
+gh release create v0.0.1 "CodexUsageMonitor/.build/AgentUsageMonitor-0.0.1.dmg" \
+  --repo chocolatechipscookiecrumbles/AgentUsageMonitor \
   --title "Agent Monitor 0.0.1" \
   --notes-file docs/release-notes/0.0.1.md
 ```
@@ -446,7 +454,7 @@ gh release create v0.0.1 \
 1. Go to **Releases → Draft a new release** in the repo.
 2. Choose the tag `v0.0.1` (or create it there).
 3. Title + notes (paste the notes below).
-4. **Attach binaries** → drop in `CodexUsageMonitor-0.0.1.zip`.
+4. **Attach binaries** → drop in `AgentUsageMonitor-0.0.1.dmg`.
 5. **Publish.** Ticking **pre-release** is a reasonable call at `0.0.1`: it is a
    first distribution of a build nobody outside this machine has run.
 
@@ -466,18 +474,19 @@ Install section — the current text omits it because Path A needs no such step:
 
 ```markdown
    - *Unsigned build:* if macOS says the app is damaged, run
-     `xattr -dr com.apple.quarantine /Applications/CodexUsageMonitor.app`
+     `xattr -dr com.apple.quarantine /Applications/AgentUsageMonitor.app`
 ```
 
 ## Step 7 — Verify the download like a stranger would
 
-Don't trust the app you built; trust the artifact you uploaded. Download the zip
-from the Release page to another folder (or another Mac), then:
+Don't trust the app you built; trust the artifact you uploaded. Download
+`AgentUsageMonitor-0.0.1.dmg` from the Release page to another folder (or another
+Mac), mount it, and copy `AgentUsageMonitor.app` to a temporary folder. Then:
 
 ```sh
 # Simulate a fresh download's quarantine flag, then check Gatekeeper's verdict:
-xattr -w com.apple.quarantine "0081;00000000;Safari;" ~/Downloads/CodexUsageMonitor.app
-spctl -a -vvv ~/Downloads/CodexUsageMonitor.app
+xattr -w com.apple.quarantine "0081;00000000;Safari;" <TEMP_DIRECTORY>/AgentUsageMonitor.app
+spctl -a -vvv <TEMP_DIRECTORY>/AgentUsageMonitor.app
 ```
 
 - Path A (notarized): `spctl` prints **`accepted … source=Notarized Developer ID`**.
@@ -528,11 +537,17 @@ xcrun notarytool submit notarize.zip --keychain-profile "notary-codexmon" --wait
 xcrun stapler staple CodexUsageMonitor.app
 xcrun stapler validate CodexUsageMonitor.app
 # 3. package
-ditto -c -k --keepParent CodexUsageMonitor.app CodexUsageMonitor-0.0.1.zip
+dmg_stage=$(mktemp -d)
+ditto CodexUsageMonitor.app "$dmg_stage/AgentUsageMonitor.app"
+ln -s /Applications "$dmg_stage/Applications"
+codesign --verify --deep --strict --verbose=2 "$dmg_stage/AgentUsageMonitor.app"
+hdiutil create -volname AgentUsageMonitor -srcfolder "$dmg_stage" \
+  -ov -format UDZO AgentUsageMonitor-0.0.1.dmg
 # 4. tag
 cd ../.. && git tag -a v0.0.1 -m "Agent Monitor 0.0.1" && git push origin v0.0.1
 # 5. release
-gh release create v0.0.1 CodexUsageMonitor/.build/CodexUsageMonitor-0.0.1.zip \
+gh release create v0.0.1 CodexUsageMonitor/.build/AgentUsageMonitor-0.0.1.dmg \
+  --repo chocolatechipscookiecrumbles/AgentUsageMonitor \
   --title "Agent Monitor 0.0.1" --notes-file docs/release-notes/0.0.1.md
 ```
 

@@ -324,7 +324,7 @@ struct WindowWarningSettings: Codable, Equatable, Sendable {
 - Modify: `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md`
 - Modify: `docs/superpowers/plans/2026-07-14-figma-settings-global-sidebar.md`
 - Modify: `UsageProbe/README.md` when behavior is implemented.
-- Modify: `how-to.md` when behavior is implemented.
+- Modify: `docs/development/operating-notes.md` when behavior is implemented.
 - Modify: `outline.md` when phase status changes.
 - Modify: `AGENTS.md` if the fixed-center or provider lifecycle rules become repository guardrails.
 

@@ -19,7 +19,7 @@
 - Keep notification thresholds fixed at 50%, 25%, 10%, and 5%.
 - Do not add export, delete, logout, account switching, adaptive refresh choices, Launch at Login, or appearance controls.
 - Preserve the user's 600-point Settings window width and native macOS `Form`, `Section`, `LabeledContent`, and tab presentation.
-- Update `outline.md`, `how-to.md`, `UsageProbe/README.md`, the daily-driver roadmap, and this plan whenever behavior or documented status changes.
+- Update `outline.md`, `docs/development/operating-notes.md`, `UsageProbe/README.md`, the daily-driver roadmap, and this plan whenever behavior or documented status changes.
 
 ---
 
@@ -369,7 +369,7 @@ Do not replace the native Settings scene with a custom `NSWindow` controller.
 - Modify: `docs/superpowers/plans/2026-07-13-settings-foundation.md`
 - Modify: `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md`
 - Modify: `outline.md`
-- Modify: `how-to.md`
+- Modify: `docs/development/operating-notes.md`
 - Modify: `UsageProbe/README.md`
 
 **Interfaces:**
