@@ -54,7 +54,7 @@ like:
 | Seven-day reliability observation | ✅ Passed — see the caveat in [reliability Task 5](../superpowers/plans/2026-07-13-codex-reliability-hardening.md#task-5-run-and-review-the-one-week-hardening-period) |
 | Claude credential disclosure | ✅ README, app Data & Privacy page, release notes |
 | Release notes | ✅ Published from [`docs/release-notes/0.0.1.md`](../release-notes/0.0.1.md) |
-| Git remote | ✅ `origin` → `chocolatechipscookiecrumbles/agent-usage` |
+| Project / Git remote | ⏳ Project name `AgentUsageMonitor`; working `origin` remains `chocolatechipscookiecrumbles/agent-usage` until the GitHub rename |
 | **Apple Developer membership** | ✅ Active |
 | **Developer ID certificate** | ✅ `Developer ID Application: Project maintainer (<APPLE_TEAM_ID>)`, installed with its private key |
 | **Notarization of the pre-rename build** | ✅ **Accepted** — `Codex Usage Monitor` / `1.0.0` / `254`. Superseded; do not publish it |

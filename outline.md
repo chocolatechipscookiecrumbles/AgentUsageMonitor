@@ -14,7 +14,7 @@ The application should help users answer five practical questions:
 4. What caused a recent increase in usage?
 5. Which provider is best positioned for my next task?
 
-The first release is Agent Monitor 0.0.1, a personal-use macOS application published outside the Mac App Store on 2026-07-31. Its Developer ID-signed, notarized, and stapled archive was downloaded after publication and observed working as intended. Preserve clean provider boundaries so a later commercial release is possible, but treat Mac App Store compatibility as a separate feasibility gate after authentication and sandbox requirements are known.
+The first release is Agent Monitor 0.0.1 from the **AgentUsageMonitor** project, a personal-use macOS application published outside the Mac App Store on 2026-07-31. Its Developer ID-signed, notarized, and stapled archive was downloaded after publication and observed working as intended. Preserve clean provider boundaries so a later commercial release is possible, but treat Mac App Store compatibility as a separate feasibility gate after authentication and sandbox requirements are known.
 
 ⸻
 
@@ -1175,6 +1175,7 @@ Current release status (2026-07-31)
 * Agent Monitor 0.0.1 / build 266 is Developer ID signed, notarized, stapled, tagged `v0.0.1`, published, downloaded, and observed working as intended.
 * The release supports Codex and Claude Code. GitHub Copilot remains absent until a verified personal-quota capability exists.
 * Two Claude follow-ups are explicitly open: reconcile CLI-only usage recovery with plan identity, and consolidate the separately signed `ClaudeUsageBridge` executable into a non-UI mode of the main app executable so a future bundle ships one executable binary.
+* Two additional released-state bugs require diagnosis: Codex Token Monitor can fail to publish local usage, and Claude setup is not a dependable first-run flow. A separate requested connection-policy change will start both providers app-locally disconnected on a fresh installation and require explicit, independent Connect actions before quota collection.
 * The Product Planning Board is the current execution index. The dated status log below is retained as historical implementation provenance.
 
 Historical execution status (2026-07-13)

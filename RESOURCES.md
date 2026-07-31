@@ -15,6 +15,11 @@
 
 ### Neighboring projects
 
+The projects below helped shape AgentUsageMonitor's ideas and supplied independent
+research and comparison points. They are references, not bundled runtime
+dependencies; their inclusion does not imply endorsement or direct code
+contribution.
+
 - [Token Monitor — Javis603](https://github.com/Javis603/token-monitor)
   Electron dashboard that separates local usage collection, quota probing, aggregation, synchronization, and presentation. Use for: studying broad product coverage and a watch-triggered collector pipeline.
 - [Token Monitor `AGENTS.md`](https://github.com/Javis603/token-monitor/blob/main/AGENTS.md)

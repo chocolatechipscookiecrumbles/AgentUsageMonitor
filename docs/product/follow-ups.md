@@ -473,3 +473,120 @@ Acceptance
 * invoking bridge mode cannot open UI or start the normal app lifecycle
 * a real Claude Code status-line invocation survives app upgrade, move, relaunch,
   and rollback without manual repair
+
+⸻
+
+## 11. Codex Token Monitor can fail to read local usage
+
+**Status:** **Needs diagnosis.** Observed in the published 0.0.1 release. No cause
+or workaround is confirmed.
+
+Problem
+
+Codex has been used locally, but its Token Monitor can remain without local token
+usage instead of publishing observed requests. Provider quota and local token
+activity are separate paths, so a working quota connection does not prove that
+transcript discovery and reconciliation work.
+
+Unknown boundary
+
+The current report does not distinguish among an undiscovered/custom Codex home,
+file permissions, transcript-schema drift, unsafe-file rejection, incremental
+reader/cache state, file-event delivery, or reconciliation. These are investigation
+targets, not root-cause claims. Do not ask for or export raw prompts or responses to
+diagnose the failure.
+
+Required outcome
+
+Reproduce the released failure with sanitized diagnostics, identify the exact
+discovery/read/reconciliation boundary, and make the Token Monitor either publish
+the correct locally observed totals or name an evidence-supported unavailable
+reason and recovery action.
+
+Acceptance
+
+* test default and explicit `CODEX_HOME`, missing roots, unreadable roots, current
+  record schemas, app launch, file events, cache rebuild, disable/re-enable, and
+  relaunch
+* retain field-scoped decoding and never persist or export record content, paths,
+  session identifiers, prompts, or responses
+* a valid empty day remains distinguishable from failed discovery or reading
+* the released failure gets the smallest deterministic regression once reproduced
+
+⸻
+
+## 12. Claude setup is not a dependable first-run flow
+
+**Status:** **Needs diagnosis and interaction plan.** The user reported the
+published setup as problematic, but the exact failed step has not yet been captured
+well enough to claim a root cause.
+
+Problem
+
+Claude setup spans existing Claude Code credentials, a possible Keychain prompt,
+passive status-line capture, cached state, and the explicitly consented CLI
+`/usage` recovery. In the released experience these boundaries can require extra
+or unclear recovery actions rather than one understandable setup sequence.
+
+Required outcome
+
+Instrument and observe the first-run transitions before redesigning them. The app
+must clearly distinguish:
+
+* existing Claude Code credentials available without interaction
+* credential access requiring an explicit user action and possible Keychain prompt
+* passive status-line capture installed, absent, stale, or conflicting
+* CLI-only usage recovery that does not prove account/plan identity
+* setup failure with a safe, specific retry path
+
+Acceptance
+
+* one guided path reaches a coherent connected/usable state or names the exact
+  blocker without contradictory status
+* ordinary background refresh remains non-prompting
+* existing custom `~/.claude/settings.json` configuration is never overwritten
+* cancel, deny, retry, relaunch, stale snapshot, and later credential recovery are
+  explicit
+* Follow-up 9's usage/plan reconciliation and Follow-up 10's executable packaging
+  remain separate ownership boundaries rather than being hidden inside setup copy
+
+⸻
+
+## 13. First launch should require explicit connection for both providers
+
+**Status:** **Needs plan.** Requested connection-policy hardening after 0.0.1.
+
+Problem
+
+The 0.0.1 app can infer provider availability from existing CLI state before the
+user has explicitly connected that provider inside the app. That makes the consent
+boundary unclear, especially for Claude, where an intentional connection action is
+the appropriate place to explain and authorize a possible cross-app Keychain
+prompt.
+
+Required outcome
+
+On a fresh app installation, Codex and Claude both begin in app-local
+**Disconnected** states and require separate, explicit connection actions before
+quota collection starts. Connecting one provider must not connect or alter the
+other. The flow may perform non-interactive capability checks needed to explain the
+next action, but it must not silently adopt an existing CLI session as an
+app-level connection.
+
+Acceptance
+
+* test fresh app state with both CLIs signed in, only Codex signed in, only Claude
+  signed in, neither signed in, missing CLIs, denied interaction, and custom homes;
+  both app-level providers still begin disconnected
+* Codex and Claude expose independent Connect actions with provider-specific
+  disclosure and recovery
+* launch, scheduled refresh, wake refresh, and passive discovery never trigger a
+  Keychain prompt or silently convert a provider to connected
+* connecting one provider does not connect, sign in, sign out, or otherwise mutate
+  the other provider
+* reconnect after an app-local disconnect remains explicit, while upgrades preserve
+  a previously established app-level connection unless a migration plan says
+  otherwise
+* connection state and Token Monitor collection remain separate; whether local
+  activity should be visible before quota connection is an explicit product choice,
+  not an accidental authentication side effect

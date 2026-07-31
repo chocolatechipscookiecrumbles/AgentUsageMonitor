@@ -2,7 +2,8 @@
 
 This is about **the repository**, not the app release. The release checklist lives
 in [releasing-on-github.md](releasing-on-github.md); this file covers what has to
-change before `chocolatechipscookiecrumbles/agent-usage` is readable by strangers.
+change around the **AgentUsageMonitor** project. Its current GitHub endpoint remains
+`chocolatechipscookiecrumbles/agent-usage` until the remote rename is completed.
 
 Written 2026-07-29 and updated after the verified 0.0.1 publication on 2026-07-31.
 Release-specific signing item 2 is closed; the separate repository-publication
@@ -181,15 +182,18 @@ than links, and both files are candidates for item 4 anyway.
 - [x] Markdown documents cleaned
 - [ ] HTML pages cleaned, or moved under item 4
 
-### 8. The rename to Agent Monitor — what is done, what is left
+### 8. Public naming layers — what is done, what is left
 
-**Decided 2026-07-29:** the product is **Agent Monitor**, because it no longer
-monitors Codex alone. Documents and every user-visible string were changed;
-developer naming was deliberately left alone.
+**Decided 2026-07-29:** the shipped app display name is **Agent Monitor**, because
+it no longer monitors Codex alone. **Updated 2026-07-31:** the project and local
+clone name are **AgentUsageMonitor**. The GitHub repository name/slug remains
+`agent-usage` until the remote is renamed. Developer naming was deliberately left
+alone.
 
 | Surface | State | Notes |
 |---|---|---|
-| README title and prose | ✅ Agent Monitor | |
+| README title | ✅ AgentUsageMonitor | Project name |
+| README app-facing prose | ✅ Agent Monitor | Shipped app display name |
 | Release notes | ✅ Agent Monitor 0.0.1 | |
 | Release guide prose, tag messages, `gh` titles | ✅ Agent Monitor | |
 | Planning board record | ✅ | |
@@ -202,7 +206,8 @@ developer naming was deliberately left alone.
 | `CodexUsageMonitor.app`, `com.david.codex-usage-monitor`, `CFBundleName`, target and directory names | ⬜ unchanged **by choice** | Developer naming. Changing the identifier orphans existing preferences and Keychain grants |
 | `~/Library/Application Support/CodexUsageMonitor` and the six file names | ⬜ unchanged **by choice** | Real paths. Renaming them strands every existing user's cache and history |
 | Export filename `CodexUsageMonitor-local-data-<date>.json` | ⬜ | User-visible in the save panel, but named after the data directory it comes from. Rename only if the directory is ever renamed |
-| Repository name `agent-usage` | ❌ | Matches neither the old nor the new product name |
+| Project/local clone name | ✅ AgentUsageMonitor | README and clone destination |
+| GitHub repository name/slug and endpoint | ⏳ `agent-usage` | Rename the remote only when the destination exists, then update clone and compare URLs |
 
 **Leave `CFBundleIdentifier` alone regardless.** A new identifier is a new app to
 macOS: preferences reset, the Keychain "Always Allow" grant is lost, and the user
@@ -216,8 +221,10 @@ gets every first-run prompt again.
       row, Diagnostics Name, copied report, exported data, and a newly triggered
       Terminal permission prompt. The release smoke test does not prove every
       cached or permission-dependent string.
-- [x] The `agent-usage` repository-name mismatch was accepted for 0.0.1. GitHub can
-      redirect the old URL if it is renamed later.
+- [ ] Rename the GitHub endpoint from `agent-usage` to `AgentUsageMonitor`, then
+      update the remote and documentation URLs. The requested destination returned
+      “Repository not found” on 2026-07-31, so current clone/PR links intentionally
+      retain the working endpoint.
 
 ---
 

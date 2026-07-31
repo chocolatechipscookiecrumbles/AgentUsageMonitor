@@ -3,6 +3,12 @@
 This guide verifies the Claude paths that ship in Agent Monitor 0.0.1. It is a
 real-machine smoke check, not a substitute for the automated suite.
 
+> **Known 0.0.1 setup defect:** Claude setup has required unclear extra recovery
+> in the published app. The exact failing boundary has not been reproduced, so
+> record whether failure occurs during credential discovery, Keychain permission,
+> passive status-line setup, or explicit CLI recovery instead of treating those
+> paths as one generic “connection” failure.
+
 ## Current source hierarchy
 
 | Tier | Source | Runtime status |
