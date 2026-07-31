@@ -1,5 +1,10 @@
 # Manual sanitized-repository publication checklist
 
+> **Historical checklist:** The publication and post-public verification are
+> complete. Use the [public update workflow](public-update-workflow.md) for ongoing
+> branches and releases; retain this file as the evidence boundary for the
+> one-time repository migration.
+
 Use this checklist for the GitHub-only work that is intentionally not delegated to
 an authenticated agent. Keep the original `agent-usage` repository private. Do not
 upload scanner reports, replacement maps, Actions logs, or temporary audit files to

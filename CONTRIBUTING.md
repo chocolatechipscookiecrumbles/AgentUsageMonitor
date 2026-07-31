@@ -18,3 +18,9 @@ Pull requests must use the repository's evidence-rich template and follow
 [the evidence contract](docs/development/evidence-rich-pull-requests.md). Include
 only the approved scope, distinguish observed evidence from inference, and leave
 unexercised states marked unverified.
+
+All changes start from the public repository's current `main`. Before pushing a
+feature branch, follow the
+[public update workflow](docs/development/public-update-workflow.md): verify commit
+identity, inspect the exact public patch, scan new commits, and keep the historical
+private repository out of the branch graph.
