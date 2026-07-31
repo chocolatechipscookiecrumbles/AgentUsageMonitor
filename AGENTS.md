@@ -30,6 +30,13 @@ Skills live in `.agents/skills/`. Most are synced from a global source and are g
 - Update `UsageProbe/README.md` and `how-to.md` when a native-app change affects user-visible behavior or operating instructions.
 - Use `.agents/skills/preparing-evidence-rich-prs` and `docs/development/evidence-rich-pull-requests.md` when preparing or updating a pull request.
 - The user creates every GitHub pull request manually. For every approved push or planned-PR request, push only the approved scope and generate a filled draft from `.github/pull_request_template.md` (including the compare URL) for the user to submit. Never create a GitHub pull request.
+- For stacked pull requests, treat each PR's base branch as the only destination.
+  Either merge the deepest child upward first and finish with the root into `main`,
+  or retarget each remaining child to current `main` after its parent merges. Never
+  assume a later merge into an already-merged feature branch propagates to `main`.
+  Before release or branch deletion, verify both ancestry and patch equivalence
+  against `origin/main`; see
+  `docs/development/evidence-rich-pull-requests.md#keep-stacked-pull-request-bases-moving-in-the-same-direction`.
 - For future implementation work, do not add feature-presence, routing, happy-path, implementation-detail, or broad general test cases. Add automated coverage only for a reproducible defect: the smallest deterministic regression test that demonstrates the old failure and protects the fix. If a regression test is not feasible, record the manual regression boundary and why. Preserve existing tests unless the task explicitly changes or removes them.
 - Preserve existing user changes and keep unrelated edits out of the current task.
 

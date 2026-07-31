@@ -111,6 +111,14 @@ User-Agent: claude-code/2.0.0
 **Tier 3 — statusLine snapshot** *(passive, local, free)*
 Claude Code renders a status line on every turn. We install a native helper, **`claude-usage-bridge`** ([main.swift](../../CodexUsageMonitor/Sources/ClaudeUsageBridge/main.swift)), into `~/.claude/settings.json`'s `statusLine` command via [ClaudeStatusLineInstaller](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/ClaudeStatusLineInstaller.swift) (which merges non-destructively and never clobbers an existing custom status line). Claude Code pipes its status-line JSON to the helper on each render; the helper extracts only the `rate_limits` windows and writes `Application Support/CodexUsageMonitor/claude-rate-limits.json`. [ClaudeRateLimitSnapshotReader](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeRateLimitSnapshotReader.swift) reads that file (best-effort, never throws). This costs nothing but is only as fresh as the last time Claude Code ran.
 
+In 0.0.1 that helper is a second Mach-O executable nested in the app bundle. The
+build signs it first and then signs the containing app, so it is operationally
+correct but expands the signing, verification, and notarization surface. Product
+Follow-up 10 tracks consolidating the same stdin-driven helper mode into the main
+app executable. The replacement must still exit without creating UI, preserve the
+field-scoped privacy boundary and atomic snapshot write, remain safe when invoked
+by Claude Code, and keep installation/update paths stable.
+
 **Tier 4 — cache** *(last resort)*
 [ClaudeUsageCache](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeUsageCache.swift) holds the most recent successful snapshot from any source. If nothing else is available, the last good reading is shown labelled `cached`; if even that is empty, a "no source available" warning is returned.
 

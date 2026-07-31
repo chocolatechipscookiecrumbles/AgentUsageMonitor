@@ -115,7 +115,10 @@ Two concrete gaps this plan closes, beyond "no UI":
 - **Menu-bar Claude card** — a Claude quota card in `MenuBarExtra`/`QuotaMenuView` alongside Codex, with a "Refresh Claude Usage" action. This plan surfaces Claude only in Settings; the menu card is `claude_probe_plan` Task 9's remainder.
 - **Tier 3 — user-authorized CLI `/usage` PTY probe** (`claude_probe_plan` §6 / Task 7). Highest risk surface; its own plan.
 - **One-click `statusLine` setup + conflict-merge UX** (`claude_probe_plan` §5 "Claude configuration integration") — Task 6 here only makes the bridge path resolvable; the interactive installer UI is deferred.
-- **Proper Developer ID signing and permission acceptance** — deferred by user direction until per-agent notifications and the proper menu-bar popover are complete. Functional work may continue using the locally assembled/ad-hoc-verified app; final release acceptance still requires a valid stable signature.
+- **Proper Developer ID signing and permission acceptance** — deferred during this
+  implementation, then completed for the published 0.0.1 artifact on 2026-07-31.
+  The downloaded release was observed working as intended; exhaustive unrecorded
+  permission and accessibility states remain separate verification.
 - **Account-change fingerprinting / quarantine** (`claude_probe_plan` §5 "Account-change protection") — the current snapshot model has no `credentialFingerprint`; add when multi-account handling is in scope.
 - **OAuth token refresh** (`claude_probe_plan` §4 "Credential refresh") — for now an expired access token surfaces as "unavailable, sign in through Claude Code," per the probe plan's own fallback allowance.
 - **Real-account parity verification** (`claude_probe_plan` Task 11) — run once the live surface exists.
@@ -125,6 +128,21 @@ Two concrete gaps this plan closes, beyond "no UI":
 The user observed an intermittent state that this completed wiring scope does not recover coherently. An ordinary, non-prompting Claude refresh can lack both the Keychain credential and Claude values and report **Needs attention**. Running the explicit, user-authorized CLI `/usage` check can then restore the quota windows, but that snapshot has no plan hint. Claude Settings consequently shows status plus the **Connected account** action while omitting **Plan** until a later ordinary refresh restores the credential-derived identity.
 
 This is tracked as [Product Follow-up 9](../../product/follow-ups.md#9-claude-refresh-can-recover-usage-without-recovering-plan-identity), with status **Needs plan**. No code change is claimed here. The future plan must preserve non-prompting ordinary refreshes, identify the trigger for the missing credential/value state, define how CLI-only usage reconciles with last-confirmed account identity, and recover usage plus connection identity without requiring a second refresh.
+
+## Post-release packaging follow-up — 2026-07-31
+
+The 0.0.1 bundle contains `ClaudeUsageBridge` as a second native executable, not
+as passive data. The release build correctly signs the helper before the app, but
+that creates two executable code objects in the bundle and a nested signing,
+verification, and notarization boundary.
+
+[Product Follow-up 10](../../product/follow-ups.md#10-consolidate-the-claude-usage-bridge-into-the-app-executable)
+tracks replacing the separate executable target with a non-UI bridge mode in the
+main app executable. This completed wiring plan is not reopened and no production
+change is claimed here. The future plan must preserve the Claude status-line stdin
+contract, field-scoped extraction, owner-only atomic snapshot, stable install and
+upgrade path, and direct testability while reducing the shipped bundle to one
+executable binary.
 
 ## Completion criteria
 

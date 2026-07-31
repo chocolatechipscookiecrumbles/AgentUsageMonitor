@@ -2,6 +2,13 @@
 
 Centralized status and file links: [Product Planning Board](../../product/planning-board.md).
 
+> **Post-release status (2026-07-31):** The roadmap culminated in the published,
+> notarized `Agent Monitor` 0.0.1 release. Later explicit direction expanded the
+> shipped scope from Codex-only to Codex plus Claude and superseded several
+> historical constraints below. The uploaded release artifact was downloaded and
+> observed working as intended. Use the Product Planning Board for current work;
+> retain this document as sequence and decision provenance.
+
 > **For agentic workers:** Implement one branch at a time with `executing-plans`. Add focused automated coverage for deterministic seams and use compilation, read-only live collection, schema inspection, signed-app inspection, and manual UI acceptance in proportion to the claim. Update `outline.md`, `how-to.md`, `UsageProbe/README.md`, and the active plan whenever behavior changes.
 
 **Goal:** Turn the proven quota monitor into a dependable daily-driver with configurable warnings, adaptive refresh, safe account connection, a separate Settings window, a compact multi-provider menu popover, and launch at login.

@@ -57,9 +57,9 @@ asks for a password, and no prompt, response, or file content ever leaves your M
 3. Launch it. **It lives in the menu bar** — there is no Dock icon and no window on
    first launch. Look at the right end of the menu bar.
 
-The 0.0.1 download must be signed with an Apple **Developer ID** certificate,
-notarized, and stapled before it is published. The earlier accepted ticket belongs
-to a superseded pre-rename build and does not cover the shipping artifact.
+The published 0.0.1 download is signed with an Apple **Developer ID** certificate,
+notarized, and stapled. On 2026-07-31 the uploaded archive was downloaded again,
+accepted by Gatekeeper, launched, and observed working as intended.
 
 ### Build from source
 
@@ -91,7 +91,7 @@ ad-hoc signing and warns you — fine for local use, but see
 | **OS** | macOS 14 (Sonoma) or later |
 | **Codex support** | The Codex CLI, already signed in |
 | **Claude support** | Claude Code, already signed in |
-| **Runtime** | None. The Claude usage bridge is a native Swift executable bundled and signed inside the app — no Python needed |
+| **Runtime** | None. The Claude usage bridge is currently a second native Swift executable bundled and signed inside the app — no Python needed |
 | **Accounts** | None. The app adds no account, network login, or credential of its own |
 
 You need at least one of the two providers; neither is required for the other to
@@ -388,7 +388,12 @@ requests may not be merged.
 - **`ClaudeUsageBridge`** is a separate native executable, bundled and signed inside
   the app, that turns a Claude Code statusLine payload into the snapshot the app
   reads. `ClaudeUsageBridgeCore` holds its pure, dependency-free logic so it can be
-  tested directly.
+  tested directly. This works in 0.0.1, but it creates a second nested code object
+  that must be built, signed, verified, and notarized with the app.
+  [Product Follow-up 10](docs/product/follow-ups.md#10-consolidate-the-claude-usage-bridge-into-the-app-executable)
+  plans to give the main app executable a non-UI status-line bridge mode so the
+  bundle ships one executable binary while preserving the same stdin, privacy,
+  installation, and failure contracts.
 - **`AppSettings`** persists preferences; **`LocalDataInventory`** is the single
   declaration of every file the app writes, and both the Data & Privacy page and the
   export action read from it.

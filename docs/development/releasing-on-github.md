@@ -17,12 +17,17 @@ the commands, so you can repeat it.
 > then, do not remove the disclosure from any of those three places. Codex usage
 > is read from the local Codex CLI app-server and carries no such caveat.
 
-## Where this stands right now (2026-07-30)
+## Where this stands right now (2026-07-31)
 
-**Apple notarized the app — but not the app you are going to ship.** The approved
-submission was built *before* the rename and the version change: it reports
-`Codex Usage Monitor` / `1.0.0` / build `254`. The source now says
-`Agent Monitor` / `0.0.1`.
+**Agent Monitor 0.0.1 is published.** The shipping `Agent Monitor` / `0.0.1` /
+build `266` app was Developer ID signed, notarized, stapled, tagged `v0.0.1`, and
+published. The uploaded archive was downloaded again after publication; the user
+verified the release artifact, launched it, and observed the app working as
+intended.
+
+The earlier accepted submission remains useful historical evidence, but it was not
+the shipping artifact. It reports `Codex Usage Monitor` / `1.0.0` / build `254`
+and predates the rename and version change.
 
 **A notarization ticket is bound to the exact binary that was submitted**, by its
 code-directory hash. Changing `CFBundleDisplayName` or `CFBundleShortVersionString`
@@ -30,7 +35,8 @@ rewrites `Info.plist`, which changes the hash, which makes the approved ticket
 inapplicable. There is no way to carry it across — the ticket is not a licence for
 the project, it is a receipt for one binary.
 
-So the approval is worth something, just not the thing it looks like:
+That first approval was worth something, just not the thing it initially looked
+like:
 
 | The approval **does** prove | It **does not** give you |
 |---|---|
@@ -38,30 +44,37 @@ So the approval is worth something, just not the thing it looks like:
 | The hardened runtime, secure timestamp, and absence of `get-task-allow` all satisfy the notary | Any standing that transfers to a rebuilt bundle |
 | The nested bridge is signed correctly — the usual cause of a rejected submission | Permission to skip resubmitting |
 
-Expect the resubmission to pass: nothing about the *signing* changed, only two
-strings and a build number. The first submission is where the risk was.
-
 | Prerequisite | State |
 |---|---|
-| Build and tests green | ✅ 316 tests, 1 skipped, 0 failures |
+| Build and tests green | ✅ Final integration suite: 329 tests, 0 failures |
 | Optimized release binary | ✅ `build-app.sh` builds `-c release` |
 | App icon | ✅ `AppIcon.appiconset`, all ten sizes; bundle `.icns` built by `iconutil` |
 | Version and build number | ✅ `0.0.1` / `266` in `Info.plist`. `254` is spent — the notary has already seen it, and Apple rejects a re-used build number |
 | Product name | ✅ `Agent Monitor` in every user-visible string; identity stays `CodexUsageMonitor` |
 | Seven-day reliability observation | ✅ Passed — see the caveat in [reliability Task 5](../superpowers/plans/2026-07-13-codex-reliability-hardening.md#task-5-run-and-review-the-one-week-hardening-period) |
 | Claude credential disclosure | ✅ README, app Data & Privacy page, release notes |
-| Release notes | ✅ Drafted at [`docs/release-notes/0.0.1.md`](../release-notes/0.0.1.md) |
+| Release notes | ✅ Published from [`docs/release-notes/0.0.1.md`](../release-notes/0.0.1.md) |
 | Git remote | ✅ `origin` → `chocolatechipscookiecrumbles/agent-usage` |
 | **Apple Developer membership** | ✅ Active |
 | **Developer ID certificate** | ✅ `Developer ID Application: Project maintainer (<APPLE_TEAM_ID>)`, installed with its private key |
 | **Notarization of the pre-rename build** | ✅ **Accepted** — `Codex Usage Monitor` / `1.0.0` / `254`. Superseded; do not publish it |
-| **Notarization of the shipping build** | ❌ **Not started.** `Agent Monitor` / `0.0.1` / `266` has not been submitted or stapled |
-| `gh` CLI authenticated | ❌ `gh auth login` still needed (or use the web UI) |
+| **Notarization of the shipping build** | ✅ **Accepted and stapled** — `Agent Monitor` / `0.0.1` / `266` |
+| Git tag and GitHub Release | ✅ `v0.0.1` published |
+| Uploaded artifact verification | ✅ Downloaded after publication; accepted and observed working as intended |
 
-### Signing evidence — the pre-rename build (2026-07-29)
+### Shipping-build evidence — 2026-07-31
+
+The final release completed the Developer ID build, resource verification,
+notarization, stapling, packaging, tagging, and publication sequence below. The
+user then downloaded the uploaded archive and verified the released app rather than
+relying on the local build. This closes the 0.0.1 release gate. It does not
+retroactively claim that every possible VoiceOver, permission-denied, long-copy, or
+manufactured conditional state was exercised.
+
+### Historical signing evidence — the pre-rename build (2026-07-29)
 
 Kept because it is the evidence that the signing setup is sound; it describes the
-**approved but superseded** bundle, not the one you will publish. Read back from
+**approved but superseded** bundle, not the artifact later published. Read back from
 `CodexUsageMonitor/.build/CodexUsageMonitor.app`, built at 18:09:
 
 ```
@@ -74,18 +87,17 @@ Timestamp=Jul 29, 2026 at 18:09:56
 ```
 
 `codesign -d --entitlements -` returns none, so there is no `get-task-allow`.
-`spctl -a -vv` prints `rejected … source=Unnotarized Developer ID` — which is the
-**expected** verdict at this point: the signature is right and notarization is the
-only thing missing. `xcrun stapler validate` correspondingly reports
-"does not have a ticket stapled to it."
+For that superseded build, `spctl -a -vv` printed
+`rejected … source=Unnotarized Developer ID`; `xcrun stapler validate` likewise
+reported that no ticket was stapled. Those results describe only the historical
+bundle, not the published 0.0.1 artifact.
 
 `CodexUsageMonitor-notarize.zip` was produced at 19:28 and submitted.
 
-### The remaining sequence
+### Completed first-release sequence
 
-`CFBundleVersion` is already set to `266` in this branch, so nothing needs editing
-first. Run this in **your own Terminal** — every step below either signs, reaches
-the Keychain, or talks to Apple, and none of it should be run by an agent:
+This is the sequence used for 0.0.1 and the baseline for future releases. Run
+signing, Keychain, and Apple-service steps in your own Terminal:
 
 ```sh
 cd CodexUsageMonitor
@@ -111,8 +123,8 @@ xcrun stapler validate CodexUsageMonitor.app     # "The validate action worked!"
 spctl -a -vv CodexUsageMonitor.app               # accepted … source=Notarized Developer ID
 ```
 
-Then package (Step 4), tag `v0.0.1` (Step 5), authenticate `gh` and publish
-(Step 6), and verify the uploaded artifact like a stranger would (Step 7).
+The release then followed Step 4 packaging, Step 5 tagging, Step 6 publication, and
+Step 7 verification of the downloaded artifact.
 
 **Step 2 is not ceremony.** The rename lives entirely in `Info.plist` and five
 Swift strings; if the build picked up a stale plist you would notarize a bundle
@@ -209,14 +221,13 @@ macOS apps carry two version strings in `Info.plist`:
 
 Currently: `CFBundleShortVersionString = 0.0.1`, `CFBundleVersion = 266`.
 
-**Set to `0.0.1` on 2026-07-29** (revised down from an earlier `1.0.0`). The build
-is feature-complete — both providers ship, the reliability observation passed, and
-the icon and release binary are in place — but `0.0.1` says the *distribution* is
-new: nobody outside this machine has run it, several surfaces are implemented
-without signed-app acceptance, and the Claude credential path is expected to be
-replaced. Save `1.0.0` for the build you would defend to a stranger. The build
-number is the repository's commit count at the time of the bump, which keeps it
-monotonic without a second thing to remember — regenerate it with:
+**Set to `0.0.1` on 2026-07-29** (revised down from an earlier `1.0.0`) and
+published on 2026-07-31. The version deliberately described a first distribution:
+both providers and the release path were ready, but outside installation history
+was new and the Claude credential architecture still carried disclosed follow-up
+work. Keep `1.0.0` for a later maturity decision. The build number was derived from
+the repository commit count at the time of the bump, which keeps it monotonic
+without a second thing to remember — regenerate it with:
 
 ```sh
 git rev-list --count HEAD
@@ -537,3 +548,7 @@ For a **later** release, add a step 0: bump `CFBundleShortVersionString` and set
 - **A `.dmg`** with a styled drag-to-Applications window for nicer first impressions.
 - **A first-party Claude OAuth client**, which is what retires the terms caveat
   at the top of this file. Planned as the first post-release work.
+- **One executable in the app bundle.** In 0.0.1 the Claude status-line bridge is
+  a separately built and signed nested executable. [Product Follow-up 10](../product/follow-ups.md#10-consolidate-the-claude-usage-bridge-into-the-app-executable)
+  tracks moving its entry point into a non-UI mode of the main app executable so
+  future releases have one executable binary and no nested-helper signing step.

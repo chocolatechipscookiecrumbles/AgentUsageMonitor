@@ -1,5 +1,14 @@
 # Claude StatusLine Usage Bridge Implementation Plan
 
+> **Post-release status (2026-07-31):** This document preserves the original
+> Python prototype plan. The shipped 0.0.1 bridge was subsequently replaced by a
+> native Swift executable and wired into the supported provider path. That native
+> bridge is a second executable binary nested in the app bundle and is signed
+> before the containing app. [Product Follow-up 10](../../product/follow-ups.md#10-consolidate-the-claude-usage-bridge-into-the-app-executable)
+> tracks consolidating its entry point into a non-UI mode of the main app
+> executable so a future bundle contains one executable binary. Do not execute
+> this historical Python plan as current implementation guidance.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build a zero-cost, privacy-scoped bridge that captures Claude Code's own official `rate_limits` (5-hour/weekly `used_percentage` + `resets_at`) from its `statusLine` payload into a small local snapshot file, plus an isolated, tested Swift reader for that file — with no wiring into any visible UI, connection controller, or refresh cycle.
@@ -508,7 +517,7 @@ This is a Phase 0 harness that captures Claude Code's own official `rate_limits`
 fields — the same 5-hour and weekly `used_percentage`/`resets_at` values Claude
 Code already computes from real API response headers — into a small local
 snapshot file, at zero additional token cost. See the
-[capability research](../docs/superpowers/plans/2026-07-20-claude-code-capability-research.md)
+[capability research](2026-07-20-claude-code-capability-research.md)
 this implements (Signal A).
 
 ## Safety boundary
@@ -570,7 +579,7 @@ The snapshot this bridge writes is read by `ClaudeRateLimitSnapshotReader` in
 the native app (`CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/`). As of
 this plan, that reader is an isolated, tested component only — it is not yet
 wired into any Settings UI, connection controller, or refresh cycle. See the
-[capability research's gate](../docs/superpowers/plans/2026-07-20-claude-code-capability-research.md#gate-before-implementation)
+[capability research's gate](2026-07-20-claude-code-capability-research.md#gate-before-implementation)
 for what still has to be true before a visible Claude usage UI ships.
 ```
 

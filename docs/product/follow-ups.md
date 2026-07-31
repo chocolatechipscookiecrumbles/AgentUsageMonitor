@@ -415,3 +415,61 @@ Acceptance
 * the CLI-only path either retains a valid last-confirmed plan identity with accurate provenance or clearly represents the identity as unresolved without a contradictory connected state
 * another ordinary refresh is not required to restore the Plan row
 * relaunch, cached data, expired credential, denied Keychain access, CLI-only success, and later OAuth recovery are covered explicitly
+
+⸻
+
+## 10. Consolidate the Claude usage bridge into the app executable
+
+**Status:** **Needs plan.** The 0.0.1 implementation works and was signed,
+notarized, published, and verified, but its packaging boundary is more complex than
+the product needs.
+
+Problem
+
+`ClaudeUsageBridge` is not a passive resource. It is a separate native executable
+binary nested in the app bundle. `build-app.sh` builds and signs that helper first,
+then signs the containing app. The release verifier and notarization boundary must
+therefore account for two executable code objects. This is operationally correct,
+but it increases build, signing, verification, update, and failure surface.
+
+Required outcome
+
+Ship one executable binary in the app bundle. The main Agent Monitor executable
+should expose a dedicated non-UI bridge mode that can receive Claude Code's
+status-line JSON on stdin, extract the existing allowlisted rate-limit fields, write
+the same atomic owner-only snapshot, and exit without launching the menu-bar app.
+The release build should require one app signing operation rather than a separate
+nested-helper signing step followed by app signing.
+
+The plan must compare at least:
+
+* invoking the executable inside the installed app bundle with a bridge-mode
+  argument, including what happens when the app is moved or replaced
+* copying the already signed main executable to the deterministic app-owned
+  Application Support path, including update and code-signature behavior
+* eliminating passive status-line capture if neither single-binary route can meet
+  path stability, privacy, and reliability requirements
+
+Constraints
+
+* preserve the current stdin/stdout/exit contract expected by Claude Code
+* do not initialize SwiftUI, `NSApplication`, menu state, refresh scheduling,
+  Keychain access, or network collection in bridge mode
+* retain field-scoped extraction: never persist prompts, responses, paths, model
+  metadata, or other status-line fields
+* retain atomic writes and owner-only directory/file permissions
+* migrate existing `~/.claude/settings.json` status-line commands without
+  clobbering unrelated user configuration or leaving a broken helper path
+* define rollback and compatibility for existing 0.0.1 installations
+* keep `ClaudeUsageBridgeCore` reusable and directly testable even if the separate
+  executable target is removed
+
+Acceptance
+
+* the shipped app bundle contains one executable Mach-O binary
+* `build-app.sh` no longer builds, copies, or separately signs a nested bridge
+* the bundle, signing, and notarization verifiers expect one executable
+* passive capture produces the same sanitized snapshot from the same fixtures
+* invoking bridge mode cannot open UI or start the normal app lifecycle
+* a real Claude Code status-line invocation survives app upgrade, move, relaunch,
+  and rollback without manual repair

@@ -1,6 +1,9 @@
 # Release-Readiness UI Fixes Implementation Plan
 
-> **Status (2026-07-28): Implemented; signed-app visual acceptance unobserved.** Three independent pre-release corrections: key equivalents for the menu-popover footer commands, a template-safe Codex menu-bar glyph, and real actions on the Data & Privacy and Diagnostics Settings pages.
+> **Status (2026-07-31): Released in 0.0.1.** The published artifact was downloaded
+> and observed working as intended. The original exhaustive visual/accessibility
+> matrix remains recorded separately where individual states were not explicitly
+> exercised.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` (recommended) or `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -141,9 +144,14 @@ the next refresh repopulating diagnostics.
 - [x] `swift test --package-path CodexUsageMonitor` — full suite green, including the new glyph regression.
 - [x] `CODESIGN_IDENTITY=- zsh CodexUsageMonitor/Scripts/build-app.sh` succeeds and compiles the new imageset.
 - [x] `git diff --check` clean.
+- [x] Published `v0.0.1` artifact downloaded and observed working as intended on
+      2026-07-31.
 - [ ] Signed-app visual acceptance per AGENTS.md: General, Data & Privacy, and Diagnostics at 680 × 560 with the Context Rail hidden and visible, Light and Dark; the popover footer with shortcuts on and off; the menu-bar glyph in both appearances.
 
-**Recorded limitation.** Signed-app visual, keyboard, and VoiceOver acceptance is recorded as **unobserved** until directly inspected. Do not claim it passed. The waiver in the multi-provider popover branch does not extend to this branch.
+**Recorded boundary.** The published-artifact smoke test closes the release gate,
+but it does not identify every Light/Dark, keyboard, VoiceOver, conditional-state,
+or control-specific check in the exhaustive matrix. Do not convert unrecorded
+individual states into observed evidence.
 
 ## Results — 2026-07-28
 
@@ -173,4 +181,15 @@ the next refresh repopulating diagnostics.
   ad-hoc verification build, not the Developer ID shipping artifact.
 - `git diff --check` reported no whitespace errors.
 - Signed-app visual, keyboard, VoiceOver, normal-export, and file-event acceptance
-  remains unobserved and is still required before merge/tagging.
+  was still unobserved at merge time.
+
+## Post-release closeout — 2026-07-31
+
+- Build `266` was Developer ID signed, notarized, stapled, tagged `v0.0.1`, and
+  published.
+- The user downloaded the uploaded artifact, verified it, launched it, and reported
+  that the app works as intended.
+- The release branch was deleted after merge. The historical sideways stacked-PR
+  branches contained no patches absent from `main` and are eligible for cleanup.
+- The observation is a release smoke test, not retrospective proof of every
+  unrecorded VoiceOver, permission, long-copy, or manufactured conditional state.

@@ -121,6 +121,38 @@ failed refresh
 
 A horizontal “add all infrastructure” PR usually hides whether any user outcome works.
 
+### Keep stacked pull-request bases moving in the same direction
+
+GitHub merges a pull request into the base branch named on that pull request. It
+does not remember that the base branch previously merged into `main`, and a later
+merge into that old base does not propagate upward automatically.
+
+For branches `A <- B <- C`, use one of these two safe workflows:
+
+1. Keep the stack intact and merge deepest first: `C` into `B`, then `B` into `A`,
+   then `A` into `main`.
+2. Merge `A` into `main`, then retarget `B` from `A` to current `main`, verify the
+   new comparison, merge it, and repeat for `C`.
+
+Do not merge parents top-down while leaving their children based on already-merged
+feature branches. Every GitHub PR can show “Merged” while `main` still contains
+only the first layer.
+
+Before a release or branch deletion:
+
+```sh
+git fetch origin --prune
+git merge-base --is-ancestor origin/feature/example origin/main
+git log --no-merges --cherry-pick --right-only \
+  --oneline origin/main...origin/feature/example
+```
+
+The ancestry check proves the branch tip actually landed. The cherry-equivalence
+check catches sideways/squashed histories where the tip is not an ancestor but no
+content patch remains unique. Investigate any listed commit before deleting the
+branch. Also open the GitHub comparison against `main`; an empty or already-landed
+content comparison is the human-readable cleanup boundary.
+
 ### Update the plan while evidence changes
 
 The implementation plan is not a ceremonial preface. Update it when:

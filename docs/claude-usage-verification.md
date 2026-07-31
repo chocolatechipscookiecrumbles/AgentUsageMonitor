@@ -53,9 +53,10 @@ Scripts/verify-signed-app-resources.sh
 codesign --verify --deep --strict --verbose=2 .build/CodexUsageMonitor.app
 ```
 
-Before release, use the Developer ID identity and complete notarization/stapling.
-Ad-hoc signing is only a local development check and can cause Keychain approval
-to reappear after rebuilds.
+The published 0.0.1 artifact used the Developer ID identity and completed
+notarization/stapling. Future release candidates must repeat those steps; ad-hoc
+signing remains only a local development check and can cause Keychain approval to
+reappear after rebuilds.
 
 ## 3. Explicit Claude Code credential connection
 

@@ -4,8 +4,9 @@ This is about **the repository**, not the app release. The release checklist liv
 in [releasing-on-github.md](releasing-on-github.md); this file covers what has to
 change before `chocolatechipscookiecrumbles/agent-usage` is readable by strangers.
 
-Written 2026-07-29, when the app was signed with a Developer ID identity and its
-notarization submission was in flight.
+Written 2026-07-29 and updated after the verified 0.0.1 publication on 2026-07-31.
+Release-specific signing item 2 is closed; the separate repository-publication
+items remain live unless marked done.
 
 Each item says what it is, **why it matters**, and the fix. Nothing here is done
 unless it is marked done.
@@ -39,12 +40,12 @@ README's License section to point at it instead of at this file.
 
 - [ ] Licence chosen and `LICENSE` committed
 
-### 2. The notarized build is not the build being shipped
+### 2. Closed — notarize the actual shipping build
 
-The README's Install section says releases "are signed with an Apple **Developer
-ID** certificate and notarized by Apple." Apple did notarize the app on
-2026-07-29 — but that submission was `Codex Usage Monitor` / `1.0.0` / build `254`,
-made before the rename and the version change.
+Apple first notarized `Codex Usage Monitor` / `1.0.0` / build `254` on 2026-07-29,
+before the rename and version change. That historical ticket could not cover the
+shipping artifact. `Agent Monitor` / `0.0.1` / build `266` was subsequently signed,
+notarized, stapled, published, downloaded, and verified on 2026-07-31.
 
 **Why it matters.** A notarization ticket binds to the submitted binary's
 code-directory hash. Editing `CFBundleDisplayName` and `CFBundleShortVersionString`
@@ -52,24 +53,22 @@ changes that hash, so the accepted ticket cannot apply to the shipping bundle. T
 approval is easy to mistake for "the app is notarized"; what it establishes is that
 the *signing setup* satisfies the notary, which is a different and lesser claim.
 
-**The trap to avoid.** The final verification replaced `.build` with an ad-hoc
-`Agent Monitor` / `0.0.1` / `266` candidate. It is not the earlier accepted
-Developer ID build and is not a shipping artifact. Rebuild with the Developer ID
-identity before you submit or package anything, and do not reuse any surviving
-`Codex Usage Monitor` / `1.0.0` archive from the 2026-07-29 run.
+**The trap that was avoided.** The release-readiness verification had replaced
+`.build` with an ad-hoc `Agent Monitor` / `0.0.1` / `266` candidate. It was not a
+shipping artifact, and the surviving `Codex Usage Monitor` / `1.0.0` archive from
+the 2026-07-29 run could not be reused.
 
-**The fix.** `CFBundleVersion` is already `266` in the repository (`254` is
-permanently consumed — Apple tracks build numbers per bundle identifier, which the
-rename did not change). Rebuild, submit, staple, and confirm `spctl -a -vv` prints
-`accepted … source=Notarized Developer ID`. Publish nothing before that. If you end
-up shipping Path B instead, rewrite that Install paragraph and add the `xattr`
-workaround.
+**The completed fix.** Build `266` was rebuilt with the Developer ID identity,
+submitted, accepted, stapled, packaged, published, and downloaded again for
+verification on 2026-07-31. Build `254` remains permanently consumed because Apple
+tracks build numbers per bundle identifier.
 
 - [x] `CFBundleVersion` bumped to `266`
-- [ ] Rebuilt — `plutil` confirms `Agent Monitor` / `0.0.1` / `266` inside the bundle
-- [ ] Notary returned `Accepted`, ticket stapled, `spctl` verdict re-checked
-- [ ] No superseded `1.0.0` bundle or zip remains, and the release zip was created
-      only from the stapled `Agent Monitor` / `0.0.1` / `266` app
+- [x] Rebuilt — `plutil` confirmed `Agent Monitor` / `0.0.1` / `266` inside the bundle
+- [x] Notary returned `Accepted`, ticket was stapled, and the release artifact was
+      downloaded and verified after publication on 2026-07-31
+- [x] The published release zip was created only from the stapled
+      `Agent Monitor` / `0.0.1` / `266` app
 
 ### 3. The Claude ToS disclosure is load-bearing — keep it in all three places
 
@@ -209,16 +208,16 @@ developer naming was deliberately left alone.
 macOS: preferences reset, the Keychain "Always Allow" grant is lost, and the user
 gets every first-run prompt again.
 
-**Remaining:**
+**Post-release state:**
 
-- [ ] **Signed-app acceptance of the renamed strings** — the source change is
-      verified only by `swift build` and the 316-test suite, which assert nothing
-      about this copy. Check Finder's Get Info, the popover's Quit row, the
-      Diagnostics **Name** row, a **Copy Report** paste, and an **Export Local
-      Data…** file. Also re-trigger the Terminal permission prompt if you can, since
-      macOS caches its text per app.
-- [ ] Repository renamed, or the mismatch accepted (easiest *before* the first
-      release is published; GitHub redirects the old URL afterwards)
+- [x] The published signed app was downloaded, launched, and observed working as
+      intended on 2026-07-31.
+- [ ] An exhaustive renamed-string sweep remains useful: Finder Get Info, the Quit
+      row, Diagnostics Name, copied report, exported data, and a newly triggered
+      Terminal permission prompt. The release smoke test does not prove every
+      cached or permission-dependent string.
+- [x] The `agent-usage` repository-name mismatch was accepted for 0.0.1. GitHub can
+      redirect the old URL if it is renamed later.
 
 ---
 
