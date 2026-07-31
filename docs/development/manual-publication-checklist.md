@@ -20,25 +20,28 @@ either repository.
 
 ## 2. Inspect the published `v0.0.1` release
 
-- Download the release archive from the original private repository.
-- Record the exact archive filename and the exact `.app` name inside it. Use those
-  observed names in the README and release notes.
+- Download `AgentUsageMonitor-0.0.1.dmg` from the original private repository and
+  confirm it contains `AgentUsageMonitor.app`.
 - Record the existing SHA-256 checksum before uploading anything elsewhere:
 
   ```sh
-  shasum -a 256 <DOWNLOADED_ARCHIVE>
-  unzip -Z1 <DOWNLOADED_ARCHIVE>
+  shasum -a 256 AgentUsageMonitor-0.0.1.dmg
+  hdiutil imageinfo AgentUsageMonitor-0.0.1.dmg
   ```
 
-- Extract the archive into a temporary directory and recheck the shipped app:
+- Mount the disk image, copy the app into a temporary directory, eject it, and
+  recheck the copied app:
 
   ```sh
-  codesign --verify --deep --strict --verbose=2 <EXTRACTED_APP>
-  spctl --assess --type execute --verbose=4 <EXTRACTED_APP>
-  xcrun stapler validate <EXTRACTED_APP>
+  hdiutil attach AgentUsageMonitor-0.0.1.dmg
+  ditto <MOUNT_POINT>/AgentUsageMonitor.app <TEMP_DIRECTORY>/AgentUsageMonitor.app
+  hdiutil detach <MOUNT_POINT>
+  codesign --verify --deep --strict --verbose=2 <TEMP_DIRECTORY>/AgentUsageMonitor.app
+  spctl --assess --type execute --verbose=4 <TEMP_DIRECTORY>/AgentUsageMonitor.app
+  xcrun stapler validate <TEMP_DIRECTORY>/AgentUsageMonitor.app
   ```
 
-- Confirm the archive still reports **Agent Monitor**, version `0.0.1`, build
+- Confirm the copied app still reports **Agent Monitor**, version `0.0.1`, build
   `266`. The Developer ID output is expected to expose the certificate holder and
   is the signed-release exception to source/history sanitization.
 
@@ -82,8 +85,8 @@ Do not use `--mirror` or `--all`. Verify that the destination contains one branc
 
 - Copy the original `v0.0.1` release notes to a release attached to the rewritten
   `v0.0.1` tag.
-- Upload the already verified archive without rebuilding, renaming, rezipping, or
-  otherwise changing it.
+- Upload the already verified disk image without rebuilding, renaming, recompressing,
+  or otherwise changing it.
 - Download it again from the new private repository and confirm its SHA-256 matches
   the checksum from step 2.
 - Repeat the signature, Gatekeeper, and stapler checks against the newly downloaded

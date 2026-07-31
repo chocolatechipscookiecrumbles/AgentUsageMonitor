@@ -86,7 +86,7 @@ local Markdown/HTML paths and anchors resolve.
 | Targeted pre-rewrite PII/URL inventory | Run | Metadata, blobs, messages, and annotated tag inventoried with counts only; rewrite required |
 | Full-history workflow-path inspection | Run | No `.github/workflows` path was ever committed |
 | Current-tree prohibited identity/path searches | Run | 0 matches |
-| Published archive and contained `.app` name | Not run | Requires maintainer inspection of the private release |
+| Published artifact and contained `.app` name | Observed | Maintainer confirmed `AgentUsageMonitor-0.0.1.dmg` contains `AgentUsageMonitor.app` |
 | Private Actions logs/artifacts audit | Not run | Authenticated GitHub work remains manual |
 | Signed-app visual checks | Not run | No Swift or built-app change |
 
@@ -99,9 +99,8 @@ instructions.
 **Rollback:** Revert this documentation-only commit in the original private
 repository. Do not publish the rewritten candidate.
 
-**Known limitations / unrun checks:** The README and release documentation still
-need the exact observed release archive and contained-app names. The authenticated
-Actions/release audit, final history rewrite, post-rewrite scans, new private
+**Known limitations / unrun checks:** The authenticated Actions audit, artifact
+checksum/signature recheck, final history rewrite, post-rewrite scans, new private
 repository configuration, release migration, and signed-out browser checks remain
 gated after this PR.
 

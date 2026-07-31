@@ -23,8 +23,8 @@ private and retains its pull requests, Actions, branches, stashes, and audit tra
 - [x] Record the signed Data & Privacy disclosure as rechecked and unchanged.
 - [x] Add a separate future plan for the Diagnostics affiliation disclaimer; make
   no Swift change in this work.
-- [ ] Reconcile the README download/archive and contained-app names from the actual
-  published release asset. Do not infer them from old prose.
+- [x] Reconcile the README and release notes to the maintainer-observed published
+  asset: `AgentUsageMonitor-0.0.1.dmg`, containing `AgentUsageMonitor.app`.
 - [x] Complete Markdown link and anchor validation: Lychee 0.24.2 checked 532
   Markdown/HTML links offline with anchor validation; 430 checks succeeded, 102
   network links were excluded by offline mode, and zero local links or anchors
@@ -54,7 +54,7 @@ private and retains its pull requests, Actions, branches, stashes, and audit tra
 - [ ] Create a new private `AgentUsageMonitor` repository and push only rewritten
   `main` and rewritten `v0.0.1`.
 - [ ] Migrate the verified release asset and release notes without changing its
-  checksum, then recheck signature, notarization, Gatekeeper, archive name, and
+  checksum, then recheck signature, notarization, Gatekeeper, disk-image name, and
   contained app name.
 - [ ] Configure repository metadata, Issues, private vulnerability reporting,
   security features, and `main` protection using only checks that exist.

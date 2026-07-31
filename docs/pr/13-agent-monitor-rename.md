@@ -46,8 +46,8 @@ stranger.
 | Diagnostics **Copy Report** title | `SettingsStatus` |
 | Exported-data `application.name` | `LocalDataActions` |
 
-**Not included, by decision:** `CFBundleIdentifier`, `CFBundleName`,
-`CodexUsageMonitor.app`, the target and directory names,
+**Not included, by decision:** `CFBundleIdentifier`, `CFBundleName`, the target and
+source directory names,
 `~/Library/Application Support/CodexUsageMonitor` and its six file names, the
 `CodexUsageMonitor-local-data-<date>.json` export filename, and the repository name.
 
@@ -63,10 +63,10 @@ entirely on existing users, to fix a string no user sees.
 so both needed changing. That duplication is a latent drift bug — the footer can
 say one thing while the catalog says another — and is worth collapsing separately.
 
-The download stays `CodexUsageMonitor-0.0.1.zip`, matching the bundle inside it. A
-zip named for the product containing a bundle named for the target is more confusing
-than either name alone. The README and release notes state the mismatch plainly
-rather than letting a user meet it at install time.
+**Post-publication correction:** the released artifact did not retain the draft
+names above. The observed download is `AgentUsageMonitor-0.0.1.dmg`, containing
+`AgentUsageMonitor.app`. Internal target, identifier, source-directory, and
+Application Support names remain unchanged for compatibility.
 
 ## Privacy, compatibility, and migration
 

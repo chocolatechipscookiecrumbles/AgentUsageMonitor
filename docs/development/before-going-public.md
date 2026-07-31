@@ -170,7 +170,8 @@ private in the original repository; the sanitized public candidate will use a ne
 | Diagnostics **Name** row | ✅ Agent Monitor | `DiagnosticsSettingsView` |
 | Diagnostics **Copy Report** title | ✅ "Agent Monitor diagnostics" | `SettingsStatus` |
 | Exported-data `application.name` | ✅ Agent Monitor | `LocalDataActions` |
-| `CodexUsageMonitor.app`, `com.david.codex-usage-monitor`, `CFBundleName`, target and directory names | ⬜ unchanged **by choice** | Developer naming. Changing the identifier orphans existing preferences and Keychain grants |
+| Published disk image / contained app | ✅ `AgentUsageMonitor-0.0.1.dmg` / `AgentUsageMonitor.app` | Observed release names |
+| Build output `.build/CodexUsageMonitor.app`, `com.david.codex-usage-monitor`, `CFBundleName`, target and directory names | ⬜ unchanged **by choice** | Internal compatibility naming. Changing the identifier orphans existing preferences and Keychain grants |
 | `~/Library/Application Support/CodexUsageMonitor` and the six file names | ⬜ unchanged **by choice** | Real paths. Renaming them strands every existing user's cache and history |
 | Export filename `CodexUsageMonitor-local-data-<date>.json` | ⬜ | User-visible in the save panel, but named after the data directory it comes from. Rename only if the directory is ever renamed |
 | Project/local clone name | ✅ AgentUsageMonitor | README and clone destination |

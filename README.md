@@ -12,10 +12,11 @@ asks for a password, and no prompt, response, or file content ever leaves your M
 `version 0.0.1`
 
 > **Naming:** the project and local clone name are now **AgentUsageMonitor**. The
-> published 0.0.1 app still displays **Agent Monitor**, while its bundle, download,
-> target, and source directory remain `CodexUsageMonitor` for compatibility. The
-> public repository is **AgentUsageMonitor**. Compatibility names such as the
-> Swift target and Application Support directory remain `CodexUsageMonitor`.
+> published 0.0.1 app displays **Agent Monitor** and is distributed as
+> `AgentUsageMonitor-0.0.1.dmg`, containing `AgentUsageMonitor.app`. The public
+> repository is **AgentUsageMonitor**. Internal compatibility names such as the
+> Swift target, source directory, bundle identifier, and Application Support
+> directory remain `CodexUsageMonitor`.
 
 ---
 
@@ -52,9 +53,9 @@ asks for a password, and no prompt, response, or file content ever leaves your M
 
 ### Download
 
-1. Grab `AgentUsageMonitor-0.0.1.zip` from the
+1. Grab `AgentUsageMonitor-0.0.1.dmg` from the
    [latest release](https://github.com/chocolatechipscookiecrumbles/AgentUsageMonitor/releases/latest).
-2. Unzip it and move **AgentUsageMonitor.app** to `/Applications`.
+2. Open the disk image and move **AgentUsageMonitor.app** to `/Applications`.
 3. Launch it. **It lives in the menu bar** — there is no Dock icon and no window on
    first launch. Look at the right end of the menu bar.
 
@@ -64,7 +65,7 @@ even when their CLIs already have sessions. Version 0.0.1 does not yet enforce t
 consent boundary consistently.
 
 The published 0.0.1 download is signed with an Apple **Developer ID** certificate,
-notarized, and stapled. On 2026-07-31 the uploaded archive was downloaded again,
+notarized, and stapled. On 2026-07-31 the uploaded disk image was downloaded again,
 accepted by Gatekeeper, launched, and observed working as intended.
 
 ### Build from source
