@@ -1,8 +1,8 @@
 # Sanitized public repository readiness plan
 
-**Status:** In progress on a private feature branch. Publication and visibility
-remain gated on full-history scanning, rewrite verification, and the maintainer's
-final go/no-go decision.
+**Status:** The local rewritten candidate is verified. Remote publication,
+repository configuration, release migration, and the maintainer's final visibility
+go/no-go remain pending.
 
 ## Objective
 
@@ -47,9 +47,9 @@ private and retains its pull requests, Actions, branches, stashes, and audit tra
   old-repository-URL blob commit/file matches; one Team-ID commit-message line;
   and one annotated tag whose tagger/message require rewriting. The institutional
   domain does not appear in historical text blobs.
-- [ ] Rewrite author, committer, tagger, message, path, identity, and canonical
+- [x] Rewrite author, committer, tagger, message, path, identity, and canonical
   repository-URL history in the disposable mirror.
-- [ ] Re-run secret, PII, object-size, and repository-integrity checks against the
+- [x] Re-run secret, PII, object-size, and repository-integrity checks against the
   rewritten candidate.
 - [ ] Create a new private `AgentUsageMonitor` repository and push only rewritten
   `main` and rewritten `v0.0.1`.
@@ -78,3 +78,23 @@ Current-tree verification on 2026-07-31: `swift build` exited zero; `swift test`
 executed 329 tests with 1 skipped and 0 failures; `git diff --check` exited zero.
 Signed-app visual checks were not rerun because this change does not modify Swift
 or the built app.
+
+Post-rewrite verification on 2026-07-31:
+
+- 281 source commits were rewritten before this audit record was appended.
+  The candidate contains only `main` and the rewritten annotated `v0.0.1` tag.
+- Every author, committer, and tagger identity is
+  `chocolatechipscookiecrumbles` with the approved GitHub noreply address.
+- Full-history searches return zero targeted identity, institutional-domain,
+  Team-ID, user-home-path, old-repository-URL, or stale compare-link matches in
+  blobs, commit messages, tag messages, and Git metadata.
+- Thirteen private/deleted-branch compare links in the current tree became labeled
+  historical text. Apart from those 13 one-line replacements and this audit
+  record, the rewritten current tree matches the merged private `main`.
+- Gitleaks 8.30.1 reports the same single instructional shell-variable placeholder
+  as the pre-rewrite scan; TruffleHog 3.96.0 reports zero candidates. The Gitleaks
+  item remains a documented false positive, not a credential.
+- `git fsck --full` exits zero with no dangling objects after garbage collection,
+  and no reachable blob exceeds 5 MiB.
+- A fresh clone passes `swift build`, 329 tests with 1 skipped and 0 failures,
+  `git diff --check`, and the offline local-link/anchor check with zero errors.
