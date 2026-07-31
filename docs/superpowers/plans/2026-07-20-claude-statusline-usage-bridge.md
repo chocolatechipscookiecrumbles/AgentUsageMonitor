@@ -121,7 +121,7 @@ def test_extract_snapshot_returns_none_for_malformed_window():
 def test_extract_snapshot_ignores_every_non_rate_limit_field():
     payload = {
         "rate_limits": {"five_hour": {"used_percentage": 5.0, "resets_at": 1_800_000_000}},
-        "cwd": "<USER_HOME>/secret-project",
+        "cwd": "./example-project",
         "context_window": {"used_percentage": 12},
         "model": {"display_name": "Sonnet"},
     }

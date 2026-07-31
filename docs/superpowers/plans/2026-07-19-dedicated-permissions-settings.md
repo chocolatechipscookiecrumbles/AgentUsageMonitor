@@ -38,7 +38,7 @@ Resume this plan only after a feature genuinely requires additional macOS access
 - Refresh permission state only on page appearance, after an explicit permission action, and through existing app startup. Do not add a timer, polling task, menu callback, or automatic permission request.
 - Do not read credentials, account identity, raw provider output, or private quota data. Do not add a dependency, new persisted schema, network request, or permission request caused by merely opening Settings.
 - Do not add broad automated tests or general test cases by user direction. Run the existing Swift package suite as regression baseline; add a narrow deterministic regression test later only for a reproducible controller defect.
-- Update the product follow-up, planning board, `how-to.md`, `UsageProbe/README.md`, and this plan after implementation. The user creates any PR manually.
+- Update the product follow-up, planning board, `docs/development/operating-notes.md`, `UsageProbe/README.md`, and this plan after implementation. The user creates any PR manually.
 
 ## Figma acceptance contract
 
@@ -260,7 +260,7 @@ After a button action returns, refresh only its matching existing owner once. Do
 **Files:**
 - Create: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/PermissionsSettingsContextView.swift` only if Task 1 accepts it.
 - Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsPreviewView.swift` only if Task 1 accepts it.
-- Modify: `docs/product/follow-ups.md`, `docs/product/planning-board.md`, `how-to.md`, `UsageProbe/README.md`, and this plan.
+- Modify: `docs/product/follow-ups.md`, `docs/product/planning-board.md`, `docs/development/operating-notes.md`, `UsageProbe/README.md`, and this plan.
 
 **Interfaces:**
 - Produces no new persistence, request, timer, network access, or navigation owner.

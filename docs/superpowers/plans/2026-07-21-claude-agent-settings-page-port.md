@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the static `ClaudeCodePreviewSettingsView` with a real `ClaudeAgentSettingsView` that ports the **existing Codex agent-page template** — the same `SettingsSection` / `AgentQuotaSessionSection` / `AgentUsageWarningsSection` composition `CodexAgentSettingsView` already uses — adapted to Claude's data model, matching the pixel spec in the [High-fidelity macOS menu UI v6 "agent view update" Figma download](../../../High-fidelity%20macOS%20menu%20UI%20v6%20agent%20view%20update/src/components/AgentsSection.tsx). Most of the template is already provider-neutral and transfers directly; this plan is about the *visual* port, wiring the small set of Claude-specific adaptations onto the shared components.
+**Goal:** Replace the static `ClaudeCodePreviewSettingsView` with a real `ClaudeAgentSettingsView` that ports the **existing Codex agent-page template** — the same `SettingsSection` / `AgentQuotaSessionSection` / `AgentUsageWarningsSection` composition `CodexAgentSettingsView` already uses — adapted to Claude's data model, matching the pixel spec in the historical untracked `High-fidelity macOS menu UI v6 agent view update/src/components/AgentsSection.tsx` Figma download. Most of the template is already provider-neutral and transfers directly; this plan is about the *visual* port, wiring the small set of Claude-specific adaptations onto the shared components.
 
 ## Relationship to the wiring plan (read first)
 
@@ -31,7 +31,7 @@ The tab strip **already includes Claude** — [AgentsSettingsView.swift:23](../.
 
 ### B. Figma v6 reference — `AgentsSection.tsx`
 
-The download's [`CodexAgentPage`](../../../High-fidelity%20macOS%20menu%20UI%20v6%20agent%20view%20update/src/components/AgentsSection.tsx) is the detailed target: four grouped cards — **Connection**, **Current Quota**, **Usage Warnings**, **Privacy** — built from `PrefGroupInline` (the rounded-10 card) and `InfoRow` (label/value). Note its `ClaudeAgentPage` is the **old "not connected / planned" placeholder** (a centered hero card + Requirements list); **do not port that** — Claude now has real data, so it gets the Codex page's rich structure. Use the Figma's Claude page only for the *unavailable/onboarding* fallback styling (the centered icon-badge + primary button pattern, Claude orange `#D97757`).
+The historical untracked download's `CodexAgentPage` is the detailed target: four grouped cards — **Connection**, **Current Quota**, **Usage Warnings**, **Privacy** — built from `PrefGroupInline` (the rounded-10 card) and `InfoRow` (label/value). Note its `ClaudeAgentPage` is the **old "not connected / planned" placeholder** (a centered hero card + Requirements list); **do not port that** — Claude now has real data, so it gets the Codex page's rich structure. Use the Figma's Claude page only for the *unavailable/onboarding* fallback styling (the centered icon-badge + primary button pattern, Claude orange `#D97757`).
 
 ### C. Dimensions reference (Swift `SettingsLayoutMetrics` governs; Figma values in parentheses)
 

@@ -28,7 +28,7 @@
 
 ## Current Source State (grounded 2026-07-24)
 
-- **README:** none at the repo root. Existing docs: `how-to.md`, `AGENTS.md`, `MISSION.md`, `CONTEXT.md`, `RESOURCES.md`, `UsageProbe/README.md`, and the `docs/` tree.
+- **README:** none at the repo root. Existing docs: `docs/development/operating-notes.md`, `AGENTS.md`, `MISSION.md`, `CONTEXT.md`, `RESOURCES.md`, `UsageProbe/README.md`, and the `docs/` tree.
 - **App icon:** `CodexUsageMonitor/Resources/Assets.xcassets` contains `Codex`, `Claude`, and `Copilot` imagesets but **no `AppIcon`**. `Info.plist` sets no icon.
 - **Menu-bar label:** `Menu/MenuBarLabelPresentation.swift` — with multiple available providers it renders only the single `MenuProviderSummary.mostAtRisk` provider (percent + that provider's glyph). It does not show both providers at once.
 - **Settings connections:**
@@ -56,7 +56,7 @@
 
 Adopt the *shape* (tagline → why → install/build → provider/data-source table → privacy → docs index), sized to this app's actual, smaller provider set (Codex + Claude). Do not copy their text, and do not claim providers or features this app does not have.
 
-**Files:** Create `README.md`; cross-link `how-to.md`, `AGENTS.md`, `docs/product/planning-board.md`, `docs/development/evidence-rich-pull-requests.md`, `UsageProbe/README.md`.
+**Files:** Create `README.md`; cross-link `docs/development/operating-notes.md`, `AGENTS.md`, `docs/product/planning-board.md`, `docs/development/evidence-rich-pull-requests.md`, `UsageProbe/README.md`.
 
 - [x] **Step 1 (done):** `README.md` created following the reference shape — tagline, product statement, a provider/data-source table with the per-provider privacy boundary, a build/run section (`swift build`, `swift test`, `Scripts/build-app.sh`), a feature tour, and a durable-docs index.
 - [x] **Step 2 (done):** Compact architecture note (owners `QuotaViewModel`, `QuotaMonitor`/`ClaudeUsageMonitor`, `QuotaNotifier`), plus an explicit personal, non-commercial scope and the Anthropic ToS caveat. All cross-links verified to resolve.
@@ -184,7 +184,7 @@ Prefer one focused PR per workstream (or per small group) over one omnibus PR, p
 
 ## Documentation and acceptance
 
-- Update `docs/product/planning-board.md` (new rows per workstream), the relevant deferred plans (mark superseded scope), `AGENTS.md` (only durable invariants — e.g. provider-scoped notification identity, per-agent threshold store), `how-to.md`, and `UsageProbe/README.md` where user-visible behavior changes.
+- Update `docs/product/planning-board.md` (new rows per workstream), the relevant deferred plans (mark superseded scope), `AGENTS.md` (only durable invariants — e.g. provider-scoped notification identity, per-agent threshold store), `docs/development/operating-notes.md`, and `UsageProbe/README.md` where user-visible behavior changes.
 - Each workstream's PR must separate Run / Observed / Not run evidence and keep the menu-bar popover visual/keyboard/VoiceOver waiver explicit.
 
 ## Additional candidate touches (flagged, not committed)

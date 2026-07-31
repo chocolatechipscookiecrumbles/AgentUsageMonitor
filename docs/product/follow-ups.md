@@ -590,3 +590,28 @@ Acceptance
 * connection state and Token Monitor collection remain separate; whether local
   activity should be visible before quota connection is an explicit product choice,
   not an accidental authentication side effect
+
+⸻
+
+## 14. Add the independent-project disclaimer to Diagnostics
+
+**Status:** **Planned; no Swift change in repository-readiness work.**
+
+Problem
+
+The README states the project's independent status, but the installed app does not
+yet present the same notice in Diagnostics.
+
+Required copy
+
+> AgentUsageMonitor is an independent project and is not affiliated with, endorsed
+> by, or supported by OpenAI, Anthropic, GitHub, or Apple. Provider names and marks
+> belong to their respective owners.
+
+Implementation and acceptance
+
+Follow the dedicated
+[Diagnostics affiliation disclaimer plan](../superpowers/plans/2026-07-31-diagnostics-affiliation-disclaimer.md).
+Implementation must use the Settings UI and interface-writing skills, then inspect
+the signed app in Light and Dark with the Context Rail hidden and visible. Verify
+wrapping and VoiceOver directly; keep any unexercised state marked unverified.

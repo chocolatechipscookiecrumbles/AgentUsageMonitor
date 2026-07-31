@@ -40,7 +40,7 @@ The initial draft considered an event-driven **Refresh on open** preference. The
 | `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/AppSettings.swift` | Persist `refreshOnWake` and normalize the legacy one-minute raw value. |
 | `CodexUsageMonitor/Sources/CodexUsageMonitor/Monitoring/QuotaMonitor.swift` | Gate the existing wake event at the monitor boundary. |
 | `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/RefreshSettingsView.swift` | Bind the working wake switch and remove unavailable/open copy. |
-| `AGENTS.md`, `how-to.md`, `UsageProbe/README.md`, product documentation, and this plan | Preserve the passive-menu boundary, behavior, migration, and verification record. |
+| `AGENTS.md`, `docs/development/operating-notes.md`, `UsageProbe/README.md`, product documentation, and this plan | Preserve the passive-menu boundary, behavior, migration, and verification record. |
 
 ## Implementation tasks
 

@@ -9,7 +9,7 @@ Centralized status and file links: [Product Planning Board](../../product/planni
 > observed working as intended. Use the Product Planning Board for current work;
 > retain this document as sequence and decision provenance.
 
-> **For agentic workers:** Implement one branch at a time with `executing-plans`. Add focused automated coverage for deterministic seams and use compilation, read-only live collection, schema inspection, signed-app inspection, and manual UI acceptance in proportion to the claim. Update `outline.md`, `how-to.md`, `UsageProbe/README.md`, and the active plan whenever behavior changes.
+> **For agentic workers:** Implement one branch at a time with `executing-plans`. Add focused automated coverage for deterministic seams and use compilation, read-only live collection, schema inspection, signed-app inspection, and manual UI acceptance in proportion to the claim. Update `outline.md`, `docs/development/operating-notes.md`, `UsageProbe/README.md`, and the active plan whenever behavior changes.
 
 **Goal:** Turn the proven quota monitor into a dependable daily-driver with configurable warnings, adaptive refresh, safe account connection, a separate Settings window, a compact multi-provider menu popover, and launch at login.
 
@@ -196,4 +196,4 @@ After the Codex release, or earlier only by explicit user direction for a read-o
 
 ## Documentation rule
 
-Every merged branch must update its plan checkboxes, `outline.md` phase status, `how-to.md` user instructions, and `UsageProbe/README.md` when the native companion’s behavior or privacy boundary changes.
+Every merged branch must update its plan checkboxes, `outline.md` phase status, `docs/development/operating-notes.md` user instructions, and `UsageProbe/README.md` when the native companion’s behavior or privacy boundary changes.

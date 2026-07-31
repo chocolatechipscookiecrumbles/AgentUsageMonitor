@@ -3,11 +3,16 @@
 This is about **the repository**, not the app release. The release checklist lives
 in [releasing-on-github.md](releasing-on-github.md); this file covers what has to
 change around the **AgentUsageMonitor** project. Its current GitHub endpoint remains
-`chocolatechipscookiecrumbles/agent-usage` until the remote rename is completed.
+private. Public publication targets a new
+`chocolatechipscookiecrumbles/AgentUsageMonitor` repository rather than changing
+the visibility of the repository that holds the original review and audit history.
 
 Written 2026-07-29 and updated after the verified 0.0.1 publication on 2026-07-31.
 Release-specific signing item 2 is closed; the separate repository-publication
 items remain live unless marked done.
+
+The authenticated GitHub portion is performed manually using the
+[sanitized-repository publication checklist](manual-publication-checklist.md).
 
 Each item says what it is, **why it matters**, and the fix. Nothing here is done
 unless it is marked done.
@@ -16,30 +21,18 @@ unless it is marked done.
 
 ## Blockers — do not make the repository public until these are resolved
 
-### 1. There is no licence
+### 1. Closed — MIT licence selected
 
-`git ls-files` finds no `LICENSE`. The README says "non-commercial," which states
-an *intent* but has no legal effect on its own.
+The repository now carries the standard MIT License with
+`Copyright (c) 2026 chocolatechipscookiecrumbles`. Public-facing source-licensing
+copy in the README and release notes now points to it.
 
-**Why it matters.** With no licence, default copyright applies: all rights reserved.
-Nobody may legally copy, modify, or redistribute the source — and strictly, the
-`.app` you hand out has no stated terms either. A public repo with no licence reads
-as an oversight rather than a decision, and it is the first thing a careful reader
-checks.
+The MIT License covers this project's source and documentation. It does not grant
+rights to provider services, credentials, names, marks, or third-party terms.
+Historical personal-use statements that document the accepted Claude
+provider-policy risk are retained because they are not source-licensing terms.
 
-**The fix — a decision only you can make.** Three realistic options:
-
-| Option | What it gives you | Cost |
-|---|---|---|
-| **PolyForm Noncommercial 1.0.0** | Says exactly what the README already claims: use, modify, share, but not commercially. Written for software. | Not OSI-approved, so GitHub labels it "non-standard" and some people will skip it |
-| **A short proprietary notice** ("personal, non-commercial use only; no redistribution") | Maximum control, minimum ambiguity | Not a recognised licence; no community norms attach |
-| **A permissive OSI licence** (MIT / Apache-2.0) | Recognised, frictionless | Contradicts "non-commercial" — you would be allowing commercial use |
-
-Recommended: **PolyForm Noncommercial 1.0.0**, because it matches the claim already
-made in the README and the release notes. Add it as `LICENSE`, and change the
-README's License section to point at it instead of at this file.
-
-- [ ] Licence chosen and `LICENSE` committed
+- [x] Licence chosen and `LICENSE` added
 
 ### 2. Closed — notarize the actual shipping build
 
@@ -84,14 +77,14 @@ for a public audience — invalidates the decision.
 
 - [x] Present in the README (prominent, above the fold)
 - [x] Present in [release notes 0.0.1](../release-notes/0.0.1.md)
-- [ ] Re-read the app's Data & Privacy page in the signed build and confirm the
-      wording still matches
+- [x] Re-read the signed 0.0.1 Data & Privacy page on 2026-07-31; its wording is
+      unchanged and still matches the README and release notes
 
 ---
 
 ## Should fix — these make the repo read as unfinished
 
-### 4. Personal learning scaffolding sits at the repository root
+### 4. Closed by decision — retain the study notes, but sanitize them
 
 These are study notes from building the project, not project documentation:
 
@@ -105,29 +98,17 @@ These are study notes from building the project, not project documentation:
 | `lessons/*.html` | Two rendered course pages |
 | `reference/*.html` | Two rendered reference pages |
 
-**Why it matters.** A visitor's first impression of a repository is its root
-listing. Right now that listing mixes an app, its docs, and someone's private
-coursework, which makes the serious parts look less serious than they are.
+The maintainer chose to keep these notes in their current locations as part of the
+project's learning and decision record. Names, institutional addresses, signing
+team identifiers, and user-specific filesystem paths must not appear in them or in
+the rest of the public source tree.
 
-**The fix — cheap, because inbound links are almost nil.** Only
-`docs/superpowers/plans/2026-07-24-prototype-finalization.md` links `MISSION.md` and
-`RESOURCES.md`; the rest are unreferenced except by each other.
+- [x] Keep the study notes in place
+- [x] Replace current-tree personal identifiers and user-home paths with neutral
+      placeholders or repository-relative commands
+- [ ] Re-run the same checks against rewritten full history before publication
 
-```sh
-mkdir -p docs/notes
-git mv MISSION.md NOTES.md RESOURCES.md feasibility_assessment.md docs/notes/
-git mv learning-records lessons reference docs/notes/
-# then fix: the two links in 2026-07-24-prototype-finalization.md, and the
-# ../assets/course.css href inside the four moved HTML pages
-```
-
-**Do not move `outline.md`, `how-to.md`, `CONTEXT.md`, or `AGENTS.md`.** They are
-cross-linked from dozens of plan documents that form the project's evidence trail;
-moving them is a much larger, riskier edit and buys much less.
-
-- [ ] Scaffolding relocated or deleted
-
-### 5. Screenshots cannot currently be committed
+### 5. Screenshots deferred
 
 As of 2026-07-29 the repository ignores every image, so the README has no gallery.
 Comparable menu-bar apps lead with one — it is usually the single most persuasive
@@ -137,58 +118,44 @@ element on the page.
 in prose is strictly worse than showing it, and a README with no picture reads as
 abandoned even when the project is not.
 
-**The fix — pick one:**
+The maintainer has deferred screenshots until approved, redistributable assets
+exist. Do not un-ignore local design or release assets merely to fill this gap.
 
-- **Un-ignore a screenshots directory** (recommended). Add to `.gitignore`:
-  ```
-  !docs/screenshots/
-  !docs/screenshots/*.png
-  ```
-  Keep them few and small; they are the one image class worth versioning.
-- **Host them outside the repo.** Drag images into a GitHub issue or the release
-  body and hot-link the resulting `user-images.githubusercontent.com` URLs. Nothing
-  lands in git, but the links rot if the issue is deleted.
+- [x] Screenshot work explicitly deferred
 
-- [ ] Screenshot route chosen, and the README updated to use it
-
-### 6. `how-to.md` is not a how-to
+### 6. Closed — operating notes renamed
 
 It documents the login flow, the usage probe, and running the app from source — an
 operating log for you, not a user guide. The README used to describe it as
 "user-facing behavior and operations," which was wrong; the rewritten README now
 describes it accurately.
 
-**Why it matters.** A public repo with a file called `how-to.md` sets an expectation
-it does not meet, and the person who follows it is a *user*, not a maintainer.
+**Why it matters.** The old filename implied a user guide. The new path and heading
+correctly present the document as maintainer-facing operational context.
 
-**The fix.** Either rename it (`docs/development/operating-notes.md`) or leave the
-name and keep the accurate description. If you rename it, update
-[AGENTS.md](../../AGENTS.md#documentation-discipline) line 30, which names the file
-as a required update target, along with the ~8 plan documents that link it.
+The file is now `docs/development/operating-notes.md`, with no redirect stub. Its
+heading, README description, repository rules, plan references, and links identify
+it as maintainer operating notes.
 
-- [ ] Decided
+- [x] Renamed and current references updated
 
-### 7. Absolute `<USER_HOME>/…` paths in tracked documents
+### 7. Closed — user-specific absolute paths removed
 
-Fixed on 2026-07-29 in `docs/claude-usage-verification.md`, `how-to.md`, and
+Fixed on 2026-07-29 in `docs/claude-usage-verification.md`, `docs/development/operating-notes.md`, and
 `docs/superpowers/plans/2026-07-12-codex-menu-bar-mvp.md` — the last of those had
 two markdown links pointing at absolute local paths, which render as **broken links
 on GitHub**.
 
-Two remain, inside the course HTML pages (`lessons/0001-…html`,
-`reference/codex-monitor-ui-map.html`). They are illustrative shell snippets rather
-than links, and both files are candidates for item 4 anyway.
-
 - [x] Markdown documents cleaned
-- [ ] HTML pages cleaned, or moved under item 4
+- [x] HTML examples use repository-relative commands
 
 ### 8. Public naming layers — what is done, what is left
 
 **Decided 2026-07-29:** the shipped app display name is **Agent Monitor**, because
 it no longer monitors Codex alone. **Updated 2026-07-31:** the project and local
 clone name are **AgentUsageMonitor**. The GitHub repository name/slug remains
-`agent-usage` until the remote is renamed. Developer naming was deliberately left
-alone.
+private in the original repository; the sanitized public candidate will use a new
+`AgentUsageMonitor` repository. Developer naming was deliberately left alone.
 
 | Surface | State | Notes |
 |---|---|---|
@@ -207,7 +174,7 @@ alone.
 | `~/Library/Application Support/CodexUsageMonitor` and the six file names | ⬜ unchanged **by choice** | Real paths. Renaming them strands every existing user's cache and history |
 | Export filename `CodexUsageMonitor-local-data-<date>.json` | ⬜ | User-visible in the save panel, but named after the data directory it comes from. Rename only if the directory is ever renamed |
 | Project/local clone name | ✅ AgentUsageMonitor | README and clone destination |
-| GitHub repository name/slug and endpoint | ⏳ `agent-usage` | Rename the remote only when the destination exists, then update clone and compare URLs |
+| Public GitHub repository name/slug and endpoint | ⏳ `AgentUsageMonitor` | Create a separate private repository after history rewrite; do not change the original repository's visibility |
 
 **Leave `CFBundleIdentifier` alone regardless.** A new identifier is a new app to
 macOS: preferences reset, the Keychain "Always Allow" grant is lost, and the user
@@ -221,37 +188,38 @@ gets every first-run prompt again.
       row, Diagnostics Name, copied report, exported data, and a newly triggered
       Terminal permission prompt. The release smoke test does not prove every
       cached or permission-dependent string.
-- [ ] Rename the GitHub endpoint from `agent-usage` to `AgentUsageMonitor`, then
-      update the remote and documentation URLs. The requested destination returned
-      “Repository not found” on 2026-07-31, so current clone/PR links intentionally
-      retain the working endpoint.
+- [ ] Create the new private `AgentUsageMonitor` destination after history rewrite,
+      push only rewritten `main` and `v0.0.1`, and keep the original repository
+      private indefinitely.
 
 ---
 
 ## Worth doing, not urgent
 
-- **Repository description and topics.** Empty right now. Set a one-line description
-  and topics like `macos`, `menu-bar`, `swiftui`, `openai-codex`, `claude-code`.
-- **Issue templates.** `.github/` contains only `pull_request_template.md`. A bug
-  template that asks for macOS version, app version and build, and which provider is
-  connected will save several round trips.
-- **`SECURITY.md`** — but only if you actually want vulnerability reports. An
-  unanswered security policy is worse than none.
-- **Contribution stance.** The README states that unsolicited PRs may not be merged.
-  Comparable projects put this up front and it works well; consider a one-paragraph
-  `CONTRIBUTING.md` saying the same thing so GitHub surfaces it in the PR flow.
-- **Affiliation disclaimer in the app**, not just the README — a line in
-  **Diagnostics** or an About panel stating no affiliation with OpenAI, Anthropic,
-  GitHub, or Apple.
+- **Repository description and topics.** Configure the new repository with the
+  approved description and `macos`, `menu-bar`, `swift`, `swiftui`,
+  `openai-codex`, `claude-code`, and `usage-monitor`.
+- **Issue templates.** Done in source: the privacy-safe bug form asks for version,
+  build, macOS, provider, surface, reproduction, and expected/actual behavior;
+  blank issues are disabled.
+- **`SECURITY.md`.** Done in source: vulnerability reports go through GitHub's
+  private vulnerability reporting, with no fixed response SLA.
+- **Contribution stance.** Done in source: issues are welcome, implementation PRs
+  require prior agreement, and privacy-sensitive records must never be attached.
+- **Affiliation disclaimer in the app.** Planned, not implemented. The dedicated
+  [Diagnostics disclaimer plan](../superpowers/plans/2026-07-31-diagnostics-affiliation-disclaimer.md)
+  carries the exact copy, Settings skills, signed-app Light/Dark and Context Rail
+  matrix, wrapping, and VoiceOver acceptance.
 - **Do not describe unverified surfaces as tested.** The planning board's
   **Verification** rows are the live list. Public copy — README, release notes,
   issue replies — should not promote them to "verified."
 
 ---
 
-## Already checked and clean
+## Current-tree preliminary checks
 
-Recorded so it does not have to be re-litigated:
+These current-tree observations do not replace the required two-scanner,
+full-history audit:
 
 | Check | Result |
 |---|---|
@@ -260,5 +228,5 @@ Recorded so it does not have to be re-litigated:
 | Live probe output | **None tracked** — `UsageProbe/Outputs/` is ignored except its `.gitkeep` |
 | Local credentials and quota caches | Ignored: `auth.json`, `last-known-good.json`, `quota-history.json`, `.env*` |
 | Per-machine agent config | Ignored: `.claude/`, `.agents/skills/*`, `skills-lock.json`, `.worktrees/` |
-| Real name and Apple Team ID (`Project maintainer`, `<APPLE_TEAM_ID>`) | Present in two docs, by choice. Both are embedded in any distributed signature and readable from the shipped `.app`, so this discloses nothing new |
+| Personal legal name and Apple Team ID in source/docs | Replaced with neutral placeholders. The already signed release remains exempt because Developer ID signatures inherently expose the certificate holder |
 | Build artifacts | Ignored: `.build/`, `DerivedData/`, `__pycache__/`, `*.log` |

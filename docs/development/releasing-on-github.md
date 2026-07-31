@@ -54,9 +54,9 @@ like:
 | Seven-day reliability observation | ✅ Passed — see the caveat in [reliability Task 5](../superpowers/plans/2026-07-13-codex-reliability-hardening.md#task-5-run-and-review-the-one-week-hardening-period) |
 | Claude credential disclosure | ✅ README, app Data & Privacy page, release notes |
 | Release notes | ✅ Published from [`docs/release-notes/0.0.1.md`](../release-notes/0.0.1.md) |
-| Project / Git remote | ⏳ Project name `AgentUsageMonitor`; working `origin` remains `chocolatechipscookiecrumbles/agent-usage` until the GitHub rename |
+| Project / Git remote | ⏳ Original private remote remains `chocolatechipscookiecrumbles/agent-usage`; sanitized publication targets the separate `chocolatechipscookiecrumbles/AgentUsageMonitor` repository |
 | **Apple Developer membership** | ✅ Active |
-| **Developer ID certificate** | ✅ `Developer ID Application: Project maintainer (<APPLE_TEAM_ID>)`, installed with its private key |
+| **Developer ID certificate** | ✅ Developer ID Application identity installed with its private key; certificate holder and Team ID redacted from public source |
 | **Notarization of the pre-rename build** | ✅ **Accepted** — `Codex Usage Monitor` / `1.0.0` / `254`. Superseded; do not publish it |
 | **Notarization of the shipping build** | ✅ **Accepted and stapled** — `Agent Monitor` / `0.0.1` / `266` |
 | Git tag and GitHub Release | ✅ `v0.0.1` published |
@@ -78,10 +78,10 @@ Kept because it is the evidence that the signing setup is sound; it describes th
 `CodexUsageMonitor/.build/CodexUsageMonitor.app`, built at 18:09:
 
 ```
-Authority=Developer ID Application: Project maintainer (<APPLE_TEAM_ID>)
+Authority=Developer ID Application: [certificate holder and Team ID redacted]
 Authority=Developer ID Certification Authority
 Authority=Apple Root CA
-TeamIdentifier=<APPLE_TEAM_ID>
+TeamIdentifier=[redacted]
 CodeDirectory ... flags=0x10000(runtime)
 Timestamp=Jul 29, 2026 at 18:09:56
 ```
@@ -342,15 +342,15 @@ security find-identity -v -p codesigning
 > the same reason `build-app.sh` attempts the real signature directly instead of
 > probing for an identity first.
 
-- If you see a **`Developer ID Application: … (TEAMID)`** line → Path A. The script
+- If you see a **`Developer ID Application: … (<APPLE_TEAM_ID>)`** line → Path A. The script
   picks it up automatically, or set it explicitly:
   ```sh
-  CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" ./Scripts/build-app.sh
+  CODESIGN_IDENTITY="Developer ID Application: Project maintainer (<APPLE_TEAM_ID>)" ./Scripts/build-app.sh
   ```
-  Then re-run the notarization-readiness checks above. **On this machine that is
-  already done:** `Developer ID Application: Project maintainer (<APPLE_TEAM_ID>)` exists and the
-  current `.build` bundle is signed with it, with the hardened runtime and a secure
-  timestamp.
+  Then re-run the notarization-readiness checks above. On the release machine,
+  confirm that the selected identity exists and that the current `.build` bundle
+  has the hardened runtime and a secure timestamp; the public documentation does
+  not record the certificate holder or Team ID.
 - If you see nothing usable → Path B (ad-hoc). The script warns and continues; skip
   the notarization step and read [Path B](#path-b--no-paid-account-unsignedad-hoc).
 

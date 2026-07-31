@@ -22,7 +22,7 @@
 - The top Settings tab bar must remain full-width and unchanged. The Agents provider sidebar begins below it and divides only the lower Agents content region.
 - Preserve Codex, Claude Code, and GitHub Copilot as the visible provider list; Codex remains the only active integration.
 - Keep menu-bar display controls out of this branch. The independently stacked `feature/menu-bar-display` branch adds them to General without coupling them to the remaining Settings follow-ups.
-- Update `outline.md`, the daily-driver roadmap, `how-to.md`, and `UsageProbe/README.md` when implementation changes behavior.
+- Update `outline.md`, the daily-driver roadmap, `docs/development/operating-notes.md`, and `UsageProbe/README.md` when implementation changes behavior.
 
 ---
 
@@ -119,7 +119,7 @@
 - Modify: `docs/superpowers/plans/2026-07-13-settings-ui-followups.md`
 - Modify: `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md`
 - Modify: `outline.md`
-- Modify: `how-to.md`
+- Modify: `docs/development/operating-notes.md`
 - Modify: `UsageProbe/README.md`
 
 **Interfaces:**
@@ -133,7 +133,7 @@
 - [ ] Verify System/Light/Dark changes app-owned windows immediately and persists after relaunch.
 - [ ] Verify disabling keyboard shortcuts removes `Command-R` behavior without disabling **Refresh now**, Settings, or Quit.
 - [ ] Verify the Agents sidebar begins below the unchanged full-width tab bar and divides only the lower content region.
-- [x] Record all behavior and any remaining manual limitations in the plan, `outline.md`, `how-to.md`, and `UsageProbe/README.md`.
+- [x] Record all behavior and any remaining manual limitations in the plan, `outline.md`, `docs/development/operating-notes.md`, and `UsageProbe/README.md`.
 
 ## Implementation and verification notes
 

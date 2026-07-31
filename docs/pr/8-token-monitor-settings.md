@@ -91,7 +91,7 @@ not fix it, and the default state is still the tall one.
 ## Documentation and review focus
 
 Changed: `CONTEXT.md`, the Token Monitor settings plan, the token-activity plan,
-`how-to.md`, and the planning board.
+`docs/development/operating-notes.md`, and the planning board.
 
 Focus on the **gating boundary**: confirm no read path survives when a provider is
 disabled, including the initial scan at launch and the file-observer callback.

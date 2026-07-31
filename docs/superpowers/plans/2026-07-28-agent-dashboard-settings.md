@@ -32,7 +32,7 @@
 - Preserve the 340-point, non-scrolling popover and its provider-intrinsic height. Do not reintroduce a minimum-height floor, and keep the shared 12-point content-to-footer gap outside the provider switch.
 - Do not add feature-presence, happy-path, or toggle-round-trip tests. Add automated coverage only for a reproducible defect, as the smallest deterministic regression. Otherwise record the manual regression boundary.
 - Production Swift changes require the main macOS `xcodebuild`, the full existing suite, and the signed `.app` from `CodexUsageMonitor/Scripts/build-app.sh`. Settings changes additionally require the visual acceptance in AGENTS.md: inspect at the default 680 × 560 size with the Context Rail hidden and visible, in Light and Dark.
-- Update `CONTEXT.md`, `docs/product/planning-board.md`, `how-to.md`, `outline.md`, `UsageProbe/README.md`, and `docs/superpowers/plans/2026-07-14-dashboard.md` when behavior, scope, or a limitation changes.
+- Update `CONTEXT.md`, `docs/product/planning-board.md`, `docs/development/operating-notes.md`, `outline.md`, `UsageProbe/README.md`, and `docs/superpowers/plans/2026-07-14-dashboard.md` when behavior, scope, or a limitation changes.
 
 ---
 
@@ -47,7 +47,7 @@ The rename therefore applies everywhere the user can read it, not only to the ne
 - the card header string (`ProviderTokenActivityPresentation.title`, currently `"Token activity"`);
 - the new Settings section title and its master toggle;
 - the `CONTEXT.md` vocabulary entries;
-- the operating documentation in `how-to.md`, `outline.md`, and `UsageProbe/README.md`.
+- the operating documentation in `docs/development/operating-notes.md`, `outline.md`, and `UsageProbe/README.md`.
 
 Existing Swift type names (`ProviderTokenActivityCard`, `ProviderTokenActivityPresentation`, `LocalActivityMonitor`, and the `Activity/` directory) are deliberately **not** renamed. They are internal identifiers, the vocabulary rule governs what a user reads, and a type-wide rename would add churn and review surface to a change whose value is entirely in the copy. Task 5 records this so a later reader does not treat the mismatch as an oversight.
 
@@ -92,7 +92,7 @@ Approximate savings, to be replaced with measured values in Task 6:
 - `CodexUsageMonitor/Sources/CodexUsageMonitor/Activity/LocalActivityMonitor.swift` — starts and stops per-provider collection and purges a disabled provider's cache.
 - `CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/QuotaViewModel.swift` — forwards visibility changes to the monitor.
 - `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/DataPrivacySettingsView.swift` — states that hiding an agent's Token Monitor stops reading its records.
-- `CONTEXT.md`, `how-to.md`, `outline.md`, `UsageProbe/README.md`, `docs/product/planning-board.md`, `docs/superpowers/plans/2026-07-14-dashboard.md` — vocabulary, operating guidance, and gate measurements.
+- `CONTEXT.md`, `docs/development/operating-notes.md`, `outline.md`, `UsageProbe/README.md`, `docs/product/planning-board.md`, `docs/superpowers/plans/2026-07-14-dashboard.md` — vocabulary, operating guidance, and gate measurements.
 
 ---
 
@@ -625,7 +625,7 @@ Expected: exit `0`, 299 tests with 0 failures.
 - Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/ProviderTokenActivityPresentation.swift`
 - Modify: `CONTEXT.md`
 - Modify: `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/DataPrivacySettingsView.swift`
-- Modify: `how-to.md`
+- Modify: `docs/development/operating-notes.md`
 - Modify: `outline.md`
 - Modify: `UsageProbe/README.md`
 - Modify: `docs/product/planning-board.md`
@@ -667,7 +667,7 @@ _Avoid_: Card row, widget, module
                 }
 ```
 
-- [x] **Step 4:** In `how-to.md`, describe the control where the card is described: each agent's Settings page has a **Token Monitor** section with a show/hide toggle and four section toggles; hiding an agent's Token Monitor stops reading that agent's records; the card's title, scope, day total, and request count always remain when it is shown. Replace any remaining "Token activity" phrasing with **Token Monitor**.
+- [x] **Step 4:** In `docs/development/operating-notes.md`, describe the control where the card is described: each agent's Settings page has a **Token Monitor** section with a show/hide toggle and four section toggles; hiding an agent's Token Monitor stops reading that agent's records; the card's title, scope, day total, and request count always remain when it is shown. Replace any remaining "Token activity" phrasing with **Token Monitor**.
 
 - [x] **Step 5:** In `outline.md` and `UsageProbe/README.md`, rename the feature to **Token Monitor** and add one sentence each stating that visibility and section composition are per-agent preferences, and that hiding an agent stops collection for it.
 

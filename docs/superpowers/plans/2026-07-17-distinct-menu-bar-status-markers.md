@@ -28,7 +28,7 @@
 - Modify `CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/MenuBarLabelView.swift`: render the presentation-owned marker.
 - Modify `CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/MenuBarStatusLabel.swift`: pass live connection state only at the real menu-bar boundary.
 - Create `CodexUsageMonitor/Tests/CodexUsageMonitorTests/MenuBarLabelPresentationTests.swift`: cover the reported ambiguity.
-- Modify `docs/product/planning-board.md`, `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md`, `how-to.md`, and `UsageProbe/README.md` after acceptance.
+- Modify `docs/product/planning-board.md`, `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md`, `docs/development/operating-notes.md`, and `UsageProbe/README.md` after acceptance.
 
 ## Task 1: Add one unambiguous marker contract
 
@@ -205,7 +205,7 @@ git commit -m "Record menu bar status marker acceptance"
 **Files:**
 - Modify: `docs/product/planning-board.md`
 - Modify: `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md`
-- Modify: `how-to.md`
+- Modify: `docs/development/operating-notes.md`
 - Modify: `UsageProbe/README.md`
 
 **Interfaces:**
@@ -227,7 +227,7 @@ Expected: focused and existing tests pass, signed app builds, and no whitespace 
 - [ ] **Step 4: Commit synchronized docs.**
 
 ~~~bash
-git add docs/product/planning-board.md docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md docs/superpowers/plans/2026-07-17-distinct-menu-bar-status-markers.md how-to.md UsageProbe/README.md
+git add docs/product/planning-board.md docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md docs/superpowers/plans/2026-07-17-distinct-menu-bar-status-markers.md docs/development/operating-notes.md UsageProbe/README.md
 git commit -m "Document menu bar status markers"
 ~~~
 
@@ -237,5 +237,3 @@ git commit -m "Document menu bar status markers"
 - **Scope control:** No collection, cache, connection, login, scheduler, menu structure, timer, network inference, or provider behavior changes.
 - **Regression coverage:** One deterministic test asserts that disconnected overrides the identical cached display marker; manual acceptance covers native-menu behavior.
 - **Type consistency:** `QuotaViewModel.connectionState` already publishes `AgentConnectionState`; only `MenuBarStatusLabel` forwards it. Previews retain the default `nil` state.
-
-

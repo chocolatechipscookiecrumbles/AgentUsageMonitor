@@ -1,3 +1,8 @@
+# Operating notes
+
+These maintainer notes cover the Codex login flow, the read-only usage probe, and
+running the native app from source.
+
 The URLs you saw are the standard Codex-managed ChatGPT login flow. Port `1455` is Codex’s default localhost callback port.
 
 Important: the callback URL you pasted contained a one-time authorization code. Treat it as sensitive. It is probably expired or already consumed, but don’t paste future callback URLs anywhere.
@@ -37,7 +42,7 @@ command -v codex
 codex --version
 ```
 
-Current detected installation:
+Version recorded during the original investigation (not a current-version claim):
 
 ```text
 codex-cli 0.144.1

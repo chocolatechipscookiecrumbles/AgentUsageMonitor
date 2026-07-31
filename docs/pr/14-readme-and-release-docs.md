@@ -98,7 +98,7 @@ concluding anything is broken.
 | Other check | State | Result |
 |---|---|---|
 | Link check across every edited document | Run | All relative links resolve |
-| `codesign -dvv` on the built `.app` | Run | `Developer ID Application: Project maintainer (<APPLE_TEAM_ID>)`, `flags=0x10000(runtime)`, `Timestamp=Jul 29, 2026 at 18:09:56` |
+| `codesign -dvv` on the built `.app` | Run | Developer ID Application certificate holder and Team ID redacted for public source; `flags=0x10000(runtime)`, `Timestamp=Jul 29, 2026 at 18:09:56` |
 | `spctl -a -vv` | Run | `rejected … source=Unnotarized Developer ID` — expected pre-ticket |
 | `xcrun stapler validate` | Run | No ticket stapled |
 | Notarization | **Not run** | Submitted for the superseded `1.0.0`/`254` build; result outstanding |
@@ -118,7 +118,7 @@ someone reads it. Gated as blocker 2 in `before-going-public.md`.
 2. **The notarized-download claim** is not yet true.
 3. Personal coursework sits at the repository root.
 4. **Screenshots cannot be committed** after PR 12.
-5. `how-to.md` is an operating log, not a how-to.
+5. The operating-notes document is a maintainer log, not a user guide.
 6. The repository name matches neither the old nor the new product name.
 
 ## Documentation and review focus

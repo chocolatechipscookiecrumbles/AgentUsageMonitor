@@ -85,7 +85,7 @@ The following Figma-only items remain excluded: Show in Menu Bar, Start Minimize
 | Modify `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/SettingsNavigationSidebar.swift`, `SettingsPageHeader.swift`, `SettingsContextPanel.swift`, `SettingsContextCard.swift` | Consume the injected palette for all window-owned visible surfaces. |
 | Modify `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/GeneralSettingsView.swift` | Move Style, Show, and System/Light/Dark Appearance into the shared trailing-control row without altering bindings. |
 | Modify `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/RefreshSettingsView.swift` | Present the existing interval menu with the shared row and add the two truthful unavailable rows; do not touch monitoring code. |
-| Modify `docs/superpowers/plans/2026-07-17-figma-settings-design-completion.md`, `docs/product/planning-board.md`, and `how-to.md` | Link the follow-on scope, record the no-behavior boundary, and document only observed visual verification. |
+| Modify `docs/superpowers/plans/2026-07-17-figma-settings-design-completion.md`, `docs/product/planning-board.md`, and `docs/development/operating-notes.md` | Link the follow-on scope, record the no-behavior boundary, and document only observed visual verification. |
 
 ---
 
@@ -457,7 +457,7 @@ Do not add a test case.
 ### Task 5: Document evidence and perform direct visual acceptance
 
 **Files:**
-- Modify: `docs/superpowers/plans/2026-07-17-figma-settings-design-completion.md`, `docs/product/planning-board.md`, `how-to.md`, and this plan.
+- Modify: `docs/superpowers/plans/2026-07-17-figma-settings-design-completion.md`, `docs/product/planning-board.md`, `docs/development/operating-notes.md`, and this plan.
 
 **Interfaces:**
 - Records only direct signed-app observations and leaves unobserved cells as **Not run**.
@@ -469,7 +469,7 @@ In the original Figma completion plan, replace its obsolete blanket exclusion of
 
 - [x] **Step 2: Update user-facing guidance after implementation.**
 
-In `how-to.md`, describe the Refresh page precisely: **Refresh interval** changes the existing schedule; **Refresh on wake** defaults on and is configurable; there is no Refresh-on-open option, and opening the menu does not refresh it.
+In `docs/development/operating-notes.md`, describe the Refresh page precisely: **Refresh interval** changes the existing schedule; **Refresh on wake** defaults on and is configurable; there is no Refresh-on-open option, and opening the menu does not refresh it.
 
 - [ ] **Step 3: Directly inspect the signed app before completion.**
 
@@ -488,7 +488,7 @@ If normal UI automation cannot inspect a state, stop promptly, do not terminate 
 Run the existing package suite, signed build, strict code-sign verification, plist lint, and `git diff --check`. Record every visual **Observed**/**Not run** cell in this plan and board. Do not create a PR or push.
 
 ```bash
-git add docs/superpowers/plans docs/product/planning-board.md how-to.md
+git add docs/superpowers/plans docs/product/planning-board.md docs/development/operating-notes.md
 git commit -m "Document Settings palette and Refresh presentation"
 ```
 

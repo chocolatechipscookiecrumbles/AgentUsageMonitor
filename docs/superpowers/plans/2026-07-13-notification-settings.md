@@ -15,7 +15,7 @@
 - Forecast alerts require confirmed live data and medium/high confidence.
 - Never notify from raw provider text or persist raw provider errors.
 - Do not generate or run automated tests.
-- Update `how-to.md`, `UsageProbe/README.md`, `outline.md`, and this plan with behavior changes.
+- Update `docs/development/operating-notes.md`, `UsageProbe/README.md`, `outline.md`, and this plan with behavior changes.
 - Notification decisions may inspect normalized monitoring outcomes, but notification UI must consume the provider-neutral `QuotaDisplayState` defined in the daily-driver roadmap; do not create a competing freshness model in Settings or the popover.
 
 ### Task 1: Persist notification preferences
@@ -111,7 +111,7 @@
 ### Task 5: Document and close the branch
 
 **Files:**
-- Modify: `how-to.md`
+- Modify: `docs/development/operating-notes.md`
 - Modify: `UsageProbe/README.md`
 - Modify: `outline.md`
 

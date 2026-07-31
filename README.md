@@ -8,14 +8,14 @@ Code** — with reset countdowns, a per-provider popover, a local token monitor,
 optional quota alerts. It reads sessions you already have on your machine. It never
 asks for a password, and no prompt, response, or file content ever leaves your Mac.
 
-`macOS 14+` · `Swift 6` · `menu-bar only (no Dock icon)` · `non-commercial` ·
+`macOS 14+` · `Swift 6` · `menu-bar only (no Dock icon)` · `MIT licensed` ·
 `version 0.0.1`
 
 > **Naming:** the project and local clone name are now **AgentUsageMonitor**. The
 > published 0.0.1 app still displays **Agent Monitor**, while its bundle, download,
 > target, and source directory remain `CodexUsageMonitor` for compatibility. The
-> GitHub repository name and endpoint are still `agent-usage` until that remote
-> rename is completed, so the clone command below continues to use the working URL.
+> public repository is **AgentUsageMonitor**. Compatibility names such as the
+> Swift target and Application Support directory remain `CodexUsageMonitor`.
 
 ---
 
@@ -52,7 +52,8 @@ asks for a password, and no prompt, response, or file content ever leaves your M
 
 ### Download
 
-1. Grab `AgentUsageMonitor-0.0.1.zip` from the [latest release](../../releases/latest).
+1. Grab `AgentUsageMonitor-0.0.1.zip` from the
+   [latest release](https://github.com/chocolatechipscookiecrumbles/AgentUsageMonitor/releases/latest).
 2. Unzip it and move **AgentUsageMonitor.app** to `/Applications`.
 3. Launch it. **It lives in the menu bar** — there is no Dock icon and no window on
    first launch. Look at the right end of the menu bar.
@@ -69,7 +70,7 @@ accepted by Gatekeeper, launched, and observed working as intended.
 ### Build from source
 
 ```sh
-git clone https://github.com/chocolatechipscookiecrumbles/AgentUsageMonitor.git AgentUsageMonitor
+git clone https://github.com/chocolatechipscookiecrumbles/AgentUsageMonitor.git
 cd "AgentUsageMonitor/CodexUsageMonitor"
 
 swift build          # compile
@@ -252,7 +253,8 @@ Everything the app writes lives in `~/Library/Application Support/CodexUsageMoni
 
 The app's own **Data & Privacy** page shows this same list live, and can reveal or
 export it. See [Data & Privacy verification](docs/claude-usage-verification.md) for
-how each path was checked.
+how each path was checked. The signed 0.0.1 page was rechecked for repository
+readiness on 2026-07-31; its disclosures remain unchanged and match this list.
 
 ## How Claude usage is read, and the terms caveat
 
@@ -392,8 +394,9 @@ Yes. Disconnect the other in **Settings → Agents**; the menu bar and popover a
 No. Disconnect is app-local only. Your credential is untouched.
 
 **Is it open to contributions?**
-This is a personal, non-commercial project. Issues are welcome; unsolicited pull
-requests may not be merged.
+Issues are welcome. Agree on implementation scope before opening a pull request;
+unsolicited implementation pull requests may not be merged. See
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Architecture
 
@@ -459,7 +462,9 @@ and pull requests follow the
 | [Authentication and usage collection](docs/development/authentication-and-usage-collection.md) | The provider read paths in detail |
 | [Popover spec](docs/design/menu-bar-popover/SPEC.md) | The menu-bar popover design contract |
 | [Implementation plans](docs/superpowers/plans/) | The full design and evidence trail |
-| [how-to.md](how-to.md) | Operating notes for the login flow, the usage probe, and running the app from source |
+| [Operating notes](docs/development/operating-notes.md) | Maintainer notes for the login flow, the usage probe, and running the app from source |
+| [Contributing](CONTRIBUTING.md) | Issue, privacy, regression-test, and pull-request expectations |
+| [Security policy](SECURITY.md) | Private vulnerability-reporting guidance |
 
 ## Acknowledgements
 
@@ -484,9 +489,13 @@ or a direct code contribution. The detailed research links remain in
 
 ## License
 
-**Non-commercial.** This is a personal project distributed for personal use. It is
-not affiliated with, endorsed by, or supported by OpenAI, Anthropic, GitHub, or
-Apple. Provider names and marks belong to their respective owners.
+The source code in this repository is available under the
+[MIT License](LICENSE).
 
-No license file has been chosen yet — see
-[before going public](docs/development/before-going-public.md).
+The MIT License covers this project's source and documentation. It does not grant
+rights to provider services, credentials, names, logos, or other marks, and it does
+not override OpenAI, Anthropic, GitHub, Apple, or other third-party terms.
+
+AgentUsageMonitor is an independent project and is not affiliated with, endorsed
+by, or supported by OpenAI, Anthropic, GitHub, or Apple. Provider names and marks
+belong to their respective owners.

@@ -86,7 +86,7 @@
 - Modify: `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md`
 - Modify: `docs/superpowers/plans/2026-07-13-settings-ui-followups.md`
 - Modify: `outline.md`
-- Modify: `how-to.md`
+- Modify: `docs/development/operating-notes.md`
 - Modify: `UsageProbe/README.md`
 
 - [x] Run `swift build --package-path CodexUsageMonitor -Xswiftc -warnings-as-errors`.

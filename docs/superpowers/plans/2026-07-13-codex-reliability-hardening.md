@@ -40,7 +40,7 @@
 - Do not make a manual refresh wait behind a background refresh; allow only one collection at a time.
 - Do not redesign the menu in this phase. Add visible diagnostic detail only if a real failure requires an explanation.
 - Do not generate or run test cases. Use the verification steps stated in each task.
-- Update `how-to.md`, `UsageProbe/README.md`, and this plan whenever behavior or persistence changes.
+- Update `docs/development/operating-notes.md`, `UsageProbe/README.md`, and this plan whenever behavior or persistence changes.
 
 ---
 
@@ -159,7 +159,7 @@ func evaluate(_ record: QuotaRecord) async
 **Files:**
 - Modify: `UsageProbe/Findings/codex.md`
 - Modify: `docs/superpowers/plans/2026-07-12-codex-menu-bar-mvp.md`
-- Modify: `how-to.md`
+- Modify: `docs/development/operating-notes.md`
 
 - [x] Run the installed menu-bar app for seven calendar days under normal work.
 - [ ] At the end, summarize confirmed, confirmed-after-retry, cached, unconfirmed, and unavailable counts; do not export account-specific quota values.

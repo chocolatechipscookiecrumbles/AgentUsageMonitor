@@ -89,7 +89,7 @@ A PR must add provenance, license, update, security, privacy, failure-UX, and co
 | Durable architecture or ownership decision | ADR |
 | Always-on repository invariant | Nearest `AGENTS.md` |
 | Repeatable task workflow | Repo-local skill |
-| User-visible operation or limitation | `UsageProbe/README.md` and/or `how-to.md` |
+| User-visible operation or limitation | `UsageProbe/README.md` and/or `docs/development/operating-notes.md` |
 | Review-specific evidence and risk | Pull request |
 
 Do not turn `AGENTS.md` into a project tour. Put only durable traps and routing there.

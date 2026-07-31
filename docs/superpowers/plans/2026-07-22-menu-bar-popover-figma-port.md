@@ -20,7 +20,7 @@ Net effect: a shorter popover that is tabs → header (icon, title, pill) → wi
 
 ## Where this sits (state as of 2026-07-22)
 
-- **Current menu is 168 lines of plain rows** across [QuotaMenuView.swift](../../../CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/QuotaMenuView.swift) (31), [ConnectedQuotaMenuView.swift](../../../CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/ConnectedQuotaMenuView.swift) (66) and [CodexDisconnectedMenuView.swift](../../../CodexUsageMonitor/Sources/CodexUsageMonitor/Menu/CodexDisconnectedMenuView.swift) (71). It is Codex-only and has no provider concept.
+- **The pre-port menu was 168 lines of plain rows** across the now-deleted `QuotaMenuView.swift` (31), `ConnectedQuotaMenuView.swift` (66), and `CodexDisconnectedMenuView.swift` (71). It was Codex-only and had no provider concept.
 - **Claude usage is already live** in Settings via `ClaudeUsageMonitor` → `ClaudeUsageDisplayModel`. The Claude tab consumes that mapper; it must not be reimplemented.
 - **The Figma export is untracked** in git. `docs/design/menu-bar-popover/` is now the durable copy — treat it, not the loose folder, as the source of truth.
 
@@ -220,7 +220,7 @@ The revision removed three pieces of information from the popover. Settled below
 ## Task 8: Retire the old menu and document
 
 - [x] **Step 1:** Removed `QuotaMenuView`, `ConnectedQuotaMenuView`, and `CodexDisconnectedMenuView` (affordances confirmed ported in Tasks 5–6). Also removed the view helpers they solely fed — `QuotaWindowRow`, `MenuRefreshTimingView` — and the now-dead `MenuRefreshTimingPresentation` plus its `QuotaViewModel` plumbing (`refreshTimingPresentation`/`nextRefreshAt` and `updateRefreshTimingPresentation()`); the revised design dropped the next-refresh row, and `RefreshNowButton`/`effectiveRefreshInterval`/`refreshScheduleReason` stay because Settings still uses them. The `CodexDisconnectedMenuView` sign-in copy was already reproduced in `CodexUnavailableContent`. **Not touched (out of scope):** the base-inherited, unwired `ClaudeSignInView` (old-menu-style, references the shelved browser sign-in); the popover uses the themed `ClaudeCredentialActions` instead.
-- [x] **Step 2:** Updated the [planning board](../../product/planning-board.md) (new popover entry; fixed board links that pointed at the deleted files) and extended [the verification guide](../../claude-usage-verification.md) with a menu-level manual-check section (§12) plus corrected suite counts and the stale Claude sign-in gap note. Also refreshed the menu descriptions in [how-to.md](../../../how-to.md) and [UsageProbe/README.md](../../../UsageProbe/README.md). Historical plan files that reference the deleted views are left intact as provenance.
+- [x] **Step 2:** Updated the [planning board](../../product/planning-board.md) (new popover entry; fixed board links that pointed at the deleted files) and extended [the verification guide](../../claude-usage-verification.md) with a menu-level manual-check section (§12) plus corrected suite counts and the stale Claude sign-in gap note. Also refreshed the menu descriptions in [the operating notes](../../development/operating-notes.md) and [UsageProbe/README.md](../../../UsageProbe/README.md). Historical plan files that reference the deleted views are left intact as provenance.
 - [x] **Step 3:** `swift build`, the full 229-test suite, and `git diff --check` pass. **Committed.**
 
 ---

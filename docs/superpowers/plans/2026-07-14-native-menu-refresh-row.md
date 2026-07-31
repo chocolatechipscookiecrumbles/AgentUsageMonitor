@@ -243,7 +243,7 @@ Planning note (2026-07-17): retain this deferred item on the centralized [Produc
 - Modify: `docs/superpowers/plans/2026-07-13-adaptive-refresh.md`
 - Modify: `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md`
 - Modify: `UsageProbe/README.md`
-- Modify: `how-to.md`
+- Modify: `docs/development/operating-notes.md`
 - Modify: `outline.md`
 
 **Interfaces:**
@@ -258,7 +258,7 @@ State whether the native menu shows an absolute next-refresh time or an explicit
 
 List the signed build, appearances, states, transitions, interaction paths, soak duration, and crash-report result. Do not mark unobserved conditional states complete.
 
-`UsageProbe/README.md`, `how-to.md`, the adaptive-refresh plan, daily-driver roadmap, and `outline.md` now describe event-driven absolute next-refresh timing and retain the coupled highlight/crash history. This plan records the signed connected/scheduled visual pass, process/signature evidence, current-appearance-only coverage, and the blocked interaction/conditional-state matrix without marking those states complete.
+`UsageProbe/README.md`, `docs/development/operating-notes.md`, the adaptive-refresh plan, daily-driver roadmap, and `outline.md` now describe event-driven absolute next-refresh timing and retain the coupled highlight/crash history. This plan records the signed connected/scheduled visual pass, process/signature evidence, current-appearance-only coverage, and the blocked interaction/conditional-state matrix without marking those states complete.
 
 ## Verification evidence — 2026-07-17
 

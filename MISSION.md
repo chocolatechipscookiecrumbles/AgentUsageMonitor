@@ -15,7 +15,7 @@ Become a stronger macOS developer by studying successful neighboring projects, a
 - Keep the app Codex-first, native to macOS, and conservative about credentials and local data.
 - Keep the current preference not to add or run automated tests unless it is explicitly revisited; use probes, fixtures, compilation, and signed-app inspection in the meantime.
 - Preserve the native inline menu unless a panel-style redesign is intentional.
-- Document user-visible behavior changes in the README, how-to, and relevant implementation plan.
+- Document user-visible behavior changes in the README, operating notes, and relevant implementation plan.
 
 ## Out of scope
 - Copying another app's branding, visual identity, or full feature set.

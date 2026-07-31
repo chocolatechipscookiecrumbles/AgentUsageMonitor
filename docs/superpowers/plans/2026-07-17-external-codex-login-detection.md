@@ -29,7 +29,7 @@
 - Modify `CodexUsageMonitor/Sources/CodexUsageMonitor/Connection/CodexConnectionController.swift`: own the activation observer, one cancellable disconnected-state task, testable read-status injection, typed state-transition side effects, and exactly-once post-external-login refresh callback.
 - Create `CodexUsageMonitor/Tests/CodexUsageMonitorTests/CodexConnectionControllerTests.swift`: one deterministic regression test proving an activation-triggered external status change reconnects once without a menu or quota scheduler.
 - Modify `docs/product/follow-ups.md`, `docs/product/planning-board.md`, and `docs/superpowers/plans/2026-07-13-codex-connection.md`: link the dedicated plan and promote the recorded problem from **Needs plan** to **Queued**.
-- Modify `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md`, `outline.md`, `how-to.md`, and `UsageProbe/README.md`: after implementation, describe the 30-second/activation behavior, privacy boundary, acceptance evidence, and any unrun live state without overstating coverage.
+- Modify `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md`, `outline.md`, `docs/development/operating-notes.md`, and `UsageProbe/README.md`: after implementation, describe the 30-second/activation behavior, privacy boundary, acceptance evidence, and any unrun live state without overstating coverage.
 
 ## Task 1: Write the external-login activation regression first
 
@@ -386,7 +386,7 @@ git commit -m "Record external login detection acceptance"
 - Modify: `docs/superpowers/plans/2026-07-13-codex-connection.md`
 - Modify: `docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md`
 - Modify: `outline.md`
-- Modify: `how-to.md`
+- Modify: `docs/development/operating-notes.md`
 - Modify: `UsageProbe/README.md`
 - Modify: `docs/superpowers/plans/2026-07-17-external-codex-login-detection.md`
 
@@ -400,7 +400,7 @@ Change Product Follow-up 8 and the matching bug-board entry from **Needs plan** 
 
 - [x] **Step 2: Update user-facing instructions only after the signed acceptance passes.**
 
-Add this bounded statement to `how-to.md` and the corresponding native-app section of `UsageProbe/README.md`:
+Add this bounded statement to `docs/development/operating-notes.md` and the corresponding native-app section of `UsageProbe/README.md`:
 
 > If you run `codex login` independently while Codex Usage Monitor is disconnected, it rechecks the same Codex home immediately when the app becomes active and at most 30 seconds later while it remains disconnected. The check uses read-only `account/read`; it does not read credential files or start another quota schedule.
 
@@ -434,7 +434,7 @@ git add \
   docs/superpowers/plans/2026-07-13-codex-daily-driver-roadmap.md \
   docs/superpowers/plans/2026-07-17-external-codex-login-detection.md \
   outline.md \
-  how-to.md \
+  docs/development/operating-notes.md \
   UsageProbe/README.md
 git commit -m "Document external Codex login detection"
 ```

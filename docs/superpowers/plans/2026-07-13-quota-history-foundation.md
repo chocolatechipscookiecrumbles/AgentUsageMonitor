@@ -17,7 +17,7 @@
 - Scope history by provider, account fingerprint, limit lane, and reset timestamp; never calculate a forecast across different reset windows.
 - Retain at most 500 entries and remove entries older than 90 days.
 - Do not generate or run test cases. Validate through compilation and live read-only app-server output.
-- Update `how-to.md`, `UsageProbe/README.md`, and the Codex MVP plan when behavior/storage changes.
+- Update `docs/development/operating-notes.md`, `UsageProbe/README.md`, and the Codex MVP plan when behavior/storage changes.
 
 ---
 
@@ -96,7 +96,7 @@ actor QuotaRepository {
 ### Task 4: Verify and document the invisible functional foundation
 
 **Files:**
-- Modify: `how-to.md`
+- Modify: `docs/development/operating-notes.md`
 - Modify: `UsageProbe/README.md`
 - Modify: `docs/superpowers/plans/2026-07-12-codex-menu-bar-mvp.md`
 
@@ -114,4 +114,4 @@ actor QuotaRepository {
 
 ## Superseded details
 
-The foundation was implemented and verified before the reliability-hardening phase. The later `2026-07-13-codex-reliability-hardening.md` plan now owns the evolved forecast contract: forecasts require three observations over at least 15 minutes, use median adjacent positive slopes, and include confidence and observation count. Current operating documentation in `how-to.md` and `UsageProbe/README.md` reflects the stricter behavior.
+The foundation was implemented and verified before the reliability-hardening phase. The later `2026-07-13-codex-reliability-hardening.md` plan now owns the evolved forecast contract: forecasts require three observations over at least 15 minutes, use median adjacent positive slopes, and include confidence and observation count. Current operating documentation in `docs/development/operating-notes.md` and `UsageProbe/README.md` reflects the stricter behavior.

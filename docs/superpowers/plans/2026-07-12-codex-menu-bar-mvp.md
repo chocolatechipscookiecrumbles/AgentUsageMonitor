@@ -22,7 +22,7 @@
 - Invoke only `codex app-server --listen stdio://` and read-only account methods; never send a model prompt, consume a reset credit, log out, or read `auth.json`.
 - Store only a one-way account fingerprint and confirmed non-secret quota fields in Application Support with file protection appropriate to macOS.
 - Do not generate test cases for this prototype. Verify each task through compilation, live read-only Codex responses, and visible menu-bar behavior.
-- Update `how-to.md` and `UsageProbe/README.md` whenever a user-visible command, safeguard, field, or setup requirement changes.
+- Update `docs/development/operating-notes.md` and `UsageProbe/README.md` whenever a user-visible command, safeguard, field, or setup requirement changes.
 
 ---
 

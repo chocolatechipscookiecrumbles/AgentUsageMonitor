@@ -60,7 +60,7 @@ The user-provided local `High-fidelity macOS menu UI v4/src/components/Preferenc
 - Modify `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/GeneralSettingsView.swift` and `GeneralSettingsContextView.swift`: remove duplicate/obsolete General information and make the rail preview authoritative.
 - Modify `CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/NotificationSettingsView.swift`: replace all existing Boolean rows with the shared switch component while preserving authorization and disabled hierarchy.
 - Modify `CodexUsageMonitor/Tests/CodexUsageMonitorTests/SettingsWindowLayoutTests.swift`: one focused geometry-invariant regression test.
-- Modify `AGENTS.md`, `docs/product/follow-ups.md`, `docs/product/planning-board.md`, this plan, `docs/superpowers/plans/2026-07-14-settings-provider-followups.md`, `how-to.md`, `UsageProbe/README.md`, and `outline.md`: reconcile the current shell contract, source status, operating behavior, and acceptance evidence after implementation.
+- Modify `AGENTS.md`, `docs/product/follow-ups.md`, `docs/product/planning-board.md`, this plan, `docs/superpowers/plans/2026-07-14-settings-provider-followups.md`, `docs/development/operating-notes.md`, `UsageProbe/README.md`, and `outline.md`: reconcile the current shell contract, source status, operating behavior, and acceptance evidence after implementation.
 
 ## Task 1: Reconcile the current Settings shell contract and make geometry deterministic — complete
 
@@ -453,7 +453,7 @@ Expected: the focused layout regression and full test suite pass. Record any unm
 - Modify: `docs/superpowers/plans/2026-07-15-settings-system-appearance-transition.md`
 - Modify: `docs/product/follow-ups.md`
 - Modify: `docs/product/planning-board.md`
-- Modify: `how-to.md`, `UsageProbe/README.md`, and `outline.md`
+- Modify: `docs/development/operating-notes.md`, `UsageProbe/README.md`, and `outline.md`
 
 - [x] **Step 1: Run final static checks.**
 
@@ -572,7 +572,7 @@ git commit -m "Organize Settings appearance and diagnostics"
 - Modify: `docs/superpowers/plans/2026-07-17-figma-settings-design-completion.md`
 - Modify: `docs/product/follow-ups.md`
 - Modify: `docs/product/planning-board.md`
-- Modify: `how-to.md`, `UsageProbe/README.md`, and `outline.md`
+- Modify: `docs/development/operating-notes.md`, `UsageProbe/README.md`, and `outline.md`
 - Modify (ignored handoff): `.worktrees/figma-settings-design-completion-PR.md`
 
 - [x] **Step 1: Re-run final static checks and preserve the signed-app distinction.**
