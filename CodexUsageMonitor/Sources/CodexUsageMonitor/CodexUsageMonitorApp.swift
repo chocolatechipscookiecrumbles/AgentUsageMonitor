@@ -5,7 +5,11 @@ import UserNotifications
 @main
 @MainActor
 struct CodexUsageMonitorApp: App {
-    @StateObject private var viewModel = QuotaViewModel()
+    @NSApplicationDelegateAdaptor(ApplicationDelegate.self) private var appDelegate
+
+    /// The composition root owns the model; the scenes read the same instance
+    /// the startup tour was given.
+    private var viewModel: QuotaViewModel { appDelegate.viewModel }
 
     init() {
         if CommandLine.arguments.contains(ClaudeUsageProbeCommand.flag) {

@@ -5,6 +5,9 @@ struct MenuBarPopoverView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openSettings) private var openSettings
     @ObservedObject var viewModel: QuotaViewModel
+    /// Observed separately so recording enrollment redraws an open popover the
+    /// same way a Token Monitor preference change does.
+    @ObservedObject var enrollment: ProviderEnrollmentStore
     @State private var selectedProvider: AgentProvider
 
     init(
@@ -12,6 +15,7 @@ struct MenuBarPopoverView: View {
         initialProvider: AgentProvider? = nil
     ) {
         self.viewModel = viewModel
+        enrollment = viewModel.enrollment
         // An explicit caller request wins; otherwise restore the last-viewed
         // tab. Either is resolved against the supported catalog so an
         // unsupported persisted provider falls back to Codex.
@@ -41,6 +45,10 @@ struct MenuBarPopoverView: View {
                 MenuActionFooter(
                     settings: viewModel.settings,
                     isRefreshing: isRefreshing,
+                    // A connect-only tab has nothing to refresh, and a Refresh
+                    // that silently enrolled would defeat the explicit consent
+                    // this whole gate exists for.
+                    isRefreshEnabled: menuMode == .operational,
                     refresh: refresh,
                     openNotificationSettings: showNotificationSettings,
                     openPreferences: showPreferences,
@@ -63,8 +71,17 @@ struct MenuBarPopoverView: View {
         MenuPopoverProviderCatalog.resolvedSelection(selectedProvider)
     }
 
+    /// Enrollment is resolved before any provider state is read, so an
+    /// unenrolled tab cannot be promoted by a cached reading.
+    private var menuMode: ProviderMenuMode {
+        ProviderMenuMode.resolve(policy: viewModel.runtimePolicy(for: activeProvider))
+    }
+
     private var headerPresentation: MenuProviderHeaderPresentation {
-        switch activeProvider {
+        guard menuMode == .operational else {
+            return .connectOnly(provider: activeProvider)
+        }
+        return switch activeProvider {
         case .codex, .githubCopilot:
             .codex(
                 displayState: viewModel.displayState,
@@ -93,14 +110,28 @@ struct MenuBarPopoverView: View {
 
     @ViewBuilder
     private var providerContent: some View {
-        switch activeProvider {
-        case .codex:
-            CodexMenuContent(viewModel: viewModel, settings: viewModel.settings)
-        case .claudeCode:
-            ClaudeMenuContent(viewModel: viewModel, settings: viewModel.settings)
-        case .githubCopilot:
+        switch (activeProvider, menuMode) {
+        case (.githubCopilot, _):
             MenuProviderContentPlaceholder()
                 .padding(.horizontal, MenuPopoverTheme.contentHorizontalPadding)
+        case (let provider, .connectOnly):
+            ProviderConnectCard(provider: provider) { connect(provider) }
+                .padding(.horizontal, MenuPopoverTheme.contentHorizontalPadding)
+        case (.codex, .operational):
+            CodexMenuContent(viewModel: viewModel, settings: viewModel.settings)
+        case (.claudeCode, .operational):
+            ClaudeMenuContent(viewModel: viewModel, settings: viewModel.settings)
+        }
+    }
+
+    private func connect(_ provider: AgentProvider) {
+        switch provider {
+        case .codex:
+            viewModel.connectCodex()
+        case .claudeCode:
+            viewModel.connectClaude()
+        case .githubCopilot:
+            break
         }
     }
 

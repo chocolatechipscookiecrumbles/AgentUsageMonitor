@@ -32,6 +32,10 @@ final class QuotaViewModel: ObservableObject {
     @Published private(set) var localActivityStates: [AgentProvider: ProviderLocalActivityState] = [:]
 
     let settings: AppSettings
+    /// The one owner of app-local provider consent. Shared with the menu,
+    /// Settings, and the quota owners so nothing has to guess whether the user
+    /// asked for a provider.
+    let enrollment: ProviderEnrollmentStore
 
     /// Providers currently connected enough to show a menu-bar reading, in
     /// canonical order. Drives the smart provider selector: with fewer than two,
@@ -75,18 +79,25 @@ final class QuotaViewModel: ObservableObject {
             legacyClaudeSetupEvidence: AppSettings.hasLegacyClaudeSetupEvidence()
         )
         self.settings = settings
+        let enrollment = ProviderEnrollmentStore()
+        self.enrollment = enrollment
         claudeSetupState = ClaudeSetupState.resolve(
             connectionState: .notConnected,
             usageState: .unavailable(reason: ClaudeUsageState.notConnectedReason),
             hasSetupHistory: settings.hasClaudeSetupHistory,
             hasCompletedSourceDiscovery: false
         )
-        let monitor = QuotaMonitor(settings: settings)
+        let monitor = QuotaMonitor(settings: settings, enrollment: enrollment)
         self.monitor = monitor
         let connectionController = CodexConnectionController(
             onConnected: { monitor.refresh(reason: .authentication) },
-            isUserDisconnected: { [settings] in settings.codexDisconnected },
-            setUserDisconnected: { [settings] disconnected in settings.codexDisconnected = disconnected }
+            // Enrollment is the authority the controller consults; the two
+            // former disconnect booleans are gone, so there is one answer to
+            // "has the user asked for this provider" rather than two.
+            isUserDisconnected: { [enrollment] in !enrollment.isEnabled(.codex) },
+            setUserDisconnected: { [enrollment] disconnected in
+                if disconnected { enrollment.disable(.codex) } else { enrollment.enable(.codex) }
+            }
         )
         self.connectionController = connectionController
         // Claude follows the shared Refresh Preferences like Codex, but its
@@ -134,7 +145,10 @@ final class QuotaViewModel: ObservableObject {
         monitor.$refreshState.sink { [weak self] state in
             self?.refreshState = state
             if case .refreshing = state { self?.isRefreshing = true } else { self?.isRefreshing = false }
-            if case .failed = state { self?.connectionController.recheckConnection() }
+            if case .failed = state,
+               self?.runtimePolicy(for: .codex).mayCheckAccount == true {
+                self?.connectionController.recheckConnection()
+            }
         }.store(in: &subscriptions)
         monitor.$diagnosticSummary.sink { [weak self] summary in
             self?.diagnosticSummary = summary
@@ -175,17 +189,20 @@ final class QuotaViewModel: ObservableObject {
             self?.localActivityStates = states
         }.store(in: &subscriptions)
         // Hiding an agent's Token Monitor stops reading that agent's records,
-        // so visibility has to reach the monitor and not only the menu.
+        // so visibility has to reach the monitor and not only the menu. Since
+        // 0.0.1 the same path also carries enrollment: an unenrolled provider
+        // is not read at all, whatever its card preference says.
         settings.$tokenMonitorVisibilityByProvider
             .removeDuplicates()
             .sink { [weak self] visibility in
                 guard let self else { return }
-                for provider in AgentProvider.allCases {
-                    self.activityMonitor.setCollectionEnabled(
-                        visibility[provider] ?? true,
-                        for: provider
-                    )
-                }
+                self.applyLocalActivityPolicy(visibility: visibility)
+            }.store(in: &subscriptions)
+        enrollment.$states
+            .removeDuplicates()
+            .sink { [weak self] states in
+                guard let self else { return }
+                self.applyLocalActivityPolicy(enrollmentStates: states)
             }.store(in: &subscriptions)
         // The day/week choice decides how the monitor aggregates, so it has to
         // reach the monitor too. Nothing is reread; the reconciled requests are
@@ -207,6 +224,35 @@ final class QuotaViewModel: ObservableObject {
         !arguments.contains("--live-read-once")
             && !arguments.contains(ClaudeUsageProbeCommand.flag)
             && !arguments.contains(MenuPopoverViabilityGate.launchArgument)
+            // Re-opening the tour for visual acceptance must not read a
+            // provider, so the preview run is inert in the same way the probes
+            // are.
+            && !arguments.contains(OnboardingLaunchMode.previewArgument)
+    }
+
+    /// The policy every provider's runtime owners are gated on. Enrollment
+    /// decides whether an owner may run at all; the individual owners keep
+    /// their own separate operational state.
+    func runtimePolicy(for provider: AgentProvider) -> ProviderRuntimePolicy {
+        ProviderRuntimePolicy.resolve(
+            enrollment: enrollment.state(for: provider),
+            isTokenMonitorVisible: settings.isTokenMonitorVisible(for: provider)
+        )
+    }
+
+    private func applyLocalActivityPolicy(
+        visibility: [AgentProvider: Bool]? = nil,
+        enrollmentStates: [AgentProvider: ProviderEnrollmentState]? = nil
+    ) {
+        let visibility = visibility ?? settings.tokenMonitorVisibilityByProvider
+        let states = enrollmentStates ?? enrollment.states
+        for provider in AgentProvider.allCases {
+            let policy = ProviderRuntimePolicy.resolve(
+                enrollment: states[provider] ?? .notRequested,
+                isTokenMonitorVisible: visibility[provider] ?? true
+            )
+            activityMonitor.setCollectionEnabled(policy.mayCollectLocalActivity, for: provider)
+        }
     }
 
     func localActivityState(for provider: AgentProvider) -> ProviderLocalActivityState {
@@ -221,18 +267,25 @@ final class QuotaViewModel: ObservableObject {
         )
     }
 
+    /// Starts only what the user has explicitly enrolled. Each provider is
+    /// evaluated independently, so one enrolled provider never drags the other
+    /// into account checks, quota reads, or local scans.
     func start() {
-        connectionController.start()
-        monitor.start()
-        // Activity collection is local and costs no tokens, so it follows app
-        // monitoring rather than any provider's connection state.
+        if runtimePolicy(for: .codex).mayCheckAccount {
+            connectionController.start()
+            monitor.start()
+        }
+        // Activity collection is local and costs no tokens, but it is still a
+        // read of the user's machine, so since 0.0.1 it waits for that
+        // provider's Connect action. The monitor starts either way; the
+        // per-provider gate was already applied from `applyLocalActivityPolicy`.
         activityMonitor.start()
-        // Respect a persisted Claude disconnect: show disconnected without
-        // reading, rather than resuming passive capture.
-        if settings.claudeDisconnected {
-            claudeMonitor.disconnect()
-        } else {
+        if runtimePolicy(for: .claudeCode).mayRefreshQuota {
             claudeMonitor.start()
+        } else {
+            // Show disconnected without reading, rather than resuming passive
+            // capture.
+            claudeMonitor.disconnect()
         }
         Task { [weak self] in
             guard let self else { return }
@@ -241,7 +294,28 @@ final class QuotaViewModel: ObservableObject {
     }
 
     func refresh() {
+        guard runtimePolicy(for: .codex).mayRefreshQuota else { return }
         monitor.refresh(reason: .manual)
+    }
+
+    /// The explicit Codex enrollment action. It records consent for Codex only,
+    /// then hands off to the existing controller — which may adopt an already
+    /// authenticated CLI session, because consent is now on record.
+    func connectCodex() {
+        guard !enrollment.isEnabled(.codex) else { return }
+        enrollment.enable(.codex)
+        connectionController.start()
+        // `start()` performs the launch refresh on a first enrollment. A
+        // re-enrollment after Disconnect finds the monitor already started, and
+        // the enrollment transition it just published drives that refresh.
+        monitor.start()
+    }
+
+    /// The explicit Claude enrollment action. Enrolling alone raises no Keychain
+    /// prompt; the credential read it delegates to is the user-initiated step
+    /// that may.
+    func connectClaude() {
+        connectClaudeWithCredentials()
     }
 
     /// User-initiated from Diagnostics: drop the recorded refresh history.
@@ -250,20 +324,25 @@ final class QuotaViewModel: ObservableObject {
     }
 
     func checkCodexConnection() {
+        guard runtimePolicy(for: .codex).mayCheckAccount else { return }
         connectionController.checkConnection()
     }
 
     /// App-local disconnect: hide Codex usage and stop auto-detecting, leaving
-    /// the Codex CLI session and stored credential untouched.
+    /// the Codex CLI session and stored credential untouched. The controller
+    /// records `.disabled` through its `setUserDisconnected` closure, which also
+    /// stops the quota owner and purges Codex's derived local-activity cache.
     func disconnectCodex() {
         connectionController.disconnect()
     }
 
     func signInWithBrowser() {
+        guard runtimePolicy(for: .codex).mayCheckAccount else { return }
         connectionController.signInWithBrowser()
     }
 
     func signInWithCLI() {
+        guard runtimePolicy(for: .codex).mayCheckAccount else { return }
         connectionController.signInWithCLI()
     }
 
@@ -285,6 +364,7 @@ final class QuotaViewModel: ObservableObject {
     /// User-initiated: this is the only path allowed to raise a Keychain
     /// prompt, so it must never be called from a background trigger.
     func refreshClaude() {
+        guard runtimePolicy(for: .claudeCode).mayRefreshQuota else { return }
         Task { [claudeMonitor] in
             await claudeMonitor.refreshNow(reason: .userInitiated)
         }
@@ -293,15 +373,17 @@ final class QuotaViewModel: ObservableObject {
     /// Explicit user action — the only path that may raise the Keychain
     /// prompt for Claude Code's credential.
     func connectClaudeWithCredentials() {
-        settings.claudeDisconnected = false
+        enrollment.enable(.claudeCode)
         claudeMonitor.reconnect()
         claudeConnectionController.useClaudeCodeCredentials()
     }
 
     /// App-local disconnect: hide Claude usage (including passive capture) and
     /// reset the connection, leaving the Claude Code Keychain credential intact.
+    /// Recording `.disabled` also stops Claude's local reads and purges its
+    /// derived Token Monitor cache through the existing privacy path.
     func disconnectClaude() {
-        settings.claudeDisconnected = true
+        enrollment.disable(.claudeCode)
         claudeMonitor.disconnect()
         claudeConnectionController.signOut()
     }
@@ -309,6 +391,7 @@ final class QuotaViewModel: ObservableObject {
     /// Tier 2. Manual only, and only after the user has consented to the
     /// token cost — never called from a scheduled refresh.
     func runClaudeCLIProbe() {
+        guard runtimePolicy(for: .claudeCode).mayRefreshQuota else { return }
         guard !isRunningClaudeCLIProbe else { return }
         isRunningClaudeCLIProbe = true
         claudeCLIProbeError = nil

@@ -36,8 +36,7 @@ final class AppSettings: ObservableObject {
         static let claudeCLIProbeConsented = "claude.cliProbeConsented"
         static let claudeSetupHistory = "claude.hasSetupHistory"
         static let selectedMenuProvider = "menu.selectedProvider"
-        static let codexDisconnected = "codex.disconnected"
-        static let claudeDisconnected = "claude.disconnected"
+        static let onboardingAcknowledgedVersion = "onboarding.acknowledgedVersion"
     }
 
     private let defaults: UserDefaults
@@ -88,14 +87,15 @@ final class AppSettings: ObservableObject {
     /// with no current snapshot stays selected while an unsupported one falls
     /// back to Codex.
     @Published var selectedMenuProvider: AgentProvider { didSet { defaults.set(selectedMenuProvider.rawValue, forKey: Key.selectedMenuProvider) } }
-    /// App-local Codex disconnect: the user hid Codex usage without touching the
-    /// Codex CLI session. Persisted so the disconnect survives relaunch and the
-    /// app does not auto-reconnect from the still-valid CLI credential.
-    @Published var codexDisconnected: Bool { didSet { defaults.set(codexDisconnected, forKey: Key.codexDisconnected) } }
-    /// App-local Claude disconnect: hide Claude usage (passive capture included)
-    /// without touching the Claude Code Keychain credential. Persisted so the
-    /// disconnect survives relaunch.
-    @Published var claudeDisconnected: Bool { didSet { defaults.set(claudeDisconnected, forKey: Key.claudeDisconnected) } }
+    /// The onboarding version this installation has acknowledged. Zero means the
+    /// tour has never been completed, skipped, or closed.
+    ///
+    /// Non-secret presentation state, so `UserDefaults` is the right home. It is
+    /// deliberately *not* provider consent: acknowledging the tour connects
+    /// nothing. See `ProviderEnrollmentStore` for that.
+    @Published private(set) var acknowledgedOnboardingVersion: Int {
+        didSet { defaults.set(acknowledgedOnboardingVersion, forKey: Key.onboardingAcknowledgedVersion) }
+    }
     /// Whether the user has acknowledged that the CLI usage probe costs
     /// tokens. Gates the confirmation prompt so it appears on first use, not
     /// on every press.
@@ -144,11 +144,27 @@ final class AppSettings: ObservableObject {
         keyboardShortcutsEnabled = Self.value(for: Key.keyboardShortcutsEnabled, defaults: defaults, defaultValue: true)
         selectedMenuProvider = defaults.string(forKey: Key.selectedMenuProvider)
             .flatMap(AgentProvider.init(rawValue:)) ?? .codex
-        codexDisconnected = defaults.bool(forKey: Key.codexDisconnected)
-        claudeDisconnected = defaults.bool(forKey: Key.claudeDisconnected)
+        acknowledgedOnboardingVersion = defaults.integer(forKey: Key.onboardingAcknowledgedVersion)
         // Seed per-provider keys on first run / migration so the store is
         // durable from the start.
         persistQuotaThresholds()
+    }
+
+    /// Bumping this re-presents the tour once to everyone, including users who
+    /// already dismissed version 1. Only raise it when the pages themselves
+    /// change enough that a returning user needs to see them again.
+    static let currentOnboardingVersion = 1
+
+    var needsOnboarding: Bool {
+        acknowledgedOnboardingVersion < Self.currentOnboardingVersion
+    }
+
+    /// Idempotent, and the only writer. Skip, the window's close button, and the
+    /// final page all route here, because all three mean "the user is done with
+    /// this tour" — and none of them mean "connect a provider".
+    func acknowledgeCurrentOnboarding() {
+        guard needsOnboarding else { return }
+        acknowledgedOnboardingVersion = Self.currentOnboardingVersion
     }
 
     /// Providers that have remaining-quota windows and therefore threshold
