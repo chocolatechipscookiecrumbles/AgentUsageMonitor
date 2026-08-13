@@ -41,7 +41,8 @@ final class ClaudeUsageMonitor: ObservableObject {
         collector: ClaudeUsageCollecting = ClaudeUsageCollector(
             oauthSource: ClaudeOAuthUsageSource(credentialStore: ClaudeCompositeCredentialStore()),
             statusLineReader: ClaudeRateLimitSnapshotReader(),
-            cache: ClaudeUsageCache()
+            cache: ClaudeUsageCache(),
+            delegatedRefresh: ClaudeDelegatedRefreshCoordinator()
         ),
         pollInterval: Duration = ClaudeUsageMonitor.defaultPollInterval
     ) {
@@ -55,7 +56,8 @@ final class ClaudeUsageMonitor: ObservableObject {
         collector: ClaudeUsageCollecting = ClaudeUsageCollector(
             oauthSource: ClaudeOAuthUsageSource(credentialStore: ClaudeCompositeCredentialStore()),
             statusLineReader: ClaudeRateLimitSnapshotReader(),
-            cache: ClaudeUsageCache()
+            cache: ClaudeUsageCache(),
+            delegatedRefresh: ClaudeDelegatedRefreshCoordinator()
         ),
         cadence: @escaping @MainActor () -> Duration
     ) {
