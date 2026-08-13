@@ -52,12 +52,13 @@ actor ClaudeLocalActivitySource: LocalActivitySource {
             var parsedFiles: [ParsedClaudeFile] = []
             var seenFileIDs: Set<String> = []
             var anyRootExists = false
+            var skippedFileCount = 0
             let cache = parseCache
 
             for root in projectRoots {
-                let files: [ParsedClaudeFile]
+                let outcome: LocalActivityFileTraversal.Outcome<ParsedClaudeFile>
                 do {
-                    files = try await traversal.parseJSONLFiles(
+                    outcome = try await traversal.parseJSONLFiles(
                         root: root,
                         resume: { fingerprint, fileDescriptor in
                             LocalActivityResumePoint.decide(
@@ -76,10 +77,11 @@ actor ClaudeLocalActivitySource: LocalActivitySource {
                     continue
                 }
                 anyRootExists = true
+                skippedFileCount += outcome.skippedFileCount
                 // Configured roots can resolve to the same directory, and the
                 // same file must not be parsed twice under two cursors.
                 parsedFiles.append(
-                    contentsOf: files.filter { seenFileIDs.insert($0.opaqueFileID).inserted }
+                    contentsOf: outcome.parsed.filter { seenFileIDs.insert($0.opaqueFileID).inserted }
                 )
             }
 
@@ -91,7 +93,13 @@ actor ClaudeLocalActivitySource: LocalActivitySource {
             )
 
             guard anyRootExists, !parsedFiles.isEmpty else {
-                return LocalActivityScanResult(requests: [], cursors: [], status: .localRecordsMissing)
+                // A root that exists but yielded nothing readable is not the
+                // same as one with no records in it.
+                return LocalActivityScanResult(
+                    requests: [],
+                    cursors: [],
+                    status: anyRootExists && skippedFileCount > 0 ? .unsafeToRead : .localRecordsMissing
+                )
             }
 
             let priorOffsets = Dictionary(

@@ -22,7 +22,7 @@ actor CodexLocalActivitySource: LocalActivitySource {
     func scan(bounds: LocalActivityScanBounds) async -> LocalActivityScanResult {
         do {
             let cache = parseCache
-            let parsedFiles = try await traversal.parseJSONLFiles(
+            let outcome = try await traversal.parseJSONLFiles(
                 root: sessionsRoot,
                 resume: { fingerprint, fileDescriptor in
                     LocalActivityResumePoint.decide(
@@ -38,6 +38,7 @@ actor CodexLocalActivitySource: LocalActivitySource {
                 }
             )
             try Task.checkCancellation()
+            let parsedFiles = outcome.parsed
             // Rebuilding rather than merging drops files that no longer exist.
             parseCache = Dictionary(
                 parsedFiles.map { ($0.opaqueFileID, $0) },
@@ -45,7 +46,14 @@ actor CodexLocalActivitySource: LocalActivitySource {
             )
 
             guard !parsedFiles.isEmpty else {
-                return LocalActivityScanResult(requests: [], cursors: [], status: .localRecordsMissing)
+                // Nothing readable. Whether that is an empty root or a root this
+                // build cannot interpret at all are different answers, and the
+                // card says different things for each.
+                return LocalActivityScanResult(
+                    requests: [],
+                    cursors: [],
+                    status: outcome.skippedFileCount > 0 ? .unsafeToRead : .localRecordsMissing
+                )
             }
 
             let priorOffsets = Dictionary(
@@ -303,11 +311,20 @@ private struct FileParseState: Sendable {
             // evidence. A usage object that *is* present stays strict below.
             guard let info = payload.info else { return }
             guard let rawTimestamp = record.timestamp,
-                  let timestamp = CodexLocalActivitySource.date(rawTimestamp),
-                  let turnID = payload.turnID ?? currentTurnID
+                  let timestamp = CodexLocalActivitySource.date(rawTimestamp)
             else {
+                // A usage claim with no time cannot be placed in any window, so
+                // this stays strict.
                 throw CodexLocalActivityFailure.malformedUsage
             }
+            // Codex never writes a turn identifier on `token_count`, so this is
+            // always the one latched from the preceding `task_started`. A
+            // resumed session replays prior usage *before* its first new turn,
+            // leaving nothing latched — and requiring one there discarded every
+            // reading in the whole root. The turn only frames the request's
+            // identity digest; no arithmetic depends on it, so an absent one is
+            // recorded rather than refused.
+            let turnID = payload.turnID ?? currentTurnID
             let last = try info.lastTokenUsage.map(Totals.init)
             let total = try info.totalTokenUsage.map(Totals.init)
             guard last != nil || total != nil else {

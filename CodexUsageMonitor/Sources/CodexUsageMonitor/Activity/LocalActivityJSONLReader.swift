@@ -106,18 +106,29 @@ struct LocalActivityFileTraversal: Sendable {
         makeState: @Sendable (String) -> State,
         consume: @Sendable (inout State, LocalActivityJSONLReader.Line) throws -> Void,
         finish: @Sendable (LocalActivityFileFingerprint, State, Int64) -> Parsed
-    ) async throws -> [Parsed] {
+    ) async throws -> Outcome<Parsed> {
         try Task.checkCancellation()
         let rootDescriptor = try Self.openRootDirectory(root)
         defer { _ = Darwin.close(rootDescriptor) }
-        return try await parse(
+        let result = try await parse(
             directoryDescriptor: rootDescriptor,
             seenFileIDs: [],
             resume: resume,
             makeState: makeState,
             consume: consume,
             finish: finish
-        ).parsed
+        )
+        return Outcome(parsed: result.parsed, skippedFileCount: result.skippedFileCount)
+    }
+
+    /// What a traversal found, and what it could not interpret.
+    ///
+    /// `skippedFileCount` exists so a caller can tell "this root has nothing in
+    /// it" from "this root has nothing this build could read" — collapsing those
+    /// would let a wholly unreadable root present as an empty one.
+    struct Outcome<Parsed: Sendable>: Sendable {
+        let parsed: [Parsed]
+        let skippedFileCount: Int
     }
 
     private func parse<State: Sendable, Parsed: Sendable>(
@@ -130,7 +141,7 @@ struct LocalActivityFileTraversal: Sendable {
         makeState: @Sendable (String) -> State,
         consume: @Sendable (inout State, LocalActivityJSONLReader.Line) throws -> Void,
         finish: @Sendable (LocalActivityFileFingerprint, State, Int64) -> Parsed
-    ) async throws -> (parsed: [Parsed], seenFileIDs: Set<String>) {
+    ) async throws -> (parsed: [Parsed], seenFileIDs: Set<String>, skippedFileCount: Int) {
         try Task.checkCancellation()
         let duplicate = dup(directoryDescriptor)
         guard duplicate >= 0, let directory = fdopendir(duplicate) else {
@@ -141,6 +152,7 @@ struct LocalActivityFileTraversal: Sendable {
 
         var parsed: [Parsed] = []
         var seenFileIDs = seenFileIDs
+        var skippedFileCount = 0
 
         while true {
             try Task.checkCancellation()
@@ -180,6 +192,7 @@ struct LocalActivityFileTraversal: Sendable {
                     )
                     parsed.append(contentsOf: nested.parsed)
                     seenFileIDs = nested.seenFileIDs
+                    skippedFileCount += nested.skippedFileCount
 
                 case S_IFREG:
                     guard name.lowercased().hasSuffix(".jsonl") else { break }
@@ -205,12 +218,32 @@ struct LocalActivityFileTraversal: Sendable {
                     }
 
                     if let start {
-                        let result = try await reader.read(
-                            fileDescriptor: childDescriptor,
-                            from: start.offset,
-                            initialState: start.state,
-                            consume: consume
-                        )
+                        // One transcript this build cannot interpret must not
+                        // erase every transcript it can. Before this, a single
+                        // unreadable record anywhere under the root propagated
+                        // out of the whole scan and blanked the card.
+                        //
+                        // Only *interpretation* failures are isolated.
+                        // Cancellation and I/O failures still propagate: those
+                        // say something about the read itself, not about one
+                        // file's contents, and swallowing them would report a
+                        // partial root as a complete one.
+                        let result: LocalActivityJSONLReader.Result<State>
+                        do {
+                            result = try await reader.read(
+                                fileDescriptor: childDescriptor,
+                                from: start.offset,
+                                initialState: start.state,
+                                consume: consume
+                            )
+                        } catch is CancellationError {
+                            throw CancellationError()
+                        } catch let error as LocalActivityJSONLReader.ReaderFailure {
+                            throw error
+                        } catch {
+                            skippedFileCount += 1
+                            break
+                        }
                         try Task.checkCancellation()
                         let completedFingerprint = LocalActivityFileFingerprint(
                             opaqueFileID: fingerprint.opaqueFileID,
@@ -238,7 +271,7 @@ struct LocalActivityFileTraversal: Sendable {
         }
         guard errno == 0 else { throw TraversalFailure.unsafeFilesystem }
 
-        return (parsed, seenFileIDs)
+        return (parsed, seenFileIDs, skippedFileCount)
     }
 
     /// Walks the root one component at a time so no ancestor symlink is

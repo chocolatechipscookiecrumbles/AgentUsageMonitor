@@ -201,3 +201,89 @@ final class LocalActivityReconciliationRegressionTests: XCTestCase {
         """
     }
 }
+
+/// Regressions for the released 0.0.1 failure diagnosed on 2026-08-04: a Codex
+/// root that contains real, current usage published nothing at all.
+/// See `docs/development/codex-local-activity-diagnostic-results.md`.
+final class CodexLocalActivityRecoveryRegressionTests: XCTestCase {
+    /// Codex never writes `turn_id` on a `token_count` payload, so the reader
+    /// depended on the turn latched from the preceding `task_started`. A resumed
+    /// session replays prior usage *before* its first new turn, leaving that
+    /// latch empty — and the reader threw rather than recording the usage.
+    ///
+    /// The turn identifier is only a component of the request-identity digest;
+    /// nothing arithmetic depends on it.
+    func testUsageBeforeTheFirstTaskStartedIsStillCounted() async throws {
+        let root = try makeIsolatedRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let lines = [
+            #"{"timestamp":"2026-07-30T09:00:00Z","type":"session_meta","payload":{"id":"fabricated-resumed-session"}}"#,
+            #"{"timestamp":"2026-07-30T09:00:01Z","type":"turn_context","payload":{"model":"gpt-5.6-codex"}}"#,
+            // Replayed usage: no turn_id on the record, and no task_started yet.
+            #"{"timestamp":"2026-07-30T09:00:02Z","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":100,"cached_input_tokens":20,"output_tokens":50,"reasoning_output_tokens":10}}}}"#,
+            #"{"timestamp":"2026-07-30T09:00:03Z","type":"event_msg","payload":{"type":"task_started","turn_id":"fabricated-turn"}}"#,
+        ]
+        try (lines.joined(separator: "\n") + "\n").write(
+            to: root.appendingPathComponent("resumed-session.jsonl"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        let result = await CodexLocalActivitySource(sessionsRoot: root)
+            .scan(bounds: LocalActivityScanBounds())
+
+        XCTAssertEqual(result.status, .readable)
+        XCTAssertEqual(result.requests.count, 1)
+        XCTAssertEqual(result.requests.first?.tokens.totalTokens, 150)
+    }
+
+    /// The blast radius, and the reason the released failure was total rather
+    /// than partial: nothing isolated a parse failure to its own file, so two
+    /// unreadable transcripts out of 261 blanked the whole card.
+    func testOneUninterpretableFileDoesNotBlankTheRestOfTheRoot() async throws {
+        let root = try makeIsolatedRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try (#"{"timestamp":"2026-07-30T09:00:00Z","type":"session_meta","payload":{"id":"fabricated-good-session"}}"# + "\n"
+            + #"{"timestamp":"2026-07-30T09:00:01Z","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":100,"cached_input_tokens":20,"output_tokens":50,"reasoning_output_tokens":10}}}}"# + "\n")
+            .write(to: root.appendingPathComponent("readable-session.jsonl"), atomically: true, encoding: .utf8)
+
+        // A usage claim this build cannot trust: it reports more cached input
+        // than input. That file is genuinely unusable — the other one is not.
+        try (#"{"timestamp":"2026-07-30T10:00:00Z","type":"session_meta","payload":{"id":"fabricated-broken-session"}}"# + "\n"
+            + #"{"timestamp":"2026-07-30T10:00:01Z","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":10,"cached_input_tokens":9999,"output_tokens":50,"reasoning_output_tokens":10}}}}"# + "\n")
+            .write(to: root.appendingPathComponent("unreadable-session.jsonl"), atomically: true, encoding: .utf8)
+
+        let result = await CodexLocalActivitySource(sessionsRoot: root)
+            .scan(bounds: LocalActivityScanBounds())
+
+        XCTAssertEqual(result.status, .readable)
+        XCTAssertEqual(result.requests.count, 1)
+        XCTAssertEqual(result.requests.first?.tokens.totalTokens, 150)
+    }
+
+    /// Isolation must not become silence. A root whose every file fails is still
+    /// unreadable, and must stay distinguishable from a valid empty root.
+    func testRootWhereEveryFileFailsStaysUnsafeToRead() async throws {
+        let root = try makeIsolatedRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try (#"{"timestamp":"2026-07-30T10:00:00Z","type":"session_meta","payload":{"id":"fabricated-broken-session"}}"# + "\n"
+            + #"{"timestamp":"2026-07-30T10:00:01Z","type":"event_msg","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":10,"cached_input_tokens":9999,"output_tokens":50,"reasoning_output_tokens":10}}}}"# + "\n")
+            .write(to: root.appendingPathComponent("unreadable-session.jsonl"), atomically: true, encoding: .utf8)
+
+        let result = await CodexLocalActivitySource(sessionsRoot: root)
+            .scan(bounds: LocalActivityScanBounds())
+
+        XCTAssertEqual(result.status, .unsafeToRead)
+        XCTAssertTrue(result.requests.isEmpty)
+    }
+
+    private func makeIsolatedRoot() throws -> URL {
+        let root = URL(fileURLWithPath: "/private/tmp", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        return root
+    }
+}
