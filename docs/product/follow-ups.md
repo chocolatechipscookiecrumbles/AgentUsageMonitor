@@ -492,6 +492,20 @@ plan: [Codex local-activity recovery](../superpowers/plans/2026-07-31-codex-loca
 diagnosis remain open: the `CODEX_HOME` discovery gap, and `parent_thread_id`
 forks (196 sessions) being silently over-counted.
 
+**Second defect, same symptom, fixed 2026-08-12.** The 2026-08-04 fix repaired
+the parse stage only. The live root still reported `.unsafeToRead` with 0
+requests while **all 295 files parsed and 0 were skipped** — the failure had
+moved one stage down, into reconciliation. `LocalActivityTokenBreakdown` applied
+`cached <= input` and `reasoning <= output` to a reconciled **delta**, but those
+are properties of Codex's cumulative snapshots and do not survive subtraction:
+when a turn reuses a large cached prefix, cached grows by far more than the total
+does. Exactly **one** delta in 17,304 violated it, and because the throw was not
+isolated to its session it blanked the entire root. Both halves are now fixed —
+the invariant is correct for deltas, and a session that cannot be reconciled is
+skipped and counted rather than aborting the scan, with a root whose every
+session fails still reporting `.unsafeToRead`. Live root: `.readable`, 17,304
+requests across 295 files. **Signed-app acceptance is unobserved.**
+
 Problem
 
 Codex has been used locally, but its Token Monitor can remain without local token
