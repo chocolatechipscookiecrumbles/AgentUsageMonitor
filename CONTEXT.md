@@ -131,7 +131,7 @@ Authentication owned by an external agent provider or its official client, which
 _Avoid_: App login, stored credential, connected agent
 
 **Paired Agent**:
-A Supported Agent that has completed this app's connection process at least once and remains known to the app across active, inactive, connected, and disconnected states. Pairing history is retained indefinitely in the current product model.
+A Supported Agent that the user has explicitly connected to this app at least once and that remains known across active, inactive, connected, and disconnected states. Detecting an existing Provider Session never pairs an agent by itself; pairing history is retained indefinitely in the current product model.
 _Avoid_: Connected agent, active agent, planned agent
 
 **Active Agent**:
@@ -177,6 +177,10 @@ _Avoid_: Default icon mode, selected-agent view
 **Multi-Agent Menu Bar Mode**:
 A planned menu-bar presentation that renders progress for multiple agents. Single-agent selection and failover rules do not govern this mode; their controls are provisionally disabled while their stored values are preserved.
 _Avoid_: Dual quota view, automatic failover view
+
+**Onboarding Acknowledgement**:
+The app-local record that the current first-run tour was completed, skipped, or closed. It never pairs or activates an agent.
+_Avoid_: Setup complete, connected, paired
 
 ## Local Token Activity
 

@@ -3,6 +3,9 @@ import SwiftUI
 struct MenuActionFooter: View {
     @ObservedObject var settings: AppSettings
     let isRefreshing: Bool
+    /// False on a connect-only tab: there is nothing to refresh, and the row
+    /// must read as unavailable rather than quietly enrolling the provider.
+    var isRefreshEnabled = true
     let refresh: () -> Void
     let openNotificationSettings: () -> Void
     let openPreferences: () -> Void
@@ -23,7 +26,7 @@ struct MenuActionFooter: View {
                     shortcut: shortcut(.refresh),
                     action: refresh
                 )
-                .disabled(isRefreshing)
+                .disabled(isRefreshing || !isRefreshEnabled)
 
                 MenuActionRow(
                     "Notification Settings",

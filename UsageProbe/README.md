@@ -61,6 +61,14 @@ can fail to publish local usage, Claude setup can require unclear extra recovery
 and first-launch provider consent is not explicit enough. Follow-ups 11–12 retain
 unknown causes; Follow-up 13 records the requested policy that a fresh installation
 start both providers app-locally disconnected and require separate Connect actions.
+
+Follow-up 13 is implemented (unreleased, 2026-08-04): both providers start
+app-locally unenrolled, each requires its own explicit Connect before any account
+check, quota refresh, or local read, and an existing provider CLI session never
+enrolls anything. Upgrading from 0.0.1 therefore requires reconnecting once,
+without either provider CLI being signed out. A dismissible three-page first-run
+tour ships alongside it and connects nothing. Automated coverage passes; signed-app
+visual acceptance is **not yet done**. See `docs/development/operating-notes.md`.
 No probe, connection, or local-activity fix is claimed.
 
 Refresh behavior correction — 2026-07-18: the picker no longer offers one minute; its shortest fixed choice is **1 minute 30 seconds**, and a persisted legacy `one-minute` selection normalizes to that value. **Refresh on wake** is a persisted switch that defaults enabled. Opening the native menu never starts a refresh, timer, polling loop, retry loop, or second scheduler; use **Refresh now** for an explicit manual collection.

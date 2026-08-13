@@ -162,10 +162,47 @@ By default, the gauge icon appears in the menu bar with the most-consumed quota 
 
 The **Claude** tab shows Claude's five-hour and weekly windows with the shared-pool caveat that weekly usage is shared with Claude chat, a `Read from: <source>` provenance caption beneath the cards (its capture time is the header's freshness line), and a staleness strip when the read is not live. When Claude has no reading, the tab shows an explicit unavailable state offering **Use Claude Code credentials…**; browser sign-in stays shelved as unverified, and no Codex credit or collector furniture appears on this tab.
 
-**Planned first-launch connection policy:** a future release will deliberately
-start Codex and Claude app-locally disconnected on a fresh installation and require
-a separate Connect action for each provider before quota collection. Version 0.0.1
-does not yet enforce this consent boundary consistently.
+### First launch and provider enrollment (post-0.0.1, unreleased)
+
+Both providers now start app-locally **unenrolled**. Nothing about a provider is
+read — no account check, no quota refresh, no local file observer or scan, no
+notification evaluation — until you press that provider's **Connect** button.
+An existing Codex or Claude CLI session does not enroll anything; 0.0.1's
+behavior of adopting whatever session it found is the defect this replaces.
+
+- Consent lives in `provider.enrollment.codex` / `provider.enrollment.claude-code`
+  (`notRequested` / `enabled` / `disabled`), and is written only by an explicit
+  Connect or Disconnect. Reading it never writes a default.
+- **Upgrading from 0.0.1 means reconnecting once.** That build stored no key
+  distinguishing a deliberate choice from an incidental CLI session, so its
+  `codex.disconnected` / `claude.disconnected` values are not migrated as
+  consent — they are removed. Neither provider CLI is signed out or altered.
+- An unenrolled tab shows its header (`Not connected`), one Connect card, and the
+  shared footer. No quota, cached strip, Token Monitor, recovery card, or
+  notification strip appears, and the footer's **Refresh Now** is disabled rather
+  than silently enrolling the provider. Its Settings page mirrors this.
+- Codex and Claude are fully independent: connecting, disconnecting, failing, or
+  refreshing one never touches the other.
+- **Disconnect** stops that provider's owners and purges its app-owned derived
+  Token Monitor cache, leaving the provider CLI's own credential intact.
+
+A dismissible three-page tour appears on first launch (welcome, connect only what
+you use, local and private). Its bottom row is: back arrow, three-dot page
+indicator, forward arrow, and a trailing **Dismiss**. Left/Right arrows page
+through it, Escape dismisses. Dismissing, closing the window, and reaching the
+last page all record the same acknowledgement (`onboarding.acknowledgedVersion`)
+and **connect nothing**; a relaunch does not show it again. Re-open it for visual
+inspection with `--show-onboarding-preview`, which presents the window without
+writing acknowledgement, changing enrollment, or starting any provider work.
+
+Its three imagesets (`OnboardingWelcome`, `OnboardingProviders`,
+`OnboardingPrivacy`) live in the untracked asset catalog like `AppIcon`, so they
+are supplied out of band. When an imageset is missing the tour renders a neutral
+placeholder region and stays legible — that placeholder is not shippable art.
+
+**Verification status:** automated coverage passes; the tour window, connect-only
+tabs, and every enrollment transition are **not yet visually accepted** in a
+signed build.
 
 When the app cannot confirm a Codex account, the Codex tab shows a connection card instead of quota controls:
 

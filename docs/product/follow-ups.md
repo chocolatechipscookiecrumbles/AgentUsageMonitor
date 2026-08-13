@@ -528,9 +528,10 @@ Acceptance
 
 ## 12. Claude setup is not a dependable first-run flow
 
-**Status:** **Needs diagnosis and interaction plan.** The user reported the
-published setup as problematic, but the exact failed step has not yet been captured
-well enough to claim a root cause.
+**Status:** **Planned with a capability gate.** The user reported the published
+setup as problematic, but the exact failed step has not yet been captured well
+enough to claim a root cause. Follow the
+[Claude delegated OAuth and setup plan](../superpowers/plans/2026-07-31-claude-delegated-oauth-and-setup.md).
 
 Problem
 
@@ -565,7 +566,16 @@ Acceptance
 
 ## 13. First launch should require explicit connection for both providers
 
-**Status:** **Needs plan.** Requested connection-policy hardening after 0.0.1.
+**Status:** **Implemented, verification open.** The
+[first-launch and provider-enrollment plan](../superpowers/plans/2026-07-31-first-launch-and-provider-enrollment.md)
+is implemented (Tasks 1–4, 2026-08-04) inside the
+[next-release delivery sequence](../superpowers/plans/2026-07-31-next-release-setup-and-provider-reliability.md).
+`ProviderEnrollmentStore` owns app-local consent; both providers start
+`.notRequested`, each gates its own account/quota/local owners, and a 0.0.1
+upgrade reconnects once without either CLI being signed out. Automated coverage
+passes (335 tests, 0 failures). **Signed-app visual, keyboard, VoiceOver,
+Light/Dark, and provider-switch acceptance is unobserved**, and the three
+onboarding images have not been supplied — both are release blockers.
 
 Problem
 
@@ -598,9 +608,13 @@ Acceptance
 * reconnect after an app-local disconnect remains explicit, while upgrades preserve
   a previously established app-level connection unless a migration plan says
   otherwise
-* connection state and Token Monitor collection remain separate; whether local
-  activity should be visible before quota connection is an explicit product choice,
-  not an accidental authentication side effect
+* the first post-0.0.1 migration deliberately treats legacy inferred availability
+  as not connected because 0.0.1 stored no explicit app-level consent; it never logs
+  either provider CLI out
+* before a provider's Connect action, its Token Monitor does not read or display
+  local records; after that explicit enrollment, connection state and Token Monitor
+  collection remain separate so a quota-login failure does not masquerade as a local
+  read failure
 
 ⸻
 

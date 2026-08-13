@@ -6,11 +6,19 @@ struct AgentsSettingsView: View {
     // `AgentSettingsPageTemplate` captures its content once, freezing the
     // subtree; rebuilding this container is what actually refreshes the chips.
     @ObservedObject var settings: AppSettings
+    /// Observed for the same reason as `settings`: the captured template
+    /// subtree only refreshes when this container rebuilds, and connecting has
+    /// to swap the page from connect-only to operational.
+    @ObservedObject var enrollment: ProviderEnrollmentStore
     let selectedAgent: AgentProvider
 
     var body: some View {
         AgentSettingsPageTemplate {
             switch selectedAgent {
+            case .codex where isConnectOnly:
+                AgentConnectSettingsView(provider: .codex, connect: viewModel.connectCodex)
+            case .claudeCode where isConnectOnly:
+                AgentConnectSettingsView(provider: .claudeCode, connect: viewModel.connectClaude)
             case .codex:
                 CodexAgentSettingsView(
                     settings: viewModel.settings,
@@ -43,5 +51,9 @@ struct AgentsSettingsView: View {
                 EmptyView()
             }
         }
+    }
+
+    private var isConnectOnly: Bool {
+        viewModel.runtimePolicy(for: selectedAgent).showsConnectOnly
     }
 }

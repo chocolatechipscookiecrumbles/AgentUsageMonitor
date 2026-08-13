@@ -5,6 +5,14 @@ struct MenuProviderHeaderPresentation {
     let subtitle: String
     let status: MenuPopoverStatus
 
+    /// The header for a provider the user has not enrolled. It reports the
+    /// app's own state and reads nothing: no account probe, no cached quota, no
+    /// plan hint. The title stays the provider name because there is no account
+    /// to name yet.
+    static func connectOnly(provider: AgentProvider) -> Self {
+        Self(title: provider.tabTitle, subtitle: "Not connected", status: .unavailable)
+    }
+
     static func codex(
         displayState: QuotaDisplayState,
         connectionState: AgentConnectionState,

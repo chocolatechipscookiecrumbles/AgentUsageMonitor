@@ -17,6 +17,9 @@ final class QuotaMonitor: ObservableObject {
     private let diagnostics: RefreshDiagnosticsStore
     private let interruptionStore: RefreshInterruptionStore
     private let settings: AppSettings
+    /// The consent gate. Codex quota work runs only while this reports
+    /// `.enabled`; the monitor never infers permission from a CLI session.
+    private let enrollment: ProviderEnrollmentStore
     private let notifier: QuotaNotifier?
     private var refreshTask: Task<Void, Never>?
     private var refreshTimer: Timer?
@@ -31,12 +34,14 @@ final class QuotaMonitor: ObservableObject {
         repository: QuotaRepository = QuotaRepository(),
         diagnostics: RefreshDiagnosticsStore = RefreshDiagnosticsStore(),
         interruptionStore: RefreshInterruptionStore = RefreshInterruptionStore(),
-        settings: AppSettings
+        settings: AppSettings,
+        enrollment: ProviderEnrollmentStore
     ) {
         self.repository = repository
         self.diagnostics = diagnostics
         self.interruptionStore = interruptionStore
         self.settings = settings
+        self.enrollment = enrollment
         interruptionState = interruptionStore.load()
         notifier = Bundle.main.bundleURL.pathExtension == "app" ? QuotaNotifier(settings: settings) : nil
         let initialRecord = QuotaRecord.withoutForecasts(.unavailable("Codex quota unavailable. Refresh after signing in to Codex."))
@@ -73,7 +78,8 @@ final class QuotaMonitor: ObservableObject {
             .sink { [weak self] _ in
                 self?.refreshModeChanged()
             }
-        disconnectSubscription = settings.$codexDisconnected
+        disconnectSubscription = enrollment.$states
+            .map { ($0[.codex] ?? .notRequested) != .enabled }
             .removeDuplicates()
             .dropFirst()
             .sink { [weak self] disconnected in
@@ -129,8 +135,9 @@ final class QuotaMonitor: ObservableObject {
     }
 
     func refresh(reason: RefreshReason) {
-        // App-local disconnect hides Codex usage without reading the CLI.
-        guard !settings.codexDisconnected else {
+        // No explicit enrollment means no read, whatever the trigger was:
+        // launch, wake, schedule, manual, or an authentication transition.
+        guard enrollment.isEnabled(.codex) else {
             applyDisconnectedState()
             return
         }
