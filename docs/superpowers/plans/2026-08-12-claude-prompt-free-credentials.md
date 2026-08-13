@@ -46,11 +46,51 @@ From [claude-keychain-grant-durability.md](../../development/claude-keychain-gra
 
 **Consequence for design:** P3 and P4 both require a working passive tier. [Task 2 of the durability plan](2026-08-12-claude-usage-source-durability.md#task-2--revive-the-passive-status-line-tier-as-a-first-class-keychain-free-source) is therefore a hard prerequisite of this plan, not a parallel nicety.
 
-## Why not a self-run OAuth flow
+## How comparable projects fetch Claude usage
 
-The [July spike](2026-07-21-claude-oauth-web-login-spike-findings.md) got an authorize response only by sending **Claude Code's own public `client_id`**. Rejected here for three independent reasons: the delegated-OAuth plan forbids reusing that client ID; the consent screen would name Claude Code while a different application receives the token, which misrepresents the grant to the user at the exact moment they authorize it; and it would require this app to run its own `/v1/oauth/token` exchange, which the shipped design has never done. It is also unproven — the exchange itself was never observed, having been IP-throttled at 429.
+Reviewed 2026-08-13 by reading the sources at `main` of the two neighbouring projects already recorded in [RESOURCES.md](../../../RESOURCES.md). This changes the plan's conclusions, so it is recorded before them.
 
-`claude setup-token` has Claude Code run its own flow under its own identity and hand back a token meant to be given to another tool. Truthful consent, no impersonation, no exchange of ours.
+### Both agree with our tier-1 contract
+
+| | CodexBar (Swift, macOS menu bar) | Token Monitor (Electron, cross-platform) |
+|---|---|---|
+| Usage endpoint | `GET https://api.anthropic.com/api/oauth/usage` | same constant |
+| Headers | Bearer, `anthropic-beta`, `claude-code` User-Agent | same |
+| Credential source | Claude Code's Keychain item | `~/.claude/.credentials.json` first, Keychain second |
+| macOS Keychain read | Security framework | spawns `security find-generic-password -s "Claude Code-credentials" -w` |
+| Windows | — | `wincred` via `advapi32` |
+| Own token refresh | **Yes** — `POST https://platform.claude.com/v1/oauth/token` | **Yes** — `POST https://console.anthropic.com/v1/oauth/token` |
+| Client ID | `9d1c250a-…` (Claude Code's public client, env-overridable) | `9d1c250a-…` (same, hard-coded) |
+
+Our endpoint, headers, and credential shape match both independent implementations, so tier 1 is not where our divergence lies.
+
+### CodexBar tried the `security` CLI read and turned it off
+
+`ClaudeOAuthCredentials+SecurityCLIReader.swift` implements the same `security` CLI read Token Monitor relies on, behind a `.securityCLIExperimental` strategy. It is **force-disabled**: `ClaudeOAuthKeychainReadStrategyPreference.current()` coerces `.securityCLIExperimental` back to `.securityFramework`, so even an explicitly stored preference cannot select it. Their own note gives the reason — `security` can prompt too.
+
+**Consequence for us:** shelling out to `security` is not a way around the ACL, and a comparable project has already paid to learn that. Do not spend a task on it.
+
+### CodexBar treats the Keychain prompt as a first-class, gated event
+
+It carries `ClaudeOAuthKeychainAccessGate`, `KeychainPromptMode`, `KeychainPreAlertGate`, `DirectKeychainReadConsent`, and `KeychainQueryTiming` — a **pre-alert shown before the system dialog**, an explicit consent record, and prompt-mode gating. That is the same shape as this plan's prompt contract, arrived at independently, which is corroboration that *bounding* the prompt is the realistic goal for a borrowed credential rather than eliminating it. It also carries `ClaudeOAuthUsageRateLimitGate`, the counterpart of our 429 back-off.
+
+### CodexBar has a third option we had not considered: delegated refresh
+
+`ClaudeOAuthDelegatedRefreshCoordinator` exchanges nothing. It **touches the Claude CLI so Claude Code refreshes its own token**, then confirms success by observing the Keychain item's fingerprint change. It carries cooldowns (5 min default, 20 s after a soft failure), in-flight joining so concurrent callers share one attempt, and prompt-policy gating.
+
+This needs no client ID, no exchange, and no impersonation — and it deliberately causes exactly the credential rewrite our Task 0 sampler waited four and a half hours to observe naturally and never saw.
+
+## The token-exchange question, reopened
+
+The [July spike](2026-07-21-claude-oauth-web-login-spike-findings.md) was shelved after the exchange returned persistent 429s and was never once observed succeeding. The review above shows the approach is not infeasible — **two shipping projects perform it** — so "unproven" described our single attempt, not the method.
+
+**A distinction the earlier analysis missed, and it matters.** Both projects use the **`refresh_token` grant**, starting from a refresh token Claude Code already obtained and stored. Neither runs an authorize step. Our spike was blocked on the **`authorization_code` grant** — the initial exchange following a browser consent screen. Different requests, different objections:
+
+- The consent-screen objection — "the screen would name Claude Code while a different app receives the token" — applies **only to the authorization step**. A refresh-token exchange opens no browser and shows no consent screen, so that objection does not carry over. The earlier draft of this plan applied it to both. That was wrong.
+- The delegated-OAuth constraint is written as "never reuses Claude Code's OAuth client ID **in its own authorization request**". Refreshing a token Claude Code already holds is arguably not an authorization request. That is a judgement call for the maintainer, and this plan should not quietly decide it either way.
+- What a refresh **does not** do is make the credential ours. It extends a borrowed one, so it does not deliver P5 and does not remove the Keychain read. Its real value is against **D5** (the expiring borrowed token) and independence from whether Claude Code has run recently.
+
+`claude setup-token` remains the only route to a genuinely app-owned credential and therefore the only route to P5, so it stays as Task 1 — but it is no longer presented as the sole survivor of a field of rejected options. Task 1b re-tests what was never actually tried.
 
 ---
 
@@ -63,7 +103,7 @@ It sounds like it would fix everything — read once with a prompt, then read ou
 1. **It does not actually work.** Claude Code rotates that token frequently (`mdat` moves constantly). A mirrored copy goes stale within hours, returns 401, and we are back at the borrowed item needing a fresh read — the prompt is postponed, not removed.
 2. **It costs a privacy commitment for that non-fix.** The README, the app's Data & Privacy page, and the release notes all currently state that the app reads Claude Code's credential and never copies it. Mirroring makes those statements false and requires changing all three.
 
-The durable answer to the same desire is method A, which gets a token that is genuinely ours. If you disagree, say so and I will design the mirroring path with the disclosure changes it requires.
+The durable answer to the same desire is method A, which gets a token that is genuinely ours. Task 1b's delegated refresh is the cheaper partial answer: it keeps the credential where it is and lets Claude Code renew it, which addresses the staleness that mirroring was reaching for without copying anything. If you disagree, say so and I will design the mirroring path with the disclosure changes it requires.
 
 ---
 
@@ -103,6 +143,21 @@ The durable answer to the same desire is method A, which gets a token that is ge
 - [ ] **Step 3: Validate once, then prove it survives relaunch.** One typed usage request; retain only HTTP status and non-secret window presence. Store it, terminate the app, relaunch, and perform one **non-prompting** read. That read succeeding is the direct proof of P5.
 - [ ] **Step 4: Decide by explicit gate.** Accept only if validation, relaunch read, and clean deletion all succeed. Otherwise leave method A unavailable in the UI and record why.
 - [ ] **Step 5: Write the capability record** — Run / Observed / Not run, accepted path, exact CLI version, non-secret statuses, and why any rejected path stays unavailable.
+
+## Task 1b — Re-test the token exchange instead of shelving it
+
+The July spike is **not** removed. It was one attempt against one host that never returned anything but 429, which is not a verdict. Two shipping projects perform this exchange, so the question is which variant works here.
+
+Run these in order and stop at the first that succeeds — each is cheaper and less contested than the one after it.
+
+- [ ] **Step 1: Delegated refresh first — no exchange at all.** Reproduce CodexBar's approach: touch the Claude CLI so **Claude Code** refreshes its own token, then confirm by observing the Keychain item's `mdat`/fingerprint change. No client ID, no token endpoint, no impersonation, and nothing this repository's constraints prohibit. Carry over their hard-won details: a cooldown (5 min default, ~20 s after a soft failure), in-flight joining so concurrent callers share one attempt, and never touching from a non-user-initiated path without the cooldown.
+  - This doubles as the **Task 0 experiment we could not run**: a deliberate credential rewrite, immediately followed by a non-prompting read. If the grant dies exactly there, the recurring-prompt cause is identified in one shot.
+- [ ] **Step 2: Retry the `refresh_token` exchange against the untried host.** Our spike only ever hit `console.anthropic.com/v1/oauth/token`. CodexBar uses `platform.claude.com/v1/oauth/token`. Send **one** `POST`, form-encoded, `grant_type=refresh_token` + `refresh_token` + `client_id`, using the refresh token already in Claude Code's Keychain item.
+  - **One attempt only.** The spike established that retrying re-arms the cooldown; treat a 429 as "wait much longer", never as "try again shortly". Record status only.
+  - A 200 here answers a question open since July. A 429 or 4xx is also an answer — record which, and stop.
+- [ ] **Step 3: Only if both fail, revisit the `authorization_code` flow.** This is the one carrying the real consent-screen objection, because the browser page would name Claude Code while this app receives the token. Do not run it without an explicit decision recorded against the delegated-OAuth plan's client-ID constraint.
+- [ ] **Step 4: Record the outcome as evidence, not as a recommendation.** Extend the spike findings document with Run / Observed / Not run for each step: exact host, grant type, HTTP status, and whether the Keychain item changed. No token, refresh token, authorization code, or callback URL may appear — the spike's own security note is the standard to meet.
+- [ ] **Step 5: State what it does and does not buy.** A working refresh extends a **borrowed** credential. It helps D5 and removes the dependency on Claude Code having run recently. It does **not** deliver P5 and does not remove the Keychain read, and the plan must not imply otherwise.
 
 ## Task 2 — Correct the app-owned Keychain boundary
 
@@ -146,4 +201,5 @@ The existing store is not fit to hold a primary credential.
 - **The lapse cause is still unknown.** This plan is deliberately designed not to need the answer: method A removes the cross-app read, and P1–P4 bound method B's behaviour either way. Task 0's sampler continues independently.
 - **Method A depends on an ungated interface.** If the capability gate rejects `setup-token`, P5 is unavailable this release and the honest outcome is P1–P4 plus a working passive tier. That limitation must then be stated in the README, Data & Privacy page, and release notes rather than left implied.
 - **P3 and P4 require the passive tier**, which is currently dead. Durability-plan Task 2 must land first or these degrade to "silent, but with no data".
+- **The exchange question is open, not closed.** Task 1b re-tests what the July spike never actually reached. A working refresh would not deliver P5; it extends a borrowed credential rather than creating an app-owned one.
 - **Compilation is not acceptance.** Every prompt-behaviour claim requires the signed app; unit tests can only prove which policy was requested, not what macOS did.
