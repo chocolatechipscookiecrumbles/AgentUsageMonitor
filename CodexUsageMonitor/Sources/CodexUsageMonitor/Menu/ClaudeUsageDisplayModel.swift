@@ -62,9 +62,14 @@ struct ClaudeUsageDisplayModel {
         capturedAtText = RelativeTimeText.text(from: snapshot.capturedAt, to: now)
         isLive = presentation.delivery == .live
         creditsUsedText = Self.creditsUsed(snapshot.extraUsage)
+        // Prefer the collector's specific cause over the generic sentence. A
+        // refresh that produced no live reading should say *why* — rate limited,
+        // Keychain denied, credential rejected — so the user knows whether to
+        // wait or to act, instead of pressing a button that appears inert.
         stalenessNotice = presentation.delivery == .live
             ? nil
-            : "Live usage is temporarily unavailable; showing the last result."
+            : presentation.warnings.first
+                ?? "Live usage is temporarily unavailable; showing the last result."
     }
 
     /// Spend, optionally against its cap. Never phrased as remaining.

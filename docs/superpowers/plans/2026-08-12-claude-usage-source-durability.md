@@ -99,15 +99,15 @@ The point of this task is to replace a guess with a fact. Do not implement a wor
 
 ## Task 1 — Make an explicit Refresh always perform a real read
 
-Ships independently of Task 0's conclusion. This is the reported bug.
+Ships independently of Task 0's conclusion. This is the reported bug. **Implemented 2026-08-12 on `fix/claude-refresh-defects`; 6 regressions, 5 of which fail against the previous build.**
 
-- [ ] **Step 1: Reproduce D1.** In `ClaudeRefreshDefectTests`, drive the collector with a stubbed source that returns `rateLimited(retryAfter: now + 15m)`, then call `refresh(reason: .userInitiated)` and assert the stub **was** asked again. Fails today.
-- [ ] **Step 2: Reproduce D2.** Start a `.scheduled` refresh against a source suspended on a continuation, call `refreshNow(reason: .userInitiated)` while it is in flight, then release it. Assert a user-initiated read reached the source. Fails today.
-- [ ] **Step 3: Condition the back-off on reason.** `.userInitiated` bypasses `oauthBackoffUntil`. Guard the bypass with its own minimum interval (proposal: at most one bypassing read per 60 seconds, and at most 5 within the back-off window) so a held-down button cannot compound a 429. A bypass that is itself refused must return a **stated** result — "Rate limited by Anthropic until HH:MM · showing last reading" — never a silent fall-through.
-- [ ] **Step 4: Replace the drop with supersede.** `refreshNow` must not discard a user action. When a refresh is in flight and a `.userInitiated` request arrives, cancel or await the in-flight read and then run the user-initiated one; a second `.scheduled` request while busy still coalesces. Preserve the existing rule that a late result cannot overwrite a newer state.
-- [ ] **Step 5: Make the no-op visible.** Any Refresh that ends without a live reading publishes one specific reason — backed off, Keychain denied, credential absent, credential rejected, offline, no source — with one verb-labelled action. A pressed button that changes nothing on screen is itself the defect.
-- [ ] **Step 6: Reconcile D3.** The CLI probe reports which tier served and whether the app's back-off would have applied, so the app and the CLI can no longer disagree without saying why. The CLI's independent back-off state stays acceptable and is documented, not hidden.
-- [ ] **Step 7: Verify.** Run the new regressions and the full existing Claude suite.
+- [x] **Step 1: Reproduce D1.** In `ClaudeRefreshDefectTests`, drive the collector with a stubbed source that returns `rateLimited(retryAfter: now + 15m)`, then call `refresh(reason: .userInitiated)` and assert the stub **was** asked again. Fails today.
+- [x] **Step 2: Reproduce D2.** Start a `.scheduled` refresh against a source suspended on a continuation, call `refreshNow(reason: .userInitiated)` while it is in flight, then release it. Assert a user-initiated read reached the source. Fails today.
+- [x] **Step 3: Condition the back-off on reason.** `.userInitiated` bypasses `oauthBackoffUntil`. Guard the bypass with its own minimum interval (proposal: at most one bypassing read per 60 seconds, and at most 5 within the back-off window) so a held-down button cannot compound a 429. A bypass that is itself refused must return a **stated** result — "Rate limited by Anthropic until HH:MM · showing last reading" — never a silent fall-through.
+- [x] **Step 4: Replace the drop with supersede.** `refreshNow` must not discard a user action. When a refresh is in flight and a `.userInitiated` request arrives, cancel or await the in-flight read and then run the user-initiated one; a second `.scheduled` request while busy still coalesces. Preserve the existing rule that a late result cannot overwrite a newer state.
+- [x] **Step 5: Make the no-op visible.** Any Refresh that ends without a live reading publishes one specific reason — backed off, Keychain denied, credential absent, credential rejected, offline, no source — with one verb-labelled action. A pressed button that changes nothing on screen is itself the defect.
+- [x] **Step 6: Reconcile D3.** The CLI probe reports which tier served and whether the app's back-off would have applied, so the app and the CLI can no longer disagree without saying why. The CLI's independent back-off state stays acceptable and is documented, not hidden.
+- [x] **Step 7: Verify.** Run the new regressions and the full existing Claude suite.
 
 ---
 

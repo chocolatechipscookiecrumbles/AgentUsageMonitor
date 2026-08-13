@@ -94,6 +94,10 @@ final class ClaudeConnectionController: ObservableObject {
         // OAuth-layer failures surface here too.
         if let oauthError = error as? ClaudeOAuthError {
             switch oauthError {
+            case .credentialAccessDenied:
+                // The credential exists; macOS refused this app's read. That is
+                // the Keychain recovery path, not the reconnect-from-scratch one.
+                return .failed(.keychainAccessDenied)
             case .credentialsNotFound, .unauthorized, .insufficientScope:
                 return .failed(.credentialsNotFound)
             case .malformedResponse, .serverFailure, .rateLimited, .transportError:

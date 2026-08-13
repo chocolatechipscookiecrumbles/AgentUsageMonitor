@@ -35,6 +35,12 @@ enum ClaudeUsageProbeCommand {
         let ranAt: Date
         /// Which tier-1 credential method served, if any — never the token.
         let tier1Method: String?
+        /// Why this probe can succeed at the same moment the app degrades.
+        /// The probe is a separate process, so it starts with no rate-limit
+        /// back-off state and its user-initiated read goes straight to the
+        /// Keychain. A disagreement between the two is expected here and is
+        /// stated rather than left for the reader to infer.
+        let processNote: String
         let layers: [Layer]
         let coordinatorResult: Coordinator
     }
@@ -113,7 +119,14 @@ enum ClaudeUsageProbeCommand {
             warnings: presentation.warnings
         )
 
-        let report = Report(ranAt: .now, tier1Method: tier1Method, layers: layers, coordinatorResult: coordinator)
+        let report = Report(
+            ranAt: .now,
+            tier1Method: tier1Method,
+            processNote: "Separate process: no rate-limit back-off state is carried over from the app, "
+                + "and this read is user-initiated, so it may reach the Keychain when an app refresh would not.",
+            layers: layers,
+            coordinatorResult: coordinator
+        )
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
