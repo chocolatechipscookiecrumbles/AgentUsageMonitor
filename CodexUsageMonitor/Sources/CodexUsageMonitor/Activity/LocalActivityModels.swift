@@ -32,9 +32,17 @@ struct LocalActivityTokenBreakdown: Sendable, Equatable, Codable {
         let normalizedTotal: Int64
         switch provider {
         case .codex:
+            // Codex reports cumulative session totals, so every breakdown this
+            // app builds for it holds a *delta* between two of those snapshots
+            // — or a sum of such deltas. `cached <= input` and
+            // `reasoning <= output` are properties of a cumulative snapshot and
+            // do not survive subtraction: when a turn reuses a large cached
+            // prefix, cached can grow by far more than the total does. Enforcing
+            // them here rejected legitimate activity, and because the throw was
+            // not isolated it blanked an entire 295-file root over one record.
+            // Non-negativity is what actually separates a corrupt record from a
+            // valid delta, and it is still enforced above.
             guard cacheCreationTokens == nil,
-                  cachedInputTokens.map({ $0 <= inputTokens }) ?? true,
-                  reasoningOutputTokens.map({ $0 <= outputTokens }) ?? true,
                   let total = Self.sum(inputTokens, outputTokens)
             else { return nil }
             normalizedTotal = total

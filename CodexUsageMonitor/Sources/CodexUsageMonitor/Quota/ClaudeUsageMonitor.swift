@@ -33,6 +33,9 @@ final class ClaudeUsageMonitor: ObservableObject {
     /// Refresh Preferences takes effect without restarting the monitor.
     private let pollInterval: @MainActor () -> Duration
     private var pollTask: Task<Void, Never>?
+    /// The refresh currently running, with the reason that started it, so a
+    /// user action can tell whether waiting for it is enough.
+    private var inFlight: (task: Task<Void, Never>, reason: ClaudeRefreshReason)?
 
     init(
         collector: ClaudeUsageCollecting = ClaudeUsageCollector(
@@ -106,15 +109,40 @@ final class ClaudeUsageMonitor: ObservableObject {
 
     /// The reason is load-bearing: it decides whether the Keychain read is
     /// allowed to prompt (only `.userInitiated` is).
+    ///
+    /// A refresh already in flight used to make this return immediately. That
+    /// silently discarded the user's press whenever it landed inside a
+    /// scheduled read's network window — no read, no state change, no message —
+    /// and the press was exactly the one refresh permitted to raise the
+    /// Keychain dialog. An automatic refresh still coalesces; a press never
+    /// does.
     func refreshNow(reason: ClaudeRefreshReason) async {
         guard !isDisconnected else { return }
-        guard !isRefreshing else { return }
-        isRefreshing = true
-        defer { isRefreshing = false }
 
-        let presentation = await collector.refresh(reason: reason)
-        state = Self.mapState(presentation)
-        hasCompletedInitialRefresh = true
+        while let existing = inFlight {
+            guard reason == .userInitiated else { return }
+            _ = await existing.task.value
+            // A press already running produces exactly what this press would,
+            // so waiting for it is the whole obligation — starting a second
+            // read would only mean a second permission dialog.
+            if existing.reason == .userInitiated { return }
+            if inFlight?.task == existing.task { inFlight = nil }
+        }
+
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let presentation = await self.collector.refresh(reason: reason)
+            guard !self.isDisconnected else { return }
+            self.state = Self.mapState(presentation)
+            self.hasCompletedInitialRefresh = true
+        }
+        inFlight = (task, reason)
+        isRefreshing = true
+        _ = await task.value
+        if inFlight?.task == task {
+            inFlight = nil
+            isRefreshing = false
+        }
     }
 
     /// Publishes a snapshot obtained outside the automatic hierarchy — the

@@ -61,15 +61,26 @@ actor CodexLocalActivitySource: LocalActivitySource {
                 uniquingKeysWith: { _, latest in latest }
             )
             let baselines = try parentBaselines(in: parsedFiles)
-            let requests = try reconcile(
+            let reconciled = try reconcile(
                 parsedFiles,
                 priorOffsets: priorOffsets,
                 parentBaselines: baselines
             )
+            // Reconciling nothing while some group failed is the same condition
+            // the empty-parse guard above reports: the root holds activity this
+            // build could not interpret. Reporting it as readable-but-empty
+            // would present an unreadable root as an idle one.
+            guard !reconciled.requests.isEmpty || reconciled.skippedGroupCount == 0 else {
+                return LocalActivityScanResult(requests: [], cursors: [], status: .unsafeToRead)
+            }
             let cursors = parsedFiles
                 .map { LocalActivityFileCursor(opaqueFileID: $0.opaqueFileID, nextByteOffset: $0.nextOffset) }
                 .sorted { $0.opaqueFileID < $1.opaqueFileID }
-            return LocalActivityScanResult(requests: requests, cursors: cursors, status: .readable)
+            return LocalActivityScanResult(
+                requests: reconciled.requests,
+                cursors: cursors,
+                status: .readable
+            )
         } catch LocalActivityFileTraversal.TraversalFailure.rootMissing {
             return LocalActivityScanResult(requests: [], cursors: [], status: .localRecordsMissing)
         } catch {
@@ -111,113 +122,156 @@ actor CodexLocalActivitySource: LocalActivitySource {
         return result
     }
 
+    /// What reconciliation produced, and how much of it could not be interpreted.
+    ///
+    /// `skippedGroupCount` exists for the same reason the traversal's
+    /// `skippedFileCount` does: the caller must be able to tell "this root has
+    /// no activity" from "this root has activity this build could not
+    /// reconcile". Collapsing them would let an unreadable root present as an
+    /// empty one.
+    struct ReconcileOutcome {
+        let requests: [LocalActivityRequest]
+        let skippedGroupCount: Int
+    }
+
     private func reconcile(
         _ files: [ParsedFile],
         priorOffsets: [String: Int64],
         parentBaselines: [ParentBaselineKey: Totals]
-    ) throws -> [LocalActivityRequest] {
+    ) throws -> ReconcileOutcome {
         let grouped = Dictionary(grouping: files) {
             $0.metadata?.sessionID ?? "file:\($0.opaqueFileID)"
         }
         var requests: [LocalActivityRequest] = []
+        var skippedGroupCount = 0
 
         for (groupingKey, sessionFiles) in grouped {
-            let metadata = try consistentMetadata(in: sessionFiles)
-            let sessionIdentity = metadata?.sessionID
-            // Every event here shares one session, so the session-independent
-            // ordering identity gives the same deterministic order without
-            // hashing inside the comparator.
-            var decorated: [(file: ParsedFile, event: UsageEvent, orderingKey: String)] = []
-            for file in sessionFiles {
-                for event in file.events {
-                    decorated.append((file, event, event.orderingIdentity))
-                }
-            }
-            decorated.sort { lhs, rhs in
-                lhs.event.timestamp == rhs.event.timestamp
-                    ? lhs.orderingKey < rhs.orderingKey
-                    : lhs.event.timestamp < rhs.event.timestamp
-            }
-            let events: [(ParsedFile, UsageEvent)] = decorated.map { ($0.file, $0.event) }
-
-            guard events.isEmpty || sessionIdentity != nil else {
-                throw CodexLocalActivityFailure.malformedRecord
-            }
-            let inherited: Totals?
-            if let parentID = metadata?.parentSessionID {
-                guard events.isEmpty || metadata?.forkedAt != nil else {
-                    throw CodexLocalActivityFailure.unresolvedFork
-                }
-                if events.isEmpty {
-                    inherited = nil
-                } else {
-                    guard let forkedAt = metadata?.forkedAt,
-                          let baseline = parentBaselines[
-                            ParentBaselineKey(parentID: parentID, forkedAt: forkedAt)
-                          ]
-                    else {
-                        throw CodexLocalActivityFailure.unresolvedFork
-                    }
-                    inherited = baseline
-                }
-            } else {
-                inherited = nil
-            }
-
-            var tracker = TotalsTracker()
-            var remainingInherited = inherited
-            for (file, event) in events {
-                var last = event.last
-                var total = event.total
-                if let inherited {
-                    total = total?.subtractingFloorZero(inherited)
-                    if let rawLast = last, let remaining = remainingInherited {
-                        if total == .zero {
-                            last = rawLast.subtractingFloorZero(remaining)
-                            remainingInherited = remaining.subtractingFloorZero(rawLast)
-                            if remainingInherited == .zero { remainingInherited = nil }
-                        } else {
-                            remainingInherited = nil
-                        }
-                    }
-                }
-
-                guard let delta = try tracker.accept(last: last, total: total) else { continue }
-                if delta == .zero { continue }
-                guard let tokens = LocalActivityTokenBreakdown(
-                    provider: .codex,
-                    inputTokens: delta.input,
-                    cachedInputTokens: delta.cached,
-                    outputTokens: delta.output,
-                    reasoningOutputTokens: delta.reasoning
-                ) else {
-                    throw CodexLocalActivityFailure.invalidReconciledUsage
-                }
-
-                let priorOffset = priorOffsets[file.opaqueFileID] ?? 0
-                guard priorOffset > file.nextOffset || event.lineOffset >= priorOffset else { continue }
-                var requestIdentity = [
-                    "provider",
-                    "codex",
-                ]
-                requestIdentity.append(contentsOf: event.logicalIdentityFields(
-                    sessionKey: sessionIdentity ?? groupingKey
-                ))
-                requestIdentity.append("reconciled-delta")
-                requestIdentity.append(contentsOf: delta.framingFields)
-                requestIdentity.append("reconciled-total")
-                requestIdentity.append(contentsOf: Self.framingFields(for: total))
-                requests.append(LocalActivityRequest(
-                    id: Self.digest(requestIdentity),
-                    provider: .codex,
-                    occurredAt: event.timestamp,
-                    modelID: event.modelID,
-                    tokens: tokens
-                ))
+            // One session that cannot be reconciled — an unresolvable fork,
+            // conflicting metadata, an overflow — says nothing about the other
+            // sessions. Before this boundary existed, a single such group threw
+            // out of the whole scan and blanked every other session's activity.
+            // Cancellation is deliberately not caught: it is not a data defect.
+            do {
+                try reconcileGroup(
+                    groupingKey: groupingKey,
+                    sessionFiles: sessionFiles,
+                    priorOffsets: priorOffsets,
+                    parentBaselines: parentBaselines,
+                    into: &requests
+                )
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                skippedGroupCount += 1
             }
         }
-        return requests.sorted {
-            $0.occurredAt == $1.occurredAt ? $0.id < $1.id : $0.occurredAt < $1.occurredAt
+        return ReconcileOutcome(
+            requests: requests.sorted {
+                $0.occurredAt == $1.occurredAt ? $0.id < $1.id : $0.occurredAt < $1.occurredAt
+            },
+            skippedGroupCount: skippedGroupCount
+        )
+    }
+
+    private func reconcileGroup(
+        groupingKey: String,
+        sessionFiles: [ParsedFile],
+        priorOffsets: [String: Int64],
+        parentBaselines: [ParentBaselineKey: Totals],
+        into requests: inout [LocalActivityRequest]
+    ) throws {
+        let metadata = try consistentMetadata(in: sessionFiles)
+        let sessionIdentity = metadata?.sessionID
+        // Every event here shares one session, so the session-independent
+        // ordering identity gives the same deterministic order without
+        // hashing inside the comparator.
+        var decorated: [(file: ParsedFile, event: UsageEvent, orderingKey: String)] = []
+        for file in sessionFiles {
+            for event in file.events {
+                decorated.append((file, event, event.orderingIdentity))
+            }
+        }
+        decorated.sort { lhs, rhs in
+            lhs.event.timestamp == rhs.event.timestamp
+                ? lhs.orderingKey < rhs.orderingKey
+                : lhs.event.timestamp < rhs.event.timestamp
+        }
+        let events: [(ParsedFile, UsageEvent)] = decorated.map { ($0.file, $0.event) }
+
+        guard events.isEmpty || sessionIdentity != nil else {
+            throw CodexLocalActivityFailure.malformedRecord
+        }
+        let inherited: Totals?
+        if let parentID = metadata?.parentSessionID {
+            guard events.isEmpty || metadata?.forkedAt != nil else {
+                throw CodexLocalActivityFailure.unresolvedFork
+            }
+            if events.isEmpty {
+                inherited = nil
+            } else {
+                guard let forkedAt = metadata?.forkedAt,
+                      let baseline = parentBaselines[
+                        ParentBaselineKey(parentID: parentID, forkedAt: forkedAt)
+                      ]
+                else {
+                    throw CodexLocalActivityFailure.unresolvedFork
+                }
+                inherited = baseline
+            }
+        } else {
+            inherited = nil
+        }
+
+        var tracker = TotalsTracker()
+        var remainingInherited = inherited
+        for (file, event) in events {
+            var last = event.last
+            var total = event.total
+            if let inherited {
+                total = total?.subtractingFloorZero(inherited)
+                if let rawLast = last, let remaining = remainingInherited {
+                    if total == .zero {
+                        last = rawLast.subtractingFloorZero(remaining)
+                        remainingInherited = remaining.subtractingFloorZero(rawLast)
+                        if remainingInherited == .zero { remainingInherited = nil }
+                    } else {
+                        remainingInherited = nil
+                    }
+                }
+            }
+
+            guard let delta = try tracker.accept(last: last, total: total) else { continue }
+            if delta == .zero { continue }
+            guard let tokens = LocalActivityTokenBreakdown(
+                provider: .codex,
+                inputTokens: delta.input,
+                cachedInputTokens: delta.cached,
+                outputTokens: delta.output,
+                reasoningOutputTokens: delta.reasoning
+            ) else {
+                throw CodexLocalActivityFailure.invalidReconciledUsage
+            }
+
+            let priorOffset = priorOffsets[file.opaqueFileID] ?? 0
+            guard priorOffset > file.nextOffset || event.lineOffset >= priorOffset else { continue }
+            var requestIdentity = [
+                "provider",
+                "codex",
+            ]
+            requestIdentity.append(contentsOf: event.logicalIdentityFields(
+                sessionKey: sessionIdentity ?? groupingKey
+            ))
+            requestIdentity.append("reconciled-delta")
+            requestIdentity.append(contentsOf: delta.framingFields)
+            requestIdentity.append("reconciled-total")
+            requestIdentity.append(contentsOf: Self.framingFields(for: total))
+            requests.append(LocalActivityRequest(
+                id: Self.digest(requestIdentity),
+                provider: .codex,
+                occurredAt: event.timestamp,
+                modelID: event.modelID,
+                tokens: tokens
+            ))
         }
     }
 

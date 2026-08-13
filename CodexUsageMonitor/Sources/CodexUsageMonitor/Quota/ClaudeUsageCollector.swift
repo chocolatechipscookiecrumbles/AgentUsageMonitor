@@ -1,6 +1,6 @@
 import Foundation
 
-enum ClaudeRefreshReason: Sendable {
+enum ClaudeRefreshReason: Sendable, Equatable {
     case appLaunch
     case scheduled
     case menuOpened
@@ -50,6 +50,16 @@ actor ClaudeUsageCollector {
     /// Used when a 429 arrives with no `Retry-After` header.
     private static let defaultRateLimitBackoff: TimeInterval = 15 * 60
 
+    /// A press is allowed through the back-off, because a back-off the user
+    /// cannot see or override is indistinguishable from a broken button — the
+    /// read never reaches the Keychain, so not even the permission dialog
+    /// appears. The allowance is bounded so a held-down button still cannot
+    /// compound a 429.
+    private var lastBypassAt: Date?
+    private var bypassCount = 0
+    private static let minimumBypassInterval: TimeInterval = 60
+    private static let maximumBypassesPerWindow = 5
+
     init(
         oauthSource: ClaudeOAuthUsageSource,
         statusLineReader: ClaudeRateLimitSnapshotReader,
@@ -63,19 +73,28 @@ actor ClaudeUsageCollector {
     }
 
     func refresh(reason: ClaudeRefreshReason) async -> ClaudeUsagePresentation {
-        if oauthBackoffUntil.map({ now() >= $0 }) ?? true {
+        // Why this refresh is not returning a live reading. A refresh that ends
+        // without one must say so: a pressed button that changes nothing on
+        // screen and explains nothing is itself the defect being fixed here.
+        var degradeReason: String?
+
+        switch tierOneAttempt(for: reason) {
+        case .suppressed(let notice):
+            degradeReason = notice
+
+        case .attempt:
             do {
                 let snapshot = try await oauthSource.fetch(promptPolicy: reason.keychainPromptPolicy)
-                oauthBackoffUntil = nil
+                clearBackoff()
                 cache.save(snapshot)
                 return ClaudeUsagePresentation(snapshot: snapshot, delivery: .live, warnings: [])
             } catch let error as ClaudeOAuthError {
                 if case .rateLimited(let retryAfter) = error {
                     oauthBackoffUntil = retryAfter ?? now().addingTimeInterval(Self.defaultRateLimitBackoff)
                 }
-                // fall through to the local sources below
+                degradeReason = Self.explanation(for: error, backoffUntil: oauthBackoffUntil)
             } catch {
-                // fall through to the local sources below
+                degradeReason = "Claude usage could not be read just now."
             }
         }
 
@@ -87,13 +106,15 @@ actor ClaudeUsageCollector {
         let statusLine = statusLineReader.readSnapshot().map(adaptStatusLineSnapshot)
         let cached = cache.load()?.snapshot
 
+        let warnings = degradeReason.map { [$0] } ?? []
+
         if let statusLine, cached.map({ statusLine.capturedAt >= $0.capturedAt }) ?? true {
             cache.save(statusLine)
-            return ClaudeUsagePresentation(snapshot: statusLine, delivery: .passiveSnapshot, warnings: [])
+            return ClaudeUsagePresentation(snapshot: statusLine, delivery: .passiveSnapshot, warnings: warnings)
         }
 
         if let cached {
-            return ClaudeUsagePresentation(snapshot: cached, delivery: .cached, warnings: [])
+            return ClaudeUsagePresentation(snapshot: cached, delivery: .cached, warnings: warnings)
         }
 
         return ClaudeUsagePresentation(
@@ -102,7 +123,78 @@ actor ClaudeUsageCollector {
                 source: .oauth, capturedAt: .now, schemaVersion: 1
             ),
             delivery: .cached,
-            warnings: ["No Claude usage source is currently available."]
+            warnings: [degradeReason ?? "No Claude usage source is currently available."]
         )
+    }
+
+    private enum TierOneAttempt {
+        case attempt
+        case suppressed(String)
+    }
+
+    /// Decides whether tier 1 runs, and if not, why — in words the UI can show.
+    ///
+    /// The back-off used to gate every reason equally, so during a 15-minute
+    /// window an explicit Refresh silently skipped the network *and* the
+    /// Keychain. That is the reported bug: no reading, no dialog, no message,
+    /// while the CLI probe — a separate process holding no back-off state —
+    /// worked seconds later.
+    private func tierOneAttempt(for reason: ClaudeRefreshReason) -> TierOneAttempt {
+        guard let until = oauthBackoffUntil, now() < until else {
+            if oauthBackoffUntil != nil { clearBackoff() }
+            return .attempt
+        }
+        // An automatic read must never re-enter the endpoint during a back-off.
+        guard reason == .userInitiated else {
+            return .suppressed(Self.rateLimitNotice(until: until))
+        }
+        guard bypassCount < Self.maximumBypassesPerWindow else {
+            return .suppressed(Self.rateLimitNotice(until: until))
+        }
+        if let lastBypassAt, now().timeIntervalSince(lastBypassAt) < Self.minimumBypassInterval {
+            return .suppressed(Self.rateLimitNotice(until: until))
+        }
+        lastBypassAt = now()
+        bypassCount += 1
+        return .attempt
+    }
+
+    private func clearBackoff() {
+        oauthBackoffUntil = nil
+        lastBypassAt = nil
+        bypassCount = 0
+    }
+
+    private static func rateLimitNotice(until: Date) -> String {
+        "Anthropic is rate-limiting usage reads until \(shortTime(until)). Showing the last reading."
+    }
+
+    private static func shortTime(_ date: Date) -> String {
+        date.formatted(date: .omitted, time: .shortened)
+    }
+
+    /// One specific sentence per failure, so a degraded refresh names its cause
+    /// instead of reporting a generic outage.
+    private static func explanation(for error: ClaudeOAuthError, backoffUntil: Date?) -> String {
+        switch error {
+        case .rateLimited:
+            return backoffUntil.map(rateLimitNotice(until:))
+                ?? "Anthropic is rate-limiting usage reads. Showing the last reading."
+        case .credentialAccessDenied:
+            return "macOS denied access to the Claude Code credential in your Keychain. "
+                + "Reconnect Claude to grant access again."
+        case .credentialsNotFound:
+            return "No Claude Code credential was found. Connect Claude to read live usage."
+        case .insufficientScope:
+            return "The stored Claude credential cannot read usage. Reconnect Claude."
+        case .unauthorized:
+            return "Claude rejected the stored credential. Reconnect Claude."
+        case .serverFailure(let statusCode):
+            return "Claude's usage service returned an error (\(statusCode)). Showing the last reading."
+        case .transportError:
+            return "Could not reach Claude's usage service. Showing the last reading."
+        case .malformedResponse:
+            return "Claude's usage service returned an unexpected response. Showing the last reading."
+        }
     }
 }
