@@ -1,15 +1,21 @@
 # Before going public
 
+> **Historical closeout:** Public publication completed on 2026-07-31. The
+> original repository remains private, the sanitized `AgentUsageMonitor`
+> repository is public, and GitHub Support purged the discarded initialization
+> commit after the final credential-free audit. Ongoing work follows the
+> [public update workflow](public-update-workflow.md).
+
 This is about **the repository**, not the app release. The release checklist lives
 in [releasing-on-github.md](releasing-on-github.md); this file covers what has to
-change around the **AgentUsageMonitor** project. Its current GitHub endpoint remains
-private. Public publication targets a new
+change around the **AgentUsageMonitor** project. The original GitHub endpoint
+remains private. Public publication used a new
 `chocolatechipscookiecrumbles/AgentUsageMonitor` repository rather than changing
 the visibility of the repository that holds the original review and audit history.
 
 Written 2026-07-29 and updated after the verified 0.0.1 publication on 2026-07-31.
-Release-specific signing item 2 is closed; the separate repository-publication
-items remain live unless marked done.
+Release-specific signing and repository-publication items are closed unless an
+item is explicitly recorded as deferred future work.
 
 The authenticated GitHub portion is performed manually using the
 [sanitized-repository publication checklist](manual-publication-checklist.md).
@@ -61,7 +67,7 @@ tracks build numbers per bundle identifier.
 - [x] Rebuilt — `plutil` confirmed `Agent Monitor` / `0.0.1` / `266` inside the bundle
 - [x] Notary returned `Accepted`, ticket was stapled, and the release artifact was
       downloaded and verified after publication on 2026-07-31
-- [x] The published release zip was created only from the stapled
+- [x] The published disk image was created only from the stapled
       `Agent Monitor` / `0.0.1` / `266` app
 
 ### 3. The Claude ToS disclosure is load-bearing — keep it in all three places
@@ -106,7 +112,7 @@ the rest of the public source tree.
 - [x] Keep the study notes in place
 - [x] Replace current-tree personal identifiers and user-home paths with neutral
       placeholders or repository-relative commands
-- [ ] Re-run the same checks against rewritten full history before publication
+- [x] Re-run the same checks against rewritten full history before publication
 
 ### 5. Screenshots deferred
 
@@ -175,7 +181,7 @@ private in the original repository; the sanitized public candidate will use a ne
 | `~/Library/Application Support/CodexUsageMonitor` and the six file names | ⬜ unchanged **by choice** | Real paths. Renaming them strands every existing user's cache and history |
 | Export filename `CodexUsageMonitor-local-data-<date>.json` | ⬜ | User-visible in the save panel, but named after the data directory it comes from. Rename only if the directory is ever renamed |
 | Project/local clone name | ✅ AgentUsageMonitor | README and clone destination |
-| Public GitHub repository name/slug and endpoint | ⏳ `AgentUsageMonitor` | Create a separate private repository after history rewrite; do not change the original repository's visibility |
+| Public GitHub repository name/slug and endpoint | ✅ `AgentUsageMonitor` | Sanitized repository is public; the original repository remains private |
 
 **Leave `CFBundleIdentifier` alone regardless.** A new identifier is a new app to
 macOS: preferences reset, the Keychain "Always Allow" grant is lost, and the user
@@ -189,17 +195,16 @@ gets every first-run prompt again.
       row, Diagnostics Name, copied report, exported data, and a newly triggered
       Terminal permission prompt. The release smoke test does not prove every
       cached or permission-dependent string.
-- [ ] Create the new private `AgentUsageMonitor` destination after history rewrite,
-      push only rewritten `main` and `v0.0.1`, and keep the original repository
-      private indefinitely.
+- [x] Create the new private `AgentUsageMonitor` destination after history rewrite,
+      push only rewritten `main` and `v0.0.1`, publish after the go/no-go checks,
+      and keep the original repository private indefinitely.
 
 ---
 
 ## Worth doing, not urgent
 
-- **Repository description and topics.** Configure the new repository with the
-  approved description and `macos`, `menu-bar`, `swift`, `swiftui`,
-  `openai-codex`, `claude-code`, and `usage-monitor`.
+- **Repository description and topics.** Configured. The maintainer explicitly
+  accepted the shorter description and `codex` topic used by the public repository.
 - **Issue templates.** Done in source: the privacy-safe bug form asks for version,
   build, macOS, provider, surface, reproduction, and expected/actual behavior;
   blank issues are disabled.
