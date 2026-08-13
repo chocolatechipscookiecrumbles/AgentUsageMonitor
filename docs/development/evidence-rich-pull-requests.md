@@ -8,6 +8,10 @@ A good PR is not a diary of everything the author did. It is a compact argument:
 
 Use the repo-local `preparing-evidence-rich-prs` skill when drafting or updating a PR. The skill supplies the short workflow; this guide explains the reasoning and the repository-specific evidence gates.
 
+Branch creation, commit identity, pre-push privacy checks, public/private promotion,
+and history-rewrite incident response follow the
+[public update workflow](public-update-workflow.md).
+
 ## Contents
 
 - [The development loop](#the-development-loop)

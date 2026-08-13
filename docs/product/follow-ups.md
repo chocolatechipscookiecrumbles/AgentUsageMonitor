@@ -478,9 +478,19 @@ Acceptance
 
 ## 11. Codex Token Monitor can fail to read local usage
 
-**Status:** **Diagnosis planned.** Observed in the published 0.0.1 release. No
-cause or workaround is confirmed. Follow the
-[Codex local-activity recovery diagnosis](../superpowers/plans/2026-07-31-codex-local-activity-recovery-diagnosis.md).
+**Status:** **Fixed, verification open.** Diagnosed and fixed 2026-08-04; the
+cause is confirmed, not inferred. A usage-bearing `token_count` that precedes its
+session's first `task_started` — a resumed session replaying prior usage — threw
+`malformedUsage`, because Codex never writes `turn_id` on that record and the
+turn latched from `task_started` was still empty. Nothing isolated that throw to
+its file, so 2 files out of 261 made the whole root `.unsafeToRead` on every
+launch. Against the live root the fix moves `.unsafeToRead` with 0 requests to
+`.readable` with 14,534 requests across all 261 files. Evidence:
+[diagnostic results](../development/codex-local-activity-diagnostic-results.md);
+plan: [Codex local-activity recovery](../superpowers/plans/2026-07-31-codex-local-activity-recovery-diagnosis.md).
+**Signed-app acceptance is unobserved.** Two further defects found during
+diagnosis remain open: the `CODEX_HOME` discovery gap, and `parent_thread_id`
+forks (196 sessions) being silently over-counted.
 
 Problem
 

@@ -446,6 +446,9 @@ added. See [AGENTS.md](AGENTS.md#documentation-discipline).
 Releases follow [docs/development/releasing-on-github.md](docs/development/releasing-on-github.md),
 and pull requests follow the
 [evidence-rich PR contract](docs/development/evidence-rich-pull-requests.md).
+Before creating a branch or pushing a commit, follow the
+[public update workflow](docs/development/public-update-workflow.md) for repository
+identity, privacy review, secret scanning, and promotion rules.
 
 ## Documentation
 
@@ -455,7 +458,8 @@ and pull requests follow the
 | [Product follow-ups](docs/product/follow-ups.md) | The detailed problem statements behind the board |
 | [Release notes](docs/release-notes/) | Per-version notes |
 | [Releasing on GitHub](docs/development/releasing-on-github.md) | Signing, notarization, tagging, publishing |
-| [Before going public](docs/development/before-going-public.md) | What still needs to change before the repository is made public |
+| [Public update workflow](docs/development/public-update-workflow.md) | Public-first branches, commit identity, privacy gates, secret scanning, and incident response |
+| [Public-readiness record](docs/development/before-going-public.md) | Historical checklist and decisions behind the sanitized public repository |
 | [AGENTS.md](AGENTS.md) | Durable repository invariants and guardrails |
 | [CONTEXT.md](CONTEXT.md) | Canonical vocabulary for the app's UI regions |
 | [Data & Privacy verification](docs/claude-usage-verification.md) | How each Claude read path was verified |
