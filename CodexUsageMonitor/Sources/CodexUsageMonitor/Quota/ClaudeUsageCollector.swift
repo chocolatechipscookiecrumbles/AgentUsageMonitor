@@ -41,6 +41,9 @@ actor ClaudeUsageCollector {
     private let oauthSource: ClaudeOAuthUsageSource
     private let statusLineReader: ClaudeRateLimitSnapshotReader
     private let cache: ClaudeUsageCache
+    /// Asks Claude Code to renew its own credential when ours is rejected.
+    /// Optional so tests and the CLI probe can opt out of ever spawning a CLI.
+    private let delegatedRefresh: ClaudeDelegatedRefreshCoordinator?
     private let now: @Sendable () -> Date
     /// When the endpoint returns 429, skip the networked OAuth read until this
     /// time and serve local sources. `/api/oauth/usage` rate-limits aggressively
@@ -64,11 +67,13 @@ actor ClaudeUsageCollector {
         oauthSource: ClaudeOAuthUsageSource,
         statusLineReader: ClaudeRateLimitSnapshotReader,
         cache: ClaudeUsageCache,
+        delegatedRefresh: ClaudeDelegatedRefreshCoordinator? = nil,
         now: @escaping @Sendable () -> Date = { .now }
     ) {
         self.oauthSource = oauthSource
         self.statusLineReader = statusLineReader
         self.cache = cache
+        self.delegatedRefresh = delegatedRefresh
         self.now = now
     }
 
@@ -91,6 +96,19 @@ actor ClaudeUsageCollector {
             } catch let error as ClaudeOAuthError {
                 if case .rateLimited(let retryAfter) = error {
                     oauthBackoffUntil = retryAfter ?? now().addingTimeInterval(Self.defaultRateLimitBackoff)
+                }
+                // A 401 means the credential was read successfully and then
+                // rejected — almost always an expired borrowed access token.
+                // Claude Code renews it only when it happens to run, which in
+                // one observed case left a continuously running app with no
+                // reading for three hours. Ask Claude Code to renew instead of
+                // waiting for the user to open it. The retry cannot introduce a
+                // second dialog: reaching a 401 proves the Keychain read already
+                // succeeded.
+                if case .unauthorized = error,
+                   let renewed = await renewThroughClaudeCode(reason: reason) {
+                    cache.save(renewed)
+                    return ClaudeUsagePresentation(snapshot: renewed, delivery: .live, warnings: [])
                 }
                 degradeReason = Self.explanation(for: error, backoffUntil: oauthBackoffUntil)
             } catch {
@@ -125,6 +143,16 @@ actor ClaudeUsageCollector {
             delivery: .cached,
             warnings: [degradeReason ?? "No Claude usage source is currently available."]
         )
+    }
+
+    /// Returns a fresh snapshot only if Claude Code actually renewed the
+    /// credential and the retried read then succeeded. Anything less returns
+    /// nil so the caller degrades and states why, rather than reporting a
+    /// recovery that did not happen.
+    private func renewThroughClaudeCode(reason: ClaudeRefreshReason) async -> ClaudeUsageSnapshot? {
+        guard let delegatedRefresh else { return nil }
+        guard await delegatedRefresh.attempt(reason: reason) == .refreshed else { return nil }
+        return try? await oauthSource.fetch(promptPolicy: reason.keychainPromptPolicy)
     }
 
     private enum TierOneAttempt {
