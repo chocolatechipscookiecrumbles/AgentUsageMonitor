@@ -44,6 +44,11 @@ UsageProbe/Outputs/*
 .claude/
 skills-lock.json
 
+# Local consolidated architecture/technology reference. It is generated from
+# the tracked source, plans, ADRs, and operating docs and may contain
+# maintainer-oriented assessments that are not part of the public docs set.
+TECH_STACK.md
+
 # Raw Figma exports and screen recordings: large, regenerated, and the v6
 # design is preserved as tracked spec + source in docs/design/menu-bar-popover/.
 High-fidelity macOS menu UI*/

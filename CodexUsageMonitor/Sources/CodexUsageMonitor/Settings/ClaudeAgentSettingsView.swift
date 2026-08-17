@@ -21,8 +21,12 @@ struct ClaudeAgentSettingsView: View {
     let hasConsentedToCLIProbe: Bool
     let setCLIProbeConsent: (Bool) -> Void
     let runCLIProbe: () -> Void
+    let passiveCapture: ClaudePassiveCaptureHealth?
+    let refreshPassiveCapture: () -> Void
+    let configurePassiveCapture: (Bool) -> Void
 
     @State private var showCLIConsent = false
+    @State private var pendingRepair: String?
 
     var body: some View {
         if setupState == .notSetUp {
@@ -31,6 +35,28 @@ struct ClaudeAgentSettingsView: View {
             // Built once per render: it does date math and currency formatting,
             // and a computed property would rebuild it at every reference.
             content(model: usageState.presentation.map { ClaudeUsageDisplayModel(presentation: $0) })
+        }
+    }
+
+    /// Passive capture: free, credential-free, and the only source that keeps
+    /// working when the OAuth token expires or its Keychain grant lapses.
+    @ViewBuilder
+    private var passiveCaptureRow: some View {
+        if let passiveCapture {
+            SettingsPreferenceControlRow(
+                "Passive capture",
+                description: passiveCapture.summary
+            ) {
+                if let title = passiveCapture.repairActionTitle {
+                    Button(title) {
+                        if case .repairable(let existing, _) = passiveCapture.state {
+                            pendingRepair = existing
+                        } else {
+                            configurePassiveCapture(false)
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -79,7 +105,7 @@ struct ClaudeAgentSettingsView: View {
                     description: model?.stalenessNotice
                 )
             }
-            SettingsSectionRow(showsDivider: false) {
+            SettingsSectionRow {
                 SettingsPreferenceControlRow(
                     "Refresh now",
                     description: "Uses the free sources. Never prompts."
@@ -87,6 +113,28 @@ struct ClaudeAgentSettingsView: View {
                     Button("Refresh", action: refresh)
                 }
             }
+            SettingsSectionRow(showsDivider: false) {
+                passiveCaptureRow
+            }
+        }
+        .onAppear(perform: refreshPassiveCapture)
+        .confirmationDialog(
+            "Replace Claude Code's status line?",
+            isPresented: Binding(
+                get: { pendingRepair != nil },
+                set: { if !$0 { pendingRepair = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Replace", role: .destructive) {
+                configurePassiveCapture(true)
+                pendingRepair = nil
+            }
+            Button("Cancel", role: .cancel) { pendingRepair = nil }
+        } message: {
+            // The exact command being replaced is shown, because this edits the
+            // user's own Claude Code configuration file.
+            Text(pendingRepair.map { "Replaces:\n\($0)\n\nOnly the statusLine entry changes." } ?? "")
         }
 
         forceCLISection

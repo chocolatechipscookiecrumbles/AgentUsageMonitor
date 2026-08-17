@@ -370,6 +370,31 @@ final class QuotaViewModel: ObservableObject {
         }
     }
 
+    /// Passive capture is the only Claude source that costs nothing and needs
+    /// no credential, so its health is surfaced rather than left silent — it
+    /// was dead in production for weeks while the app said nothing.
+    @Published private(set) var claudePassiveCapture: ClaudePassiveCaptureHealth?
+
+    func refreshClaudePassiveCaptureHealth() {
+        guard let installer = ClaudeStatusLineInstaller() else {
+            claudePassiveCapture = nil
+            return
+        }
+        claudePassiveCapture = ClaudePassiveCaptureHealth(
+            state: installer.inspect(),
+            lastCapturedAt: ClaudeRateLimitSnapshotReader().readSnapshot()?.capturedAt
+        )
+    }
+
+    /// Installs passive capture, or repairs a status line this project left
+    /// behind. `replacingExisting` is the user's explicit confirmation; a
+    /// working third-party status line is never replaced either way.
+    func configureClaudePassiveCapture(replacingExisting: Bool) {
+        guard let installer = ClaudeStatusLineInstaller() else { return }
+        _ = installer.install(replacingExisting: replacingExisting)
+        refreshClaudePassiveCaptureHealth()
+    }
+
     /// Explicit user action — the only path that may raise the Keychain
     /// prompt for Claude Code's credential.
     func connectClaudeWithCredentials() {
