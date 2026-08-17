@@ -45,7 +45,10 @@ struct AgentsSettingsView: View {
                     cliProbeError: viewModel.claudeCLIProbeError,
                     hasConsentedToCLIProbe: viewModel.settings.claudeCLIProbeConsented,
                     setCLIProbeConsent: { viewModel.settings.claudeCLIProbeConsented = $0 },
-                    runCLIProbe: viewModel.runClaudeCLIProbe
+                    runCLIProbe: viewModel.runClaudeCLIProbe,
+                    passiveCapture: viewModel.claudePassiveCapture,
+                    refreshPassiveCapture: viewModel.refreshClaudePassiveCaptureHealth,
+                    configurePassiveCapture: viewModel.configureClaudePassiveCapture
                 )
             case .githubCopilot:
                 EmptyView()
