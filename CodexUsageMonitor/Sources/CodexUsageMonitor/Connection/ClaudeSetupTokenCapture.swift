@@ -104,7 +104,6 @@ private final class ClaudeSetupTokenProcessSession: @unchecked Sendable {
         try? slaveHandle.close()
 
         var outputWindow = Data()
-        var capturedToken: String?
         while true {
             let chunk: Data
             do {
@@ -114,7 +113,6 @@ private final class ClaudeSetupTokenProcessSession: @unchecked Sendable {
                 throw ClaudeSetupTokenError.setupTokenFailed
             }
             if chunk.isEmpty { break }
-            guard capturedToken == nil else { continue }
             outputWindow.append(chunk)
             if outputWindow.count > Self.maximumOutputBytes {
                 outputWindow = Data(outputWindow.suffix(Self.maximumOutputBytes))
@@ -122,8 +120,16 @@ private final class ClaudeSetupTokenProcessSession: @unchecked Sendable {
             if let text = String(data: outputWindow, encoding: .utf8),
                let token = ClaudeSetupTokenService.extractToken(from: text),
                let range = text.range(of: token), range.upperBound < text.endIndex {
-                capturedToken = token
                 outputWindow.removeAll(keepingCapacity: false)
+                // Token emission is the completion boundary. Some Claude CLI
+                // versions leave the interactive PTY alive after browser
+                // success, so waiting for EOF keeps the app in `.signingIn`
+                // forever. Stop only the child process this capture owns and
+                // return the reduced token immediately for validation.
+                if process.isRunning {
+                    process.terminate()
+                }
+                return token
             }
         }
         process.waitUntilExit()
@@ -131,9 +137,6 @@ private final class ClaudeSetupTokenProcessSession: @unchecked Sendable {
         guard !Task.isCancelled else { throw CancellationError() }
         guard process.terminationStatus == 0 else {
             throw ClaudeSetupTokenError.setupTokenFailed
-        }
-        if let capturedToken {
-            return capturedToken
         }
         guard let text = String(data: outputWindow, encoding: .utf8),
               let token = ClaudeSetupTokenService.extractToken(from: text) else {

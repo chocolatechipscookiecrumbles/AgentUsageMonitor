@@ -14,6 +14,8 @@ Implemented on `feat/claude-setup-token-primary`: actor-isolated app-owned and b
 
 Per user direction, no tests were added or modified for this implementation and behavioral tests remain with the user. Release approval remains open: signed-app capture, relaunch, locked-Mac read, prompt observation, revocation, cleanup, Light/Dark Settings, and native-menu interaction evidence are recorded as unverified in the capability record. Do not merge as release-ready merely because the compile checks pass.
 
+The first user behavioral pass exposed two implementation defects: capture waited for CLI EOF after token emission, and the shared Disconnect control depended on a confirmation dialog despite the documented immediate-action contract. Both boundaries were corrected on 2026-08-26; their signed-app retest remains open in the capability record.
+
 ## Global Constraints
 
 - Treat [the 2026-08-26 source audit](../../development/claude-usage-monitor-source-audit-2026-08-26.md) as the product decision. “Keychain fallback” means a separately disclosed compatibility action, never an automatic cross-method cascade.
