@@ -26,7 +26,18 @@ struct ClaudeMenuContent: View {
                     ClaudeStalenessStrip(notice: staleness)
                 }
 
-                ClaudeUsageWindowCard(model: model)
+                // Recovery occupies the quota card's slot instead of stacking
+                // below the activity card. The native menu does not scroll, so
+                // showing both cards can extend beyond shorter displays.
+                if case .failed = viewModel.claudeConnectionState {
+                    ClaudeConnectionRecoveryCard(
+                        state: viewModel.claudeConnectionState,
+                        connectWithSetupToken: viewModel.connectClaudeWithSetupToken,
+                        connectWithCredentials: viewModel.connectClaudeWithCredentials
+                    )
+                } else {
+                    ClaudeUsageWindowCard(model: model)
+                }
 
                 activityCard
 
@@ -39,18 +50,6 @@ struct ClaudeMenuContent: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .fixedSize(horizontal: false, vertical: true)
 
-                // Passive capture is a legitimate source that needs no
-                // connection, so a merely-not-connected state is normal and
-                // shows no recovery card. Only an actively failed connection
-                // warrants offering the credential affordance alongside the
-                // last result.
-                if case .failed = viewModel.claudeConnectionState {
-                    ClaudeConnectionRecoveryCard(
-                        state: viewModel.claudeConnectionState,
-                        connectWithSetupToken: viewModel.connectClaudeWithSetupToken,
-                        connectWithCredentials: viewModel.connectClaudeWithCredentials
-                    )
-                }
             } else {
                 // Activity is read locally and does not depend on quota, so it
                 // stays above the recovery content rather than disappearing

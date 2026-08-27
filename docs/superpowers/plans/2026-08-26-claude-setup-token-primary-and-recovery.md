@@ -16,6 +16,8 @@ Per user direction, no tests were added or modified for this implementation and 
 
 The first user behavioral pass exposed two implementation defects: capture waited for CLI EOF after token emission, and the shared Disconnect control depended on a confirmation dialog despite the documented immediate-action contract. Both boundaries were corrected on 2026-08-26; their signed-app retest remains open in the capability record.
 
+A follow-up user pass found that OAuth/setup still becomes stuck and Disconnect still has no effect. The first corrections are not accepted as behavioral fixes. Both defects remain open and are deliberately deferred for a later focused diagnosis. This pass only compacts the native menu: when a cached Claude reading exists and the connection has failed, recovery replaces the five-hour/weekly quota card instead of stacking beneath it.
+
 ## Global Constraints
 
 - Treat [the 2026-08-26 source audit](../../development/claude-usage-monitor-source-audit-2026-08-26.md) as the product decision. “Keychain fallback” means a separately disclosed compatibility action, never an automatic cross-method cascade.

@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// Shown alongside the last result when Claude's connection has actively
-/// failed, so the credential affordance stays reachable without discarding
-/// the data already on screen. Not shown for a merely-not-connected account,
-/// because passive capture needs no connection.
+/// Replaces the quota-window card when Claude's connection has actively failed,
+/// so recovery stays reachable without making the non-scrolling menu taller.
+/// Token activity and provenance remain visible below it. Not shown for a
+/// merely-not-connected account, because passive capture needs no connection.
 struct ClaudeConnectionRecoveryCard: View {
     let state: ClaudeConnectionState
     let connectWithSetupToken: () -> Void
