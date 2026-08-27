@@ -38,12 +38,7 @@ final class ClaudeUsageMonitor: ObservableObject {
     private var inFlight: (task: Task<Void, Never>, reason: ClaudeRefreshReason)?
 
     init(
-        collector: ClaudeUsageCollecting = ClaudeUsageCollector(
-            oauthSource: ClaudeOAuthUsageSource(credentialStore: ClaudeCompositeCredentialStore()),
-            statusLineReader: ClaudeRateLimitSnapshotReader(),
-            cache: ClaudeUsageCache(),
-            delegatedRefresh: ClaudeDelegatedRefreshCoordinator()
-        ),
+        collector: ClaudeUsageCollecting,
         pollInterval: Duration = ClaudeUsageMonitor.defaultPollInterval
     ) {
         self.collector = collector
@@ -53,12 +48,7 @@ final class ClaudeUsageMonitor: ObservableObject {
     /// Production initializer: the poll cadence follows the shared `RefreshMode`
     /// setting (clamped to Claude's network floor) and is re-read each tick.
     init(
-        collector: ClaudeUsageCollecting = ClaudeUsageCollector(
-            oauthSource: ClaudeOAuthUsageSource(credentialStore: ClaudeCompositeCredentialStore()),
-            statusLineReader: ClaudeRateLimitSnapshotReader(),
-            cache: ClaudeUsageCache(),
-            delegatedRefresh: ClaudeDelegatedRefreshCoordinator()
-        ),
+        collector: ClaudeUsageCollecting,
         cadence: @escaping @MainActor () -> Duration
     ) {
         self.collector = collector

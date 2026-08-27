@@ -33,10 +33,10 @@ func adaptStatusLineSnapshot(_ snapshot: ClaudeRateLimitSnapshot) -> ClaudeUsage
     )
 }
 
-/// Single entry point implementing the four-tier fallback order:
-/// OAuth (1) -> CLI /usage probe (2) -> statusLine (3) -> cache (4).
-/// Tier 2 is deliberately manual-only and therefore stays outside this automatic
-/// collector. The automatic runtime order is OAuth -> statusLine -> cache.
+/// Single entry point for automatic Claude usage collection. A very recent
+/// status-line capture is served before constructing any credential read;
+/// otherwise OAuth supplies the authoritative reading, followed by the best
+/// local snapshot or cache. `/usage` remains an explicit recovery action.
 actor ClaudeUsageCollector {
     private let oauthSource: ClaudeOAuthUsageSource
     private let statusLineReader: ClaudeRateLimitSnapshotReader
@@ -44,6 +44,7 @@ actor ClaudeUsageCollector {
     /// Asks Claude Code to renew its own credential when ours is rejected.
     /// Optional so tests and the CLI probe can opt out of ever spawning a CLI.
     private let delegatedRefresh: ClaudeDelegatedRefreshCoordinator?
+    private let credentialRouter: ClaudeCompositeCredentialStore?
     private let now: @Sendable () -> Date
     /// When the endpoint returns 429, skip the networked OAuth read until this
     /// time and serve local sources. `/api/oauth/usage` rate-limits aggressively
@@ -52,6 +53,10 @@ actor ClaudeUsageCollector {
     private var oauthBackoffUntil: Date?
     /// Used when a 429 arrives with no `Retry-After` header.
     private static let defaultRateLimitBackoff: TimeInterval = 15 * 60
+    /// Status-line data arrives immediately after a Claude response. Within
+    /// this short window it is fresher than another network read and lets the
+    /// app avoid all credential access.
+    private static let passiveFastPathFreshness: TimeInterval = 2 * 60
 
     /// A press is allowed through the back-off, because a back-off the user
     /// cannot see or override is indistinguishable from a broken button — the
@@ -68,16 +73,23 @@ actor ClaudeUsageCollector {
         statusLineReader: ClaudeRateLimitSnapshotReader,
         cache: ClaudeUsageCache,
         delegatedRefresh: ClaudeDelegatedRefreshCoordinator? = nil,
+        credentialRouter: ClaudeCompositeCredentialStore? = nil,
         now: @escaping @Sendable () -> Date = { .now }
     ) {
         self.oauthSource = oauthSource
         self.statusLineReader = statusLineReader
         self.cache = cache
         self.delegatedRefresh = delegatedRefresh
+        self.credentialRouter = credentialRouter
         self.now = now
     }
 
     func refresh(reason: ClaudeRefreshReason) async -> ClaudeUsagePresentation {
+        if let passive = freshPassiveSnapshot() {
+            cache.save(passive)
+            return ClaudeUsagePresentation(snapshot: passive, delivery: .passiveSnapshot, warnings: [])
+        }
+
         // Why this refresh is not returning a live reading. A refresh that ends
         // without one must say so: a pressed button that changes nothing on
         // screen and explains nothing is itself the defect being fixed here.
@@ -105,12 +117,24 @@ actor ClaudeUsageCollector {
                 // waiting for the user to open it. The retry cannot introduce a
                 // second dialog: reaching a 401 proves the Keychain read already
                 // succeeded.
-                if case .unauthorized = error,
-                   let renewed = await renewThroughClaudeCode(reason: reason) {
-                    cache.save(renewed)
-                    return ClaudeUsagePresentation(snapshot: renewed, delivery: .live, warnings: [])
+                if case .unauthorized(let method) = error {
+                    switch method {
+                    case .claudeCodeCredentials:
+                        if let renewed = await renewThroughClaudeCode() {
+                            cache.save(renewed)
+                            return ClaudeUsagePresentation(snapshot: renewed, delivery: .live, warnings: [])
+                        }
+                    case .setupToken:
+                        do {
+                            try await credentialRouter?.invalidateSelfIssued()
+                        } catch {
+                            degradeReason = "Claude rejected the setup token, and its Keychain item could not be removed."
+                        }
+                    }
                 }
-                degradeReason = Self.explanation(for: error, backoffUntil: oauthBackoffUntil)
+                if degradeReason == nil {
+                    degradeReason = Self.explanation(for: error, backoffUntil: oauthBackoffUntil)
+                }
             } catch {
                 degradeReason = "Claude usage could not be read just now."
             }
@@ -145,14 +169,25 @@ actor ClaudeUsageCollector {
         )
     }
 
+    private func freshPassiveSnapshot() -> ClaudeUsageSnapshot? {
+        guard let snapshot = statusLineReader.readSnapshot().map(adaptStatusLineSnapshot),
+              snapshot.fiveHour != nil || snapshot.sevenDay != nil,
+              now().timeIntervalSince(snapshot.capturedAt) <= Self.passiveFastPathFreshness else {
+            return nil
+        }
+        return snapshot
+    }
+
     /// Returns a fresh snapshot only if Claude Code actually renewed the
     /// credential and the retried read then succeeded. Anything less returns
     /// nil so the caller degrades and states why, rather than reporting a
     /// recovery that did not happen.
-    private func renewThroughClaudeCode(reason: ClaudeRefreshReason) async -> ClaudeUsageSnapshot? {
+    private func renewThroughClaudeCode() async -> ClaudeUsageSnapshot? {
         guard let delegatedRefresh else { return nil }
-        guard await delegatedRefresh.attempt(reason: reason) == .refreshed else { return nil }
-        return try? await oauthSource.fetch(promptPolicy: reason.keychainPromptPolicy)
+        guard await delegatedRefresh.attempt(reason: .scheduled) == .refreshed else { return nil }
+        // Renewal is automated even if the original read followed a button
+        // press. The retry must never raise a second Keychain prompt.
+        return try? await oauthSource.fetch(promptPolicy: .never)
     }
 
     private enum TierOneAttempt {
@@ -215,8 +250,13 @@ actor ClaudeUsageCollector {
             return "No Claude Code credential was found. Connect Claude to read live usage."
         case .insufficientScope:
             return "The stored Claude credential cannot read usage. Reconnect Claude."
-        case .unauthorized:
-            return "Claude rejected the stored credential. Reconnect Claude."
+        case .unauthorized(let method):
+            switch method {
+            case .setupToken:
+                return "Claude rejected the setup token. Connect Claude again to create a new one."
+            case .claudeCodeCredentials:
+                return "Claude rejected the borrowed Claude Code credential. Reconnect Claude Code credentials."
+            }
         case .serverFailure(let statusCode):
             return "Claude's usage service returned an error (\(statusCode)). Showing the last reading."
         case .transportError:

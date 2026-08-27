@@ -1,10 +1,11 @@
 import Foundation
+import LocalAuthentication
 import Security
 
 /// Deliberately NOT Codable, CustomStringConvertible, or
 /// CustomDebugStringConvertible — nothing about this type should be
 /// persistable or printable by accident. The token lives in Keychain only.
-struct ClaudeOAuthCredential {
+struct ClaudeOAuthCredential: Sendable {
     let accessToken: String
     let refreshToken: String?
     let expiresAt: Date?
@@ -12,10 +13,12 @@ struct ClaudeOAuthCredential {
     let subscriptionType: String?
 }
 
-enum ClaudeCredentialError: Error, Equatable {
+enum ClaudeCredentialError: Error, Equatable, Sendable {
     case notFound
     case malformedData
+    case interactionNotAllowed
     case accessDenied
+    case unexpectedStatus(OSStatus)
 }
 
 /// Controls whether a Keychain read may raise macOS's permission dialog.
@@ -32,21 +35,21 @@ enum KeychainPromptPolicy: Equatable, Sendable {
 }
 
 protocol ClaudeCredentialProviding: Sendable {
-    func loadCredential(promptPolicy: KeychainPromptPolicy) throws -> ClaudeOAuthCredential
+    func resolveCredential(promptPolicy: KeychainPromptPolicy) async throws -> ClaudeCredentialResolution
 }
 
 extension ClaudeCredentialProviding {
     /// Defaults to the safe policy so a call site that forgets to specify one
     /// can never introduce a background prompt.
-    func loadCredential() throws -> ClaudeOAuthCredential {
-        try loadCredential(promptPolicy: .never)
+    func loadCredential(promptPolicy: KeychainPromptPolicy = .never) async throws -> ClaudeOAuthCredential {
+        try await resolveCredential(promptPolicy: promptPolicy).credential
     }
 }
 
 /// Reads Claude Code's own already-issued OAuth credential from the login
 /// Keychain (service "Claude Code-credentials"). This app never runs its
 /// own sign-in flow and never stores the token anywhere else.
-struct ClaudeKeychainCredentialStore: ClaudeCredentialProviding {
+actor ClaudeKeychainCredentialStore: ClaudeCredentialProviding {
     private let rawDataReader: @Sendable (KeychainPromptPolicy) -> Result<Data, ClaudeCredentialError>
 
     init(serviceName: String = "Claude Code-credentials") {
@@ -59,18 +62,21 @@ struct ClaudeKeychainCredentialStore: ClaudeCredentialProviding {
         self.rawDataReader = { _ in rawDataReader() }
     }
 
-    func loadCredential(promptPolicy: KeychainPromptPolicy) throws -> ClaudeOAuthCredential {
+    func resolveCredential(promptPolicy: KeychainPromptPolicy) throws -> ClaudeCredentialResolution {
         switch rawDataReader(promptPolicy) {
         case .success(let data):
-            return try Self.parse(data)
+            return ClaudeCredentialResolution(
+                credential: try Self.parse(data),
+                method: .claudeCodeCredentials
+            )
         case .failure(let error):
             throw error
         }
     }
 
-    /// Built separately so the prompt policy is directly assertable — a
-    /// background read setting `kSecUseAuthenticationUIFail` is the guarantee
-    /// that an automatic refresh cannot pop a dialog.
+    /// Built separately so the prompt policy is directly assertable. A
+    /// background read uses a non-interactive authentication context, which
+    /// guarantees an automatic refresh cannot pop a dialog.
     static func searchQuery(serviceName: String, promptPolicy: KeychainPromptPolicy) -> [String: Any] {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -79,16 +85,24 @@ struct ClaudeKeychainCredentialStore: ClaudeCredentialProviding {
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
         if promptPolicy == .never {
-            query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
+            let context = LAContext()
+            context.interactionNotAllowed = true
+            query[kSecUseAuthenticationContext as String] = context
         }
         return query
     }
 
-    /// `errSecInteractionNotAllowed` is what a `.never` read returns instead
-    /// of prompting; it maps to `.accessDenied` so the collector degrades to
-    /// the next tier rather than treating it as a hard failure.
     static func error(for status: OSStatus) -> ClaudeCredentialError {
-        status == errSecItemNotFound ? .notFound : .accessDenied
+        switch status {
+        case errSecItemNotFound:
+            .notFound
+        case errSecInteractionNotAllowed:
+            .interactionNotAllowed
+        case errSecAuthFailed, errSecMissingEntitlement:
+            .accessDenied
+        default:
+            .unexpectedStatus(status)
+        }
     }
 
     private static func readKeychainData(

@@ -38,6 +38,8 @@ struct AgentsSettingsView: View {
                     connectionState: viewModel.claudeConnectionState,
                     usageState: viewModel.claudeState,
                     valueMode: viewModel.settings.quotaValueMode,
+                    credentialMethod: viewModel.claudeCredentialMethod,
+                    connectWithSetupToken: viewModel.connectClaudeWithSetupToken,
                     connectWithCredentials: viewModel.connectClaudeWithCredentials,
                     disconnect: viewModel.disconnectClaude,
                     refresh: viewModel.refreshClaude,

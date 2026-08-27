@@ -47,6 +47,7 @@ struct ClaudeMenuContent: View {
                 if case .failed = viewModel.claudeConnectionState {
                     ClaudeConnectionRecoveryCard(
                         state: viewModel.claudeConnectionState,
+                        connectWithSetupToken: viewModel.connectClaudeWithSetupToken,
                         connectWithCredentials: viewModel.connectClaudeWithCredentials
                     )
                 }
@@ -58,6 +59,7 @@ struct ClaudeMenuContent: View {
 
                 ClaudeUnavailableContent(
                     connectionState: viewModel.claudeConnectionState,
+                    connectWithSetupToken: viewModel.connectClaudeWithSetupToken,
                     connectWithCredentials: viewModel.connectClaudeWithCredentials
                 )
             }

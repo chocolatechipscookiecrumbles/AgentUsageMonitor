@@ -7,6 +7,7 @@ import SwiftUI
 /// Refresh Now rather than a sign-in that would not help.
 struct ClaudeUnavailableContent: View {
     let connectionState: ClaudeConnectionState
+    let connectWithSetupToken: () -> Void
     let connectWithCredentials: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
@@ -37,6 +38,7 @@ struct ClaudeUnavailableContent: View {
             if showsCredentialAction {
                 ClaudeCredentialActions(
                     state: connectionState,
+                    connectWithSetupToken: connectWithSetupToken,
                     connectWithCredentials: connectWithCredentials
                 )
             }
@@ -91,8 +93,8 @@ struct ClaudeUnavailableContent: View {
             "Install the Claude CLI, or connect the credentials Claude Code already stored."
         case .notConnected:
             "Connect to show current five-hour and weekly usage."
-        case .signingIn(.browser):
-            "Finish signing in in your browser."
+        case .signingIn(.setupToken):
+            "Finish the setup-token flow in your browser."
         case .signingIn(.claudeCodeCredentials):
             "Approve the Keychain prompt to continue."
         case .failed(let failure):

@@ -8,7 +8,7 @@ import SwiftUI
 struct ClaudeSignInView: View {
     let state: ClaudeConnectionState
     let activeMethod: ClaudeSignInMethod?
-    let signInWithBrowser: () -> Void
+    let signInWithSetupToken: () -> Void
     let useClaudeCodeCredentials: () -> Void
     let signOut: () -> Void
 
@@ -29,9 +29,9 @@ struct ClaudeSignInView: View {
                 Button("Sign out of Claude", action: signOut)
             } else if state != .checking {
                 Divider()
-                Button("Sign in with browser", action: signInWithBrowser)
+                Button("Connect with setup token", action: signInWithSetupToken)
                     .disabled(presentation.signInDisabled || state == .missingCLI)
-                Text("Uses Claude’s own sign-in to issue a token for this app.")
+                Text("Runs claude setup-token once and stores the token in this app’s Keychain item.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 

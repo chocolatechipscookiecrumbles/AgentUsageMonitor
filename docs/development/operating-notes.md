@@ -144,6 +144,29 @@ For confirmed results, it also verifies the hashed account identity and the main
 
 ## Running the native menu-bar app
 
+### Claude setup-token branch workflow
+
+The primary Claude action on `feat/claude-setup-token-primary` is **Connect with
+Claude**. It requires a current Claude Code CLI. The app locates `claude`, runs
+`claude setup-token` in a PTY, lets Claude Code own browser authentication,
+validates the returned credential, and stores it under service
+`AgentUsageMonitor-ClaudeOAuth`, account `setup-token-v1`, in the app-owned
+device-bound Keychain. Do not paste a token into the app, a terminal command,
+documentation, Console, or an issue.
+
+After one successful connection, relaunches and scheduled reads use the selected
+app-owned credential. **Use Claude Code credentials…** is a separate compatibility
+action; macOS may ask for access because that item belongs to Claude Code. Automatic
+refreshes never show that prompt and never switch methods. Disconnect removes only
+the app-owned item and selection, leaving Claude Code signed in.
+
+**Claude /usage → Force Read** runs `claude -p /usage` only after explicit consent.
+It may use a small amount of Claude quota and is never scheduled. The behavioral
+matrix for setup-token capture, relaunch, lock/sleep, cleanup, prompts, and signed
+Settings/menu presentation remains in
+[claude-auth-capability-results.md](./claude-auth-capability-results.md) for the user
+to complete.
+
 Xcode 26.3 is installed in `/Applications/Xcode.app`. To make it the default developer toolchain, run this once in your own Terminal (macOS will ask for your administrator password):
 
 ```sh
@@ -160,7 +183,9 @@ open .build/CodexUsageMonitor.app
 
 By default, the gauge icon appears in the menu bar with the most-consumed quota lane shown as its remaining percentage. In **Settings… > General > Menu Bar Icon**, use **Style** to select **5-hour and weekly** for a live label such as `5H: 64% | Week: 82%`, **Bars** for two stacked 5-hour/weekly bars per provider, **Combined** for one layered bar per provider, or **Single Provider** for one connected provider's two stacked bars when exactly one provider is connected. Every graphical track is 34 points wide and always represents remaining quota. Set **Show** to **Used** to display the complementary used percentages in the text styles instead; **Remaining** is the default. That text presentation remains unchanged while Codex is the only provider with data. When Claude is the only usable read or both providers have data, the compact label selects whichever provider has the highest used percentage across its active windows and identifies it with the provider mark; **Show** changes the displayed value without changing which provider is selected. Missing or expired reads are excluded rather than displayed as zero, and ties favor Codex before Claude. Cached Codex and cached/passive Claude selections carry a pause marker, while accessibility identifies the selected reading as confirmed, cached, or passive. Opening the icon shows persistent **Codex** and **Claude** tabs, including setup/recovery states for a disconnected provider, and reopens on the tab you last viewed. Each tab has a header showing a recognized plan — **Pro**, **Plus**, or **Max 20x** — because the tab above it already names the provider. A plan proven by the current connection wins over one carried on a stored reading, and it stays put while a refresh runs. Until a supported plan is known, or when a provider returns an unrecognized identifier, the header falls back to the provider name rather than inventing a label. The header also carries a standard `Updated: <time> · <how long ago>` freshness line and a **Confirmed / Cached / Refreshing / Unavailable** status pill, followed by five-hour and weekly window cards showing used percent, remaining percent, and reset timing. The popover intentionally uses bounded intrinsic content and does not scroll. The **Codex** tab also shows a forecast line and, when present, a credit-balance card with at most two earned reset-credit expiry dates plus a “more in Settings” caption; the balance is rounded to four significant figures there, while Settings shows the full balance and complete expiry list. A cached read is flagged by a warning strip above the cards. The plan tier appears in the popover header and in Settings; both are rendered from one formatter, so they always spell it the same way. A bottom action row provides **Refresh Now**, **Notification Settings**, **Preferences…**, and **Quit Agent Monitor**. **Refresh Now** targets the active provider, keeps the popover open, and shows progress in place; the other commands dismiss first. While **Enable keyboard shortcuts** is on in General, each row shows its key equivalent right-aligned — `⌘R`, `⇧⌘N`, `⌘,`, and `⌘Q` — and pressing it runs that command. With the preference off, the symbols disappear and none of the four is bound. If macOS notification permission is denied, a slim recovery strip with **Open System Notification Settings** appears on either tab; the per-quota-alert toggle lives in Settings, not the popover.
 
-The **Claude** tab shows Claude's five-hour and weekly windows with the shared-pool caveat that weekly usage is shared with Claude chat, a `Read from: <source>` provenance caption beneath the cards (its capture time is the header's freshness line), and a staleness strip when the read is not live. When Claude has no reading, the tab shows an explicit unavailable state offering **Use Claude Code credentials…**; browser sign-in stays shelved as unverified, and no Codex credit or collector furniture appears on this tab.
+The **Claude** tab shows Claude's five-hour and weekly windows with the shared-pool caveat that weekly usage is shared with Claude chat, a `Read from: <source>` provenance caption beneath the cards (its capture time is the header's freshness line), and a staleness strip when the read is not live. When Claude has no reading, the tab offers **Connect with Claude** first and **Use Claude Code credentials…** as compatibility; no Codex credit or collector furniture appears on this tab.
+
+Claude collection treats a valid status-line snapshot captured within two minutes as a zero-secret fast path: it serves that snapshot before invoking OAuth or any credential provider. When it does need a credential, `ClaudeCompositeCredentialStore` reads only the selected method. A failure never silently falls through into Claude Code's Keychain item; the app instead shows passive/cache data and explicit recovery, including the existing consented `/usage` action.
 
 ### First launch and provider enrollment (post-0.0.1, unreleased)
 

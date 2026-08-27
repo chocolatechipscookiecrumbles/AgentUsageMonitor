@@ -6,6 +6,7 @@ import SwiftUI
 /// because passive capture needs no connection.
 struct ClaudeConnectionRecoveryCard: View {
     let state: ClaudeConnectionState
+    let connectWithSetupToken: () -> Void
     let connectWithCredentials: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
@@ -24,6 +25,7 @@ struct ClaudeConnectionRecoveryCard: View {
 
             ClaudeCredentialActions(
                 state: state,
+                connectWithSetupToken: connectWithSetupToken,
                 connectWithCredentials: connectWithCredentials
             )
         }
@@ -41,7 +43,7 @@ struct ClaudeConnectionRecoveryCard: View {
         if case .failed(let failure) = state {
             return failure.displayMessage
         }
-        return "Reconnect Claude Code credentials to restore live updates."
+        return "Reconnect with a setup token or explicitly use Claude Code credentials to restore live updates."
     }
 
     private var theme: MenuPopoverTheme {

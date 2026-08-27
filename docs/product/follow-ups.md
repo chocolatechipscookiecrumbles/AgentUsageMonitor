@@ -542,10 +542,13 @@ Acceptance
 
 ## 12. Claude setup is not a dependable first-run flow
 
-**Status:** **Planned with a capability gate.** The user reported the published
-setup as problematic, but the exact failed step has not yet been captured well
-enough to claim a root cause. Follow the
-[Claude delegated OAuth and setup plan](../superpowers/plans/2026-07-31-claude-delegated-oauth-and-setup.md).
+**Status:** **Implemented on feature branch; behavioral capability gate open.**
+The normal credential will be an app-owned long-lived token obtained through
+`claude setup-token`. A fresh status-line reading is the zero-secret fast path,
+`/usage` is explicit recovery, and Claude Code's Keychain credential is an
+opt-in compatibility mode only. Follow the
+[prompt-free credential plan](../superpowers/plans/2026-08-12-claude-prompt-free-credentials.md)
+and its [source audit](../development/claude-usage-monitor-source-audit-2026-08-26.md).
 
 Problem
 
@@ -556,10 +559,12 @@ or unclear recovery actions rather than one understandable setup sequence.
 
 Required outcome
 
-Instrument and observe the first-run transitions before redesigning them. The app
-must clearly distinguish:
+The setup-token security boundary and primary UI are implemented. Complete the
+signed-app relaunch, locked-Mac, prompt, cleanup, and visual capability gate, then present one
+primary setup path and clearly distinguish:
 
-* existing Claude Code credentials available without interaction
+* a fresh zero-secret status-line reading
+* an app-owned long-lived token ready for normal authoritative reads
 * credential access requiring an explicit user action and possible Keychain prompt
 * passive status-line capture installed, absent, stale, or conflicting
 * CLI-only usage recovery that does not prove account/plan identity
@@ -570,6 +575,7 @@ Acceptance
 * one guided path reaches a coherent connected/usable state or names the exact
   blocker without contradictory status
 * ordinary background refresh remains non-prompting
+* a selected credential failure never silently reads the other credential method
 * existing custom `~/.claude/settings.json` configuration is never overwritten
 * cancel, deny, retry, relaunch, stale snapshot, and later credential recovery are
   explicit

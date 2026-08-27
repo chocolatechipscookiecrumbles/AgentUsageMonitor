@@ -4,6 +4,8 @@ enum ClaudeSetupTokenError: Error, Equatable {
     case missingCLI
     case setupTokenFailed
     case tokenNotFoundInOutput
+    case timedOut
+    case cancelled
     /// The endpoint refused the token (401/403) — it is never persisted.
     case rejected
     case usageUnavailable
@@ -59,19 +61,16 @@ actor ClaudeSetupTokenService {
     static let tokenPrefix = "sk-ant-oat01-"
 
     private let store: ClaudeSelfIssuedCredentialStore
-    private let environmentReader: @Sendable (String) -> String?
-    private let setupTokenRunner: @Sendable () throws -> String
+    private let capture: ClaudeSetupTokenCapturing
     private let usageValidator: @Sendable (ClaudeOAuthCredential) async -> Result<ClaudeUsageSnapshot, ClaudeOAuthError>
 
     init(
         store: ClaudeSelfIssuedCredentialStore = ClaudeSelfIssuedCredentialStore(),
-        environmentReader: @escaping @Sendable (String) -> String? = { ProcessInfo.processInfo.environment[$0] },
-        setupTokenRunner: (@Sendable () throws -> String)? = nil,
+        capture: ClaudeSetupTokenCapturing = ClaudeSetupTokenCapture(),
         usageValidator: (@Sendable (ClaudeOAuthCredential) async -> Result<ClaudeUsageSnapshot, ClaudeOAuthError>)? = nil
     ) {
         self.store = store
-        self.environmentReader = environmentReader
-        self.setupTokenRunner = setupTokenRunner ?? { try Self.runSetupToken() }
+        self.capture = capture
         self.usageValidator = usageValidator ?? { credential in
             let source = ClaudeOAuthUsageSource(credentialStore: StaticCredentialProvider(credential: credential))
             do {
@@ -84,25 +83,10 @@ actor ClaudeSetupTokenService {
         }
     }
 
-    /// Resolves a token from the environment, else by running the CLI.
+    /// Runs the interactive CLI flow, validates the returned token, then saves
+    /// it to the app-owned Keychain item.
     func connect() async throws -> ClaudeAccountSummary {
-        if let envToken = environmentReader("CLAUDE_CODE_OAUTH_TOKEN")?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !envToken.isEmpty {
-            return try await validateAndStore(token: envToken)
-        }
-        let output = try setupTokenRunner()
-        guard let token = Self.extractToken(from: output) else {
-            throw ClaudeSetupTokenError.tokenNotFoundInOutput
-        }
-        return try await validateAndStore(token: token)
-    }
-
-    /// Entry point for the "paste your `claude setup-token` output" affordance,
-    /// used when we cannot spawn the CLI ourselves.
-    func connect(pastedToken: String) async throws -> ClaudeAccountSummary {
-        let trimmed = pastedToken.trimmingCharacters(in: .whitespacesAndNewlines)
-        let token = Self.extractToken(from: trimmed) ?? trimmed
-        guard !token.isEmpty else { throw ClaudeSetupTokenError.tokenNotFoundInOutput }
+        let token = try await capture.captureToken()
         return try await validateAndStore(token: token)
     }
 
@@ -131,7 +115,7 @@ actor ClaudeSetupTokenService {
                 scopes: ["user:profile"],
                 subscriptionType: snapshot.planHint
             )
-            try store.save(confirmed)
+            try await store.save(confirmed)
             return ClaudeAccountSummary(planType: snapshot.planHint)
         case .failure(let error):
             // Deliberately does not carry the token into the thrown error.
@@ -147,37 +131,22 @@ actor ClaudeSetupTokenService {
     /// Scans CLI output for the `sk-ant-oat01-…` token, tolerating banners,
     /// progress lines, quoting and trailing punctuation around it.
     static func extractToken(from output: String) -> String? {
-        for line in output.split(whereSeparator: \.isNewline) {
-            for field in line.split(whereSeparator: { $0.isWhitespace }) {
-                let candidate = field.trimmingCharacters(in: CharacterSet(charactersIn: "\"'`.,;:()[]{}"))
-                if candidate.hasPrefix(tokenPrefix), candidate.count > tokenPrefix.count {
-                    return candidate
-                }
-            }
+        guard let prefixRange = output.range(of: tokenPrefix) else { return nil }
+        var end = prefixRange.upperBound
+        while end < output.endIndex, Self.isTokenCharacter(output[end]) {
+            end = output.index(after: end)
         }
-        return nil
+        let token = String(output[prefixRange.lowerBound..<end])
+        return token.count > tokenPrefix.count ? token : nil
     }
 
-    private static func runSetupToken() throws -> String {
-        let executable = try ClaudeExecutableLocator().locate()
-        let process = Process()
-        process.executableURL = executable
-        process.arguments = ["setup-token"]
-        let output = Pipe()
-        process.standardOutput = output
-        process.standardError = FileHandle.nullDevice
-        do {
-            try process.run()
-        } catch {
-            throw ClaudeSetupTokenError.missingCLI
+    private static func isTokenCharacter(_ character: Character) -> Bool {
+        character.unicodeScalars.allSatisfy { scalar in
+            scalar.isASCII
+                && (CharacterSet.alphanumerics.contains(scalar) || scalar == "-" || scalar == "_")
         }
-        let data = output.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else {
-            throw ClaudeSetupTokenError.setupTokenFailed
-        }
-        return String(data: data, encoding: .utf8) ?? ""
     }
+
 }
 
 /// Wraps an already-obtained credential so it can flow through the existing
@@ -186,7 +155,7 @@ private struct StaticCredentialProvider: ClaudeCredentialProviding {
     let credential: ClaudeOAuthCredential
 
     /// Already in hand — no Keychain involved, so the policy is irrelevant.
-    func loadCredential(promptPolicy: KeychainPromptPolicy = .never) throws -> ClaudeOAuthCredential {
-        credential
+    func resolveCredential(promptPolicy: KeychainPromptPolicy = .never) async throws -> ClaudeCredentialResolution {
+        ClaudeCredentialResolution(credential: credential, method: .setupToken)
     }
 }

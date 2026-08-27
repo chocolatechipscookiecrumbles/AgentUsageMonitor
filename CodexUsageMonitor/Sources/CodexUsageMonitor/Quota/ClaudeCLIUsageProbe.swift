@@ -24,16 +24,15 @@ actor ClaudeCLIUsageProbe {
         This runs the Claude Code CLI on your machine and asks it for your \
         current usage.
 
-        Anthropic charges a small number of tokens for this check — typically \
-        well under $0.04 — which counts against the same quota it reports. \
-        Your regular background refreshes never do this.
+        It may use a small amount of Claude quota. Automatic refreshes never \
+        run it.
 
         Use it when you want to force a fresh reading and the usual sources \
         are unavailable.
         """
 
     static let buttonFootnote =
-        "Runs the Claude Code CLI. Costs a few tokens against your quota, unlike the automatic refreshes."
+        "Runs claude -p /usage once. It may use a small amount of Claude quota; automatic refresh never runs it."
 
     private let runner: @Sendable () throws -> String
 

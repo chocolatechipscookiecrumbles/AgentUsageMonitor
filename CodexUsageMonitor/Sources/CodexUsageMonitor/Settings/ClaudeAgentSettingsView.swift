@@ -13,6 +13,8 @@ struct ClaudeAgentSettingsView: View {
     let connectionState: ClaudeConnectionState
     let usageState: ClaudeUsageState
     let valueMode: QuotaValueMode
+    let credentialMethod: ClaudeSignInMethod?
+    let connectWithSetupToken: () -> Void
     let connectWithCredentials: () -> Void
     let disconnect: () -> Void
     let refresh: () -> Void
@@ -30,7 +32,10 @@ struct ClaudeAgentSettingsView: View {
 
     var body: some View {
         if setupState == .notSetUp {
-            ClaudeSetupOnboardingView(connect: connectWithCredentials)
+            ClaudeSetupOnboardingView(
+                connectWithSetupToken: connectWithSetupToken,
+                connectWithCredentials: connectWithCredentials
+            )
         } else {
             // Built once per render: it does date math and currency formatting,
             // and a computed property would rebuild it at every reference.
@@ -71,6 +76,11 @@ struct ClaudeAgentSettingsView: View {
             if let plan = planName(model) {
                 SettingsSectionRow {
                     SettingsValueRow("Plan", value: plan)
+                }
+            }
+            if let credentialMethod {
+                SettingsSectionRow {
+                    SettingsValueRow("Credentials", value: credentialMethod.displayName)
                 }
             }
             SettingsSectionRow(showsDivider: false) {
@@ -154,10 +164,10 @@ struct ClaudeAgentSettingsView: View {
             SettingsSectionRow(showsDivider: cliProbeError != nil) {
                 // Title, cost footnote and button in one row rather than three.
                 SettingsPreferenceControlRow(
-                    "Claude CLI check",
+                    "Claude /usage",
                     description: ClaudeCLIUsageProbe.buttonFootnote
                 ) {
-                    Button(isRunningCLIProbe ? "Reading…" : "Run check") {
+                    Button(isRunningCLIProbe ? "Reading…" : "Force Read") {
                         if hasConsentedToCLIProbe {
                             runCLIProbe()
                         } else {
@@ -214,6 +224,15 @@ struct ClaudeAgentSettingsView: View {
     @ViewBuilder
     private var connectionActions: some View {
         if showsConnectAction {
+            if ClaudeSetupTokenAvailability.isEnabled {
+                SettingsPreferenceControlRow(
+                    "Setup token",
+                    description: "Claude Code opens sign-in and creates a long-lived token stored in this app’s Keychain item."
+                ) {
+                    Button("Connect", action: connectWithSetupToken)
+                        .disabled(isSigningIn || connectionState == .missingCLI)
+                }
+            }
             // Disclosure sits with the button that triggers the prompt, rather
             // than as a separate full-width block.
             SettingsPreferenceControlRow(

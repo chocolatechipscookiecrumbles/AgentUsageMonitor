@@ -54,11 +54,11 @@ struct ClaudeSignInPresentation: Equatable {
         case .checking:
             nil
         case .missingCLI:
-            "Install the Claude CLI to sign in with a browser, or use Claude Code credentials instead."
+            "Install the Claude CLI to create a setup token, or use Claude Code credentials instead."
         case .notConnected:
             "Sign in to show current five-hour and weekly usage."
-        case .signingIn(.browser):
-            "Finish signing in in your browser."
+        case .signingIn(.setupToken):
+            "Finish the setup-token flow in your browser."
         case .signingIn(.claudeCodeCredentials):
             "Approve the Keychain prompt to continue."
         case .connected(let account):

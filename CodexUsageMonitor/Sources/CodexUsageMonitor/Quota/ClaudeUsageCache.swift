@@ -48,4 +48,12 @@ struct ClaudeUsageCache {
             // Cache is best-effort and must never make a refresh fail.
         }
     }
+
+    func delete() throws {
+        do {
+            try FileManager.default.removeItem(at: fileURL)
+        } catch let error as CocoaError where error.code == .fileNoSuchFile {
+            return
+        }
+    }
 }

@@ -1,6 +1,6 @@
 import Foundation
 
-enum ClaudeOAuthError: Error, Equatable {
+enum ClaudeOAuthError: Error, Equatable, Sendable {
     case credentialsNotFound
     /// macOS refused the cross-app Keychain read — either the grant lapsed, or
     /// the read was made with interaction forbidden. Distinct from
@@ -8,7 +8,7 @@ enum ClaudeOAuthError: Error, Equatable {
     /// there, this app just may not read it right now.
     case credentialAccessDenied
     case insufficientScope
-    case unauthorized
+    case unauthorized(method: ClaudeSignInMethod)
     case malformedResponse
     case serverFailure(statusCode: Int)
     /// HTTP 429. `retryAfter` is the server's `Retry-After` if it sent one; the
@@ -131,10 +131,10 @@ struct ClaudeOAuthUsageSource {
     /// `promptPolicy` defaults to the safe value: a caller that does not think
     /// about it cannot introduce a background Keychain prompt.
     func fetch(promptPolicy: KeychainPromptPolicy = .never) async throws -> ClaudeUsageSnapshot {
-        let credential: ClaudeOAuthCredential
+        let resolution: ClaudeCredentialResolution
         do {
-            credential = try credentialStore.loadCredential(promptPolicy: promptPolicy)
-        } catch ClaudeCredentialError.accessDenied {
+            resolution = try await credentialStore.resolveCredential(promptPolicy: promptPolicy)
+        } catch ClaudeCredentialError.accessDenied, ClaudeCredentialError.interactionNotAllowed {
             // Collapsing this into `credentialsNotFound` is what made a denied
             // read indistinguishable from having never connected, so the UI
             // could only offer a generic outage message.
@@ -142,6 +142,7 @@ struct ClaudeOAuthUsageSource {
         } catch {
             throw ClaudeOAuthError.credentialsNotFound
         }
+        let credential = resolution.credential
         guard credential.scopes.contains("user:profile") else {
             throw ClaudeOAuthError.insufficientScope
         }
@@ -167,7 +168,7 @@ struct ClaudeOAuthUsageSource {
             throw ClaudeOAuthError.malformedResponse
         }
         guard httpResponse.statusCode != 401, httpResponse.statusCode != 403 else {
-            throw ClaudeOAuthError.unauthorized
+            throw ClaudeOAuthError.unauthorized(method: resolution.method)
         }
         guard httpResponse.statusCode != 429 else {
             throw ClaudeOAuthError.rateLimited(retryAfter: Self.retryAfter(from: httpResponse, now: now()))

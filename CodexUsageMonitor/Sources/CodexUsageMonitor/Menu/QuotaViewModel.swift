@@ -19,6 +19,7 @@ final class QuotaViewModel: ObservableObject {
     /// Claude's read cycle, owned here the same way Codex's QuotaMonitor is.
     @Published private(set) var claudeState: ClaudeUsageState = .unavailable(reason: ClaudeUsageState.notConnectedReason)
     @Published private(set) var claudeConnectionState: ClaudeConnectionState = .notConnected
+    @Published private(set) var claudeCredentialMethod: ClaudeSignInMethod?
     /// Result of the last manual CLI probe, so the page can report a failure
     /// the user paid tokens for.
     @Published private(set) var claudeCLIProbeError: String?
@@ -36,6 +37,7 @@ final class QuotaViewModel: ObservableObject {
     /// Settings, and the quota owners so nothing has to guess whether the user
     /// asked for a provider.
     let enrollment: ProviderEnrollmentStore
+    let claudeCredentialSelection: ClaudeCredentialSelectionStore
 
     /// Providers currently connected enough to show a menu-bar reading, in
     /// canonical order. Drives the smart provider selector: with fewer than two,
@@ -65,6 +67,8 @@ final class QuotaViewModel: ObservableObject {
     /// authorization gate and UserDefaults dedup, so it cannot double-fire.
     private let appNotifier: QuotaNotifier?
     private let claudeConnectionController: ClaudeConnectionController
+    private let claudeCredentialRouter: ClaudeCompositeCredentialStore
+    private let claudeUsageCache: ClaudeUsageCache
     private let connectionController: CodexConnectionController
     private var subscriptions: Set<AnyCancellable> = []
     /// Confirmation debounce: newly-enabled thresholds are collected and one
@@ -81,6 +85,23 @@ final class QuotaViewModel: ObservableObject {
         self.settings = settings
         let enrollment = ProviderEnrollmentStore()
         self.enrollment = enrollment
+        let claudeCredentialSelection = ClaudeCredentialSelectionStore(
+            legacyEnrollmentEnabled: enrollment.isEnabled(.claudeCode)
+        )
+        self.claudeCredentialSelection = claudeCredentialSelection
+        self.claudeCredentialMethod = claudeCredentialSelection.selectedMethod
+        let selfIssuedStore = ClaudeSelfIssuedCredentialStore()
+        let orphanCleanupTask: Task<Void, Error>? = claudeCredentialSelection.selectedMethod == nil
+            ? Task { try await selfIssuedStore.delete() }
+            : nil
+        let claudeCredentialRouter = ClaudeCompositeCredentialStore(
+            selectedMethod: claudeCredentialSelection.selectedMethod,
+            selfIssued: selfIssuedStore,
+            borrowed: ClaudeKeychainCredentialStore()
+        )
+        self.claudeCredentialRouter = claudeCredentialRouter
+        let claudeUsageCache = ClaudeUsageCache()
+        self.claudeUsageCache = claudeUsageCache
         claudeSetupState = ClaudeSetupState.resolve(
             connectionState: .notConnected,
             usageState: .unavailable(reason: ClaudeUsageState.notConnectedReason),
@@ -102,7 +123,15 @@ final class QuotaViewModel: ObservableObject {
         self.connectionController = connectionController
         // Claude follows the shared Refresh Preferences like Codex, but its
         // networked OAuth read is floored for endpoint safety.
+        let claudeCollector = ClaudeUsageCollector(
+            oauthSource: ClaudeOAuthUsageSource(credentialStore: claudeCredentialRouter),
+            statusLineReader: ClaudeRateLimitSnapshotReader(),
+            cache: claudeUsageCache,
+            delegatedRefresh: ClaudeDelegatedRefreshCoordinator(),
+            credentialRouter: claudeCredentialRouter
+        )
         let claudeMonitor = ClaudeUsageMonitor(
+            collector: claudeCollector,
             cadence: { [settings] in
                 ClaudeRefreshCadence.pollInterval(for: settings.refreshMode)
             }
@@ -116,20 +145,30 @@ final class QuotaViewModel: ObservableObject {
             ? QuotaNotifier(settings: settings)
             : nil
         self.previousThresholds = settings.enabledQuotaThresholdsByProvider
+        let setupTokenService = ClaudeSetupTokenService(store: selfIssuedStore)
         self.claudeConnectionController = ClaudeConnectionController(
-            browserSignIn: {
-                // Browser sign-in (claude setup-token) is shelved as unverified;
-                // it must not be presented as working. See the spike findings.
-                throw ClaudeSetupTokenError.missingCLI
+            setupTokenSignIn: {
+                try await orphanCleanupTask?.value
+                return try await setupTokenService.connect()
             },
             credentialsSignIn: {
+                try await orphanCleanupTask?.value
                 // Proof of connection is a real usage read. User-initiated, so
                 // this is the one path allowed to raise the Keychain prompt.
-                let source = ClaudeOAuthUsageSource(credentialStore: ClaudeCompositeCredentialStore())
+                let source = ClaudeOAuthUsageSource(credentialStore: ClaudeKeychainCredentialStore())
                 let snapshot = try await source.fetch(
                     promptPolicy: ClaudeRefreshReason.userInitiated.keychainPromptPolicy
                 )
                 return ClaudeAccountSummary(planType: snapshot.planHint)
+            },
+            onMethodSelected: { method in
+                if let method {
+                    claudeCredentialSelection.select(method)
+                    await claudeCredentialRouter.select(method)
+                } else {
+                    claudeCredentialSelection.clear()
+                    await claudeCredentialRouter.clearSelection()
+                }
             }
         )
         displayState = monitor.displayState
@@ -183,7 +222,13 @@ final class QuotaViewModel: ObservableObject {
             self?.updateClaudeSetupState()
             // A successful connect proves the credential works; pull usage now
             // rather than waiting for the next scheduled refresh.
-            if state.isConnected { self?.refreshClaude() }
+            if state.isConnected {
+                self?.claudeMonitor.reconnect()
+                self?.refreshClaude()
+            }
+        }.store(in: &subscriptions)
+        claudeCredentialSelection.$selectedMethod.removeDuplicates().sink { [weak self] method in
+            self?.claudeCredentialMethod = method
         }.store(in: &subscriptions)
         activityMonitor.$states.sink { [weak self] states in
             self?.localActivityStates = states
@@ -315,7 +360,7 @@ final class QuotaViewModel: ObservableObject {
     /// prompt; the credential read it delegates to is the user-initiated step
     /// that may.
     func connectClaude() {
-        connectClaudeWithCredentials()
+        connectClaudeWithSetupToken()
     }
 
     /// User-initiated from Diagnostics: drop the recorded refresh history.
@@ -399,8 +444,15 @@ final class QuotaViewModel: ObservableObject {
     /// prompt for Claude Code's credential.
     func connectClaudeWithCredentials() {
         enrollment.enable(.claudeCode)
-        claudeMonitor.reconnect()
         claudeConnectionController.useClaudeCodeCredentials()
+    }
+
+    /// Primary Claude connection: Anthropic's CLI performs OAuth once and the
+    /// app keeps the returned setup token in its own Keychain item.
+    func connectClaudeWithSetupToken() {
+        guard ClaudeSetupTokenAvailability.isEnabled else { return }
+        enrollment.enable(.claudeCode)
+        claudeConnectionController.signInWithSetupToken()
     }
 
     /// App-local disconnect: hide Claude usage (including passive capture) and
@@ -408,9 +460,18 @@ final class QuotaViewModel: ObservableObject {
     /// Recording `.disabled` also stops Claude's local reads and purges its
     /// derived Token Monitor cache through the existing privacy path.
     func disconnectClaude() {
-        enrollment.disable(.claudeCode)
-        claudeMonitor.disconnect()
-        claudeConnectionController.signOut()
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await claudeCredentialRouter.deleteSelfIssued()
+                await claudeConnectionController.signOut()
+                claudeMonitor.disconnect()
+                try claudeUsageCache.delete()
+                enrollment.disable(.claudeCode)
+            } catch {
+                claudeConnectionController.reportFailure(error)
+            }
+        }
     }
 
     /// Tier 2. Manual only, and only after the user has consented to the

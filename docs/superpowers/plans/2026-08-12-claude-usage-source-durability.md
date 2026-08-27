@@ -30,6 +30,14 @@ Captured 2026-08-12/13 on the development machine. All values are non-secret; no
 | E10 | The same probe's tier 4 showed the **running app** had written a cache at 01:17:14Z — a `.never`-policy read, which can only succeed while the ACL grants access without interaction. Background reads were working too. | probe output |
 | E11 | Only one bundle exists on disk and it is the running process. A second, differently-signed build alternating with the release build is ruled out. | `mdfind`, `ps` |
 
+**2026-08-26 correction to E3–E5.** Those observations describe the original
+failure state, not the current tree. The status-line installer and repair action
+now have production call sites, and a real `claude-rate-limits.json` has been
+observed on this machine. Task 2 Step 5 remains open only for signed-app proof
+that tier 3 serves correctly while tier 1 is deliberately unavailable. See the
+[source audit](../../development/claude-usage-monitor-source-audit-2026-08-26.md)
+for the evidence behind the final source ordering.
+
 **What E1 rules out.** The repository's only documented cause for a returning "Always Allow" prompt is ad-hoc signing, where the designated requirement is the binary's cdhash and changes every build ([PR 1 note](../../pr/1-claude-usage-provider.md), [README](../../../README.md), [release guide](../../development/releasing-on-github.md)). The reported reprompting is happening on a **stably signed, notarized** build, so that explanation does not apply and the real cause is **unidentified**. Task 0 identifies it before anything is built on top of it.
 
 ---
@@ -41,7 +49,7 @@ Captured 2026-08-12/13 on the development machine. All values are non-secret; no
 | **D1** | The 429 back-off gate wraps the whole tier-1 attempt and is not conditioned on the refresh reason, so a **user-initiated** Refresh is skipped for up to 15 minutes. Tier 1 is never entered, so the Keychain is never read, so no permission dialog can appear. | [ClaudeUsageCollector.swift:67](../../../CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeUsageCollector.swift#L67) | "the refresh button doesn't work and I don't get usage data, and the Keychain dialogue isn't triggered" |
 | **D2** | `refreshNow` returns immediately when `isRefreshing` is set. A scheduled refresh holds that flag across an `await` (up to a 10 s request timeout), and the button press lands inside that window silently — no read, no state change, no message. The user's explicit action is discarded in favour of a non-prompting background read. | [ClaudeUsageMonitor.swift:112](../../../CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeUsageMonitor.swift#L112) | same as D1, plus "sometimes" — it depends on timing |
 | **D3** | `oauthBackoffUntil` is in-memory and per-process. The `UsageProbe` CLI runs in a **separate process** with a fresh collector, so it has no back-off state and goes straight to a `.userInitiatedOnly` Keychain read. | [ClaudeUsageCollector.swift:44](../../../CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeUsageCollector.swift#L44), [ClaudeUsageProbeCommand.swift:64](../../../CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeUsageProbeCommand.swift#L64) | "it triggers after I use the CLI force a read refresh" — the CLI is not subject to the app's back-off, so it prompts where the app would not |
-| **D4** | The passive status-line tier is dead in production (E3, E4, E5), so below tier 1 there is only a cache. A denied or backed-off tier 1 therefore means stale-or-nothing. | installer has no call site | "I don't get usage data" |
+| **D4** | Historical defect: the passive status-line tier was dead in production (E3, E4, E5), so below tier 1 there was only a cache. The installer/repair path is now wired; signed-app fallback acceptance remains open. | status-line installer and collector | "I don't get usage data" |
 | **D5** | `ClaudeOAuthUsageSource.fetch` never inspects `credential.expiresAt` and the app never refreshes the borrowed token. An expired borrowed access token produces a 401 that is reported as generic `unauthorized`, indistinguishable from a revoked grant. | [ClaudeOAuthUsageSource.swift:128](../../../CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeOAuthUsageSource.swift#L128) | intermittent loss of live readings on a timescale of hours |
 | **D6** | The Keychain grant's non-persistence on a stably signed build is unexplained. | — | "always allow doesn't seem to work consistently … reprompts after a few hours" |
 
@@ -113,7 +121,7 @@ Ships independently of Task 0's conclusion. This is the reported bug. **Implemen
 
 ## Task 2 — Revive the passive status-line tier as a first-class keychain-free source
 
-**Steps 1–4 implemented 2026-08-16** on `fix/claude-passive-capture-revival`; 10 regressions. Verified read-only against the real machine: its configured command classifies as `repairable — supersededProjectBridge`. **Step 5 remains open** — it needs the user to confirm the repair and run one Claude Code turn.
+**Steps 1–4 implemented 2026-08-16** on `fix/claude-passive-capture-revival`; 10 regressions. The repair has since produced a real `claude-rate-limits.json` snapshot on this machine. **Step 5 remains partially open** — signed-app proof that tier 3 serves while tier 1 is deliberately unavailable has not been recorded.
 
 This is the durable answer to "a more consistent way to get usage": a source that needs **no Keychain grant, no network call of ours, and no token**, and that refreshes on every Claude Code turn.
 
@@ -121,7 +129,7 @@ This is the durable answer to "a more consistent way to get usage": a source tha
 - [x] **Step 2: Distinguish a stale predecessor from a real custom status line.** `install()` today returns `.existingCustomStatusLineFound` for *any* foreign command, including this project's own dead Python bridge pointing at a deleted directory (E3). Add detection for: a command naming a path that does not exist, and a command matching an earlier bridge this project itself installed. Report those as **repairable**, with the exact old and new command shown, and replace only on an explicit confirmation. A genuine third-party status line stays untouched, as today.
 - [x] **Step 3: Surface capture health.** Show when the last snapshot was written, or state that none has ever been. `capturedAt` already flows through [ClaudeRateLimitSnapshotReader](../../../CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeRateLimitSnapshotReader.swift); the missing part is telling the user that the tier is dead rather than merely quiet.
 - [x] **Step 4: Add the reproduced installer regressions.** A settings file whose status-line command points at a missing path is classified repairable; a live third-party command is not; a confirmed repair rewrites only `statusLine` and preserves every other key byte-for-byte; a malformed settings file is still refused.
-- [ ] **Step 5: Verify against a real Claude Code turn.** Install, run one turn, confirm `claude-rate-limits.json` appears with plausible windows, then confirm the app serves tier 3 with tier 1 unavailable. Record it in the verification section — this is the acceptance that E4 currently fails.
+- [ ] **Step 5: Complete signed-app fallback verification.** A real Claude Code turn has produced `claude-rate-limits.json` with plausible windows. Deliberately make tier 1 unavailable, confirm the signed app serves tier 3 without touching any credential source, and record the result in the verification section.
 
 ---
 

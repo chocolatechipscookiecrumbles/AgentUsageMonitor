@@ -46,12 +46,8 @@ enum ClaudeUsageProbeCommand {
     }
 
     static func run() async {
-        // Claude Code credentials is the working default (browser sign-in is
-        // shelved pending a decisive re-test). The recorder reports which
-        // method actually served, so a degrade is never invisible.
-        let recorder = ClaudeEffectiveMethodRecorder()
         let credentialStore = ClaudeCompositeCredentialStore(
-            selectedMethod: .claudeCodeCredentials, recorder: recorder
+            selectedMethod: .claudeCodeCredentials
         )
         let oauthSource = ClaudeOAuthUsageSource(credentialStore: credentialStore)
         let statusLineReader = ClaudeRateLimitSnapshotReader()
@@ -69,10 +65,10 @@ enum ClaudeUsageProbeCommand {
             let snapshot = try await oauthSource.fetch(
                 promptPolicy: ClaudeRefreshReason.userInitiated.keychainPromptPolicy
             )
-            tier1Method = recorder.effectiveMethod?.rawValue
+            tier1Method = await credentialStore.selectedMethodValue()?.rawValue
             let five = snapshot.fiveHour.map { String(format: "%.1f%%", $0.usedPercent) } ?? "—"
             let seven = snapshot.sevenDay.map { String(format: "%.1f%%", $0.usedPercent) } ?? "—"
-            let via = recorder.effectiveMethod.map { " · via \($0.displayName)" } ?? ""
+            let via = await credentialStore.selectedMethodValue().map { " · via \($0.displayName)" } ?? ""
             layers.append(.init(tier: 1, name: "OAuth live fetch", available: true,
                                 detail: "5h \(five) · 7d \(seven) · plan \(snapshot.planHint ?? "unknown")\(via)"))
         } catch {

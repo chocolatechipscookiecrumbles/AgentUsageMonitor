@@ -8,17 +8,17 @@ import Foundation
 final class ClaudeConnectionController: ObservableObject {
     @Published private(set) var state: ClaudeConnectionState = .notConnected
 
-    private let browserSignIn: @Sendable () async throws -> ClaudeAccountSummary
+    private let setupTokenSignIn: @Sendable () async throws -> ClaudeAccountSummary
     private let credentialsSignIn: @Sendable () async throws -> ClaudeAccountSummary
-    private let onMethodSelected: @MainActor (ClaudeSignInMethod?) -> Void
+    private let onMethodSelected: @MainActor (ClaudeSignInMethod?) async -> Void
     private var connectionTask: Task<Void, Never>?
 
     init(
-        browserSignIn: @escaping @Sendable () async throws -> ClaudeAccountSummary,
+        setupTokenSignIn: @escaping @Sendable () async throws -> ClaudeAccountSummary,
         credentialsSignIn: @escaping @Sendable () async throws -> ClaudeAccountSummary,
-        onMethodSelected: @escaping @MainActor (ClaudeSignInMethod?) -> Void = { _ in }
+        onMethodSelected: @escaping @MainActor (ClaudeSignInMethod?) async -> Void = { _ in }
     ) {
-        self.browserSignIn = browserSignIn
+        self.setupTokenSignIn = setupTokenSignIn
         self.credentialsSignIn = credentialsSignIn
         self.onMethodSelected = onMethodSelected
     }
@@ -28,8 +28,8 @@ final class ClaudeConnectionController: ObservableObject {
     }
 
     /// Method (a): delegate the browser OAuth flow to `claude setup-token`.
-    func signInWithBrowser() {
-        beginSignIn(using: .browser, operation: browserSignIn)
+    func signInWithSetupToken() {
+        beginSignIn(using: .setupToken, operation: setupTokenSignIn)
     }
 
     /// Method (b): read Claude Code's existing Keychain credential. This is
@@ -39,11 +39,11 @@ final class ClaudeConnectionController: ObservableObject {
         beginSignIn(using: .claudeCodeCredentials, operation: credentialsSignIn)
     }
 
-    func signOut() {
+    func signOut() async {
         connectionTask?.cancel()
         connectionTask = nil
         state = .notConnected
-        onMethodSelected(nil)
+        await onMethodSelected(nil)
     }
 
     private func beginSignIn(
@@ -56,9 +56,9 @@ final class ClaudeConnectionController: ObservableObject {
             do {
                 let account = try await operation()
                 guard let self, !Task.isCancelled else { return }
+                await onMethodSelected(method)
                 state = .connected(account)
                 connectionTask = nil
-                onMethodSelected(method)
             } catch is CancellationError {
                 guard let self else { return }
                 state = .notConnected
@@ -71,11 +71,19 @@ final class ClaudeConnectionController: ObservableObject {
         }
     }
 
+    func reportFailure(_ error: Error) {
+        state = Self.mappedFailure(error)
+    }
+
     private static func mappedFailure(_ error: Error) -> ClaudeConnectionState {
         if let setupError = error as? ClaudeSetupTokenError {
             switch setupError {
             case .missingCLI:
                 return .missingCLI
+            case .timedOut:
+                return .failed(.setupTokenTimedOut)
+            case .cancelled:
+                return .notConnected
             case .setupTokenFailed, .tokenNotFoundInOutput, .rejected:
                 return .failed(.setupTokenFailed)
             case .usageUnavailable:
@@ -84,8 +92,10 @@ final class ClaudeConnectionController: ObservableObject {
         }
         if let credentialError = error as? ClaudeCredentialError {
             switch credentialError {
-            case .accessDenied:
+            case .accessDenied, .interactionNotAllowed:
                 return .failed(.keychainAccessDenied)
+            case .unexpectedStatus:
+                return .failed(.keychainStorageFailed)
             case .notFound, .malformedData:
                 return .failed(.credentialsNotFound)
             }
