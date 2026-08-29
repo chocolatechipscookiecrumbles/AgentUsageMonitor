@@ -62,6 +62,10 @@ final class ClaudeUsageMonitor: ObservableObject {
     /// Refreshes once immediately so callers see a state without waiting a
     /// full interval, then re-refreshes on the configured cadence.
     func start() {
+        startPolling(refreshImmediately: true)
+    }
+
+    private func startPolling(refreshImmediately: Bool) {
         guard !isDisconnected else { return }
         guard pollTask == nil else { return }
         pollTask = Task { [weak self] in
@@ -69,7 +73,9 @@ final class ClaudeUsageMonitor: ObservableObject {
             // Checked before the launch refresh too: stopping immediately
             // after starting must prevent the read, not just later polls.
             guard !Task.isCancelled else { return }
-            await refreshNow(reason: .appLaunch)
+            if refreshImmediately {
+                await refreshNow(reason: .appLaunch)
+            }
             while !Task.isCancelled {
                 try? await Task.sleep(for: self.pollInterval())
                 guard !Task.isCancelled else { return }
@@ -97,6 +103,18 @@ final class ClaudeUsageMonitor: ObservableObject {
         guard isDisconnected else { return }
         isDisconnected = false
         start()
+    }
+
+    /// Connect already performed the authoritative OAuth read. Publish that
+    /// exact result and begin at the next cadence boundary instead of issuing a
+    /// duplicate read (and potentially a second Keychain prompt) immediately.
+    func reconnect(with snapshot: ClaudeUsageSnapshot) {
+        isDisconnected = false
+        state = Self.mapState(
+            ClaudeUsagePresentation(snapshot: snapshot, delivery: .live, warnings: [])
+        )
+        hasCompletedInitialRefresh = true
+        startPolling(refreshImmediately: false)
     }
 
     /// The reason is load-bearing: it decides whether the Keychain read is

@@ -70,7 +70,7 @@ struct ProviderConnectCard: View {
         case .codex:
             "Connect Codex to show quota and local activity from this Mac."
         case .claudeCode:
-            "Connect through Claude Code to show quota and local activity. The connection may ask for Keychain access."
+            "Connect once to enable passive capture and read Claude Code’s Keychain credential. macOS may ask for permission."
         case .githubCopilot:
             "Connect \(provider.title) to show usage from this Mac."
         }

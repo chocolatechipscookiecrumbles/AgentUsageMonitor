@@ -29,11 +29,10 @@ struct ClaudeMenuContent: View {
                 // Recovery occupies the quota card's slot instead of stacking
                 // below the activity card. The native menu does not scroll, so
                 // showing both cards can extend beyond shorter displays.
-                if case .failed = viewModel.claudeConnectionState {
+                if showsConnectionCard {
                     ClaudeConnectionRecoveryCard(
                         state: viewModel.claudeConnectionState,
-                        connectWithSetupToken: viewModel.connectClaudeWithSetupToken,
-                        connectWithCredentials: viewModel.connectClaudeWithCredentials
+                        connect: viewModel.connectClaude
                     )
                 } else {
                     ClaudeUsageWindowCard(model: model)
@@ -58,8 +57,7 @@ struct ClaudeMenuContent: View {
 
                 ClaudeUnavailableContent(
                     connectionState: viewModel.claudeConnectionState,
-                    connectWithSetupToken: viewModel.connectClaudeWithSetupToken,
-                    connectWithCredentials: viewModel.connectClaudeWithCredentials
+                    connect: viewModel.connectClaude
                 )
             }
 
@@ -70,6 +68,13 @@ struct ClaudeMenuContent: View {
             }
         }
         .padding(.horizontal, MenuPopoverTheme.contentHorizontalPadding)
+    }
+
+    private var showsConnectionCard: Bool {
+        switch viewModel.claudeConnectionState {
+        case .failed, .connecting: true
+        default: false
+        }
     }
 
     @ViewBuilder

@@ -44,7 +44,6 @@ actor ClaudeUsageCollector {
     /// Asks Claude Code to renew its own credential when ours is rejected.
     /// Optional so tests and the CLI probe can opt out of ever spawning a CLI.
     private let delegatedRefresh: ClaudeDelegatedRefreshCoordinator?
-    private let credentialRouter: ClaudeCompositeCredentialStore?
     private let now: @Sendable () -> Date
     /// When the endpoint returns 429, skip the networked OAuth read until this
     /// time and serve local sources. `/api/oauth/usage` rate-limits aggressively
@@ -73,14 +72,12 @@ actor ClaudeUsageCollector {
         statusLineReader: ClaudeRateLimitSnapshotReader,
         cache: ClaudeUsageCache,
         delegatedRefresh: ClaudeDelegatedRefreshCoordinator? = nil,
-        credentialRouter: ClaudeCompositeCredentialStore? = nil,
         now: @escaping @Sendable () -> Date = { .now }
     ) {
         self.oauthSource = oauthSource
         self.statusLineReader = statusLineReader
         self.cache = cache
         self.delegatedRefresh = delegatedRefresh
-        self.credentialRouter = credentialRouter
         self.now = now
     }
 
@@ -117,20 +114,10 @@ actor ClaudeUsageCollector {
                 // waiting for the user to open it. The retry cannot introduce a
                 // second dialog: reaching a 401 proves the Keychain read already
                 // succeeded.
-                if case .unauthorized(let method) = error {
-                    switch method {
-                    case .claudeCodeCredentials:
-                        if let renewed = await renewThroughClaudeCode() {
-                            cache.save(renewed)
-                            return ClaudeUsagePresentation(snapshot: renewed, delivery: .live, warnings: [])
-                        }
-                    case .setupToken:
-                        do {
-                            try await credentialRouter?.invalidateSelfIssued()
-                        } catch {
-                            degradeReason = "Claude rejected the setup token, and its Keychain item could not be removed."
-                        }
-                    }
+                if case .unauthorized = error,
+                   let renewed = await renewThroughClaudeCode(reason: reason) {
+                    cache.save(renewed)
+                    return ClaudeUsagePresentation(snapshot: renewed, delivery: .live, warnings: [])
                 }
                 if degradeReason == nil {
                     degradeReason = Self.explanation(for: error, backoffUntil: oauthBackoffUntil)
@@ -182,9 +169,9 @@ actor ClaudeUsageCollector {
     /// credential and the retried read then succeeded. Anything less returns
     /// nil so the caller degrades and states why, rather than reporting a
     /// recovery that did not happen.
-    private func renewThroughClaudeCode() async -> ClaudeUsageSnapshot? {
+    private func renewThroughClaudeCode(reason: ClaudeRefreshReason) async -> ClaudeUsageSnapshot? {
         guard let delegatedRefresh else { return nil }
-        guard await delegatedRefresh.attempt(reason: .scheduled) == .refreshed else { return nil }
+        guard await delegatedRefresh.attempt(reason: reason) == .refreshed else { return nil }
         // Renewal is automated even if the original read followed a button
         // press. The retry must never raise a second Keychain prompt.
         return try? await oauthSource.fetch(promptPolicy: .never)
@@ -250,13 +237,8 @@ actor ClaudeUsageCollector {
             return "No Claude Code credential was found. Connect Claude to read live usage."
         case .insufficientScope:
             return "The stored Claude credential cannot read usage. Reconnect Claude."
-        case .unauthorized(let method):
-            switch method {
-            case .setupToken:
-                return "Claude rejected the setup token. Connect Claude again to create a new one."
-            case .claudeCodeCredentials:
-                return "Claude rejected the borrowed Claude Code credential. Reconnect Claude Code credentials."
-            }
+        case .unauthorized:
+            return "Claude rejected the Claude Code credential. Use Claude Code, then reconnect here."
         case .serverFailure(let statusCode):
             return "Claude's usage service returned an error (\(statusCode)). Showing the last reading."
         case .transportError:

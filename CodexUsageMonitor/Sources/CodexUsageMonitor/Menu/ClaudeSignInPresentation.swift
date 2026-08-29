@@ -1,36 +1,25 @@
 import Foundation
 
-/// Pure copy/state mapping for the Claude sign-in surface, so the two-method
-/// wording is unit-tested rather than buried in a view body (matching the
-/// MenuBarLabelPresentation / SettingsStatus convention).
 struct ClaudeSignInPresentation: Equatable {
     let title: String
     let detail: String?
     let signInDisabled: Bool
     let showsSignOut: Bool
 
-    /// Shown next to the Claude Code credentials button. The user must know
-    /// what that method grants *before* macOS raises the Keychain dialog.
     static let keychainDisclosure =
-        "Reads the OAuth token Claude Code already stored in your Keychain. macOS will ask for permission."
+        "Reads the OAuth credential Claude Code already stores in your Keychain. macOS asks for permission once."
 
-    /// Shown before connecting, so the user understands the Keychain prompt they
-    /// are about to approve. macOS offers only Allow / Always Allow / Deny, so
-    /// this explains what each actually costs.
     static let keychainPromptExplanation = """
-        macOS asks because this app and Claude Code are different applications, and the token belongs to Claude Code.
+        macOS asks because Agent Monitor and Claude Code are different applications.
 
-        Choose Always Allow to let background refreshes read it. Allow grants one read, so the prompt returns each time you refresh by hand — background refreshes never prompt, they fall back to the passive capture instead.
+        Choose Always Allow so scheduled refreshes can read usage without interrupting you. Agent Monitor never changes or deletes Claude Code’s credential.
         """
 
-    static func make(
-        state: ClaudeConnectionState,
-        activeMethod: ClaudeSignInMethod? = nil
-    ) -> ClaudeSignInPresentation {
+    static func make(state: ClaudeConnectionState) -> ClaudeSignInPresentation {
         ClaudeSignInPresentation(
             title: title(for: state),
-            detail: detail(for: state, activeMethod: activeMethod),
-            signInDisabled: signInDisabled(for: state),
+            detail: detail(for: state),
+            signInDisabled: state == .checking || state == .connecting || state.isConnected,
             showsSignOut: state.isConnected
         )
     }
@@ -38,53 +27,21 @@ struct ClaudeSignInPresentation: Equatable {
     private static func title(for state: ClaudeConnectionState) -> String {
         switch state {
         case .checking: "Checking Claude connection…"
-        case .missingCLI: "Claude CLI not found"
         case .notConnected: "Claude isn’t connected"
-        case .signingIn(let method): "Signing in with \(method.displayName)…"
+        case .connecting: "Connecting Claude…"
         case .connected: "Claude connected"
         case .failed: "Claude connection needs attention"
         }
     }
 
-    private static func detail(
-        for state: ClaudeConnectionState,
-        activeMethod: ClaudeSignInMethod?
-    ) -> String? {
+    private static func detail(for state: ClaudeConnectionState) -> String? {
         switch state {
-        case .checking:
-            nil
-        case .missingCLI:
-            "Install the Claude CLI to create a setup token, or use Claude Code credentials instead."
-        case .notConnected:
-            "Sign in to show current five-hour and weekly usage."
-        case .signingIn(.setupToken):
-            "Finish the setup-token flow in your browser."
-        case .signingIn(.claudeCodeCredentials):
-            "Approve the Keychain prompt to continue."
+        case .checking: nil
+        case .notConnected: "Connect once to show current five-hour and weekly usage."
+        case .connecting: "Approve the Keychain prompt and choose Always Allow."
         case .connected(let account):
-            connectedDetail(account: account, activeMethod: activeMethod)
-        case .failed(let failure):
-            failure.displayMessage
-        }
-    }
-
-    private static func connectedDetail(
-        account: ClaudeAccountSummary,
-        activeMethod: ClaudeSignInMethod?
-    ) -> String? {
-        let via = activeMethod.map { "via \($0.displayName)" }
-        guard let plan = account.planType else { return via }
-        guard let via else { return "Plan: \(plan)" }
-        return "Plan: \(plan) · \(via)"
-    }
-
-    /// Only an in-flight sign-in or an established connection disables the
-    /// buttons — a failure must remain retryable, and a missing CLI must
-    /// still leave the Claude Code credentials method reachable.
-    private static func signInDisabled(for state: ClaudeConnectionState) -> Bool {
-        switch state {
-        case .signingIn, .checking, .connected: true
-        case .notConnected, .failed, .missingCLI: false
+            account.planType.map { "Plan: \($0)" }
+        case .failed(let failure): failure.displayMessage
         }
     }
 }

@@ -68,7 +68,7 @@ final class ClaudeCompositeCredentialStoreTests: XCTestCase {
         XCTAssertEqual(selfIssued.loadCount, 0)
     }
 
-    func testFallsBackToOtherMethodAndReportsEffectiveMethod() throws {
+    func testMissingSelectedMethodDoesNotReadOtherMethod() {
         let selfIssued = SpyCredentialProvider(.failure(.notFound))
         let borrowed = SpyCredentialProvider(.success(credential("borrowed")))
         let recorder = ClaudeEffectiveMethodRecorder()
@@ -76,11 +76,11 @@ final class ClaudeCompositeCredentialStoreTests: XCTestCase {
             selectedMethod: .browser, selfIssued: selfIssued, borrowed: borrowed, recorder: recorder
         )
 
-        let resolution = try store.resolve()
-
-        XCTAssertEqual(resolution.credential.accessToken, "borrowed")
-        XCTAssertEqual(resolution.method, .claudeCodeCredentials, "the degrade must be reported, not masked")
-        XCTAssertEqual(recorder.effectiveMethod, .claudeCodeCredentials)
+        XCTAssertThrowsError(try store.resolve()) { error in
+            XCTAssertEqual(error as? ClaudeCredentialError, .notFound)
+        }
+        XCTAssertEqual(borrowed.loadCount, 0, "borrowed Keychain access must be an explicit user choice")
+        XCTAssertNil(recorder.effectiveMethod)
     }
 
     func testRecordsSelectedMethodWhenNoDegradeHappened() throws {
@@ -97,21 +97,21 @@ final class ClaudeCompositeCredentialStoreTests: XCTestCase {
         XCTAssertEqual(recorder.effectiveMethod, .browser)
     }
 
-    func testThrowsWhenBothMethodsFail() {
+    func testSelectedMethodFailureIsSurfaced() {
+        let borrowed = SpyCredentialProvider(.failure(.accessDenied))
         let store = ClaudeCompositeCredentialStore(
             selectedMethod: .browser,
             selfIssued: SpyCredentialProvider(.failure(.notFound)),
-            borrowed: SpyCredentialProvider(.failure(.accessDenied))
+            borrowed: borrowed
         )
 
         XCTAssertThrowsError(try store.resolve()) { error in
-            // Surfaces the *selected* method's failure so the message matches
-            // what the user chose; the collector then degrades to tier 2/3/4.
             XCTAssertEqual(error as? ClaudeCredentialError, .notFound)
         }
+        XCTAssertEqual(borrowed.loadCount, 0)
     }
 
-    func testInvalidateSelfIssuedDeletesItAndFallsBackToBorrowed() throws {
+    func testInvalidateSelfIssuedDeletesItWithoutReadingBorrowed() {
         let selfIssued = SpyCredentialProvider(.success(credential("self-issued")))
         let borrowed = SpyCredentialProvider(.success(credential("borrowed")))
         let store = ClaudeCompositeCredentialStore(
@@ -119,11 +119,10 @@ final class ClaudeCompositeCredentialStoreTests: XCTestCase {
         )
 
         store.invalidateSelfIssued()
-        let resolution = try store.resolve()
 
         XCTAssertEqual(selfIssued.deleteCount, 1)
-        XCTAssertEqual(resolution.credential.accessToken, "borrowed")
-        XCTAssertEqual(resolution.method, .claudeCodeCredentials)
+        XCTAssertThrowsError(try store.resolve())
+        XCTAssertEqual(borrowed.loadCount, 0)
     }
 
     func testPromptPolicyIsForwardedToTheUnderlyingProvider() throws {
@@ -152,8 +151,7 @@ final class ClaudeCompositeCredentialStoreTests: XCTestCase {
         XCTAssertEqual(borrowed.seenPolicies, [.never], "the default must never be able to prompt")
     }
 
-    /// A degrade must not smuggle an interactive read into the other method.
-    func testDegradePreservesThePromptPolicy() throws {
+    func testFailedSelectedMethodDoesNotForwardPolicyToOtherMethod() {
         let borrowed = SpyCredentialProvider(.success(credential("borrowed")))
         let store = ClaudeCompositeCredentialStore(
             selectedMethod: .browser,
@@ -161,9 +159,9 @@ final class ClaudeCompositeCredentialStoreTests: XCTestCase {
             borrowed: borrowed
         )
 
-        _ = try store.resolve(promptPolicy: .never)
+        XCTAssertThrowsError(try store.resolve(promptPolicy: .never))
 
-        XCTAssertEqual(borrowed.seenPolicies, [.never])
+        XCTAssertEqual(borrowed.seenPolicies, [])
     }
 
     func testLoadCredentialConformanceDelegatesToResolve() throws {

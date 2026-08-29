@@ -109,7 +109,7 @@ struct DataPrivacySettingsView: View {
 
             SettingsSection("Excluded data") {
                 SettingsSectionRow(showsDivider: false) {
-                    SettingsDescription("Except for a selected setup token in the app-owned Keychain item, the app does not store passwords, OAuth tokens, email addresses, prompts, source code, raw provider responses, or raw provider errors. Keychain credentials never enter diagnostics or exports.")
+                    SettingsDescription("The app does not store passwords, OAuth tokens, email addresses, prompts, source code, raw provider responses, or raw provider errors. Keychain credentials remain provider-owned and never enter diagnostics or exports.")
                 }
             }
 

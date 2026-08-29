@@ -13,9 +13,7 @@ struct ClaudeAgentSettingsView: View {
     let connectionState: ClaudeConnectionState
     let usageState: ClaudeUsageState
     let valueMode: QuotaValueMode
-    let credentialMethod: ClaudeSignInMethod?
-    let connectWithSetupToken: () -> Void
-    let connectWithCredentials: () -> Void
+    let connect: () -> Void
     let disconnect: () -> Void
     let refresh: () -> Void
     let isRunningCLIProbe: Bool
@@ -32,10 +30,7 @@ struct ClaudeAgentSettingsView: View {
 
     var body: some View {
         if setupState == .notSetUp {
-            ClaudeSetupOnboardingView(
-                connectWithSetupToken: connectWithSetupToken,
-                connectWithCredentials: connectWithCredentials
-            )
+            ClaudeSetupOnboardingView(connect: connect)
         } else {
             // Built once per render: it does date math and currency formatting,
             // and a computed property would rebuild it at every reference.
@@ -76,11 +71,6 @@ struct ClaudeAgentSettingsView: View {
             if let plan = planName(model) {
                 SettingsSectionRow {
                     SettingsValueRow("Plan", value: plan)
-                }
-            }
-            if let credentialMethod {
-                SettingsSectionRow {
-                    SettingsValueRow("Credentials", value: credentialMethod.displayName)
                 }
             }
             SettingsSectionRow(showsDivider: false) {
@@ -201,7 +191,10 @@ struct ClaudeAgentSettingsView: View {
     /// as connected on both surfaces even if the sign-in button was never
     /// pressed.
     private func status(_ model: ClaudeUsageDisplayModel?) -> ClaudeConnectionStatus {
-        ClaudeConnectionStatus.resolve(signInState: connectionState, usageState: usageState)
+        ClaudeConnectionStatus.resolve(
+            signInState: connectionState,
+            usageState: usageState
+        )
     }
 
     /// Prefers the plan proven by the connection; falls back to the plan hint
@@ -224,22 +217,13 @@ struct ClaudeAgentSettingsView: View {
     @ViewBuilder
     private var connectionActions: some View {
         if showsConnectAction {
-            if ClaudeSetupTokenAvailability.isEnabled {
-                SettingsPreferenceControlRow(
-                    "Setup token",
-                    description: "Claude Code opens sign-in and creates a long-lived token stored in this app’s Keychain item."
-                ) {
-                    Button("Connect", action: connectWithSetupToken)
-                        .disabled(isSigningIn || connectionState == .missingCLI)
-                }
-            }
             // Disclosure sits with the button that triggers the prompt, rather
             // than as a separate full-width block.
             SettingsPreferenceControlRow(
-                "Claude Code credentials",
+                "Claude connection",
                 description: ClaudeSignInPresentation.keychainDisclosure
             ) {
-                Button("Connect", action: connectWithCredentials)
+                Button("Connect", action: connect)
                     .disabled(isSigningIn)
             }
             // The Always Allow / Allow explanation belongs before connecting,
@@ -265,13 +249,14 @@ struct ClaudeAgentSettingsView: View {
     private var showsConnectAction: Bool {
         if isEffectivelyConnected { return false }
         switch connectionState {
-        case .notConnected, .failed, .signingIn, .missingCLI: return true
+        case .notConnected, .failed: return true
         case .checking, .connected: return false
+        case .connecting: return false
         }
     }
 
     private var isSigningIn: Bool {
-        if case .signingIn = connectionState { return true }
+        if case .connecting = connectionState { return true }
         return false
     }
 }

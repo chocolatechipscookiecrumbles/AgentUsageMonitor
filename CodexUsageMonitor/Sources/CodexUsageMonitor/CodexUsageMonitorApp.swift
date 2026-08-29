@@ -2,7 +2,6 @@ import SwiftUI
 import Darwin
 import UserNotifications
 
-@main
 @MainActor
 struct CodexUsageMonitorApp: App {
     @NSApplicationDelegateAdaptor(ApplicationDelegate.self) private var appDelegate

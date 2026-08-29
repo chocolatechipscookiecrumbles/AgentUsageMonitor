@@ -99,7 +99,9 @@ actor ClaudeCLIUsageProbe {
     }
 
     private static func runClaudeUsage() throws -> String {
-        let executable = try ClaudeExecutableLocator().locate()
+        guard let executable = try? ClaudeExecutableLocator().locate() else {
+            throw ClaudeCLIProbeError.missingCLI
+        }
         let process = Process()
         process.executableURL = executable
         // Print mode so the session is non-interactive and exits on its own.

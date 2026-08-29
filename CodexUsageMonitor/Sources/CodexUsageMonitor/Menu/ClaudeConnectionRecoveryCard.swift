@@ -1,19 +1,16 @@
 import SwiftUI
 
-/// Replaces the quota-window card when Claude's connection has actively failed,
-/// so recovery stays reachable without making the non-scrolling menu taller.
-/// Token activity and provenance remain visible below it. Not shown for a
-/// merely-not-connected account, because passive capture needs no connection.
+/// Replaces the quota card while credential access needs attention, keeping
+/// the non-scrolling menu within the display height.
 struct ClaudeConnectionRecoveryCard: View {
     let state: ClaudeConnectionState
-    let connectWithSetupToken: () -> Void
-    let connectWithCredentials: () -> Void
+    let connect: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: MenuPopoverTheme.compactControlSpacing) {
-            Text("Claude connection needs attention")
+            Text(state == .connecting ? "Connecting Claude…" : "Claude connection needs attention")
                 .font(.callout.weight(.semibold))
                 .foregroundStyle(theme.primaryText)
 
@@ -23,30 +20,21 @@ struct ClaudeConnectionRecoveryCard: View {
                 .lineLimit(MenuPopoverTheme.maximumDetailLines)
                 .fixedSize(horizontal: false, vertical: true)
 
-            ClaudeCredentialActions(
-                state: state,
-                connectWithSetupToken: connectWithSetupToken,
-                connectWithCredentials: connectWithCredentials
-            )
+            ClaudeCredentialActions(state: state, connect: connect)
         }
         .padding(.horizontal, MenuPopoverTheme.cardHorizontalPadding)
         .padding(.vertical, MenuPopoverTheme.cardVerticalPadding)
         .background(theme.cardBackground, in: RoundedRectangle(cornerRadius: MenuPopoverTheme.cardCornerRadius))
-        .shadow(
-            color: theme.cardShadow,
-            radius: MenuPopoverTheme.cardShadowRadius,
-            y: MenuPopoverTheme.cardShadowY
-        )
+        .shadow(color: theme.cardShadow, radius: MenuPopoverTheme.cardShadowRadius, y: MenuPopoverTheme.cardShadowY)
     }
 
     private var detail: String {
-        if case .failed(let failure) = state {
-            return failure.displayMessage
+        if state == .connecting {
+            return "Approve the Keychain prompt and choose Always Allow for background updates."
         }
-        return "Reconnect with a setup token or explicitly use Claude Code credentials to restore live updates."
+        if case .failed(let failure) = state { return failure.displayMessage }
+        return "Reconnect to restore live updates. Passive capture remains available after Claude Code’s next turn."
     }
 
-    private var theme: MenuPopoverTheme {
-        MenuPopoverTheme.resolve(for: colorScheme)
-    }
+    private var theme: MenuPopoverTheme { MenuPopoverTheme.resolve(for: colorScheme) }
 }

@@ -35,15 +35,7 @@ enum KeychainPromptPolicy: Equatable, Sendable {
 }
 
 protocol ClaudeCredentialProviding: Sendable {
-    func resolveCredential(promptPolicy: KeychainPromptPolicy) async throws -> ClaudeCredentialResolution
-}
-
-extension ClaudeCredentialProviding {
-    /// Defaults to the safe policy so a call site that forgets to specify one
-    /// can never introduce a background prompt.
-    func loadCredential(promptPolicy: KeychainPromptPolicy = .never) async throws -> ClaudeOAuthCredential {
-        try await resolveCredential(promptPolicy: promptPolicy).credential
-    }
+    func loadCredential(promptPolicy: KeychainPromptPolicy) async throws -> ClaudeOAuthCredential
 }
 
 /// Reads Claude Code's own already-issued OAuth credential from the login
@@ -62,13 +54,10 @@ actor ClaudeKeychainCredentialStore: ClaudeCredentialProviding {
         self.rawDataReader = { _ in rawDataReader() }
     }
 
-    func resolveCredential(promptPolicy: KeychainPromptPolicy) throws -> ClaudeCredentialResolution {
+    func loadCredential(promptPolicy: KeychainPromptPolicy = .never) throws -> ClaudeOAuthCredential {
         switch rawDataReader(promptPolicy) {
         case .success(let data):
-            return ClaudeCredentialResolution(
-                credential: try Self.parse(data),
-                method: .claudeCodeCredentials
-            )
+            return try Self.parse(data)
         case .failure(let error):
             throw error
         }

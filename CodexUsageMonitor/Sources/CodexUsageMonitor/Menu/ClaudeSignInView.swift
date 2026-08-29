@@ -1,19 +1,12 @@
 import SwiftUI
 
-/// The two co-equal Claude credential methods presented side by side, the
-/// direct counterpart of Codex's browser/CLI sign-in pair.
-///
-/// Neither method is a default: the user chooses, so the Keychain ACL grant
-/// in "Use Claude Code credentials…" is always an explicit, disclosed action.
 struct ClaudeSignInView: View {
     let state: ClaudeConnectionState
-    let activeMethod: ClaudeSignInMethod?
-    let signInWithSetupToken: () -> Void
-    let useClaudeCodeCredentials: () -> Void
-    let signOut: () -> Void
+    let connect: () -> Void
+    let disconnect: () -> Void
 
     private var presentation: ClaudeSignInPresentation {
-        ClaudeSignInPresentation.make(state: state, activeMethod: activeMethod)
+        ClaudeSignInPresentation.make(state: state)
     }
 
     var body: some View {
@@ -26,16 +19,10 @@ struct ClaudeSignInView: View {
             }
 
             if presentation.showsSignOut {
-                Button("Sign out of Claude", action: signOut)
+                Button("Disconnect Claude", action: disconnect)
             } else if state != .checking {
                 Divider()
-                Button("Connect with setup token", action: signInWithSetupToken)
-                    .disabled(presentation.signInDisabled || state == .missingCLI)
-                Text("Runs claude setup-token once and stores the token in this app’s Keychain item.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Button("Use Claude Code credentials…", action: useClaudeCodeCredentials)
+                Button("Connect Claude", action: connect)
                     .disabled(presentation.signInDisabled)
                 Text(ClaudeSignInPresentation.keychainDisclosure)
                     .font(.caption)

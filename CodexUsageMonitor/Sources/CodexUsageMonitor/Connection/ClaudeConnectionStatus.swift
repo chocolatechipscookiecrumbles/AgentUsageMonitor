@@ -26,11 +26,11 @@ struct ClaudeConnectionStatus: Equatable {
         let hasLiveRead = usageState.presentation?.delivery == .live
 
         switch signInState {
-        case .signingIn(let method):
+        case .connecting:
             return ClaudeConnectionStatus(
                 isConnected: false,
-                text: "Signing in with \(method.displayName)…",
-                detail: nil
+                text: "Connecting…",
+                detail: "Approve the Keychain prompt and choose Always Allow."
             )
         case .checking:
             return ClaudeConnectionStatus(isConnected: false, text: "Checking…", detail: nil)
@@ -39,12 +39,6 @@ struct ClaudeConnectionStatus: Equatable {
                 isConnected: false,
                 text: "Needs attention",
                 detail: failure.displayMessage
-            )
-        case .missingCLI where !hasLiveRead:
-            return ClaudeConnectionStatus(
-                isConnected: false,
-                text: "Not connected",
-                detail: ClaudeConnectionFailure.missingClaudeCLI.displayMessage
             )
         default:
             break

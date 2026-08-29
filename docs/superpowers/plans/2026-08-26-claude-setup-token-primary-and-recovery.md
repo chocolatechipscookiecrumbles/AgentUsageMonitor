@@ -1,5 +1,11 @@
 # Claude Setup-Token Primary and Explicit Recovery Implementation Plan
 
+> **Superseded 2026-08-29:** A direct Claude Code 2.1.247 `setup-token` run
+> proved callback/token completion; installed CLI semantics and the endpoint's
+> rejection establish that the inference token lacks the `user:profile` scope
+> required by `/api/oauth/usage`. Do not continue this implementation.
+> Follow [Claude Keychain, Passive Usage, and Single-Binary Bridge](./2026-08-29-claude-keychain-statusline-single-binary.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `swift-security-expert` for every credential or Keychain change, `swift-concurrency-pro` for actor/cancellation work, `swiftui-pro` and `writing-for-interfaces` for the Settings/menu surfaces, `systematic-debugging` for the live capability gate, and `verification-before-completion` before any completion claim. Use `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Make an App-Owned Claude Credential created by `claude setup-token` the normal authoritative Claude credential after one connection, retain Borrowed Claude Code Credentials as an explicit compatibility choice, and retain `claude -p /usage` as an explicit Forced Claude Usage Read.
@@ -17,6 +23,16 @@ Per user direction, no tests were added or modified for this implementation and 
 The first user behavioral pass exposed two implementation defects: capture waited for CLI EOF after token emission, and the shared Disconnect control depended on a confirmation dialog despite the documented immediate-action contract. Both boundaries were corrected on 2026-08-26; their signed-app retest remains open in the capability record.
 
 A follow-up user pass found that OAuth/setup still becomes stuck and Disconnect still has no effect. The first corrections are not accepted as behavioral fixes. Both defects remain open and are deliberately deferred for a later focused diagnosis. This pass only compacts the native menu: when a cached Claude reading exists and the connection has failed, recovery replaces the five-hour/weekly quota card instead of stacking beneath it.
+
+The setup-token callback defect now has a focused successor plan:
+[Claude Setup-Token Callback Reliability](./2026-08-28-claude-setup-token-callback-reliability.md).
+That plan supersedes this document's five-minute timeout requirement. The
+Disconnect defect remains separately deferred.
+
+Implementation update 2026-08-28: the successor plan's 20-minute CLI-owned
+authorization lifetime, sanitized progress phases, attempt-safe completion, and
+explicit setup cancellation are implemented. Signed-app behavioral acceptance
+remains open; Disconnect is still a separate unresolved defect.
 
 ## Global Constraints
 

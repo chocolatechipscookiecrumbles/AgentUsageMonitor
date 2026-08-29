@@ -1,71 +1,71 @@
 import Combine
 import Foundation
 
-/// Drives the two co-equal Claude credential methods, mirroring
-/// CodexConnectionController's shape (shared `beginSignIn`, an in-flight task
-/// guard, and typed failure mapping) so both agents behave the same way.
+/// Owns the one explicit Claude connection attempt. The credential belongs to
+/// Claude Code; this controller never creates, stores, refreshes, or deletes it.
 @MainActor
 final class ClaudeConnectionController: ObservableObject {
     @Published private(set) var state: ClaudeConnectionState = .notConnected
 
-    private let setupTokenSignIn: @Sendable () async throws -> ClaudeAccountSummary
-    private let credentialsSignIn: @Sendable () async throws -> ClaudeAccountSummary
-    private let onMethodSelected: @MainActor (ClaudeSignInMethod?) async -> Void
+    private let credentialsSignIn: @Sendable () async throws -> ClaudeUsageSnapshot
+    private let onConnected: @MainActor (ClaudeUsageSnapshot) -> Void
     private var connectionTask: Task<Void, Never>?
+    private var connectionAttemptID: UUID?
 
     init(
-        setupTokenSignIn: @escaping @Sendable () async throws -> ClaudeAccountSummary,
-        credentialsSignIn: @escaping @Sendable () async throws -> ClaudeAccountSummary,
-        onMethodSelected: @escaping @MainActor (ClaudeSignInMethod?) async -> Void = { _ in }
+        credentialsSignIn: @escaping @Sendable () async throws -> ClaudeUsageSnapshot,
+        onConnected: @escaping @MainActor (ClaudeUsageSnapshot) -> Void = { _ in }
     ) {
-        self.setupTokenSignIn = setupTokenSignIn
         self.credentialsSignIn = credentialsSignIn
-        self.onMethodSelected = onMethodSelected
+        self.onConnected = onConnected
     }
 
     deinit {
         connectionTask?.cancel()
     }
 
-    /// Method (a): delegate the browser OAuth flow to `claude setup-token`.
-    func signInWithSetupToken() {
-        beginSignIn(using: .setupToken, operation: setupTokenSignIn)
+    /// Reads Claude Code's Keychain credential. This is the one call allowed to
+    /// raise the cross-app ACL prompt, so it is reached only from Connect.
+    func connect() {
+        beginSignIn { [credentialsSignIn] in
+            try await credentialsSignIn()
+        }
     }
 
-    /// Method (b): read Claude Code's existing Keychain credential. This is
-    /// the call that may raise the cross-app ACL prompt, which is why it is
-    /// only ever reached by an explicit user action.
-    func useClaudeCodeCredentials() {
-        beginSignIn(using: .claudeCodeCredentials, operation: credentialsSignIn)
-    }
-
-    func signOut() async {
+    /// App-local only. No provider credential is changed.
+    func disconnect() {
+        connectionAttemptID = nil
         connectionTask?.cancel()
         connectionTask = nil
         state = .notConnected
-        await onMethodSelected(nil)
     }
 
     private func beginSignIn(
-        using method: ClaudeSignInMethod,
-        operation: @escaping @Sendable () async throws -> ClaudeAccountSummary
+        operation: @escaping @Sendable () async throws -> ClaudeUsageSnapshot
     ) {
         guard connectionTask == nil else { return }
-        state = .signingIn(method)
+        let attemptID = UUID()
+        connectionAttemptID = attemptID
+        state = .connecting
         connectionTask = Task { [weak self] in
             do {
-                let account = try await operation()
-                guard let self, !Task.isCancelled else { return }
-                await onMethodSelected(method)
-                state = .connected(account)
+                let snapshot = try await operation()
+                guard let self,
+                      !Task.isCancelled,
+                      connectionAttemptID == attemptID else { return }
+                state = .connected(ClaudeAccountSummary(planType: snapshot.planHint))
+                onConnected(snapshot)
+                connectionAttemptID = nil
                 connectionTask = nil
             } catch is CancellationError {
-                guard let self else { return }
+                guard let self, connectionAttemptID == attemptID else { return }
                 state = .notConnected
+                connectionAttemptID = nil
                 connectionTask = nil
             } catch {
-                guard let self else { return }
+                guard let self, connectionAttemptID == attemptID else { return }
                 state = Self.mappedFailure(error)
+                connectionAttemptID = nil
                 connectionTask = nil
             }
         }
@@ -76,26 +76,12 @@ final class ClaudeConnectionController: ObservableObject {
     }
 
     private static func mappedFailure(_ error: Error) -> ClaudeConnectionState {
-        if let setupError = error as? ClaudeSetupTokenError {
-            switch setupError {
-            case .missingCLI:
-                return .missingCLI
-            case .timedOut:
-                return .failed(.setupTokenTimedOut)
-            case .cancelled:
-                return .notConnected
-            case .setupTokenFailed, .tokenNotFoundInOutput, .rejected:
-                return .failed(.setupTokenFailed)
-            case .usageUnavailable:
-                return .failed(.usageUnavailable)
-            }
-        }
         if let credentialError = error as? ClaudeCredentialError {
             switch credentialError {
             case .accessDenied, .interactionNotAllowed:
                 return .failed(.keychainAccessDenied)
             case .unexpectedStatus:
-                return .failed(.keychainStorageFailed)
+                return .failed(.keychainAccessDenied)
             case .notFound, .malformedData:
                 return .failed(.credentialsNotFound)
             }

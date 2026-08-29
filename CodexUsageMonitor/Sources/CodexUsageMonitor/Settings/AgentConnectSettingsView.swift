@@ -31,7 +31,7 @@ struct AgentConnectSettingsView: View {
         case .codex:
             "Codex is not connected. Connecting lets Agent Monitor read your five-hour and weekly quota, and read Codex usage records already on this Mac. Nothing is read until you connect."
         case .claudeCode:
-            "Claude is not connected. The primary flow asks Claude Code to create a setup token for Agent Monitor’s own Keychain item. Borrowing Claude Code credentials is a separate action that may ask for Keychain access. Nothing is read until you connect."
+            "Claude is not connected. Connect once to enable passive capture and read Claude Code’s existing Keychain credential. macOS may ask for permission. Nothing is read until you connect."
         case .githubCopilot:
             "\(provider.title) is not connected."
         }

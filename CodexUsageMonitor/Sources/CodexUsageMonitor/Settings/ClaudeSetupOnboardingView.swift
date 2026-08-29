@@ -4,8 +4,7 @@ import SwiftUI
 /// resolver says this app has never held a Claude credential or reading.
 /// Returning users keep the factual page and its recovery details.
 struct ClaudeSetupOnboardingView: View {
-    let connectWithSetupToken: () -> Void
-    let connectWithCredentials: () -> Void
+    let connect: () -> Void
 
     @Environment(\.settingsAppearancePalette) private var palette
 
@@ -26,9 +25,7 @@ struct ClaudeSetupOnboardingView: View {
                     .font(.headline)
 
                 Text(
-                    ClaudeSetupTokenAvailability.isEnabled
-                        ? "Claude Code opens sign-in and creates a long-lived token for Agent Monitor. Agent Monitor stores it in its own Keychain item and does not read Claude Code’s credential."
-                        : "Connect with Claude Code credentials for live usage, or use its status line for passive capture."
+                    "Connect once to read live usage from Claude Code’s existing credential and enable passive capture. Agent Monitor never changes that credential."
                 )
                 .font(.callout)
                 .foregroundStyle(.secondary)
@@ -37,14 +34,9 @@ struct ClaudeSetupOnboardingView: View {
                 .frame(maxWidth: SettingsLayoutMetrics.agentOnboardingTextMaxWidth)
             }
 
-            if ClaudeSetupTokenAvailability.isEnabled {
-                Button("Connect with Claude", action: connectWithSetupToken)
-                    .buttonStyle(.borderedProminent)
-                    .tint(AgentProvider.claudeCode.settingsPresentationTint)
-            }
-
-            Button("Use Claude Code credentials…", action: connectWithCredentials)
-                .buttonStyle(.link)
+            Button("Connect Claude", action: connect)
+                .buttonStyle(.borderedProminent)
+                .tint(AgentProvider.claudeCode.settingsPresentationTint)
 
             Text(ClaudeSignInPresentation.keychainDisclosure)
                 .font(.callout)

@@ -1,4 +1,6 @@
+import Darwin
 import Foundation
+import Security
 
 enum ClaudeStatusLineInstallResult: Equatable {
     case installed
@@ -89,102 +91,103 @@ struct ClaudePassiveCaptureHealth: Equatable {
 /// statusLine or a file that fails to parse as JSON.
 struct ClaudeStatusLineInstaller {
     static let bridgeExecutableName = "claude-usage-bridge"
+    private static let managedDefaultsKey = "claude.passive-capture-managed.v1"
 
     private let settingsURL: URL
+    private let bridgeExecutable: URL
     private let bridgeCommand: String
+    private let managedDefaults: UserDefaults?
 
-    /// Production path: copy the signed bundle's read-only bridge executable to
-    /// app-owned Application Support before pointing Claude Code at it.
+    /// Production path: create an app-owned symlink to this app's signed Mach-O
+    /// under the stable bridge basename. The executable remains in its signed
+    /// bundle (copying it out invalidates its Info.plist-bound signature), while
+    /// basename dispatch still enters bridge mode before SwiftUI/AppKit startup.
     ///
-    /// Copying (rather than pointing into the .app) does two things: it strips
-    /// the quarantine flag so Claude Code can exec the helper without a Gatekeeper
-    /// block, and it keeps the statusLine command stable across app-bundle
-    /// replacement.
+    /// The stable link preserves the already-validated bundle signature and
+    /// lets app launch repair the command target when the app bundle moves.
     init?(
         settingsURL: URL = URL(fileURLWithPath: NSHomeDirectory())
             .appendingPathComponent(".claude/settings.json"),
-        bundledBridgeDirectory: URL? = Bundle.main.resourceURL?
-            .appendingPathComponent("ClaudeUsageBridge"),
+        sourceExecutable: URL? = Bundle.main.executableURL,
         applicationSupportDirectory: URL? = FileManager.default.urls(
             for: .applicationSupportDirectory,
             in: .userDomainMask
         ).first,
         fileManager: FileManager = .default
     ) {
-        guard let bundledBridgeDirectory,
+        guard let sourceExecutable,
               let applicationSupportDirectory,
-              fileManager.fileExists(
-                  atPath: bundledBridgeDirectory
-                      .appendingPathComponent(Self.bridgeExecutableName)
-                      .path
-              ),
-              let bridgeDirectory = try? Self.prepareBridgeDirectory(
-                  bundledBridgeDirectory: bundledBridgeDirectory,
+              fileManager.fileExists(atPath: sourceExecutable.path),
+              let bridgeExecutable = try? Self.prepareBridgeLink(
+                  sourceExecutable: sourceExecutable,
                   applicationSupportDirectory: applicationSupportDirectory,
                   fileManager: fileManager
               )
         else { return nil }
-        self.init(
-            settingsURL: settingsURL,
-            bridgeExecutable: bridgeDirectory.appendingPathComponent(Self.bridgeExecutableName)
-        )
+        self.settingsURL = settingsURL
+        self.bridgeExecutable = bridgeExecutable
+        self.bridgeCommand = "\(Self.shellQuoted(bridgeExecutable.path)) --quiet"
+        self.managedDefaults = .standard
     }
 
     init(settingsURL: URL, bridgeExecutable: URL) {
         self.settingsURL = settingsURL
+        self.bridgeExecutable = bridgeExecutable
         self.bridgeCommand = "\(Self.shellQuoted(bridgeExecutable.path)) --quiet"
+        self.managedDefaults = nil
     }
 
-    static func prepareBridgeDirectory(
-        bundledBridgeDirectory: URL,
+    static func prepareBridgeLink(
+        sourceExecutable: URL,
         applicationSupportDirectory: URL,
         fileManager: FileManager = .default
     ) throws -> URL {
         let parentDirectory = applicationSupportDirectory
             .appendingPathComponent("CodexUsageMonitor", isDirectory: true)
-        let destination = parentDirectory
+        let destinationDirectory = parentDirectory
             .appendingPathComponent("ClaudeBridge", isDirectory: true)
-        let staging = parentDirectory
-            .appendingPathComponent(".ClaudeBridge-\(UUID().uuidString)", isDirectory: true)
+        let destination = destinationDirectory.appendingPathComponent(bridgeExecutableName)
+        let staging = destinationDirectory
+            .appendingPathComponent(".claude-usage-bridge-\(UUID().uuidString)")
 
         try fileManager.createDirectory(
-            at: parentDirectory,
+            at: destinationDirectory,
             withIntermediateDirectories: true
         )
         try fileManager.setAttributes(
             [.posixPermissions: 0o700],
             ofItemAtPath: parentDirectory.path
         )
-        try fileManager.copyItem(at: bundledBridgeDirectory, to: staging)
+        try fileManager.setAttributes(
+            [.posixPermissions: 0o700],
+            ofItemAtPath: destinationDirectory.path
+        )
+        guard hasValidCodeSignature(sourceExecutable) else {
+            throw ClaudeStatusLinePreparationError.invalidCodeSignature
+        }
+        try fileManager.createSymbolicLink(at: staging, withDestinationURL: sourceExecutable)
         defer { try? fileManager.removeItem(at: staging) }
 
-        if fileManager.fileExists(atPath: destination.path) {
-            _ = try fileManager.replaceItemAt(
-                destination,
-                withItemAt: staging,
-                backupItemName: nil
-            )
-        } else {
-            try fileManager.moveItem(at: staging, to: destination)
+        // Validate through the link too, proving the exact command target
+        // resolves to the signed bundle executable.
+        guard hasValidCodeSignature(staging) else {
+            throw ClaudeStatusLinePreparationError.invalidCodeSignature
         }
 
-        // The copied helper must be executable and free of the quarantine flag
-        // so Claude Code can exec it directly. Both are best-effort: a missing
-        // quarantine attribute is the normal case and not an error.
-        let executable = destination.appendingPathComponent(bridgeExecutableName)
-        try? fileManager.setAttributes(
-            [.posixPermissions: 0o755],
-            ofItemAtPath: executable.path
-        )
-        removeQuarantine(executable)
+        // POSIX rename atomically replaces the previous file or symlink without
+        // following it. This also migrates the released copied helper in place.
+        guard rename(staging.path, destination.path) == 0 else {
+            throw ClaudeStatusLinePreparationError.renameFailed(errno)
+        }
         return destination
     }
 
-    /// Best-effort removal of `com.apple.quarantine` from a copied executable.
-    private static func removeQuarantine(_ url: URL) {
-        _ = url.withUnsafeFileSystemRepresentation { path in
-            path.map { removexattr($0, "com.apple.quarantine", 0) }
-        }
+    private static func hasValidCodeSignature(_ url: URL) -> Bool {
+        var code: SecStaticCode?
+        guard SecStaticCodeCreateWithPath(url as CFURL, [], &code) == errSecSuccess,
+              let code else { return false }
+        return SecStaticCodeCheckValidity(code, SecCSFlags(rawValue: kSecCSStrictValidate), nil)
+            == errSecSuccess
     }
 
     /// Single-quotes a path for safe use inside the shell command Claude
@@ -256,6 +259,7 @@ struct ClaudeStatusLineInstaller {
 
         switch inspect() {
         case .installed:
+            managedDefaults?.set(true, forKey: Self.managedDefaultsKey)
             return .alreadyInstalled
         case .settingsUnreadable:
             return .unableToUpdateSettings
@@ -283,6 +287,44 @@ struct ClaudeStatusLineInstaller {
         } catch {
             return .unableToUpdateSettings
         }
+        managedDefaults?.set(true, forKey: Self.managedDefaultsKey)
         return .installed
     }
+
+    /// Removes only the exact statusLine entry installed by this app, then its
+    /// copied executable and passive snapshot. A changed or foreign command is
+    /// preserved even if an old managed marker remains.
+    func uninstallManagedCapture(fileManager: FileManager = .default) {
+        guard managedDefaults?.bool(forKey: Self.managedDefaultsKey) == true else { return }
+        defer { managedDefaults?.removeObject(forKey: Self.managedDefaultsKey) }
+        switch inspect(fileManager: fileManager) {
+        case .installed:
+            guard let data = try? Data(contentsOf: settingsURL),
+                  var root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else { return }
+            root.removeValue(forKey: "statusLine")
+            guard let updated = try? JSONSerialization.data(
+                withJSONObject: root,
+                options: [.prettyPrinted, .sortedKeys]
+            ), (try? updated.write(to: settingsURL, options: .atomic)) != nil else { return }
+        case .notConfigured, .foreign:
+            break
+        case .repairable, .settingsUnreadable:
+            // The command might still reference this path, but is not the
+            // exact managed value. Preserve it until the user repairs it.
+            return
+        }
+
+        try? fileManager.removeItem(at: bridgeExecutable)
+        let snapshot = bridgeExecutable
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("claude-rate-limits.json")
+        try? fileManager.removeItem(at: snapshot)
+    }
+}
+
+enum ClaudeStatusLinePreparationError: Error {
+    case invalidCodeSignature
+    case renameFailed(Int32)
 }

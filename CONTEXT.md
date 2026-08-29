@@ -150,6 +150,20 @@ _Avoid_: Logged-out provider, deleted account, inactive agent
 The immediate app-local action that removes an agent's link, monitoring, and notifications without confirmation and without logging out or deleting its Provider Session.
 _Avoid_: Logout, sign out, revoke credentials
 
+## Claude Usage Sources
+
+**Passive Claude Usage Snapshot**:
+An event-driven `rate_limits` reading emitted through Claude Code's status line after a qualifying response. It contains no credential and is the first source used while it is fresh, but it is not an on-demand account read.
+_Avoid_: Anonymous OAuth, live polling, credential-free login
+
+**Claude Code Credential**:
+The OAuth credential owned and stored by Claude Code. Agent Monitor reads it only after the user explicitly selects **Connect Claude**; macOS may ask once for Keychain permission, and automatic reads never request interaction. Agent Monitor never copies, stores, refreshes, or deletes this credential.
+_Avoid_: App-owned credential, browser OAuth, copied credential, prompt-free credential
+
+**Forced Claude Usage Read**:
+An explicit, user-initiated `claude -p /usage` execution used to recover a current usage reading. It is never scheduled because running it may consume Claude quota.
+_Avoid_: Automatic CLI fallback, background usage check, free refresh
+
 **Agent Status Block**:
 One read-only Context Rail summary for a Paired Agent, showing its identity and current active/connection state. Blocks remain alphabetical while they fit; when they overflow vertically, the Settings Agent is promoted to the top and the rest remain alphabetical. Agent switching belongs to the Agent Selector, not the block.
 _Avoid_: Agent card, connected-only block, provider preview
