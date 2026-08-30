@@ -202,7 +202,7 @@ final class ClaudeDelegatedRefreshTests: XCTestCase {
         private struct Store: ClaudeCredentialProviding {
             func loadCredential(promptPolicy: KeychainPromptPolicy) throws -> ClaudeOAuthCredential {
                 ClaudeOAuthCredential(
-                    accessToken: "t", refreshToken: nil, expiresAt: nil,
+                    accessToken: "t",
                     scopes: ["user:profile"], subscriptionType: "pro"
                 )
             }

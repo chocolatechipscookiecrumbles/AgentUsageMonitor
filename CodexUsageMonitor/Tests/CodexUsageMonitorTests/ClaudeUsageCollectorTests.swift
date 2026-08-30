@@ -37,7 +37,7 @@ final class ClaudeUsageCollectorTests: XCTestCase {
     func testRefreshReturnsLiveWhenOAuthSucceeds() async throws {
         let oauthSource = ClaudeOAuthUsageSource(
             credentialStore: FakeCredentialStore(result: .success(
-                ClaudeOAuthCredential(accessToken: "t", refreshToken: nil, expiresAt: nil, scopes: ["user:profile"], subscriptionType: "pro")
+                ClaudeOAuthCredential(accessToken: "t", scopes: ["user:profile"], subscriptionType: "pro")
             )),
             requestExecutor: { _ in (Self.encodedOAuthFixture(fiveHour: 10.0), Self.httpResponse(200)) }
         )
@@ -104,7 +104,7 @@ final class ClaudeUsageCollectorTests: XCTestCase {
     func testSuccessfulOAuthRefreshUpdatesCache() async throws {
         let oauthSource = ClaudeOAuthUsageSource(
             credentialStore: FakeCredentialStore(result: .success(
-                ClaudeOAuthCredential(accessToken: "t", refreshToken: nil, expiresAt: nil, scopes: ["user:profile"], subscriptionType: "pro")
+                ClaudeOAuthCredential(accessToken: "t", scopes: ["user:profile"], subscriptionType: "pro")
             )),
             requestExecutor: { _ in (Self.encodedOAuthFixture(fiveHour: 21.0), Self.httpResponse(200)) }
         )
@@ -137,7 +137,7 @@ final class ClaudeUsageCollectorTests: XCTestCase {
         let clock = NowBox(Date(timeIntervalSince1970: 1_000_000))
         let oauthSource = ClaudeOAuthUsageSource(
             credentialStore: FakeCredentialStore(result: .success(
-                ClaudeOAuthCredential(accessToken: "t", refreshToken: nil, expiresAt: nil, scopes: ["user:profile"], subscriptionType: "pro")
+                ClaudeOAuthCredential(accessToken: "t", scopes: ["user:profile"], subscriptionType: "pro")
             )),
             requestExecutor: { _ in
                 calls.increment()
@@ -224,7 +224,7 @@ final class ClaudeCollectorPromptPolicyTests: XCTestCase {
         let store = FakeCredentialStore(
             result: .success(
                 ClaudeOAuthCredential(
-                    accessToken: "t", refreshToken: nil, expiresAt: nil,
+                    accessToken: "t",
                     scopes: ["user:profile"], subscriptionType: "pro"
                 )
             ),
@@ -269,45 +269,6 @@ final class ClaudeCollectorPromptPolicyTests: XCTestCase {
         XCTAssertEqual(recorder.recorded, [.userInitiatedOnly])
     }
 
-    func testFreshPassiveSnapshotSkipsCredentialRead() async throws {
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("ClaudePassiveFirst-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-
-        let now = Date(timeIntervalSince1970: 2_000_000)
-        let statusLineURL = directory.appendingPathComponent("rate-limits.json")
-        try Data("""
-        {"schemaVersion":1,"capturedAt":\(now.addingTimeInterval(-30).timeIntervalSince1970),"fiveHour":{"usedPercentage":7.0,"resetsAt":\(now.addingTimeInterval(3600).timeIntervalSince1970)}}
-        """.utf8).write(to: statusLineURL)
-
-        let recorder = PolicyRecorder()
-        let source = ClaudeOAuthUsageSource(
-            credentialStore: FakeCredentialStore(
-                result: .success(ClaudeOAuthCredential(
-                    accessToken: "must-not-be-read", refreshToken: nil, expiresAt: nil,
-                    scopes: ["user:profile"], subscriptionType: "pro"
-                )),
-                policyRecorder: recorder
-            ),
-            requestExecutor: { _ in
-                XCTFail("a fresh passive snapshot must prevent an OAuth request")
-                throw URLError(.cancelled)
-            }
-        )
-        let collector = ClaudeUsageCollector(
-            oauthSource: source,
-            statusLineReader: ClaudeRateLimitSnapshotReader(fileURL: statusLineURL),
-            cache: ClaudeUsageCache(fileURL: directory.appendingPathComponent("cache.json")),
-            now: { now }
-        )
-
-        let result = await collector.refresh(reason: .userInitiated)
-
-        XCTAssertEqual(result.delivery, .passiveSnapshot)
-        XCTAssertEqual(result.snapshot.source, .statusLine)
-        XCTAssertEqual(recorder.recorded, [], "passive-first means no credential provider is invoked")
-    }
 }
 
 /// Tier 3 outranks tier 4 only because a statusLine capture is normally

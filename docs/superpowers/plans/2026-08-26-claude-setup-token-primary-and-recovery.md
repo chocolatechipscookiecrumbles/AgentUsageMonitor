@@ -655,7 +655,7 @@ Expected: both commands exit 0. If `gitleaks` is unavailable, run the repository
 
 ## Reference Files
 
-- `/Users/David/.codex/skills/swift-security-expert/references/keychain-fundamentals.md` — supplied the stable service/account query model, data-protection Keychain requirement, add-or-update pattern, and exhaustive `OSStatus` handling.
-- `/Users/David/.codex/skills/swift-security-expert/references/keychain-access-control.md` — supplied the explicit accessibility-class decision and the rule that interaction-not-allowed is non-destructive and retryable.
-- `/Users/David/.codex/skills/swift-security-expert/references/credential-storage-patterns.md` — supplied actor serialization, device-bound credential lifecycle, logout cleanup, and secret-scanning requirements.
-- `/Users/David/.codex/skills/swift-security-expert/references/testing-security-code.md` — supplied protocol-backed fakes, real-Keychain isolation/cleanup, injected error-path tests, and CI limitations.
+- `swift-security-expert/references/keychain-fundamentals.md` — supplied the stable service/account query model, data-protection Keychain requirement, add-or-update pattern, and exhaustive `OSStatus` handling.
+- `swift-security-expert/references/keychain-access-control.md` — supplied the explicit accessibility-class decision and the rule that interaction-not-allowed is non-destructive and retryable.
+- `swift-security-expert/references/credential-storage-patterns.md` — supplied actor serialization, device-bound credential lifecycle, logout cleanup, and secret-scanning requirements.
+- `swift-security-expert/references/testing-security-code.md` — supplied protocol-backed fakes, real-Keychain isolation/cleanup, injected error-path tests, and CI limitations.

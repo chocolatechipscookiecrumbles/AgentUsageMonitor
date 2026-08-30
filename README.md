@@ -411,15 +411,12 @@ unsolicited implementation pull requests may not be merged. See
   refresh schedule.
 - **`QuotaNotifier`** delivers threshold alerts and confirmations, gated on a single
   notification-permission state and deduplicated per provider.
-- **`ClaudeUsageBridge`** is a separate native executable, bundled and signed inside
-  the app, that turns a Claude Code statusLine payload into the snapshot the app
-  reads. `ClaudeUsageBridgeCore` holds its pure, dependency-free logic so it can be
-  tested directly. This works in 0.0.1, but it creates a second nested code object
-  that must be built, signed, verified, and notarized with the app.
-  [Product Follow-up 10](docs/product/follow-ups.md#10-consolidate-the-claude-usage-bridge-into-the-app-executable)
-  plans to give the main app executable a non-UI status-line bridge mode so the
-  bundle ships one executable binary while preserving the same stdin, privacy,
-  installation, and failure contracts.
+- **`CodexUsageMonitor`** checks for its non-UI Claude status-line bridge mode
+  before SwiftUI or AppKit starts. An app-managed, stable Application Support
+  symlink named `claude-usage-bridge` points to the signed main executable, so
+  Claude Code keeps the same stdin, privacy, installation, and failure contracts
+  while the bundle ships one executable. `ClaudeUsageBridgeCore` holds the pure,
+  dependency-free payload logic.
 - **`AppSettings`** persists preferences; **`LocalDataInventory`** is the single
   declaration of every file the app writes, and both the Data & Privacy page and the
   export action read from it.

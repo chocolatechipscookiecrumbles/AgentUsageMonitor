@@ -22,7 +22,7 @@ final class ClaudeOAuthUsageSourceTests: XCTestCase {
 
     private func credentialStore(scopes: Set<String> = ["user:profile"]) -> ClaudeCredentialProviding {
         FakeCredentialStore(result: .success(
-            ClaudeOAuthCredential(accessToken: "fixture-token", refreshToken: nil, expiresAt: nil, scopes: scopes, subscriptionType: "pro")
+            ClaudeOAuthCredential(accessToken: "fixture-token", scopes: scopes, subscriptionType: "pro")
         ))
     }
 

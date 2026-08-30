@@ -8,7 +8,7 @@
 
 **Tech Stack:** Swift 6.2, SwiftUI and Combine on macOS 14+, Foundation `Process` and `FileHandle`, Security and LocalAuthentication for read-only cross-app Keychain access, Swift Package Manager, `ClaudeUsageBridgeCore`, and the repository's signed-app packaging script.
 
-## Implementation Status — 2026-08-29
+## Implementation Status — through 2026-08-30
 
 Implemented on `feat/claude-setup-token-primary`. The user reported that the
 signed-app smoke test now appears to work; the detailed behavioral and visual
@@ -26,13 +26,14 @@ one Mach-O, the stable basename contract, and rollback replacement path. A signe
 symlink probe validated successfully, wrote only allowlisted fields, exited in
 0.01 seconds, and left no matching process.
 
-No automated tests were authored, maintained, or run during the final
-implementation, per user direction. Pre-existing test edits were preserved;
-because the retired setup-token types are still referenced by the unmaintained
-test target, this branch must remain Draft until that separately authorized
-maintenance occurs. Remaining evidence is the signed-app build/package audit,
-headless bridge probe, and user behavior matrix. Scheduled delegated renewal
-remains disabled because its capability gate is not proven.
+No automated tests were authored or run during the final implementation, per
+user direction. The authorized simplification pass deleted suites coupled only
+to retired setup-token and old connection contracts, removed one broad
+feature-presence case, and mechanically reconciled surviving credential fixtures;
+the test target was deliberately not compiled. Remaining evidence is the
+signed-app build/package audit, headless bridge probe, and user behavior matrix.
+Scheduled delegated renewal remains disabled because its capability gate is not
+proven.
 
 Implementation evidence recorded on 2026-08-29:
 
@@ -48,6 +49,13 @@ Implementation evidence recorded on 2026-08-29:
   script now accepts the configured identity only after an immediate strict
   bundle verification and otherwise emits its existing ad-hoc/ACL-durability
   warning.
+- Follow-up verification on 2026-08-30 rebuilt the macOS scheme and release app
+  successfully. The app is signed by `Developer ID Application: David Wang
+  (C4CSB67T4J)` with hardened runtime; `codesign --verify --deep --strict` reports
+  it valid and satisfying its designated requirement. Gatekeeper rejects this
+  local artifact only as `Unnotarized Developer ID`. The scheme build warned that
+  multiple macOS destinations matched, and `actool` emitted CoreMedia/AVFCore
+  symbol warnings while still producing the asset catalog.
 - Bundle inspection found exactly one Mach-O:
   `Contents/MacOS/CodexUsageMonitor`.
 - A strict-signature-verified stable-basename symlink processed a sanitized
@@ -453,12 +461,11 @@ This is a capability gate, not an assumption. The current implementation calls a
 - [x] Automatic Keychain reads forbid prompts; failures degrade to the freshest local reading with a specific recovery action.
 - [x] `/usage` remains manual and cost-disclosed.
 - [x] The app bundle contains one executable Mach-O; the stable Application Support bridge is a verified symlink to that signed main executable, not a separately built target.
-- [x] Bridge mode initializes no GUI/runtime owners, leaves no process, meets the measured single-invocation cost gate, and preserves field-scoped atomic snapshots. The longer repeated power/sleep matrix remains unobserved.
+- [x] Bridge mode initializes no GUI/runtime owners; the observed sanitized one-shot probe exited after stdin EOF with no child or matching process and preserved field-scoped atomic snapshots. The 30-invocation cost measurement, 100-invocation assertion inspection, and longer repeated power/sleep matrix remain unobserved.
 - [x] Disconnect is implemented as app-local and immediate and never changes Claude Code's credential/session; the user reported a successful smoke test without itemizing this state.
-- [ ] Production compilation and app packaging exit 0, and the build script now
-  requires strict signature verification before it reports the configured
-  identity. Durable Developer ID verification remains blocked by unstable local
-  Keychain identity/trust evaluation even though bundle hashes remain unchanged.
+- [x] Production compilation and app packaging exit 0. The 2026-08-30 artifact
+  passes strict Developer ID signature verification and contains one executable;
+  Gatekeeper rejects it only because this local build is not notarized.
   Behavioral/visual results are reported only from the user's signed-app pass.
 
 ## Explicit Non-Goals

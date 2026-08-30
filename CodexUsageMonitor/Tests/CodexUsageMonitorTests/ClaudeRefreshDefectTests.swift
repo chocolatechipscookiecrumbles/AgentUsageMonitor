@@ -193,8 +193,6 @@ private final class SpyOAuthSource: @unchecked Sendable {
         if outcome == .keychainDenied { throw ClaudeCredentialError.accessDenied }
         return ClaudeOAuthCredential(
             accessToken: "test-token",
-            refreshToken: nil,
-            expiresAt: nil,
             scopes: ["user:profile"],
             subscriptionType: "pro"
         )
