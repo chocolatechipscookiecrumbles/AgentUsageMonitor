@@ -24,26 +24,24 @@ struct ClaudeSetupOnboardingView: View {
                 Text("Set up Claude usage")
                     .font(.headline)
 
-                Text(
-                    "Connect once to read live usage from Claude Code’s existing credential and enable passive capture. Agent Monitor never changes that credential."
-                )
+                Text(ClaudeConnectionCopy.keychainDisclosure)
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: SettingsLayoutMetrics.agentOnboardingTextMaxWidth)
+
+                Text(ClaudeConnectionCopy.keychainPromptExplanation)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: SettingsLayoutMetrics.agentOnboardingTextMaxWidth)
             }
 
             Button("Connect Claude", action: connect)
                 .buttonStyle(.borderedProminent)
                 .tint(AgentProvider.claudeCode.settingsPresentationTint)
-
-            Text(ClaudeSignInPresentation.keychainDisclosure)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: SettingsLayoutMetrics.agentOnboardingTextMaxWidth)
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, SettingsLayoutMetrics.agentOnboardingHorizontalPadding)

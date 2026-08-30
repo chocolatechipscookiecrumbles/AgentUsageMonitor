@@ -79,8 +79,8 @@ struct ClaudePassiveCaptureHealth: Equatable {
 
     var repairActionTitle: String? {
         switch state {
-        case .repairable: return "Repair"
-        case .notConfigured: return "Set Up"
+        case .repairable: return "Repair Passive Capture"
+        case .notConfigured: return "Set Up Passive Capture"
         case .installed, .foreign, .settingsUnreadable: return nil
         }
     }

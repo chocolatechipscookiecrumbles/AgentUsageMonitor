@@ -10,6 +10,11 @@ struct ClaudeCredentialActions: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: MenuPopoverTheme.compactControlTextSpacing) {
+            Text(ClaudeConnectionCopy.keychainDisclosure)
+                .font(.callout)
+                .foregroundStyle(theme.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+
             Button(buttonTitle, action: connect)
                 .buttonStyle(.plain)
                 .font(.caption.weight(.semibold))
@@ -19,11 +24,6 @@ struct ClaudeCredentialActions: View {
                 .background(theme.accent, in: Capsule())
                 .disabled(isDisabled)
                 .opacity(isDisabled ? 0.45 : 1)
-
-            Text(ClaudeSignInPresentation.keychainDisclosure)
-                .font(.caption2)
-                .foregroundStyle(theme.secondaryText)
-                .fixedSize(horizontal: false, vertical: true)
         }
     }
 

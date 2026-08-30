@@ -216,18 +216,15 @@ struct ClaudeAgentSettingsView: View {
     @ViewBuilder
     private var connectionActions: some View {
         if showsConnectAction {
-            // Disclosure sits with the button that triggers the prompt, rather
-            // than as a separate full-width block.
+            // Keep the disclosure with the control it explains so the user
+            // understands both effects before granting access.
             SettingsPreferenceControlRow(
                 "Claude connection",
-                description: ClaudeSignInPresentation.keychainDisclosure
+                description: ClaudeConnectionCopy.connectionDisclosure
             ) {
-                Button("Connect", action: connect)
+                Button(connectionActionTitle, action: connect)
                     .disabled(isSigningIn)
             }
-            // The Always Allow / Allow explanation belongs before connecting,
-            // so the user understands the Keychain prompt they will approve.
-            SettingsDescription(ClaudeSignInPresentation.keychainPromptExplanation)
         }
         if connectionStatus.isConnected {
             SettingsPreferenceControlRow("Connected account") {
@@ -248,5 +245,10 @@ struct ClaudeAgentSettingsView: View {
     private var isSigningIn: Bool {
         if case .connecting = connectionState { return true }
         return false
+    }
+
+    private var connectionActionTitle: String {
+        if case .failed = connectionState { return "Reconnect Claude" }
+        return "Connect Claude"
     }
 }

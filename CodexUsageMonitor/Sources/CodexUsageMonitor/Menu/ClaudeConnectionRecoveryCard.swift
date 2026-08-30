@@ -15,9 +15,8 @@ struct ClaudeConnectionRecoveryCard: View {
                 .foregroundStyle(theme.primaryText)
 
             Text(detail)
-                .font(.caption)
+                .font(.callout)
                 .foregroundStyle(theme.warning)
-                .lineLimit(MenuPopoverTheme.maximumDetailLines)
                 .fixedSize(horizontal: false, vertical: true)
 
             ClaudeCredentialActions(state: state, connect: connect)
@@ -30,7 +29,7 @@ struct ClaudeConnectionRecoveryCard: View {
 
     private var detail: String {
         if state == .connecting {
-            return "Approve the Keychain prompt and choose Always Allow for background updates."
+            return ClaudeConnectionCopy.keychainPromptExplanation
         }
         if case .failed(let failure) = state { return failure.displayMessage }
         return "Reconnect to restore live updates. Passive capture remains available after Claude Code’s next turn."
