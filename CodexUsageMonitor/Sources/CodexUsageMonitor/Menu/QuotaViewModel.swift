@@ -82,11 +82,11 @@ final class QuotaViewModel: ObservableObject {
         self.settings = settings
         let enrollment = ProviderEnrollmentStore()
         self.enrollment = enrollment
-        // Refresh the stable passive-capture symlink after app moves or updates.
-        // Construction does not edit Claude settings; installation remains an
-        // explicit Connect/repair action.
+        // Repair the stable passive-capture symlink after an app move or update
+        // only when Claude is enrolled. The installer separately requires the
+        // durable managed-capture consent recorded by an explicit installation.
         if enrollment.isEnabled(.claudeCode) {
-            _ = ClaudeStatusLineInstaller()
+            ClaudeStatusLineInstaller().repairManagedLinkIfNeeded()
         }
         // Setup-token was experimental and is no longer a credential route.
         // Remove only this app's legacy selection hint; borrowed Claude Code
@@ -399,10 +399,7 @@ final class QuotaViewModel: ObservableObject {
     @Published private(set) var claudePassiveCapture: ClaudePassiveCaptureHealth?
 
     func refreshClaudePassiveCaptureHealth() {
-        guard let installer = ClaudeStatusLineInstaller() else {
-            claudePassiveCapture = nil
-            return
-        }
+        let installer = ClaudeStatusLineInstaller()
         claudePassiveCapture = ClaudePassiveCaptureHealth(
             state: installer.inspect(),
             lastCapturedAt: ClaudeRateLimitSnapshotReader().readSnapshot()?.capturedAt
@@ -413,8 +410,7 @@ final class QuotaViewModel: ObservableObject {
     /// behind. `replacingExisting` is the user's explicit confirmation; a
     /// working third-party status line is never replaced either way.
     func configureClaudePassiveCapture(replacingExisting: Bool) {
-        guard let installer = ClaudeStatusLineInstaller() else { return }
-        _ = installer.install(replacingExisting: replacingExisting)
+        _ = ClaudeStatusLineInstaller().install(replacingExisting: replacingExisting)
         refreshClaudePassiveCaptureHealth()
     }
 
@@ -429,7 +425,7 @@ final class QuotaViewModel: ObservableObject {
         claudeMonitor.disconnect()
         enrollment.disable(.claudeCode)
         try? claudeUsageCache.delete()
-        ClaudeStatusLineInstaller()?.uninstallManagedCapture()
+        ClaudeStatusLineInstaller().uninstallManagedCapture()
         claudePassiveCapture = nil
         Task { _ = await ClaudeLegacySetupTokenCleanup().removeAppOwnedCredential() }
     }
