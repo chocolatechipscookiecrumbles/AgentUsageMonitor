@@ -45,14 +45,14 @@ struct DataPrivacySettingsView: View {
                 }
             }
 
-            // Claude can use an app-owned Keychain item or an explicitly
-            // borrowed Claude Code item, plus a file another program writes.
+            // Claude Code owns the only credential this app reads. Agent
+            // Monitor never copies it into an app-owned Keychain item.
             SettingsSection("Claude Code") {
                 SettingsSectionRow {
                     SettingsValueRow(
                         "Credentials",
-                        value: "Stored or explicitly borrowed",
-                        description: "Setup-token sign-in stores one long-lived token in this app’s device-bound Keychain item. The compatibility action instead reads Claude Code’s item after you choose it; the two methods never switch automatically."
+                        value: "Borrowed from Claude Code",
+                        description: "After Connect Claude, Agent Monitor reads Claude Code’s existing OAuth credential in memory. It never stores, changes, directly refreshes, exports, or deletes that credential."
                     )
                 }
                 SettingsSectionRow {
@@ -72,7 +72,7 @@ struct DataPrivacySettingsView: View {
                 // to use Claude support is an informed choice.
                 SettingsSectionRow(showsDivider: false) {
                     SettingsDescription(
-                        "Anthropic does not publish the Claude usage endpoint as a third-party app contract. The compatibility method also reuses Claude Code’s credential, which Anthropic’s Terms of Service do not permit. Either method may carry account-enforcement risk; turning off Claude stops all reads."
+                        "Anthropic does not publish the Claude usage endpoint as a third-party app contract. Reusing Claude Code’s credential is not permitted by Anthropic’s Terms of Service and may carry account-enforcement risk. Turning off Claude stops all reads."
                     )
                 }
             }
@@ -115,7 +115,7 @@ struct DataPrivacySettingsView: View {
 
             SettingsSection("Export") {
                 SettingsSectionRow {
-                    SettingsDescription("Writes every store listed above to one JSON file you choose. A store this Mac has not written yet is named and marked unavailable rather than left out. Nothing outside this app's own folder is included — not either Claude Keychain item, and not the agents' own records.")
+                    SettingsDescription("Writes every store listed above to one JSON file you choose. A store this Mac has not written yet is named and marked unavailable rather than left out. Nothing outside this app's own folder is included — not Claude Code’s Keychain credential, and not the agents' own records.")
                 }
                 SettingsSectionRow {
                     VStack(alignment: .leading, spacing: SettingsLayoutMetrics.preferenceTitleDescriptionSpacing) {

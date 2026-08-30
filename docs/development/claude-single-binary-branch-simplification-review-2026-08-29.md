@@ -47,6 +47,18 @@ documentation without adding, rewriting, compiling, or running tests. This is a
 deliberate no-test/no-visual boundary: behavioral and visual acceptance remain
 user-owned rather than implied by these static changes.
 
+Final whole-branch review also found lifecycle behavior that the original
+simplification list did not cover. The follow-through makes **Connect Claude**
+and **Reconnect Claude** the only prompt-capable credential actions; ordinary
+Refresh and every automatic path are noninteractive. A failed Connect resumes
+passive monitoring, Disconnect invalidates and awaits in-flight collection
+before deleting app-owned cache, and a later successful OAuth result clears a
+typed credential failure. The privacy and verification guidance now describes
+the same one borrowed credential, passive-first collector, and main-executable
+bridge that production implements. These are correctness fixes, not additional
+abstractions; the original reasons and revision options below remain the audit
+record.
+
 ## Standards
 
 ### Hard violations

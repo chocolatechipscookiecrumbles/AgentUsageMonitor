@@ -16,8 +16,11 @@ matrix below was not itemized and remains open. Production compilation succeeds.
 method selection, app-owned credential store, and separate bridge product were
 removed. **Connect Claude** now enrolls safe passive capture and validates Claude
 Code's existing Keychain credential; Disconnect immediately clears app-local
-state and exact managed artifacts. The signed main executable supplies early
-bridge mode through a stable Application Support symlink.
+state, invalidates and awaits active collection before deleting exact managed
+artifacts, and leaves Claude Code signed in. A failed Connect resumes passive,
+noninteractive monitoring, while a later successful OAuth result clears a typed
+credential failure. The signed main executable supplies early bridge mode
+through a stable Application Support symlink.
 
 The planned copied-main capability gate failed as designed: strict `codesign`
 verification reported an invalid Info.plist when the executable was removed
@@ -86,7 +89,7 @@ The working user-observed path is Claude Code's existing Keychain credential. Th
 
 - “No user input” means **unattended steady state after one informed enrollment action**. A first-run zero-input guarantee is impossible: the app cannot silently authenticate a Claude account, choose macOS's **Always Allow** Keychain decision, or modify `~/.claude/settings.json` without prior consent.
 - The enrollment action must disclose both effects before they happen: read Claude Code's OAuth credential from Keychain, and install/repair Agent Monitor's privacy-scoped status line only when no unrelated working status line would be replaced.
-- Automatic refreshes use `KeychainPromptPolicy.never`. They fail closed to status-line/cache and never raise a Keychain dialog.
+- Only **Connect Claude** and **Reconnect Claude** may use an interactive Keychain read. Ordinary Refresh and every automatic refresh use `KeychainPromptPolicy.never`; they fail closed to status-line/cache and never raise a Keychain dialog.
 - The app never stores, mirrors, refreshes directly, logs, prints, diagnoses, or exports Claude Code's token. It exists only in memory for the request that needs it.
 - Do not revive `claude setup-token`, accept `CLAUDE_CODE_OAUTH_TOKEN`, read `.credentials.json` as an undisclosed fallback, shell out to `security` as a prompt workaround, or implement direct PKCE with Claude Code's client identity.
 - `/usage` remains a separate, explicit, cost-disclosed recovery action. It is never scheduled or cascaded from an OAuth failure.
@@ -274,6 +277,7 @@ The stable symlink resolves to the signed executable inside the app bundle. Earl
 ### Step 1.4: Fix Disconnect as part of ownership simplification
 
 - [x] Disconnect first clears app-local enrollment and stops monitors, then removes app-owned cache/snapshot/status-line artifacts. It never deletes or modifies `Claude Code-credentials` or signs Claude Code out.
+- [x] Disconnect invalidates and cancels in-flight collection, awaits its exit, and only then removes app-owned cache. A quick re-enrollment prevents the old disconnect operation from deleting newly established state.
 - [x] Obsolete-token cleanup and file deletion are independent best-effort operations. One failure cannot prevent the button from changing the visible state to disconnected.
 - [ ] If removing a managed status-line entry fails, show that specific residual-artifact warning in Settings while leaving the provider disconnected. This residual warning remains a follow-up.
 
@@ -300,6 +304,7 @@ The stable symlink resolves to the signed executable inside the app bundle. Earl
 - [x] When status line is absent, install it under this action's consent. Preserve a foreign working status line and continue with Keychain OAuth.
 - [x] Persist only a non-secret managed-capture flag after successful installation/migration. Once set, app launches may atomically repair only the exact command Agent Monitor owns.
 - [x] If the user chooses **Allow** rather than **Always Allow**, Connect may succeed for that read, but later automatic reads fail closed to passive/cache. Recovery copy explains the next action without repeatedly prompting.
+- [x] A failed Connect returns to passive, noninteractive monitoring instead of leaving collection paused. Ordinary **Refresh** never inherits the prompt-capable Connect policy.
 - [x] Keep the existing recovery-card geometry: when OAuth needs attention, recovery replaces the quota card instead of stacking below it.
 - [x] Use shared Settings components and wrapping callout copy; do not introduce `Form`, unbounded controls, caption-sized recovery text, or new geometry constants outside `SettingsLayoutMetrics`.
 - [x] Compile the production product. Light/Dark, small-screen, keyboard, VoiceOver, prompt, and detailed Disconnect behavior remain in the user's signed-app matrix.
@@ -403,6 +408,7 @@ This is a capability gate, not an assumption. The current implementation calls a
   - passive capture conflict: “Claude Code already has a custom status line. Agent Monitor left it unchanged.”
 
 - [x] Disconnect changes visible state immediately, stops quota and local-activity owners, removes exact app-managed status-line configuration and snapshots/cache, and leaves Claude Code signed in.
+- [x] Typed missing/denied/scope credential failures propagate from usage presentation to the connection surface, and a later successful OAuth result restores the connected state.
 - [x] Preserve the recovery-over-quota layout, native controls, shared Settings rows, intrinsic provider height, and existing menu hit targets.
 - [ ] Do not claim the full UI matrix fixed until the user performs the signed-app prompt, Connect, Refresh, Disconnect, small-screen, Light/Dark, keyboard, and VoiceOver pass. The user-reported smoke test is recorded without expanding its scope.
 

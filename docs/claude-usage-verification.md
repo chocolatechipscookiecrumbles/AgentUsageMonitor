@@ -13,20 +13,20 @@ real-machine smoke check, not a substitute for the automated suite.
 
 | Tier | Source | Runtime status |
 |---|---|---|
-| 1 | OAuth usage endpoint using Claude Code's Keychain credential | Active |
-| 2 | Claude CLI `/usage` | Manual-only; costs tokens |
-| 3 | Passive `statusLine` snapshot written by the bundled native bridge | Active |
+| 1 | Fresh passive `statusLine` snapshot written by main-executable bridge mode | Active; no credential or network |
+| 2 | OAuth usage endpoint using Claude Code's existing Keychain credential | Active |
+| 3 | Claude CLI `/usage` | Manual-only; costs tokens |
 | 4 | App-owned last-known-good cache | Active |
 
-Browser/setup-token sign-in is shelved as unverified and is not offered by the
-shipped UI. The app may still read an existing app-owned credential or
-`CLAUDE_CODE_OAUTH_TOKEN` as a compatibility fallback, but it does not create a
-new setup-token credential through the release interface.
+Browser/setup-token sign-in, app-owned Claude credentials, method selection, and
+environment-token fallback are retired and absent from production. The only
+authoritative credential route reads Claude Code's existing OAuth credential in
+memory after explicit connection consent.
 
-> **Keychain prompt boundary:** only an explicit user action may allow the
-> cross-app Keychain prompt. Launch, scheduled refresh, wake refresh, and passive
-> source discovery use a no-interaction query and must fail or degrade instead of
-> raising a dialog.
+> **Keychain prompt boundary:** only **Connect Claude** or **Reconnect Claude**
+> may allow the cross-app Keychain prompt. Ordinary Refresh, launch, scheduled
+> refresh, wake refresh, and passive source discovery use a no-interaction query
+> and must fail or degrade instead of raising a dialog.
 
 ## 1. Automated gate
 
@@ -67,7 +67,7 @@ reappear after rebuilds.
 ## 3. Explicit Claude Code credential connection
 
 1. Open **Settings → Agents → Claude Code**.
-2. Select **Use Claude Code credentials…** (or the equivalent first-run action).
+2. Select **Connect Claude**.
 3. Confirm macOS may present the `Claude Code-credentials` Keychain prompt.
 4. Approve the read.
 5. Confirm the page resolves to the regular connection/status surface and a
@@ -82,8 +82,8 @@ After quitting the app, remove only the app's Keychain authorization through
 Keychain Access if you need to reproduce a first-access state. Do not delete
 Claude Code's credential.
 
-1. Launch the signed app and do not press a Claude connection or manual-refresh
-   control.
+1. Launch the signed app and do not press **Connect Claude** or **Reconnect Claude**.
+   Ordinary **Refresh** may be used and must remain noninteractive.
 2. Leave it running through a scheduled refresh.
 3. Wake the Mac or trigger the configured wake refresh.
 
@@ -92,7 +92,8 @@ or recovery state, but an automatic refresh must never interrupt the user.
 
 ## 5. Manual diagnostic probe
 
-The headless probe is explicitly user-initiated and may show the Keychain prompt:
+The headless probe runs the real collector once with Keychain interaction
+forbidden:
 
 ```sh
 cd CodexUsageMonitor
@@ -101,10 +102,11 @@ cd CodexUsageMonitor
 
 Expected report properties:
 
-- `tier1Method` is `claudeCodeCredentials` when Claude Code's item served;
-- tier 2 says it is manual-only, not unimplemented;
-- tier 3 reports a passive snapshot when `claude-rate-limits.json` exists;
+- tier 1 reports a passive snapshot only when it is fresh enough for the fast path;
+- tier 2 reports OAuth only when the one noninteractive collector run succeeds;
+- tier 3 states that `/usage` is manual-only and was not run;
 - tier 4 reports the cached last-known-good when present;
+- `processNote` states that no preliminary credential read occurred;
 - no access token, refresh token, email, prompt, response, path, or raw provider
   payload is printed.
 
@@ -117,14 +119,16 @@ this command on a timer or treat it as part of the automatic collector.
 
 ## 7. Native passive bridge
 
-The signed app bundles `claude-usage-bridge`, copies it to:
+The signed app creates a stable symlink at:
 
 ```text
 ~/Library/Application Support/CodexUsageMonitor/ClaudeBridge/claude-usage-bridge
 ```
 
-and can merge a `statusLine` command into `~/.claude/settings.json` without
-overwriting an unrelated custom status line.
+The symlink targets the signed main executable inside the `.app`; basename
+dispatch enters bridge mode before SwiftUI/AppKit. The app can merge this stable
+command into `~/.claude/settings.json` without overwriting an unrelated custom
+status line.
 
 Inspect only the configured command and the normalized snapshot:
 
@@ -135,8 +139,8 @@ plutil -p ~/Library/Application\ Support/CodexUsageMonitor/claude-rate-limits.js
 
 Expected:
 
-- the command points at the copied native executable, not Python or the source
-  checkout;
+- the command points at the stable symlink to the signed main executable, not
+  Python, a copied helper, or the source checkout;
 - the snapshot contains schema/capture metadata and normalized rate-limit
   windows only;
 - its freshness advances only when Claude Code renders a status line.
