@@ -226,10 +226,10 @@ struct ClaudeAgentSettingsView: View {
                     .disabled(isSigningIn)
             }
         }
-        if connectionStatus.isConnected {
-            SettingsPreferenceControlRow("Connected account") {
-                AgentDisconnectButton(provider: .claudeCode, disconnect: disconnect)
-            }
+        SettingsPreferenceControlRow(
+            connectionStatus.isConnected ? "Connected account" : "Claude enrollment"
+        ) {
+            AgentDisconnectButton(provider: .claudeCode, disconnect: disconnect)
         }
     }
 

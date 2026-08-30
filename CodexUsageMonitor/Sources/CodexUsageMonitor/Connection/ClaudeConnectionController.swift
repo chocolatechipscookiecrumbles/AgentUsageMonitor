@@ -9,15 +9,18 @@ final class ClaudeConnectionController: ObservableObject {
 
     private let credentialsSignIn: @Sendable () async throws -> ClaudeUsageSnapshot
     private let onConnected: @MainActor (ClaudeUsageSnapshot) -> Void
+    private let onConnectionFailed: @MainActor () -> Void
     private var connectionTask: Task<Void, Never>?
     private var connectionAttemptID: UUID?
 
     init(
         credentialsSignIn: @escaping @Sendable () async throws -> ClaudeUsageSnapshot,
-        onConnected: @escaping @MainActor (ClaudeUsageSnapshot) -> Void = { _ in }
+        onConnected: @escaping @MainActor (ClaudeUsageSnapshot) -> Void = { _ in },
+        onConnectionFailed: @escaping @MainActor () -> Void = {}
     ) {
         self.credentialsSignIn = credentialsSignIn
         self.onConnected = onConnected
+        self.onConnectionFailed = onConnectionFailed
     }
 
     deinit {
@@ -39,9 +42,9 @@ final class ClaudeConnectionController: ObservableObject {
                       !Task.isCancelled,
                       connectionAttemptID == attemptID else { return }
                 state = .connected(ClaudeAccountSummary(planType: snapshot.planHint))
-                onConnected(snapshot)
                 connectionAttemptID = nil
                 connectionTask = nil
+                onConnected(snapshot)
             } catch is CancellationError {
                 guard let self, connectionAttemptID == attemptID else { return }
                 state = .notConnected
@@ -52,8 +55,22 @@ final class ClaudeConnectionController: ObservableObject {
                 state = Self.mappedFailure(error)
                 connectionAttemptID = nil
                 connectionTask = nil
+                onConnectionFailed()
             }
         }
+    }
+
+    /// Applies credential health learned by the monitor without competing with
+    /// the explicit interactive connection task.
+    func applyCredentialFailure(_ failure: ClaudeConnectionFailure) {
+        guard connectionTask == nil else { return }
+        state = .failed(failure)
+    }
+
+    /// A live OAuth result proves that the borrowed credential works again.
+    func applyLiveOAuthSnapshot(_ snapshot: ClaudeUsageSnapshot) {
+        guard connectionTask == nil else { return }
+        state = .connected(ClaudeAccountSummary(planType: snapshot.planHint))
     }
 
     /// App-local only. No provider credential is changed.

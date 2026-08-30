@@ -5,14 +5,15 @@ enum ClaudeRefreshReason: Sendable, Equatable {
     case scheduled
     case menuOpened
     case userInitiated
+    case credentialConnection
 
-    /// Only an explicit user action may raise the Keychain dialog. Every
-    /// automatic refresh reads with interaction forbidden, so a scheduled
-    /// poll can never interrupt the user with a permission prompt.
+    /// Only the explicit Connect flow may raise the Keychain dialog. Ordinary
+    /// Refresh remains user-initiated for back-off and coalescing purposes, but
+    /// reads with interaction forbidden like every automatic refresh.
     var keychainPromptPolicy: KeychainPromptPolicy {
         switch self {
-        case .userInitiated: .userInitiatedOnly
-        case .appLaunch, .scheduled, .menuOpened: .never
+        case .credentialConnection: .userInitiatedOnly
+        case .appLaunch, .scheduled, .menuOpened, .userInitiated: .never
         }
     }
 }
@@ -55,13 +56,12 @@ actor ClaudeUsageCollector {
     /// Status-line data arrives immediately after a Claude response. Within
     /// this short window it is fresher than another network read and lets the
     /// app avoid all credential access.
-    private static let passiveFastPathFreshness: TimeInterval = 2 * 60
+    static let passiveFastPathFreshness: TimeInterval = 2 * 60
 
     /// A press is allowed through the back-off, because a back-off the user
-    /// cannot see or override is indistinguishable from a broken button — the
-    /// read never reaches the Keychain, so not even the permission dialog
-    /// appears. The allowance is bounded so a held-down button still cannot
-    /// compound a 429.
+    /// cannot see or override is indistinguishable from a broken button. The
+    /// allowance is bounded so a held-down button still cannot compound a 429;
+    /// it does not change the noninteractive Keychain policy.
     private var lastBypassAt: Date?
     private var bypassCount = 0
     private static let minimumBypassInterval: TimeInterval = 60
@@ -83,7 +83,7 @@ actor ClaudeUsageCollector {
 
     func refresh(reason: ClaudeRefreshReason) async -> ClaudeUsagePresentation {
         if let passive = freshPassiveSnapshot() {
-            cache.save(passive)
+            saveIfNotCancelled(passive)
             return ClaudeUsagePresentation(snapshot: passive, delivery: .passiveSnapshot, warnings: [])
         }
 
@@ -91,6 +91,7 @@ actor ClaudeUsageCollector {
         // without one must say so: a pressed button that changes nothing on
         // screen and explains nothing is itself the defect being fixed here.
         var degradeReason: String?
+        var credentialFailure: ClaudeConnectionFailure?
 
         switch tierOneAttempt(for: reason) {
         case .suppressed(let notice):
@@ -100,7 +101,7 @@ actor ClaudeUsageCollector {
             do {
                 let snapshot = try await oauthSource.fetch(promptPolicy: reason.keychainPromptPolicy)
                 clearBackoff()
-                cache.save(snapshot)
+                saveIfNotCancelled(snapshot)
                 return ClaudeUsagePresentation(snapshot: snapshot, delivery: .live, warnings: [])
             } catch let error as ClaudeOAuthError {
                 if case .rateLimited(let retryAfter) = error {
@@ -116,9 +117,10 @@ actor ClaudeUsageCollector {
                 // succeeded.
                 if case .unauthorized = error,
                    let renewed = await renewThroughClaudeCode(reason: reason) {
-                    cache.save(renewed)
+                    saveIfNotCancelled(renewed)
                     return ClaudeUsagePresentation(snapshot: renewed, delivery: .live, warnings: [])
                 }
+                credentialFailure = Self.credentialFailure(for: error)
                 if degradeReason == nil {
                     degradeReason = Self.explanation(for: error, backoffUntil: oauthBackoffUntil)
                 }
@@ -138,12 +140,22 @@ actor ClaudeUsageCollector {
         let warnings = degradeReason.map { [$0] } ?? []
 
         if let statusLine, cached.map({ statusLine.capturedAt >= $0.capturedAt }) ?? true {
-            cache.save(statusLine)
-            return ClaudeUsagePresentation(snapshot: statusLine, delivery: .passiveSnapshot, warnings: warnings)
+            saveIfNotCancelled(statusLine)
+            return ClaudeUsagePresentation(
+                snapshot: statusLine,
+                delivery: .passiveSnapshot,
+                warnings: warnings,
+                credentialFailure: credentialFailure
+            )
         }
 
         if let cached {
-            return ClaudeUsagePresentation(snapshot: cached, delivery: .cached, warnings: warnings)
+            return ClaudeUsagePresentation(
+                snapshot: cached,
+                delivery: .cached,
+                warnings: warnings,
+                credentialFailure: credentialFailure
+            )
         }
 
         return ClaudeUsagePresentation(
@@ -152,8 +164,14 @@ actor ClaudeUsageCollector {
                 source: .oauth, capturedAt: .now, schemaVersion: 1
             ),
             delivery: .cached,
-            warnings: [degradeReason ?? "No Claude usage source is currently available."]
+            warnings: [degradeReason ?? "No Claude usage source is currently available."],
+            credentialFailure: credentialFailure
         )
+    }
+
+    private func saveIfNotCancelled(_ snapshot: ClaudeUsageSnapshot) {
+        guard !Task.isCancelled else { return }
+        cache.save(snapshot)
     }
 
     private func freshPassiveSnapshot() -> ClaudeUsageSnapshot? {
@@ -185,10 +203,10 @@ actor ClaudeUsageCollector {
     /// Decides whether tier 1 runs, and if not, why — in words the UI can show.
     ///
     /// The back-off used to gate every reason equally, so during a 15-minute
-    /// window an explicit Refresh silently skipped the network *and* the
-    /// Keychain. That is the reported bug: no reading, no dialog, no message,
-    /// while the CLI probe — a separate process holding no back-off state —
-    /// worked seconds later.
+    /// window an explicit Refresh silently skipped the network and credential
+    /// read. That is the reported bug: no reading and no message, while the CLI
+    /// probe — a separate process holding no back-off state — worked seconds
+    /// later.
     private func tierOneAttempt(for reason: ClaudeRefreshReason) -> TierOneAttempt {
         guard let until = oauthBackoffUntil, now() < until else {
             if oauthBackoffUntil != nil { clearBackoff() }
@@ -245,6 +263,19 @@ actor ClaudeUsageCollector {
             return "Could not reach Claude's usage service. Showing the last reading."
         case .malformedResponse:
             return "Claude's usage service returned an unexpected response. Showing the last reading."
+        }
+    }
+
+    private static func credentialFailure(for error: ClaudeOAuthError) -> ClaudeConnectionFailure? {
+        switch error {
+        case .credentialAccessDenied:
+            return .keychainAccessDenied
+        case .credentialsNotFound, .unauthorized:
+            return .credentialsNotFound
+        case .insufficientScope:
+            return .insufficientUsageScope
+        case .rateLimited, .serverFailure, .transportError, .malformedResponse:
+            return nil
         }
     }
 }

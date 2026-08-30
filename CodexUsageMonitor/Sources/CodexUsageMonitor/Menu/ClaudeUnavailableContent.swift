@@ -19,10 +19,9 @@ struct ClaudeUnavailableContent: View {
                 .foregroundStyle(theme.primaryText)
 
             Text(detail)
-                .font(.caption)
+                .font(.callout)
                 .foregroundStyle(detailTint)
                 .multilineTextAlignment(.center)
-                .lineLimit(MenuPopoverTheme.maximumDetailLines)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: MenuPopoverTheme.unavailableTextWidth)
 

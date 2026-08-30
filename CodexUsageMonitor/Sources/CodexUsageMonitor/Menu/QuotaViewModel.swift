@@ -143,13 +143,18 @@ final class QuotaViewModel: ObservableObject {
                 // Proof of connection is a real usage read. User-initiated, so
                 // this is the one path allowed to raise the Keychain prompt.
                 let snapshot = try await claudeOAuthUsageSource.fetch(
-                    promptPolicy: ClaudeRefreshReason.userInitiated.keychainPromptPolicy
+                    promptPolicy: ClaudeRefreshReason.credentialConnection.keychainPromptPolicy
                 )
                 return snapshot
             },
             onConnected: { snapshot in
                 claudeUsageCache.save(snapshot)
                 claudeMonitor.reconnect(with: snapshot)
+            },
+            onConnectionFailed: {
+                // Enrollment and passive capture remain active after a denied
+                // or missing credential, so resume noninteractive collection.
+                claudeMonitor.reconnect()
             }
         )
         Task { _ = await ClaudeLegacySetupTokenCleanup().removeAppOwnedCredential() }
@@ -192,6 +197,14 @@ final class QuotaViewModel: ObservableObject {
             self?.claudeState = state
             self?.updateClaudeSetupState()
             self?.deliverClaudeThresholdAlerts(for: state)
+            if case .available(let presentation) = state,
+               presentation.delivery == .live,
+               presentation.snapshot.source == .oauth {
+                self?.claudeConnectionController.applyLiveOAuthSnapshot(presentation.snapshot)
+            }
+        }.store(in: &subscriptions)
+        claudeMonitor.$credentialFailure.compactMap { $0 }.sink { [weak self] failure in
+            self?.claudeConnectionController.applyCredentialFailure(failure)
         }.store(in: &subscriptions)
         claudeMonitor.$hasCompletedInitialRefresh.removeDuplicates().sink { [weak self] _ in
             self?.updateClaudeSetupState()
@@ -337,7 +350,12 @@ final class QuotaViewModel: ObservableObject {
         // Enroll passive capture at the same time. A foreign status line is
         // preserved, and a repairable command still requires confirmation.
         configureClaudePassiveCapture(replacingExisting: false)
-        claudeConnectionController.connect()
+        Task { [weak self] in
+            guard let self else { return }
+            await claudeMonitor.prepareForConnection()
+            guard enrollment.isEnabled(.claudeCode) else { return }
+            claudeConnectionController.connect()
+        }
     }
 
     /// User-initiated from Diagnostics: drop the recorded refresh history.
@@ -383,8 +401,8 @@ final class QuotaViewModel: ObservableObject {
         NSWorkspace.shared.open(url)
     }
 
-    /// User-initiated: this is the only path allowed to raise a Keychain
-    /// prompt, so it must never be called from a background trigger.
+    /// User-initiated refresh bypasses eligible back-off/coalescing, but still
+    /// forbids Keychain interaction. Only Connect may prompt.
     func refreshClaude() {
         guard runtimePolicy(for: .claudeCode).mayRefreshQuota else { return }
         Task { [claudeMonitor] in
@@ -421,11 +439,15 @@ final class QuotaViewModel: ObservableObject {
     /// derived Token Monitor cache through the existing privacy path.
     func disconnectClaude() {
         claudeConnectionController.disconnect()
-        claudeMonitor.disconnect()
+        let cancelledRefresh = claudeMonitor.disconnect()
         enrollment.disable(.claudeCode)
-        try? claudeUsageCache.delete()
         ClaudeStatusLineInstaller().uninstallManagedCapture()
         claudePassiveCapture = nil
+        Task { [weak self] in
+            _ = await cancelledRefresh?.value
+            guard let self, !enrollment.isEnabled(.claudeCode) else { return }
+            try? claudeUsageCache.delete()
+        }
     }
 
     /// Tier 2. Manual only, and only after the user has consented to the

@@ -20,6 +20,7 @@ final class ClaudeUsageMonitor: ObservableObject {
     @Published private(set) var state: ClaudeUsageState = .unavailable(reason: ClaudeUsageState.notConnectedReason)
     @Published private(set) var hasCompletedInitialRefresh = false
     @Published private(set) var isRefreshing = false
+    @Published private(set) var credentialFailure: ClaudeConnectionFailure?
 
     /// App-local disconnect: while set, the monitor stops reading and publishes
     /// an explicit disconnected state, so passive capture does not keep showing
@@ -27,6 +28,11 @@ final class ClaudeUsageMonitor: ObservableObject {
     /// is never touched.
     static let disconnectedReason = "Claude is disconnected. Reconnect to show usage."
     private var isDisconnected = false
+    private var isPausedForConnection = false
+    /// Invalidates refresh completions that belong to an earlier enrollment or
+    /// connection attempt, even when their underlying work returns after
+    /// cancellation and the current lifecycle has already resumed.
+    private var lifecycleGeneration = 0
 
     private let collector: ClaudeUsageCollecting
     /// Evaluated before each scheduled poll so a live change to the shared
@@ -57,6 +63,7 @@ final class ClaudeUsageMonitor: ObservableObject {
 
     deinit {
         pollTask?.cancel()
+        inFlight?.task.cancel()
     }
 
     /// Refreshes once immediately so callers see a state without waiting a
@@ -66,7 +73,7 @@ final class ClaudeUsageMonitor: ObservableObject {
     }
 
     private func startPolling(refreshImmediately: Bool) {
-        guard !isDisconnected else { return }
+        guard !isDisconnected, !isPausedForConnection else { return }
         guard pollTask == nil else { return }
         pollTask = Task { [weak self] in
             guard let self else { return }
@@ -89,19 +96,43 @@ final class ClaudeUsageMonitor: ObservableObject {
         pollTask = nil
     }
 
+    /// Quiesces monitor-owned reads before the one interactive credential
+    /// connection begins. This keeps a reconnect from racing an automatic read.
+    func prepareForConnection() async {
+        lifecycleGeneration += 1
+        isPausedForConnection = true
+        stop()
+        guard let refresh = inFlight?.task else { return }
+        refresh.cancel()
+        _ = await refresh.value
+        if inFlight?.task == refresh {
+            inFlight = nil
+            isRefreshing = false
+        }
+    }
+
     /// App-local disconnect: stop reading and show the disconnected state
     /// without touching the Keychain credential.
-    func disconnect() {
+    @discardableResult
+    func disconnect() -> Task<Void, Never>? {
+        lifecycleGeneration += 1
         isDisconnected = true
+        isPausedForConnection = false
         stop()
+        let cancelledRefresh = inFlight?.task
+        cancelledRefresh?.cancel()
+        inFlight = nil
+        isRefreshing = false
+        credentialFailure = nil
         state = .unavailable(reason: Self.disconnectedReason)
         hasCompletedInitialRefresh = true
+        return cancelledRefresh
     }
 
     /// Clears the disconnect and resumes passive capture.
     func reconnect() {
-        guard isDisconnected else { return }
         isDisconnected = false
+        isPausedForConnection = false
         start()
     }
 
@@ -110,6 +141,8 @@ final class ClaudeUsageMonitor: ObservableObject {
     /// duplicate read (and potentially a second Keychain prompt) immediately.
     func reconnect(with snapshot: ClaudeUsageSnapshot) {
         isDisconnected = false
+        isPausedForConnection = false
+        credentialFailure = nil
         state = Self.mapState(
             ClaudeUsagePresentation(snapshot: snapshot, delivery: .live, warnings: [])
         )
@@ -117,32 +150,45 @@ final class ClaudeUsageMonitor: ObservableObject {
         startPolling(refreshImmediately: false)
     }
 
-    /// The reason is load-bearing: it decides whether the Keychain read is
-    /// allowed to prompt (only `.userInitiated` is).
+    /// The reason is load-bearing for back-off and coalescing. Monitor-owned
+    /// refreshes never prompt; only the separate credential connection does.
     ///
     /// A refresh already in flight used to make this return immediately. That
     /// silently discarded the user's press whenever it landed inside a
     /// scheduled read's network window — no read, no state change, no message —
-    /// and the press was exactly the one refresh permitted to raise the
-    /// Keychain dialog. An automatic refresh still coalesces; a press never
-    /// does.
+    /// while an automatic refresh was still coalesced. An automatic refresh
+    /// still coalesces; a press never does.
     func refreshNow(reason: ClaudeRefreshReason) async {
-        guard !isDisconnected else { return }
+        let generation = lifecycleGeneration
+        guard !isDisconnected, !isPausedForConnection else { return }
 
         while let existing = inFlight {
             guard reason == .userInitiated else { return }
             _ = await existing.task.value
+            guard generation == lifecycleGeneration,
+                  !isDisconnected,
+                  !isPausedForConnection else { return }
             // A press already running produces exactly what this press would,
             // so waiting for it is the whole obligation — starting a second
-            // read would only mean a second permission dialog.
+            // read would only duplicate the same explicit action.
             if existing.reason == .userInitiated { return }
             if inFlight?.task == existing.task { inFlight = nil }
         }
 
+        guard generation == lifecycleGeneration,
+              !isDisconnected,
+              !isPausedForConnection else { return }
         let task = Task { @MainActor [weak self] in
             guard let self else { return }
+            guard !Task.isCancelled,
+                  generation == self.lifecycleGeneration,
+                  !self.isDisconnected,
+                  !self.isPausedForConnection else { return }
             let presentation = await self.collector.refresh(reason: reason)
-            guard !self.isDisconnected else { return }
+            guard generation == self.lifecycleGeneration,
+                  !self.isDisconnected,
+                  !self.isPausedForConnection else { return }
+            self.credentialFailure = presentation.credentialFailure
             self.state = Self.mapState(presentation)
             self.hasCompletedInitialRefresh = true
         }

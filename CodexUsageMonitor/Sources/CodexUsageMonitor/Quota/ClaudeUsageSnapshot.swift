@@ -55,4 +55,17 @@ struct ClaudeUsagePresentation: Sendable {
     let snapshot: ClaudeUsageSnapshot
     let delivery: ClaudeUsageDelivery
     let warnings: [String]
+    let credentialFailure: ClaudeConnectionFailure?
+
+    init(
+        snapshot: ClaudeUsageSnapshot,
+        delivery: ClaudeUsageDelivery,
+        warnings: [String],
+        credentialFailure: ClaudeConnectionFailure? = nil
+    ) {
+        self.snapshot = snapshot
+        self.delivery = delivery
+        self.warnings = warnings
+        self.credentialFailure = credentialFailure
+    }
 }
