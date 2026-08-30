@@ -91,9 +91,9 @@ final class QuotaViewModel: ObservableObject {
         // Setup-token was experimental and is no longer a credential route.
         // Remove only this app's legacy selection hint; borrowed Claude Code
         // credentials are never modified here.
-        _ = UserDefaults.standard.string(forKey: "claude.credential-method.v1")
         UserDefaults.standard.removeObject(forKey: "claude.credential-method.v1")
         let claudeCredentialStore = ClaudeKeychainCredentialStore()
+        let claudeOAuthUsageSource = ClaudeOAuthUsageSource(credentialStore: claudeCredentialStore)
         let claudeUsageCache = ClaudeUsageCache()
         self.claudeUsageCache = claudeUsageCache
         claudeSetupState = ClaudeSetupState.resolve(
@@ -118,7 +118,7 @@ final class QuotaViewModel: ObservableObject {
         // Claude follows the shared Refresh Preferences like Codex, but its
         // networked OAuth read is floored for endpoint safety.
         let claudeCollector = ClaudeUsageCollector(
-            oauthSource: ClaudeOAuthUsageSource(credentialStore: claudeCredentialStore),
+            oauthSource: claudeOAuthUsageSource,
             statusLineReader: ClaudeRateLimitSnapshotReader(),
             cache: claudeUsageCache,
             delegatedRefresh: ClaudeDelegatedRefreshCoordinator()
@@ -142,8 +142,7 @@ final class QuotaViewModel: ObservableObject {
             credentialsSignIn: {
                 // Proof of connection is a real usage read. User-initiated, so
                 // this is the one path allowed to raise the Keychain prompt.
-                let source = ClaudeOAuthUsageSource(credentialStore: claudeCredentialStore)
-                let snapshot = try await source.fetch(
+                let snapshot = try await claudeOAuthUsageSource.fetch(
                     promptPolicy: ClaudeRefreshReason.userInitiated.keychainPromptPolicy
                 )
                 return snapshot
@@ -427,7 +426,6 @@ final class QuotaViewModel: ObservableObject {
         try? claudeUsageCache.delete()
         ClaudeStatusLineInstaller().uninstallManagedCapture()
         claudePassiveCapture = nil
-        Task { _ = await ClaudeLegacySetupTokenCleanup().removeAppOwnedCredential() }
     }
 
     /// Tier 2. Manual only, and only after the user has consented to the

@@ -7,6 +7,7 @@ struct ClaudeAccountSummary: Equatable, Sendable {
 enum ClaudeConnectionFailure: Equatable, Sendable {
     case keychainAccessDenied
     case credentialsNotFound
+    case insufficientUsageScope
     case usageUnavailable
 
     var displayMessage: String {
@@ -15,6 +16,8 @@ enum ClaudeConnectionFailure: Equatable, Sendable {
             "macOS denied access to Claude Code’s credential. Reconnect and choose Always Allow in the Keychain prompt."
         case .credentialsNotFound:
             "No Claude Code credential was found. Sign in to Claude Code, then reconnect here."
+        case .insufficientUsageScope:
+            "Claude Code’s current credential cannot read usage. Sign in to Claude Code again."
         case .usageUnavailable:
             "Claude accepted the credential but returned no usage. Try again shortly."
         }

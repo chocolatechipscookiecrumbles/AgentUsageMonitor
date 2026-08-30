@@ -1,9 +1,5 @@
 import Foundation
 
-enum ClaudeExecutableLocatorError: Error {
-    case missingCLI
-}
-
 /// Locates Claude Code from a GUI process, whose PATH normally omits user and
 /// Homebrew install directories.
 struct ClaudeExecutableLocator {
@@ -20,7 +16,7 @@ struct ClaudeExecutableLocator {
         self.isExecutable = isExecutable
     }
 
-    func locate() throws -> URL {
+    func locate() -> URL? {
         var candidates: [String] = []
         if let explicit = environment["CLAUDE_EXECUTABLE"], !explicit.isEmpty {
             candidates.append(explicit)
@@ -35,9 +31,6 @@ struct ClaudeExecutableLocator {
         for directory in (environment["PATH"] ?? "").split(separator: ":") {
             candidates.append(String(directory) + "/claude")
         }
-        guard let found = candidates.first(where: isExecutable) else {
-            throw ClaudeExecutableLocatorError.missingCLI
-        }
-        return URL(fileURLWithPath: found)
+        return candidates.first(where: isExecutable).map(URL.init(fileURLWithPath:))
     }
 }

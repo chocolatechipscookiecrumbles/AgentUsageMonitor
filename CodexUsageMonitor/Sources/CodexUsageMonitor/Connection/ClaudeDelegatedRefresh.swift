@@ -54,7 +54,7 @@ actor ClaudeDelegatedRefreshCoordinator {
     private var inFlight: Task<ClaudeDelegatedRefreshOutcome, Never>?
 
     init(
-        isCLIAvailable: @escaping @Sendable () -> Bool = { (try? ClaudeExecutableLocator().locate()) != nil },
+        isCLIAvailable: @escaping @Sendable () -> Bool = { ClaudeExecutableLocator().locate() != nil },
         readFingerprint: @escaping @Sendable () -> ClaudeCredentialFingerprint? = {
             ClaudeDelegatedRefreshCoordinator.currentFingerprint()
         },
@@ -126,7 +126,7 @@ actor ClaudeDelegatedRefreshCoordinator {
     /// is the result, and the CLI's stdout may carry account details this app
     /// has no business retaining.
     private static func runStatusTouch(timeout: TimeInterval = 15) async throws {
-        guard let executable = try? ClaudeExecutableLocator().locate() else {
+        guard let executable = ClaudeExecutableLocator().locate() else {
             throw ClaudeDelegatedRefreshError.cliUnavailable
         }
         let process = Process()

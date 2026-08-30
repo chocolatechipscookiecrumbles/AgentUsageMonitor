@@ -99,7 +99,7 @@ actor ClaudeCLIUsageProbe {
     }
 
     private static func runClaudeUsage() throws -> String {
-        guard let executable = try? ClaudeExecutableLocator().locate() else {
+        guard let executable = ClaudeExecutableLocator().locate() else {
             throw ClaudeCLIProbeError.missingCLI
         }
         let process = Process()

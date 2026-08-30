@@ -66,7 +66,7 @@ struct ClaudeAgentSettingsView: View {
             SettingsSectionRow {
                 // Status text is variable-length ("Signing in with Claude Code
                 // credentials…"), so it wraps rather than widening the card.
-                SettingsValueRow("Status", value: status(model).text, description: status(model).detail)
+                SettingsValueRow("Status", value: connectionStatus.text, description: connectionStatus.detail)
             }
             if let plan = planName(model) {
                 SettingsSectionRow {
@@ -89,7 +89,7 @@ struct ClaudeAgentSettingsView: View {
             resetCredits: nil,
             weeklyFootnote: ClaudeUsageDisplayModel.weeklyScopeCaveat,
             fiveHourNote: ClaudeUsageDisplayModel.showsFiveHourSessionNote(
-                isConnected: status(model).isConnected,
+                isConnected: connectionStatus.isConnected,
                 hasFiveHourWindow: model?.fiveHour != nil
             ) ? ClaudeUsageDisplayModel.fiveHourSessionNote : nil
         )
@@ -187,10 +187,9 @@ struct ClaudeAgentSettingsView: View {
         }
     }
 
-    /// The same derivation the context rail uses, so a live read is reported
-    /// as connected on both surfaces even if the sign-in button was never
-    /// pressed.
-    private func status(_ model: ClaudeUsageDisplayModel?) -> ClaudeConnectionStatus {
+    /// The same derivation the context rail uses, so every Claude surface has
+    /// one definition of a connected Keychain credential.
+    private var connectionStatus: ClaudeConnectionStatus {
         ClaudeConnectionStatus.resolve(
             signInState: connectionState,
             usageState: usageState
@@ -230,24 +229,15 @@ struct ClaudeAgentSettingsView: View {
             // so the user understands the Keychain prompt they will approve.
             SettingsDescription(ClaudeSignInPresentation.keychainPromptExplanation)
         }
-        if isEffectivelyConnected {
+        if connectionStatus.isConnected {
             SettingsPreferenceControlRow("Connected account") {
                 AgentDisconnectButton(provider: .claudeCode, disconnect: disconnect)
             }
         }
     }
 
-    /// A live read (passive capture with a working credential) or an explicit
-    /// sign-in both count as connected here, matching the status row.
-    private var isEffectivelyConnected: Bool {
-        ClaudeConnectionStatus.isEffectivelyConnected(
-            signInState: connectionState,
-            usageState: usageState
-        )
-    }
-
     private var showsConnectAction: Bool {
-        if isEffectivelyConnected { return false }
+        if connectionStatus.isConnected { return false }
         switch connectionState {
         case .notConnected, .failed: return true
         case .checking, .connected: return false

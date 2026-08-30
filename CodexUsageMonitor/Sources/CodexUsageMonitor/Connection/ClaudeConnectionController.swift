@@ -27,29 +27,14 @@ final class ClaudeConnectionController: ObservableObject {
     /// Reads Claude Code's Keychain credential. This is the one call allowed to
     /// raise the cross-app ACL prompt, so it is reached only from Connect.
     func connect() {
-        beginSignIn { [credentialsSignIn] in
-            try await credentialsSignIn()
-        }
-    }
-
-    /// App-local only. No provider credential is changed.
-    func disconnect() {
-        connectionAttemptID = nil
-        connectionTask?.cancel()
-        connectionTask = nil
-        state = .notConnected
-    }
-
-    private func beginSignIn(
-        operation: @escaping @Sendable () async throws -> ClaudeUsageSnapshot
-    ) {
         guard connectionTask == nil else { return }
         let attemptID = UUID()
         connectionAttemptID = attemptID
         state = .connecting
-        connectionTask = Task { [weak self] in
+        let credentialsSignIn = self.credentialsSignIn
+        connectionTask = Task { [weak self, credentialsSignIn] in
             do {
-                let snapshot = try await operation()
+                let snapshot = try await credentialsSignIn()
                 guard let self,
                       !Task.isCancelled,
                       connectionAttemptID == attemptID else { return }
@@ -71,8 +56,12 @@ final class ClaudeConnectionController: ObservableObject {
         }
     }
 
-    func reportFailure(_ error: Error) {
-        state = Self.mappedFailure(error)
+    /// App-local only. No provider credential is changed.
+    func disconnect() {
+        connectionAttemptID = nil
+        connectionTask?.cancel()
+        connectionTask = nil
+        state = .notConnected
     }
 
     private static func mappedFailure(_ error: Error) -> ClaudeConnectionState {
@@ -94,8 +83,10 @@ final class ClaudeConnectionController: ObservableObject {
                 // The credential exists; macOS refused this app's read. That is
                 // the Keychain recovery path, not the reconnect-from-scratch one.
                 return .failed(.keychainAccessDenied)
-            case .credentialsNotFound, .unauthorized, .insufficientScope:
+            case .credentialsNotFound, .unauthorized:
                 return .failed(.credentialsNotFound)
+            case .insufficientScope:
+                return .failed(.insufficientUsageScope)
             case .malformedResponse, .serverFailure, .rateLimited, .transportError:
                 return .failed(.usageUnavailable)
             }

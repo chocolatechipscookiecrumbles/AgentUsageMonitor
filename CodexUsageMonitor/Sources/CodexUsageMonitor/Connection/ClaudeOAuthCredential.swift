@@ -7,8 +7,6 @@ import Security
 /// persistable or printable by accident. The token lives in Keychain only.
 struct ClaudeOAuthCredential: Sendable {
     let accessToken: String
-    let refreshToken: String?
-    let expiresAt: Date?
     let scopes: Set<String>
     let subscriptionType: String?
 }
@@ -112,8 +110,6 @@ actor ClaudeKeychainCredentialStore: ClaudeCredentialProviding {
     private struct Wrapper: Decodable {
         struct OAuth: Decodable {
             let accessToken: String
-            let refreshToken: String?
-            let expiresAt: Double?
             let scopes: [String]?
             let subscriptionType: String?
         }
@@ -127,8 +123,6 @@ actor ClaudeKeychainCredentialStore: ClaudeCredentialProviding {
         let oauth = wrapper.claudeAiOauth
         return ClaudeOAuthCredential(
             accessToken: oauth.accessToken,
-            refreshToken: oauth.refreshToken,
-            expiresAt: oauth.expiresAt.map { Date(timeIntervalSince1970: $0 / 1000) },
             scopes: Set(oauth.scopes ?? []),
             subscriptionType: oauth.subscriptionType
         )
