@@ -10,6 +10,15 @@
 
 ## Implementation Status — through 2026-08-30
 
+Follow-up on 2026-09-01: a repeated prompt was captured for the same running
+signed process after **Always Allow**, and the machine's user Keychain search
+list was found to contain the same login Keychain 168 times. Automatic
+`errSecInteractionNotAllowed` is also currently promoted into connection
+failure even though a noninteractive read cannot establish that authorization
+was revoked. **Always Allow durability is therefore not yet proven.** The
+scoped-query, state-ownership, and controlled-observation work is specified in
+[Claude Keychain Reprompt Durability](2026-09-01-claude-keychain-reprompt-durability.md).
+
 Implemented on `feat/claude-setup-token-primary`. The user reported that the
 signed-app smoke test now appears to work; the detailed behavioral and visual
 matrix below was not itemized and remains open. Production compilation succeeds. The setup-token route,
