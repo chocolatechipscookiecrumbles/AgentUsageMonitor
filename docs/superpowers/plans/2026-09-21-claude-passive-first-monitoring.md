@@ -81,3 +81,15 @@ Add automated coverage only for reproduced defects, preserving existing tests:
   [diagnosis record](../../development/claude-keychain-grant-durability.md#september-22-silent-access-diagnosis).
 - Model-follow-up spelling from the user is **Astra and Claude Fable 5 and 5.1**;
   exact identifiers remain unconfirmed and model implementation is out of scope.
+
+## Shelved — 2026-09-29
+
+The user reported that passive-first monitoring is useful only while Claude
+Code is actively running: the status-line capture is refreshed only by Claude
+Code activity, so between sessions the menu falls back to a **Cached** reading
+(observed: Cached, updated three hours earlier, with **Live fallback
+unavailable** because the credential could not be read silently). The
+implementation is committed as-is and this work is shelved by user direction.
+The two signed-app acceptance items above remain open; do not treat the
+passive-first behavior as accepted. A future revision needs a way to obtain a
+current reading when Claude Code is idle without prompting on ordinary refresh.

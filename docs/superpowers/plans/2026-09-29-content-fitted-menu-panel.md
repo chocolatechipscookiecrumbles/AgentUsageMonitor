@@ -15,6 +15,10 @@ The window is therefore never smaller than the committed content. Intermediate f
 
 **Tech Stack:** Swift 6.2, SwiftUI + AppKit for macOS 14+, Swift Package Manager, existing signed-app scripts.
 
+## Current production limitation (user, 2026-09-29)
+
+The stable-host build no longer shows the switch artifact, but the 860-point transparent host still reads as a leftover dropdown: an outlined, shadowed region continues below the visible menu to the host's full height. Removing that tail is this plan's goal; no interim fix is planned.
+
 ## Starting material
 
 The rejected trial code is archived on the local branch `archive/rejected-menu-trials-2026-09-28` and is not part of this branch or `main`. Task 3 restores only what this plan reuses: `MenuContentSnapshot`, `MenuStatusHostingView`, the `MenuTrialSurface` body (as `MenuSurface`), the status-item and dismissal code in `MenuPresentationController` (as `MenuPanelController`) and `build-menu-trials.sh`. Task 2's anchor test is first run against the archived `MenuTrialShell` to show red.
