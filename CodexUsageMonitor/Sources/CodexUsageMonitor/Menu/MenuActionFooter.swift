@@ -11,6 +11,30 @@ struct MenuActionFooter: View {
     let openPreferences: () -> Void
     let quit: () -> Void
 
+    var body: some View {
+        MenuActionFooterRows(
+            keyboardShortcutsEnabled: settings.keyboardShortcutsEnabled,
+            isRefreshing: isRefreshing,
+            isRefreshEnabled: isRefreshEnabled,
+            allowsCommands: true,
+            refresh: refresh,
+            openNotificationSettings: openNotificationSettings,
+            openPreferences: openPreferences,
+            quit: quit
+        )
+    }
+}
+
+struct MenuActionFooterRows: View {
+    let keyboardShortcutsEnabled: Bool
+    let isRefreshing: Bool
+    var isRefreshEnabled = true
+    var allowsCommands = true
+    let refresh: () -> Void
+    let openNotificationSettings: () -> Void
+    let openPreferences: () -> Void
+    let quit: () -> Void
+
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
@@ -26,7 +50,7 @@ struct MenuActionFooter: View {
                     shortcut: shortcut(.refresh),
                     action: refresh
                 )
-                .disabled(isRefreshing || !isRefreshEnabled)
+                .disabled(isRefreshing || !isRefreshEnabled || !allowsCommands)
 
                 MenuActionRow(
                     "Notification Settings",
@@ -34,6 +58,7 @@ struct MenuActionFooter: View {
                     shortcut: shortcut(.notificationSettings),
                     action: openNotificationSettings
                 )
+                .disabled(!allowsCommands)
 
                 MenuActionRow(
                     "Preferences…",
@@ -41,6 +66,7 @@ struct MenuActionFooter: View {
                     shortcut: shortcut(.preferences),
                     action: openPreferences
                 )
+                .disabled(!allowsCommands)
 
                 MenuActionRow(
                     "Quit Agent Monitor",
@@ -55,7 +81,7 @@ struct MenuActionFooter: View {
     /// The preference governs registration as well as display, so an unlisted
     /// shortcut is also an unbound one.
     private func shortcut(_ shortcut: MenuActionShortcut) -> MenuActionShortcut? {
-        settings.keyboardShortcutsEnabled ? shortcut : nil
+        keyboardShortcutsEnabled ? shortcut : nil
     }
 
     private var theme: MenuPopoverTheme {

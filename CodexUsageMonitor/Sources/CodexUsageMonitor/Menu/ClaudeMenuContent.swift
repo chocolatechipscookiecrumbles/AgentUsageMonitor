@@ -13,11 +13,48 @@ struct ClaudeMenuContent: View {
     /// change redraws an open popover.
     @ObservedObject var settings: AppSettings
 
-    @Environment(\.colorScheme) private var colorScheme
-
     private var model: ClaudeUsageDisplayModel? {
         viewModel.claudeState.presentation.map { ClaudeUsageDisplayModel(presentation: $0) }
     }
+
+    var body: some View {
+        ClaudeMenuContentRender(
+            model: model,
+            monitoringStatus: monitoringStatus,
+            connectionState: viewModel.claudeConnectionState,
+            activity: settings.isTokenMonitorVisible(for: .claudeCode)
+                ? ProviderTokenActivityPresentation(
+                    provider: .claudeCode,
+                    state: viewModel.localActivityState(for: .claudeCode),
+                    range: settings.tokenMonitorRange(for: .claudeCode)
+                ) : nil,
+            visibleActivitySections: settings.enabledTokenMonitorSections(for: .claudeCode),
+            showsNotificationPermission: viewModel.notificationAuthorizationState == .denied,
+            connect: viewModel.connectClaude,
+            openSystemNotificationSettings: viewModel.openNotificationSettings
+        )
+    }
+
+    private var monitoringStatus: ClaudeConnectionStatus {
+        ClaudeConnectionStatus.resolve(
+            isEnrolled: viewModel.enrollment.isEnabled(.claudeCode),
+            signInState: viewModel.claudeConnectionState,
+            usageState: viewModel.claudeState
+        )
+    }
+}
+
+struct ClaudeMenuContentRender: View {
+    let model: ClaudeUsageDisplayModel?
+    let monitoringStatus: ClaudeConnectionStatus
+    let connectionState: ClaudeConnectionState
+    let activity: ProviderTokenActivityPresentation?
+    let visibleActivitySections: Set<TokenMonitorSection>
+    let showsNotificationPermission: Bool
+    let connect: () -> Void
+    let openSystemNotificationSettings: () -> Void
+
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(spacing: MenuPopoverTheme.contentSpacing) {
@@ -46,39 +83,27 @@ struct ClaudeMenuContent: View {
                 activityCard
 
                 ClaudeUnavailableContent(
-                    connectionState: viewModel.claudeConnectionState,
+                    connectionState: connectionState,
                     statusDetail: monitoringStatus.detail,
-                    connect: viewModel.connectClaude
+                    connect: connect
                 )
             }
 
-            if viewModel.notificationAuthorizationState == .denied {
+            if showsNotificationPermission {
                 NotificationPermissionStrip(
-                    openNotificationSettings: viewModel.openNotificationSettings
+                    openNotificationSettings: openSystemNotificationSettings
                 )
             }
         }
         .padding(.horizontal, MenuPopoverTheme.contentHorizontalPadding)
     }
 
-    private var monitoringStatus: ClaudeConnectionStatus {
-        ClaudeConnectionStatus.resolve(
-            isEnrolled: viewModel.enrollment.isEnabled(.claudeCode),
-            signInState: viewModel.claudeConnectionState,
-            usageState: viewModel.claudeState
-        )
-    }
-
     @ViewBuilder
     private var activityCard: some View {
-        if settings.isTokenMonitorVisible(for: .claudeCode) {
+        if let activity {
             ProviderTokenActivityCard(
-                presentation: ProviderTokenActivityPresentation(
-                    provider: .claudeCode,
-                    state: viewModel.localActivityState(for: .claudeCode),
-                    range: settings.tokenMonitorRange(for: .claudeCode)
-                ),
-                visibleSections: settings.enabledTokenMonitorSections(for: .claudeCode)
+                presentation: activity,
+                visibleSections: visibleActivitySections
             )
         }
     }
