@@ -50,6 +50,7 @@ final class ClaudeConnectionController: ObservableObject {
                 state = .notConnected
                 connectionAttemptID = nil
                 connectionTask = nil
+                onConnectionFailed()
             } catch {
                 guard let self, connectionAttemptID == attemptID else { return }
                 state = Self.mappedFailure(error)
@@ -58,13 +59,6 @@ final class ClaudeConnectionController: ObservableObject {
                 onConnectionFailed()
             }
         }
-    }
-
-    /// Applies credential health learned by the monitor without competing with
-    /// the explicit interactive connection task.
-    func applyCredentialFailure(_ failure: ClaudeConnectionFailure) {
-        guard connectionTask == nil else { return }
-        state = .failed(failure)
     }
 
     /// A live OAuth result proves that the borrowed credential works again.
@@ -86,8 +80,10 @@ final class ClaudeConnectionController: ObservableObject {
             switch credentialError {
             case .accessDenied, .interactionNotAllowed:
                 return .failed(.keychainAccessDenied)
+            case .userCancelled:
+                return .notConnected
             case .unexpectedStatus:
-                return .failed(.keychainAccessDenied)
+                return .failed(.usageUnavailable)
             case .notFound, .malformedData:
                 return .failed(.credentialsNotFound)
             }
@@ -96,11 +92,9 @@ final class ClaudeConnectionController: ObservableObject {
         // OAuth-layer failures surface here too.
         if let oauthError = error as? ClaudeOAuthError {
             switch oauthError {
-            case .credentialAccessDenied:
-                // The credential exists; macOS refused this app's read. That is
-                // the Keychain recovery path, not the reconnect-from-scratch one.
-                return .failed(.keychainAccessDenied)
-            case .credentialsNotFound, .unauthorized:
+            case .credentialUnavailable(let error):
+                return mappedFailure(error)
+            case .unauthorized:
                 return .failed(.credentialsNotFound)
             case .insufficientScope:
                 return .failed(.insufficientUsageScope)

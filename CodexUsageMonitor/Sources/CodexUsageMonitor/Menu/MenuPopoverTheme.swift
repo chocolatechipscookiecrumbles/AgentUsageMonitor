@@ -183,7 +183,7 @@ struct MenuPopoverTheme {
 
     func statusTint(_ status: MenuPopoverStatus) -> Color {
         switch status {
-        case .confirmed: success
+        case .confirmed, .captured: success
         case .cached: warning
         case .refreshing: accent
         case .unavailable: neutral

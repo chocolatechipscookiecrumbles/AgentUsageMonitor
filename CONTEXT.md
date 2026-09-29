@@ -157,8 +157,12 @@ An event-driven `rate_limits` reading emitted through Claude Code's status line 
 _Avoid_: Anonymous OAuth, live polling, credential-free login
 
 **Claude Code Credential**:
-The OAuth credential owned and stored by Claude Code. Agent Monitor reads it only after the user explicitly selects **Connect Claude**; macOS may ask once for Keychain permission, and automatic reads never request interaction. Agent Monitor never copies, stores, refreshes, or deletes this credential.
+The OAuth credential owned and stored by Claude Code. Agent Monitor reads it only after the user explicitly selects **Connect Claude**; macOS may ask for Keychain permission during explicit Connect/Reconnect only. Ordinary Refresh and automatic collection always read silently; unavailable access leaves monitoring enrolled and falls back to passive or cached usage. Agent Monitor never copies, stores, refreshes, or deletes this credential.
 _Avoid_: App-owned credential, browser OAuth, copied credential, prompt-free credential
+
+**Claude Monitoring Enrollment**:
+The app-local consent to collect Claude usage, shown as **Monitoring enabled**. It survives unavailable OAuth access. **Live fallback unavailable** describes a silent OAuth failure independently of reading freshness and does not establish that permission was revoked.
+_Avoid_: Permission revoked, authorization required to view passive usage
 
 **Forced Claude Usage Read**:
 An explicit, user-initiated `claude -p /usage` execution used to recover a current usage reading. It is never scheduled because running it may consume Claude quota.

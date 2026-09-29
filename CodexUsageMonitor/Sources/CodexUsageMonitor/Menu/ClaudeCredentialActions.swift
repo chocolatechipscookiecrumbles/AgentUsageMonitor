@@ -27,15 +27,12 @@ struct ClaudeCredentialActions: View {
         }
     }
 
-    private var buttonTitle: String {
-        if case .failed = state { return "Reconnect Claude" }
-        return "Connect Claude"
-    }
+    private var buttonTitle: String { "Reconnect Claude" }
 
     private var isDisabled: Bool {
         switch state {
-        case .checking, .connecting, .connected: true
-        case .notConnected, .failed: false
+        case .checking, .connecting: true
+        case .notConnected, .failed, .connected: false
         }
     }
 

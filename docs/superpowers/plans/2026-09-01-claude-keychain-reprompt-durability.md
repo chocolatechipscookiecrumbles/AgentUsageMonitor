@@ -33,6 +33,16 @@ background failure from sending the user through another permission prompt.
 
 ## Evidence and Current Diagnosis
 
+**September 21 diagnostic checkpoint:** The installed build was older than this
+checkout. The latest feature-branch build passed Developer ID signature checks
+and its noninteractive probe returned live OAuth without warnings. Following
+explicit user authorization, switched to that build and verified one running
+monitor instance; the switch-window log check recorded no Keychain prompts.
+See the [dated evidence](../../development/claude-keychain-grant-durability.md#september-21-diagnostic-follow-up).
+This is a baseline observation, not completion of the scoped-query fix or the
+credential-update/sleep-wake acceptance gate. The accepted product direction is
+fresh passive data first, silent Keychain second, and explicit `/usage` recovery.
+
 The following observations were made without reading or printing credential data:
 
 1. `securityd` recorded three ACL prompts for the same still-running process and path. Each prompt was followed by “user approved 'always allow',” yet a later prompt appeared for that same PID. Process replacement, restart into another path, and a changed code signature therefore do not explain those repetitions.

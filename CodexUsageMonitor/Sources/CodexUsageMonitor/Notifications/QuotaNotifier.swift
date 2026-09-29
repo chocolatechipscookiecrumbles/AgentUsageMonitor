@@ -3,12 +3,24 @@ import UserNotifications
 
 @MainActor
 final class QuotaNotifier {
-    private let center = UNUserNotificationCenter.current()
-    private let defaults = UserDefaults.standard
+    private var center: UNUserNotificationCenter { .current() }
+    private let defaults: UserDefaults
     private let settings: AppSettings
     private let policy = NotificationPolicy()
+    private let addRequest: @MainActor (UNNotificationRequest) async throws -> Void
+    private var inFlightKeys: Set<String> = []
 
-    init(settings: AppSettings) { self.settings = settings }
+    init(
+        settings: AppSettings,
+        defaults: UserDefaults = .standard,
+        addRequest: @escaping @MainActor (UNNotificationRequest) async throws -> Void = {
+            try await UNUserNotificationCenter.current().add($0)
+        }
+    ) {
+        self.settings = settings
+        self.defaults = defaults
+        self.addRequest = addRequest
+    }
 
     var alertsEnabled: Bool { settings.alertsEnabled }
 
@@ -88,9 +100,9 @@ final class QuotaNotifier {
         )
     }
 
-    /// Delivers Claude's remaining-quota threshold alerts. Called on a confirmed
-    /// (live) Claude read; cached reads must not re-alert. Reuses the shared
-    /// authorization gate and one-shot dedup.
+    /// Delivers Claude's remaining-quota threshold alerts for eligible live
+    /// OAuth, fresh passive, and explicit manual CLI readings. Cached or stale
+    /// readings are filtered before this shared authorization and dedup path.
     func evaluateClaudeThresholds(fiveHour: QuotaWindow?, weekly: QuotaWindow?) async {
         guard alertsEnabled else { return }
         await quotaAlerts(provider: .claudeCode, for: fiveHour, name: "5-hour")
@@ -137,13 +149,19 @@ final class QuotaNotifier {
     }
 
     private func deliverOnce(key: String, title: String, body: String) async {
-        guard !defaults.bool(forKey: key) else { return }
+        guard !defaults.bool(forKey: key), inFlightKeys.insert(key).inserted else { return }
+        defer { inFlightKeys.remove(key) }
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
         content.sound = .default
         let request = UNNotificationRequest(identifier: key, content: content, trigger: nil)
-        if (try? await center.add(request)) != nil { defaults.set(true, forKey: key) }
+        do {
+            try await addRequest(request)
+            defaults.set(true, forKey: key)
+        } catch {
+            // Failed delivery remains eligible for the next evaluation.
+        }
     }
 
     private func authorizationState() async -> NotificationAuthorizationState {

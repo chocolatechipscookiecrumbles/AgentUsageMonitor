@@ -16,6 +16,7 @@ enum ClaudeCredentialError: Error, Equatable, Sendable {
     case malformedData
     case interactionNotAllowed
     case accessDenied
+    case userCancelled
     case unexpectedStatus(OSStatus)
 }
 
@@ -23,7 +24,7 @@ enum ClaudeCredentialError: Error, Equatable, Sendable {
 ///
 /// Reading Claude Code's own Keychain item from our process is an ACL-gated
 /// cross-app access, so it *can* prompt. A prompt is acceptable when the user
-/// just pressed a button; it is never acceptable on a scheduled refresh,
+/// just pressed Connect/Reconnect; it is never acceptable on an ordinary refresh,
 /// which would interrupt them on a timer.
 enum KeychainPromptPolicy: Equatable, Sendable {
     /// Fail the read rather than prompt. Used for every automatic refresh.
@@ -61,9 +62,8 @@ actor ClaudeKeychainCredentialStore: ClaudeCredentialProviding {
         }
     }
 
-    /// Built separately so the prompt policy is directly assertable. A
-    /// background read uses a non-interactive authentication context, which
-    /// guarantees an automatic refresh cannot pop a dialog.
+    /// Keep a noninteractive context for authentication-aware query paths.
+    /// The legacy Keychain path additionally requires the process-level guard below.
     static func searchQuery(serviceName: String, promptPolicy: KeychainPromptPolicy) -> [String: Any] {
         var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -85,8 +85,10 @@ actor ClaudeKeychainCredentialStore: ClaudeCredentialProviding {
             .notFound
         case errSecInteractionNotAllowed:
             .interactionNotAllowed
-        case errSecAuthFailed, errSecMissingEntitlement:
+        case errSecAuthFailed:
             .accessDenied
+        case errSecUserCanceled:
+            .userCancelled
         default:
             .unexpectedStatus(status)
         }
@@ -96,15 +98,57 @@ actor ClaudeKeychainCredentialStore: ClaudeCredentialProviding {
         serviceName: String,
         promptPolicy: KeychainPromptPolicy
     ) -> Result<Data, ClaudeCredentialError> {
+        withLegacyInteractionPolicy(promptPolicy) {
+            readScopedKeychainData(serviceName: serviceName, promptPolicy: promptPolicy)
+        }
+    }
+
+    // Legacy SecItem reads do not honor LAContext's interaction flag. Serialize
+    // both policies while temporarily disabling the process-wide legacy UI flag.
+    // ponytail: process-wide flag; future legacy Keychain clients must share this lock.
+    private static let legacyReadLock = NSLock()
+
+    static func withLegacyInteractionPolicy(
+        _ policy: KeychainPromptPolicy,
+        getAllowed: (UnsafeMutablePointer<DarwinBoolean>) -> OSStatus = SecKeychainGetUserInteractionAllowed,
+        setAllowed: (Bool) -> OSStatus = SecKeychainSetUserInteractionAllowed,
+        read: () -> Result<Data, ClaudeCredentialError>
+    ) -> Result<Data, ClaudeCredentialError> {
+        legacyReadLock.lock()
+        defer { legacyReadLock.unlock() }
+        guard policy == .never else { return read() }
+
+        var allowed: DarwinBoolean = false
+        let getStatus = getAllowed(&allowed)
+        guard getStatus == errSecSuccess else { return .failure(.unexpectedStatus(getStatus)) }
+        let disableStatus = setAllowed(false)
+        let result = disableStatus == errSecSuccess ? read() : .failure(.unexpectedStatus(disableStatus))
+        let restoreStatus = setAllowed(allowed.boolValue)
+        guard restoreStatus == errSecSuccess else { return .failure(.unexpectedStatus(restoreStatus)) }
+        return result
+    }
+
+    private static func readScopedKeychainData(
+        serviceName: String,
+        promptPolicy: KeychainPromptPolicy
+    ) -> Result<Data, ClaudeCredentialError> {
+        // Claude Code owns a legacy file-based Keychain item. Restrict the
+        // query to one default Keychain rather than inheriting the search list.
+        var keychain: SecKeychain?
+        let keychainStatus = SecKeychainCopyDefault(&keychain)
+        guard keychainStatus == errSecSuccess, let keychain else {
+            return .failure(error(for: keychainStatus == errSecSuccess ? errSecInternalError : keychainStatus))
+        }
+        var query = searchQuery(serviceName: serviceName, promptPolicy: promptPolicy)
+        query[kSecMatchSearchList as String] = [keychain]
         var item: CFTypeRef?
         let status = SecItemCopyMatching(
-            searchQuery(serviceName: serviceName, promptPolicy: promptPolicy) as CFDictionary,
+            query as CFDictionary,
             &item
         )
-        if status == errSecSuccess, let data = item as? Data {
-            return .success(data)
-        }
-        return .failure(error(for: status))
+        guard status == errSecSuccess else { return .failure(error(for: status)) }
+        guard let data = item as? Data else { return .failure(.malformedData) }
+        return .success(data)
     }
 
     private struct Wrapper: Decodable {

@@ -37,7 +37,7 @@ final class ClaudeRefreshDefectTests: XCTestCase {
         XCTAssertEqual(source.fetchCount, 2, "an explicit refresh must still reach the source")
     }
 
-    func testUserInitiatedRefreshUsesPromptingPolicyDuringBackOff() async {
+    func testUserInitiatedRefreshRemainsNoninteractiveDuringBackOff() async {
         let source = SpyOAuthSource()
         source.outcome = .rateLimited
         let collector = ClaudeUsageCollector(
@@ -50,9 +50,8 @@ final class ClaudeRefreshDefectTests: XCTestCase {
         _ = await collector.refresh(reason: .scheduled)
         _ = await collector.refresh(reason: .userInitiated)
 
-        // The press is what earns the right to raise the Keychain dialog. If the
-        // bypassing read used `.never`, the dialog could never appear.
-        XCTAssertEqual(source.policies, [.never, .userInitiatedOnly])
+        // Bypassing rate limiting must not also authorize a Keychain dialog.
+        XCTAssertEqual(source.policies, [.never, .never])
     }
 
     func testRepeatedBypassesAreBoundedAndExplained() async {
@@ -98,8 +97,8 @@ final class ClaudeRefreshDefectTests: XCTestCase {
         let result = await collector.refresh(reason: .userInitiated)
         XCTAssertFalse(result.warnings.isEmpty)
         XCTAssertTrue(
-            result.warnings.contains { $0.localizedCaseInsensitiveContains("keychain") },
-            "a denied Keychain read must be named, not reported as a generic outage"
+            result.warnings.contains { $0.hasPrefix("Live fallback unavailable.") },
+            "a failed silent credential read must describe unavailable live fallback"
         )
     }
 

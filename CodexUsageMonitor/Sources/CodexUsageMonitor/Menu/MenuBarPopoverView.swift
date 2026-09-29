@@ -92,7 +92,7 @@ struct MenuBarPopoverView: View {
             .claude(
                 usageState: viewModel.claudeState,
                 connectionState: viewModel.claudeConnectionState,
-                isRefreshing: viewModel.isRefreshingClaude
+                isRefreshing: viewModel.isRefreshingClaude || viewModel.isRunningClaudeCLIProbe
             )
         }
     }
@@ -102,7 +102,7 @@ struct MenuBarPopoverView: View {
         case .codex:
             viewModel.isRefreshing
         case .claudeCode:
-            viewModel.isRefreshingClaude
+            viewModel.isRefreshingClaude || viewModel.isRunningClaudeCLIProbe
         case .githubCopilot:
             false
         }

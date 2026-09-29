@@ -34,7 +34,7 @@ struct AgentsSettingsView: View {
             case .claudeCode:
                 ClaudeAgentSettingsView(
                     settings: viewModel.settings,
-                    setupState: viewModel.claudeSetupState,
+                    isEnrolled: enrollment.isEnabled(.claudeCode),
                     connectionState: viewModel.claudeConnectionState,
                     usageState: viewModel.claudeState,
                     valueMode: viewModel.settings.quotaValueMode,

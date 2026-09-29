@@ -42,9 +42,6 @@ actor ClaudeUsageCollector {
     private let oauthSource: ClaudeOAuthUsageSource
     private let statusLineReader: ClaudeRateLimitSnapshotReader
     private let cache: ClaudeUsageCache
-    /// Asks Claude Code to renew its own credential when ours is rejected.
-    /// Optional so tests and the CLI probe can opt out of ever spawning a CLI.
-    private let delegatedRefresh: ClaudeDelegatedRefreshCoordinator?
     private let now: @Sendable () -> Date
     /// When the endpoint returns 429, skip the networked OAuth read until this
     /// time and serve local sources. `/api/oauth/usage` rate-limits aggressively
@@ -56,7 +53,7 @@ actor ClaudeUsageCollector {
     /// Status-line data arrives immediately after a Claude response. Within
     /// this short window it is fresher than another network read and lets the
     /// app avoid all credential access.
-    static let passiveFastPathFreshness: TimeInterval = 2 * 60
+    static let passiveFastPathFreshness = ClaudeUsagePresentation.passiveFreshness
 
     /// A press is allowed through the back-off, because a back-off the user
     /// cannot see or override is indistinguishable from a broken button. The
@@ -71,13 +68,11 @@ actor ClaudeUsageCollector {
         oauthSource: ClaudeOAuthUsageSource,
         statusLineReader: ClaudeRateLimitSnapshotReader,
         cache: ClaudeUsageCache,
-        delegatedRefresh: ClaudeDelegatedRefreshCoordinator? = nil,
         now: @escaping @Sendable () -> Date = { .now }
     ) {
         self.oauthSource = oauthSource
         self.statusLineReader = statusLineReader
         self.cache = cache
-        self.delegatedRefresh = delegatedRefresh
         self.now = now
     }
 
@@ -91,7 +86,7 @@ actor ClaudeUsageCollector {
         // without one must say so: a pressed button that changes nothing on
         // screen and explains nothing is itself the defect being fixed here.
         var degradeReason: String?
-        var credentialFailure: ClaudeConnectionFailure?
+        var freshFinancial: ClaudeUsageSnapshot?
 
         switch tierOneAttempt(for: reason) {
         case .suppressed(let notice):
@@ -99,28 +94,28 @@ actor ClaudeUsageCollector {
 
         case .attempt:
             do {
-                let snapshot = try await oauthSource.fetch(promptPolicy: reason.keychainPromptPolicy)
+                let observed = try await oauthSource.fetch(promptPolicy: .never)
+                guard observed.hasQuotaWindows || observed.extraUsage != nil else {
+                    throw ClaudeOAuthError.malformedResponse
+                }
                 clearBackoff()
-                saveIfNotCancelled(snapshot)
-                return ClaudeUsagePresentation(snapshot: snapshot, delivery: .live, warnings: [])
+                if !observed.hasQuotaWindows {
+                    // Save the independent financial observation, then let the
+                    // normal local-source ranking choose passive versus cache.
+                    var financial = observed
+                    financial.extraUsageObservedAt = observed.capturedAt
+                    freshFinancial = financial
+                    saveIfNotCancelled(financial)
+                    degradeReason = "Claude updated usage-credit spending but did not report quota."
+                } else {
+                    let snapshot = observed.retainingExtraUsage(from: cache.load()?.snapshot)
+                    saveIfNotCancelled(snapshot)
+                    return ClaudeUsagePresentation(snapshot: snapshot, delivery: .live, warnings: [])
+                }
             } catch let error as ClaudeOAuthError {
                 if case .rateLimited(let retryAfter) = error {
                     oauthBackoffUntil = retryAfter ?? now().addingTimeInterval(Self.defaultRateLimitBackoff)
                 }
-                // A 401 means the credential was read successfully and then
-                // rejected — almost always an expired borrowed access token.
-                // Claude Code renews it only when it happens to run, which in
-                // one observed case left a continuously running app with no
-                // reading for three hours. Ask Claude Code to renew instead of
-                // waiting for the user to open it. The retry cannot introduce a
-                // second dialog: reaching a 401 proves the Keychain read already
-                // succeeded.
-                if case .unauthorized = error,
-                   let renewed = await renewThroughClaudeCode(reason: reason) {
-                    saveIfNotCancelled(renewed)
-                    return ClaudeUsagePresentation(snapshot: renewed, delivery: .live, warnings: [])
-                }
-                credentialFailure = Self.credentialFailure(for: error)
                 if degradeReason == nil {
                     degradeReason = Self.explanation(for: error, backoffUntil: oauthBackoffUntil)
                 }
@@ -135,26 +130,37 @@ actor ClaudeUsageCollector {
         // preference to a recent OAuth read we already hold. Rank the two by
         // capture time so the user always sees the best reading available.
         let statusLine = statusLineReader.readSnapshot().map(adaptStatusLineSnapshot)
-        let cached = cache.load()?.snapshot
+            .flatMap { $0.hasQuotaWindows ? $0 : nil }
+        let cachedSnapshot = cache.load()?.snapshot
+        let cached = cachedSnapshot.flatMap { $0.hasQuotaWindows ? $0 : nil }
 
         let warnings = degradeReason.map { [$0] } ?? []
 
         if let statusLine, cached.map({ statusLine.capturedAt >= $0.capturedAt }) ?? true {
+            let statusLine = statusLine.retainingExtraUsage(from: cachedSnapshot)
+                .retainingExtraUsage(from: freshFinancial)
             saveIfNotCancelled(statusLine)
             return ClaudeUsagePresentation(
                 snapshot: statusLine,
                 delivery: .passiveSnapshot,
-                warnings: warnings,
-                credentialFailure: credentialFailure
+                warnings: warnings
             )
         }
 
-        if let cached {
+        if let cachedSnapshot, cachedSnapshot.hasQuotaWindows || cachedSnapshot.extraUsage != nil {
+            let snapshot = cachedSnapshot.retainingExtraUsage(from: freshFinancial)
             return ClaudeUsagePresentation(
-                snapshot: cached,
+                snapshot: snapshot,
                 delivery: .cached,
-                warnings: warnings,
-                credentialFailure: credentialFailure
+                warnings: warnings
+            )
+        }
+
+        if let freshFinancial {
+            return ClaudeUsagePresentation(
+                snapshot: freshFinancial,
+                delivery: .cached,
+                warnings: warnings
             )
         }
 
@@ -164,8 +170,7 @@ actor ClaudeUsageCollector {
                 source: .oauth, capturedAt: .now, schemaVersion: 1
             ),
             delivery: .cached,
-            warnings: [degradeReason ?? "No Claude usage source is currently available."],
-            credentialFailure: credentialFailure
+            warnings: [degradeReason ?? "No Claude usage source is currently available."]
         )
     }
 
@@ -176,23 +181,11 @@ actor ClaudeUsageCollector {
 
     private func freshPassiveSnapshot() -> ClaudeUsageSnapshot? {
         guard let snapshot = statusLineReader.readSnapshot().map(adaptStatusLineSnapshot),
-              snapshot.fiveHour != nil || snapshot.sevenDay != nil,
-              now().timeIntervalSince(snapshot.capturedAt) <= Self.passiveFastPathFreshness else {
+              snapshot.hasQuotaWindows,
+              (0...Self.passiveFastPathFreshness).contains(now().timeIntervalSince(snapshot.capturedAt)) else {
             return nil
         }
-        return snapshot
-    }
-
-    /// Returns a fresh snapshot only if Claude Code actually renewed the
-    /// credential and the retried read then succeeded. Anything less returns
-    /// nil so the caller degrades and states why, rather than reporting a
-    /// recovery that did not happen.
-    private func renewThroughClaudeCode(reason: ClaudeRefreshReason) async -> ClaudeUsageSnapshot? {
-        guard let delegatedRefresh else { return nil }
-        guard await delegatedRefresh.attempt(reason: reason) == .refreshed else { return nil }
-        // Renewal is automated even if the original read followed a button
-        // press. The retry must never raise a second Keychain prompt.
-        return try? await oauthSource.fetch(promptPolicy: .never)
+        return snapshot.retainingExtraUsage(from: cache.load()?.snapshot)
     }
 
     private enum TierOneAttempt {
@@ -248,15 +241,12 @@ actor ClaudeUsageCollector {
         case .rateLimited:
             return backoffUntil.map(rateLimitNotice(until:))
                 ?? "Anthropic is rate-limiting usage reads. Showing the last reading."
-        case .credentialAccessDenied:
-            return "macOS denied access to the Claude Code credential in your Keychain. "
-                + "Reconnect Claude to grant access again."
-        case .credentialsNotFound:
-            return "No Claude Code credential was found. Connect Claude to read live usage."
+        case .credentialUnavailable:
+            return "Live fallback unavailable. Claude Code’s credential could not be read silently."
         case .insufficientScope:
-            return "The stored Claude credential cannot read usage. Reconnect Claude."
+            return "Live fallback unavailable. The Claude Code credential cannot read usage."
         case .unauthorized:
-            return "Claude rejected the Claude Code credential. Use Claude Code, then reconnect here."
+            return "Live fallback unavailable. Claude Code’s credential was rejected; use Claude Code to renew it."
         case .serverFailure(let statusCode):
             return "Claude's usage service returned an error (\(statusCode)). Showing the last reading."
         case .transportError:
@@ -266,16 +256,4 @@ actor ClaudeUsageCollector {
         }
     }
 
-    private static func credentialFailure(for error: ClaudeOAuthError) -> ClaudeConnectionFailure? {
-        switch error {
-        case .credentialAccessDenied:
-            return .keychainAccessDenied
-        case .credentialsNotFound, .unauthorized:
-            return .credentialsNotFound
-        case .insufficientScope:
-            return .insufficientUsageScope
-        case .rateLimited, .serverFailure, .transportError, .malformedResponse:
-            return nil
-        }
-    }
 }

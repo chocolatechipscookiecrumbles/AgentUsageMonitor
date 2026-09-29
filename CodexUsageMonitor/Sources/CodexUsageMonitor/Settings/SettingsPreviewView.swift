@@ -10,7 +10,7 @@ struct SettingsPreviewView: View {
     /// Built for every active provider, not just the selected one, so the
     /// rail compares providers instead of restating the current page.
     private var providerSummaries: [ProviderContextSummary] {
-        ProviderContextSummary.activeProviders(claudeIsUsable: viewModel.claudeState.isAvailable)
+        ProviderContextSummary.activeProviders(claudeIsUsable: viewModel.enrollment.isEnabled(.claudeCode))
             .compactMap { provider in
                 switch provider {
                 case .codex:
@@ -22,6 +22,7 @@ struct SettingsPreviewView: View {
                     )
                 case .claudeCode:
                     .claude(
+                        isEnrolled: viewModel.enrollment.isEnabled(.claudeCode),
                         connectionState: viewModel.claudeConnectionState,
                         usageState: viewModel.claudeState,
                         valueMode: viewModel.settings.quotaValueMode

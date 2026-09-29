@@ -1,9 +1,9 @@
 enum ClaudeConnectionCopy {
     static let keychainDisclosure =
-        "Reads Claude Code’s existing OAuth credential from Keychain and enables passive usage capture without replacing your custom status line."
+        "Enables passive usage capture and reads Claude Code’s existing Keychain credential for live fallback. Your custom status line is preserved."
 
     static let keychainPromptExplanation =
-        "macOS prompts because Agent Monitor and Claude Code are different apps. Choose Always Allow to enable background updates. Agent Monitor never changes or deletes Claude Code’s credential."
+        "Connect or Reconnect may ask for Keychain permission. Choose Always Allow to permit silent reads. Passive monitoring continues if access is unavailable. Agent Monitor never changes or deletes Claude Code’s credential."
 
     static let connectionDisclosure =
         "\(keychainDisclosure) \(keychainPromptExplanation)"

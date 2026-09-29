@@ -149,9 +149,13 @@ For confirmed results, it also verifies the hashed account identity and the main
 The one Claude action is **Connect Claude**. Sign into Claude Code first. Agent
 Monitor enrolls passive capture when no working third-party status line would be
 replaced and asks macOS to read Claude Code's existing Keychain credential.
-Choose **Always Allow** for unattended scheduled refresh. **Allow** permits only
-the current read; automatic refreshes never prompt and fall back to passive
-capture or cached usage.
+**Always Allow** is intended to permit later reads but is not a guarantee of
+provider-owned grant durability. Only explicit Connect/Reconnect may request
+interaction. Denial, cancellation, or unavailable credentials leave monitoring
+enrolled and resume passive capture. Ordinary Refresh, launch, scheduled reads,
+and retries stay silent and fall back to passive capture or cached usage.
+**Monitoring enabled** describes enrollment, not successful OAuth authorization;
+**Live fallback unavailable** does not mean permission was revoked.
 
 Agent Monitor never stores, changes, refreshes directly, exports, or deletes
 Claude Code's credential. The retired `claude setup-token` route is not a
@@ -170,8 +174,12 @@ entry and bridge symlink. It leaves Claude Code signed in and preserves a foreig
 status line.
 
 **Claude /usage → Force Read** runs `claude -p /usage` only after explicit consent.
-It may use a small amount of Claude quota and is never scheduled. The behavioral
-matrix for relaunch, lock/sleep, Keychain prompts, disconnect, and signed
+It may use a small amount of Claude quota and is never scheduled. Duplicate
+execution is blocked; successful readings are published and cached, while failure
+retains the prior reading. Ordinary Refresh never launches delegated CLI renewal.
+Repeated Keychain prompts remain a separate
+[diagnosis](./claude-keychain-grant-durability.md), not an implementation gate.
+The behavioral matrix for relaunch, lock/sleep, Keychain prompts, disconnect, and signed
 Settings/menu presentation remains in
 [claude-auth-capability-results.md](./claude-auth-capability-results.md) for the user
 to complete.
@@ -192,9 +200,25 @@ open .build/CodexUsageMonitor.app
 
 By default, the gauge icon appears in the menu bar with the most-consumed quota lane shown as its remaining percentage. In **Settings… > General > Menu Bar Icon**, use **Style** to select **5-hour and weekly** for a live label such as `5H: 64% | Week: 82%`, **Bars** for two stacked 5-hour/weekly bars per provider, **Combined** for one layered bar per provider, or **Single Provider** for one connected provider's two stacked bars when exactly one provider is connected. Every graphical track is 34 points wide and always represents remaining quota. Set **Show** to **Used** to display the complementary used percentages in the text styles instead; **Remaining** is the default. That text presentation remains unchanged while Codex is the only provider with data. When Claude is the only usable read or both providers have data, the compact label selects whichever provider has the highest used percentage across its active windows and identifies it with the provider mark; **Show** changes the displayed value without changing which provider is selected. Missing or expired reads are excluded rather than displayed as zero, and ties favor Codex before Claude. Cached Codex and cached/passive Claude selections carry a pause marker, while accessibility identifies the selected reading as confirmed, cached, or passive. Opening the icon shows persistent **Codex** and **Claude** tabs, including setup/recovery states for a disconnected provider, and reopens on the tab you last viewed. Each tab has a header showing a recognized plan — **Pro**, **Plus**, or **Max 20x** — because the tab above it already names the provider. A plan proven by the current connection wins over one carried on a stored reading, and it stays put while a refresh runs. Until a supported plan is known, or when a provider returns an unrecognized identifier, the header falls back to the provider name rather than inventing a label. The header also carries a standard `Updated: <time> · <how long ago>` freshness line and a **Confirmed / Cached / Refreshing / Unavailable** status pill, followed by five-hour and weekly window cards showing used percent, remaining percent, and reset timing. The popover intentionally uses bounded intrinsic content and does not scroll. The **Codex** tab also shows a forecast line and, when present, a credit-balance card with at most two earned reset-credit expiry dates plus a “more in Settings” caption; the balance is rounded to four significant figures there, while Settings shows the full balance and complete expiry list. A cached read is flagged by a warning strip above the cards. The plan tier appears in the popover header and in Settings; both are rendered from one formatter, so they always spell it the same way. A bottom action row provides **Refresh Now**, **Notification Settings**, **Preferences…**, and **Quit Agent Monitor**. **Refresh Now** targets the active provider, keeps the popover open, and shows progress in place; the other commands dismiss first. While **Enable keyboard shortcuts** is on in General, each row shows its key equivalent right-aligned — `⌘R`, `⇧⌘N`, `⌘,`, and `⌘Q` — and pressing it runs that command. With the preference off, the symbols disappear and none of the four is bound. If macOS notification permission is denied, a slim recovery strip with **Open System Notification Settings** appears on either tab; the per-quota-alert toggle lives in Settings, not the popover.
 
-The **Claude** tab shows Claude's five-hour and weekly windows with the shared-pool caveat that weekly usage is shared with Claude chat, a `Read from: <source>` provenance caption beneath the cards (its capture time is the header's freshness line), and a staleness strip when the read is not live. If a connection failure occurs while a prior reading remains available, **Claude connection needs attention** replaces the five-hour/weekly card instead of stacking below Token Monitor; this keeps recovery reachable within the non-scrolling menu on shorter displays. Token Monitor and provenance remain visible. When Claude has no reading, the tab offers the single **Connect Claude** action; no Codex credit or collector furniture appears on this tab.
+The **Claude** tab shows Claude's five-hour and weekly windows with the shared-pool caveat that weekly usage is shared with Claude chat, a `Read from: <source>` provenance caption beneath the cards (its capture time is the header's freshness line), and a staleness strip when the read is not live. Usable five-hour/weekly cards remain visible when live fallback is unavailable or credential setup is in progress; concise status copy occupies the existing status area. Token Monitor, source, and the original capture time remain visible. When Claude has no reading, the tab offers the appropriate explicit Connect/Reconnect recovery action; no Codex credit or collector furniture appears on this tab.
 
-Claude collection treats a valid status-line snapshot captured within two minutes as a zero-secret fast path. Otherwise it reads Claude Code's Keychain credential using the refresh reason's prompt policy, then falls back to the freshest passive or cached result. The existing consented `/usage` action remains separate and manual.
+Claude collection first uses a valid status-line snapshot containing a quota window and captured no more than two minutes ago. Otherwise it silently reads Claude Code's credential from the single default/login Keychain, subject to OAuth backoff, then falls back to the freshest usable passive or cached result without changing its capture time. With no usable reading, usage is unavailable and recovery remains explicit. The global Keychain search list and provider credential permissions are untouched. The existing consented `/usage` action remains separate and manual; it parses reset times as well as percentages when Claude supplies an unambiguous timestamp.
+
+Fresh passive and successful manual readings can drive Claude quota-threshold
+alerts without Keychain access. Each window must carry a future reset time, and
+the existing provider/window/threshold key prevents a later OAuth reading from
+repeating the same alert. Cached, stale, future-dated, missing-reset, and
+already-reset readings do not alert. The menu calls fresh passive data
+**Captured**, reserves **Cached** for retained data, and shows **Refreshing…**
+while either normal collection or the explicit CLI read is active.
+
+Claude Settings keeps account-money concepts separate. **Usage-credit spending**
+and **Monthly spending limit** appear only from OAuth `extra_usage`; missing
+amount or currency is **Unavailable**, never an assumed zero or USD value. A
+quota-only passive or explicit CLI update retains the last financial observation
+with its original financial update time. No permitted automatic source currently provides prepaid
+**Credit balance** or redeemable **Available resets**, so those rows remain
+**Unavailable** with **Open Claude Usage** as the recovery and redemption route.
 
 ### First launch and provider enrollment (post-0.0.1, unreleased)
 

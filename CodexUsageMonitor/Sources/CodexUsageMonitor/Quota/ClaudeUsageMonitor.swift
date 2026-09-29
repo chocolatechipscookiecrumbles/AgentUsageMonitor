@@ -20,7 +20,6 @@ final class ClaudeUsageMonitor: ObservableObject {
     @Published private(set) var state: ClaudeUsageState = .unavailable(reason: ClaudeUsageState.notConnectedReason)
     @Published private(set) var hasCompletedInitialRefresh = false
     @Published private(set) var isRefreshing = false
-    @Published private(set) var credentialFailure: ClaudeConnectionFailure?
 
     /// App-local disconnect: while set, the monitor stops reading and publishes
     /// an explicit disconnected state, so passive capture does not keep showing
@@ -123,7 +122,6 @@ final class ClaudeUsageMonitor: ObservableObject {
         cancelledRefresh?.cancel()
         inFlight = nil
         isRefreshing = false
-        credentialFailure = nil
         state = .unavailable(reason: Self.disconnectedReason)
         hasCompletedInitialRefresh = true
         return cancelledRefresh
@@ -139,12 +137,15 @@ final class ClaudeUsageMonitor: ObservableObject {
     /// Connect already performed the authoritative OAuth read. Publish that
     /// exact result and begin at the next cadence boundary instead of issuing a
     /// duplicate read (and potentially a second Keychain prompt) immediately.
-    func reconnect(with snapshot: ClaudeUsageSnapshot) {
+    func reconnect(
+        with snapshot: ClaudeUsageSnapshot,
+        delivery: ClaudeUsageDelivery = .live
+    ) {
         isDisconnected = false
         isPausedForConnection = false
-        credentialFailure = nil
+        let snapshot = snapshot.retainingExtraUsage(from: state.presentation?.snapshot)
         state = Self.mapState(
-            ClaudeUsagePresentation(snapshot: snapshot, delivery: .live, warnings: [])
+            ClaudeUsagePresentation(snapshot: snapshot, delivery: delivery, warnings: [])
         )
         hasCompletedInitialRefresh = true
         startPolling(refreshImmediately: false)
@@ -188,7 +189,6 @@ final class ClaudeUsageMonitor: ObservableObject {
             guard generation == self.lifecycleGeneration,
                   !self.isDisconnected,
                   !self.isPausedForConnection else { return }
-            self.credentialFailure = presentation.credentialFailure
             self.state = Self.mapState(presentation)
             self.hasCompletedInitialRefresh = true
         }
@@ -206,18 +206,21 @@ final class ClaudeUsageMonitor: ObservableObject {
     /// tokens for a fresh reading.
     func applyManualSnapshot(_ snapshot: ClaudeUsageSnapshot) {
         guard !isDisconnected else { return }
+        // An older in-flight fallback must not replace this explicit reading.
+        lifecycleGeneration += 1
+        inFlight?.task.cancel()
+        inFlight = nil
+        isRefreshing = false
+        let snapshot = snapshot.retainingExtraUsage(from: state.presentation?.snapshot)
         state = Self.mapState(
             ClaudeUsagePresentation(snapshot: snapshot, delivery: .live, warnings: [])
         )
     }
 
-    /// A presentation with no windows at all is the collector's "no usable
-    /// source" case — it must surface as an explicit unavailable state, never
-    /// as a zeroed quota (capability gate criterion #5).
+    /// A financial-only observation remains visible while its quota windows
+    /// stay unavailable. A completely empty reading must not invent data.
     private static func mapState(_ presentation: ClaudeUsagePresentation) -> ClaudeUsageState {
-        let hasData = presentation.snapshot.fiveHour != nil
-            || presentation.snapshot.sevenDay != nil
-            || !presentation.snapshot.scopedWindows.isEmpty
+        let hasData = presentation.snapshot.hasQuotaWindows || presentation.snapshot.extraUsage != nil
         guard hasData else {
             return .unavailable(reason: presentation.warnings.first ?? ClaudeUsageState.notConnectedReason)
         }

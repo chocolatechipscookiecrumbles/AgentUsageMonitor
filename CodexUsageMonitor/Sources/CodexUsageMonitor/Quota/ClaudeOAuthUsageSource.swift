@@ -1,12 +1,7 @@
 import Foundation
 
 enum ClaudeOAuthError: Error, Equatable, Sendable {
-    case credentialsNotFound
-    /// macOS refused the cross-app Keychain read — either the grant lapsed, or
-    /// the read was made with interaction forbidden. Distinct from
-    /// `credentialsNotFound` because the recovery differs: the credential is
-    /// there, this app just may not read it right now.
-    case credentialAccessDenied
+    case credentialUnavailable(ClaudeCredentialError)
     case insufficientScope
     case unauthorized
     case malformedResponse
@@ -134,13 +129,8 @@ struct ClaudeOAuthUsageSource {
         let credential: ClaudeOAuthCredential
         do {
             credential = try await credentialStore.loadCredential(promptPolicy: promptPolicy)
-        } catch ClaudeCredentialError.accessDenied, ClaudeCredentialError.interactionNotAllowed {
-            // Collapsing this into `credentialsNotFound` is what made a denied
-            // read indistinguishable from having never connected, so the UI
-            // could only offer a generic outage message.
-            throw ClaudeOAuthError.credentialAccessDenied
-        } catch {
-            throw ClaudeOAuthError.credentialsNotFound
+        } catch let error as ClaudeCredentialError {
+            throw ClaudeOAuthError.credentialUnavailable(error)
         }
         guard credential.scopes.contains("user:profile") else {
             throw ClaudeOAuthError.insufficientScope
@@ -196,7 +186,7 @@ struct ClaudeOAuthUsageSource {
                 ClaudeExtraUsage(isEnabled: $0.isEnabled, monthlyLimit: $0.monthlyLimit, usedCredits: $0.usedCredits, currencyCode: $0.currency)
             },
             source: .oauth,
-            capturedAt: .now,
+            capturedAt: now(),
             schemaVersion: 1
         )
     }

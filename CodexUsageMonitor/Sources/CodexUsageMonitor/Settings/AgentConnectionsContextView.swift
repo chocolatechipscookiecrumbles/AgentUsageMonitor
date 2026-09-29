@@ -47,7 +47,7 @@ struct ProviderContextCard: View {
                 value: SettingsContextValue(label: "Status", value: summary.statusText)
             )
             SettingsContextValueRow(
-                value: SettingsContextValue(label: "Last refresh", value: summary.lastRefreshText)
+                value: SettingsContextValue(label: "Last updated", value: summary.lastRefreshText)
             )
         }
     }

@@ -216,6 +216,37 @@ access-object replacement.
 
 ## Conclusions so far
 
+### September 21 diagnostic follow-up
+
+- Sanitized same-day system logs recorded five displayed prompts, including
+  Always Allow approvals at 15:40 and 22:37 Eastern. The installed build 266
+  process had been running since September 15.
+- Binary inspection identified the older `ClaudeCompositeCredentialStore`
+  implementation and `kSecUseAuthenticationUIFail` imports in that installed
+  build. It is not the implementation in the current checkout; conclusions
+  about the checkout's Connect-only prompting policy cannot be applied to it.
+- The default login Keychain still appeared 168 times in the search list.
+  Attributes-only inspection found an unchanged creation date and a credential
+  modification at 22:35:54 Eastern, about 87 seconds before the latest prompt.
+  This correlation does not establish an access-object replacement.
+- The status-line snapshot existed with both quota windows. The OAuth cache
+  had also advanced after the latest approval.
+- Built the current feature checkout (`b98782f`, containing public main plus
+  eleven commits) with `Scripts/build-app.sh`: exit 0, Developer ID signed,
+  strict signature verification passed, designated requirement matched the
+  installed build. Asset compilation emitted three dyld missing-symbol
+  diagnostics for AVFCore/MediaToolbox; the build completed successfully.
+- Ran the new signed executable with `--claude-live-read-once`: exit 0,
+  interaction forbidden, live OAuth accepted, no collection warnings. Passive
+  data was too old for the two-minute fast path; `/usage` was not invoked.
+- After explicit user authorization, quit the installed app normally and
+  launched the new signed checkout build. Resolved an older duplicate checkout
+  instance through its normal Quit shortcut. Process inspection confirmed one
+  monitor remained, launched at 23:01 Eastern from the checkout bundle. The
+  three-minute system-log check around the switch recorded zero displayed
+  Keychain prompts. Credential-update and sleep/wake durability remain
+  unobserved with the new build; no permission or search-list changes were made.
+
 1. The ad-hoc-signature explanation is **ruled out** (O1).
 2. A second app identity is **ruled out** (O2).
 3. Item recreation is **ruled out** as the mechanism (O3).
@@ -236,3 +267,40 @@ access-object replacement.
 The scoped-query and state-classification changes are app-side containment, not
 a claim that Claude Code's ACL behavior has been proven. The controlled sequence
 in the follow-up plan decides whether any provider-owned limitation remains.
+
+## September 22 silent-access diagnosis
+
+Diagnosis only; no production code or provider credential/access-rule changes.
+The signed noninteractive probe reproduced fallback at 11:24 Eastern. At
+11:24:04.615, securityd logged an ACL partition mismatch for the monitor's
+Developer ID team against an ACL containing only `apple-tool:`. This identifies
+the immediate access barrier, not the process or event that changed the ACL.
+
+During the evening follow-up, securityd recorded the same mismatch and a prompt
+at 20:59:10 for the same checkout app and PID. At 20:59:14, securityd recorded
+that the user approved **Always Allow**. Explicit Reconnect then reported OAuth;
+independent silent probes at 21:02:44, 21:04:49, and 21:07:56 returned live OAuth
+without warnings. A further bounded probe at 23:36 returned live OAuth with no
+warning or matching prompt/partition-mismatch event, extending this observed
+post-approval interval to 2 hours 36 minutes 45 seconds.
+
+The running process retained the same Developer ID designated requirement and
+passed strict on-disk and dynamic signature validation. A targeted attributes-only
+query against the default `login.keychain-db` completed without prompting and
+reported credential creation `2026-07-20T02:32:03Z` and modification
+`2026-09-22T22:20:32Z`. The modification preceded both the evening mismatch
+series and Always Allow; no post-approval credential update occurred. The user
+search list still contained 168 entries resolving to one unique Keychain path,
+while the scoped query returned one item. Full `dump-keychain` remains excluded;
+the targeted default-Keychain query is the bounded metadata method for the next
+comparison.
+
+Five credential tests passed earlier in the day. The cause of recurring ACL
+restriction remains unresolved; successful short-window reads do not prove
+credential-update or sleep/wake durability.
+
+This establishes that Always Allow survived ordinary reads for the observed
+interval with one stable running identity. It does not establish durability
+across a provider credential update, relaunch, sleep/wake, or Keychain lock-state
+transition, and it does not identify what previously reduced the ACL to
+`apple-tool:`. Those natural events remain the open comparison boundary.

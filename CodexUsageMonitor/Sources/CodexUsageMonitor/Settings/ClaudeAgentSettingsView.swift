@@ -5,11 +5,10 @@ import SwiftUI
 /// actions) followed by the provider-neutral quota rows, so both agents read
 /// as one system.
 ///
-/// It uses the shared `AgentQuotaSessionSection`, passing a "used" credits
-/// label (Anthropic reports spend, not a balance) and no reset credits.
+/// Spending remains distinct from prepaid balance and redeemable reset offers.
 struct ClaudeAgentSettingsView: View {
     @ObservedObject var settings: AppSettings
-    let setupState: ClaudeSetupState
+    let isEnrolled: Bool
     let connectionState: ClaudeConnectionState
     let usageState: ClaudeUsageState
     let valueMode: QuotaValueMode
@@ -29,7 +28,7 @@ struct ClaudeAgentSettingsView: View {
     @State private var pendingRepair: String?
 
     var body: some View {
-        if setupState == .notSetUp {
+        if !isEnrolled {
             ClaudeSetupOnboardingView(connect: connect)
         } else {
             // Built once per render: it does date math and currency formatting,
@@ -89,10 +88,40 @@ struct ClaudeAgentSettingsView: View {
             resetCredits: nil,
             weeklyFootnote: ClaudeUsageDisplayModel.weeklyScopeCaveat,
             fiveHourNote: ClaudeUsageDisplayModel.showsFiveHourSessionNote(
-                isConnected: connectionStatus.isConnected,
+                isConnected: usageState.presentation?.delivery == .live,
                 hasFiveHourWindow: model?.fiveHour != nil
             ) ? ClaudeUsageDisplayModel.fiveHourSessionNote : nil
         )
+
+        SettingsSection("Credits and resets") {
+            SettingsSectionRow {
+                SettingsValueRow("Available resets", value: "Unavailable")
+            }
+            SettingsSectionRow {
+                SettingsValueRow("Credit balance", value: "Unavailable")
+            }
+            SettingsSectionRow {
+                SettingsValueRow(
+                    "Monthly spending limit", value: model?.monthlySpendingLimitText ?? "Unavailable",
+                    description: "A spending cap, separate from your prepaid balance."
+                )
+            }
+            if let updated = model?.financialUpdatedText {
+                SettingsSectionRow {
+                    SettingsValueRow(
+                        "Last updated", value: updated,
+                        description: "Last financial reading. Passive quota updates do not refresh it."
+                    )
+                }
+            }
+            SettingsSectionRow(showsDivider: false) {
+                SettingsPreferenceControlRow(
+                    "Claude Usage", description: "Check your balance and available resets in Claude."
+                ) {
+                    Link("Open Claude Usage", destination: URL(string: "https://claude.ai/settings/usage")!)
+                }
+            }
+        }
 
         SettingsSection("Source") {
             SettingsSectionRow {
@@ -101,14 +130,14 @@ struct ClaudeAgentSettingsView: View {
                 // it rides as its description instead of a block of its own.
                 SettingsValueRow(
                     "Read from",
-                    value: model.map { "\($0.sourceLabel) · \($0.capturedAtText)" } ?? "Not available",
+                    value: model.map { "\($0.sourceLabel) · Last updated \($0.capturedAtText)" } ?? "Not available",
                     description: model?.stalenessNotice
                 )
             }
             SettingsSectionRow {
                 SettingsPreferenceControlRow(
                     "Refresh now",
-                    description: "Uses the free sources. Never prompts."
+                    description: "Uses passive capture, then silent live fallback. Never requests Keychain permission."
                 ) {
                     Button("Refresh", action: refresh)
                 }
@@ -188,9 +217,10 @@ struct ClaudeAgentSettingsView: View {
     }
 
     /// The same derivation the context rail uses, so every Claude surface has
-    /// one definition of a connected Keychain credential.
+    /// one definition of monitoring enrollment and live fallback availability.
     private var connectionStatus: ClaudeConnectionStatus {
         ClaudeConnectionStatus.resolve(
+            isEnrolled: isEnrolled,
             signInState: connectionState,
             usageState: usageState
         )
@@ -215,40 +245,20 @@ struct ClaudeAgentSettingsView: View {
 
     @ViewBuilder
     private var connectionActions: some View {
-        if showsConnectAction {
-            // Keep the disclosure with the control it explains so the user
-            // understands both effects before granting access.
-            SettingsPreferenceControlRow(
-                "Claude connection",
-                description: ClaudeConnectionCopy.connectionDisclosure
-            ) {
-                Button(connectionActionTitle, action: connect)
-                    .disabled(isSigningIn)
-            }
-        }
         SettingsPreferenceControlRow(
-            connectionStatus.isConnected ? "Connected account" : "Claude enrollment"
+            "Live fallback",
+            description: "Reconnect may ask for Keychain permission. Passive monitoring continues if access is unavailable."
         ) {
-            AgentDisconnectButton(provider: .claudeCode, disconnect: disconnect)
+            Button("Reconnect Claude", action: connect)
+                .disabled(isSigningIn)
         }
-    }
-
-    private var showsConnectAction: Bool {
-        if connectionStatus.isConnected { return false }
-        switch connectionState {
-        case .notConnected, .failed: return true
-        case .checking, .connected: return false
-        case .connecting: return false
+        SettingsPreferenceControlRow("Claude monitoring") {
+            AgentDisconnectButton(provider: .claudeCode, disconnect: disconnect)
         }
     }
 
     private var isSigningIn: Bool {
         if case .connecting = connectionState { return true }
         return false
-    }
-
-    private var connectionActionTitle: String {
-        if case .failed = connectionState { return "Reconnect Claude" }
-        return "Connect Claude"
     }
 }

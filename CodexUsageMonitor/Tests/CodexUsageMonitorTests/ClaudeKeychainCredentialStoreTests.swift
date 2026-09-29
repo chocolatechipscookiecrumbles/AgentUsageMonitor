@@ -1,5 +1,6 @@
 import XCTest
 import Security
+import LocalAuthentication
 @testable import CodexUsageMonitor
 
 final class ClaudeKeychainPromptPolicyTests: XCTestCase {
@@ -11,9 +12,45 @@ final class ClaudeKeychainPromptPolicyTests: XCTestCase {
         )
 
         XCTAssertEqual(
-            query[kSecUseAuthenticationUI as String] as! CFString,
-            kSecUseAuthenticationUIFail
+            (query[kSecUseAuthenticationContext as String] as? LAContext)?.interactionNotAllowed,
+            true
         )
+    }
+
+    func testLegacySilentReadDisablesInteractionAndRestoresPriorFlagOnFailure() {
+        for initiallyAllowed in [false, true] {
+            var allowed = initiallyAllowed
+            var writes: [Bool] = []
+            let result = ClaudeKeychainCredentialStore.withLegacyInteractionPolicy(
+                .never,
+                getAllowed: { $0.pointee = DarwinBoolean(allowed); return errSecSuccess },
+                setAllowed: { allowed = $0; writes.append($0); return errSecSuccess },
+                read: {
+                    XCTAssertFalse(allowed, "legacy lookup must run with interaction disabled")
+                    return .failure(.interactionNotAllowed)
+                }
+            )
+            XCTAssertEqual(result, .failure(.interactionNotAllowed))
+            XCTAssertEqual(writes, [false, initiallyAllowed])
+            XCTAssertEqual(allowed, initiallyAllowed)
+        }
+    }
+
+    func testLegacyFlagFailurePreventsReadAndRestorationFailureIsReported() {
+        var readCount = 0
+        var setCount = 0
+        let result = ClaudeKeychainCredentialStore.withLegacyInteractionPolicy(
+            .never,
+            getAllowed: { $0.pointee = true; return errSecSuccess },
+            setAllowed: { _ in
+                setCount += 1
+                return setCount == 1 ? errSecNotAvailable : errSecAuthFailed
+            },
+            read: { readCount += 1; return .success(Data()) }
+        )
+        XCTAssertEqual(readCount, 0)
+        XCTAssertEqual(setCount, 2)
+        XCTAssertEqual(result, .failure(.unexpectedStatus(errSecAuthFailed)))
     }
 
     func testUserInitiatedPolicyAllowsInteraction() {
@@ -22,15 +59,15 @@ final class ClaudeKeychainPromptPolicyTests: XCTestCase {
         )
 
         XCTAssertNil(
-            query[kSecUseAuthenticationUI as String],
+            query[kSecUseAuthenticationContext as String],
             "a user-initiated read must be allowed to prompt"
         )
     }
 
     /// A denied read must degrade, never hard-fail: the collector needs to
     /// fall through to the next tier rather than surface an error.
-    func testInteractionNotAllowedMapsToAccessDenied() {
-        XCTAssertEqual(ClaudeKeychainCredentialStore.error(for: errSecInteractionNotAllowed), .accessDenied)
+    func testInteractionNotAllowedRemainsDistinctFromAccessDenied() {
+        XCTAssertEqual(ClaudeKeychainCredentialStore.error(for: errSecInteractionNotAllowed), .interactionNotAllowed)
     }
 
     func testMissingItemMapsToNotFound() {
@@ -47,7 +84,7 @@ final class ClaudeKeychainPromptPolicyTests: XCTestCase {
         XCTAssertEqual(ClaudeRefreshReason.scheduled.keychainPromptPolicy, .never)
         XCTAssertEqual(ClaudeRefreshReason.appLaunch.keychainPromptPolicy, .never)
         XCTAssertEqual(ClaudeRefreshReason.menuOpened.keychainPromptPolicy, .never)
-        XCTAssertEqual(ClaudeRefreshReason.userInitiated.keychainPromptPolicy, .userInitiatedOnly)
+        XCTAssertEqual(ClaudeRefreshReason.userInitiated.keychainPromptPolicy, .never)
     }
 }
 
@@ -58,57 +95,62 @@ final class ClaudeKeychainCredentialStoreTests: XCTestCase {
     {"claudeAiOauth":{"accessToken":"fixture-access-token","refreshToken":"fixture-refresh-token","expiresAt":1784572234658,"refreshTokenExpiresAt":1787074021658,"scopes":["user:file_upload","user:inference","user:mcp_servers","user:profile","user:sessions:claude_code"],"subscriptionType":"pro","rateLimitTier":"default_claude_ai"}}
     """
 
-    func testLoadCredentialParsesRealShapedFixture() throws {
+    func testLoadCredentialParsesRealShapedFixture() async throws {
         let fixture = realShapedFixture
         let store = ClaudeKeychainCredentialStore(
             rawDataReader: { .success(Data(fixture.utf8)) }
         )
 
-        let credential = try store.loadCredential()
+        let credential = try await store.loadCredential()
 
         XCTAssertEqual(credential.accessToken, "fixture-access-token")
-        XCTAssertEqual(credential.refreshToken, "fixture-refresh-token")
-        XCTAssertEqual(credential.expiresAt, Date(timeIntervalSince1970: 1_784_572_234_658 / 1000))
         XCTAssertEqual(credential.scopes, ["user:file_upload", "user:inference", "user:mcp_servers", "user:profile", "user:sessions:claude_code"])
         XCTAssertEqual(credential.subscriptionType, "pro")
     }
 
-    func testLoadCredentialThrowsNotFoundWhenKeychainItemMissing() {
+    func testLoadCredentialThrowsNotFoundWhenKeychainItemMissing() async {
         let store = ClaudeKeychainCredentialStore(rawDataReader: { .failure(.notFound) })
 
-        XCTAssertThrowsError(try store.loadCredential()) { error in
+        do {
+            _ = try await store.loadCredential()
+            XCTFail("expected credential failure")
+        } catch {
             XCTAssertEqual(error as? ClaudeCredentialError, .notFound)
         }
     }
 
-    func testLoadCredentialThrowsMalformedDataForInvalidJSON() {
+    func testLoadCredentialThrowsMalformedDataForInvalidJSON() async {
         let store = ClaudeKeychainCredentialStore(rawDataReader: { .success(Data("not json".utf8)) })
 
-        XCTAssertThrowsError(try store.loadCredential()) { error in
+        do {
+            _ = try await store.loadCredential()
+            XCTFail("expected credential failure")
+        } catch {
             XCTAssertEqual(error as? ClaudeCredentialError, .malformedData)
         }
     }
 
-    func testLoadCredentialThrowsMalformedDataWhenAccessTokenMissing() {
+    func testLoadCredentialThrowsMalformedDataWhenAccessTokenMissing() async {
         let store = ClaudeKeychainCredentialStore(
             rawDataReader: { .success(Data(#"{"claudeAiOauth":{"refreshToken":"x"}}"#.utf8)) }
         )
 
-        XCTAssertThrowsError(try store.loadCredential()) { error in
+        do {
+            _ = try await store.loadCredential()
+            XCTFail("expected credential failure")
+        } catch {
             XCTAssertEqual(error as? ClaudeCredentialError, .malformedData)
         }
     }
 
-    func testLoadCredentialToleratesMissingOptionalFields() throws {
+    func testLoadCredentialToleratesMissingOptionalFields() async throws {
         let store = ClaudeKeychainCredentialStore(
             rawDataReader: { .success(Data(#"{"claudeAiOauth":{"accessToken":"only-token"}}"#.utf8)) }
         )
 
-        let credential = try store.loadCredential()
+        let credential = try await store.loadCredential()
 
         XCTAssertEqual(credential.accessToken, "only-token")
-        XCTAssertNil(credential.refreshToken)
-        XCTAssertNil(credential.expiresAt)
         XCTAssertEqual(credential.scopes, [])
         XCTAssertNil(credential.subscriptionType)
     }

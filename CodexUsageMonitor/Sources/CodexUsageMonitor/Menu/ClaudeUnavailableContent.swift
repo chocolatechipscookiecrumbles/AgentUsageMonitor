@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ClaudeUnavailableContent: View {
     let connectionState: ClaudeConnectionState
+    let statusDetail: String?
     let connect: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
@@ -39,28 +40,20 @@ struct ClaudeUnavailableContent: View {
 
     private var showsConnect: Bool {
         switch connectionState {
-        case .checking, .connecting, .connected: false
-        case .notConnected, .failed: true
+        case .checking, .connecting: false
+        case .notConnected, .failed, .connected: true
         }
     }
 
-    private var title: String {
-        switch connectionState {
-        case .checking: "Checking Claude connection…"
-        case .connecting: "Connecting Claude…"
-        case .notConnected: "Claude isn’t connected"
-        case .failed: "Claude connection needs attention"
-        case .connected: "Unable to read usage"
-        }
-    }
+    private var title: String { "Monitoring enabled" }
 
     private var detail: String {
         switch connectionState {
-        case .checking: "Checking for Claude credentials before reading usage."
-        case .connecting: "Approve the Keychain prompt and choose Always Allow for background updates."
-        case .notConnected: "Connect once to show live usage and enable passive capture."
-        case .failed(let failure): failure.displayMessage
-        case .connected: "No confirmed Claude usage result is available yet. Use Refresh Now to try again."
+        case .checking, .connecting:
+            "Checking live fallback. Waiting for a Claude Code usage capture."
+        default:
+            (statusDetail ?? "No usage reading is available yet.")
+                + " Use Claude Code to capture usage, or open Claude Settings to run /usage."
         }
     }
 

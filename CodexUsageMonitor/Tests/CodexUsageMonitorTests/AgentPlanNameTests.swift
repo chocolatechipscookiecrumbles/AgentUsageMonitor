@@ -92,4 +92,43 @@ final class MenuProviderHeaderTitleTests: XCTestCase {
         XCTAssertEqual(refreshing.title, "Team")
         XCTAssertEqual(refreshing.subtitle, "Refreshing…")
     }
+
+    func testClaudeHeaderDistinguishesCapturedConfirmedAndCachedReadings() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        func state(delivery: ClaudeUsageDelivery, age: TimeInterval) -> ClaudeUsageState {
+            .available(ClaudeUsagePresentation(
+                snapshot: ClaudeUsageSnapshot(
+                    planHint: nil,
+                    fiveHour: ClaudeLimitWindow(usedPercent: 20, resetsAt: nil),
+                    sevenDay: nil,
+                    scopedWindows: [],
+                    extraUsage: nil,
+                    source: delivery == .live ? .oauth : .statusLine,
+                    capturedAt: now.addingTimeInterval(-age),
+                    schemaVersion: 1
+                ),
+                delivery: delivery,
+                warnings: []
+            ))
+        }
+
+        XCTAssertEqual(MenuProviderHeaderPresentation.claude(
+            usageState: state(delivery: .passiveSnapshot, age: 120),
+            connectionState: .notConnected,
+            isRefreshing: false,
+            now: now
+        ).status, .captured)
+        XCTAssertEqual(MenuProviderHeaderPresentation.claude(
+            usageState: state(delivery: .live, age: 0),
+            connectionState: .notConnected,
+            isRefreshing: false,
+            now: now
+        ).status, .confirmed)
+        XCTAssertEqual(MenuProviderHeaderPresentation.claude(
+            usageState: state(delivery: .passiveSnapshot, age: 121),
+            connectionState: .notConnected,
+            isRefreshing: false,
+            now: now
+        ).status, .cached)
+    }
 }

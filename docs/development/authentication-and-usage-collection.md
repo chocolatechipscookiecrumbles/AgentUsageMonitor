@@ -31,15 +31,35 @@ are not retained.
 
 Automatic Claude collection has one source policy:
 
-1. Serve a usable status-line snapshot captured within two minutes. This
-   performs no Keychain read, network request, or Claude CLI launch.
-2. Read Claude Code's existing Keychain credential with the prompt policy for
-   the refresh reason and call `GET /api/oauth/usage`.
-3. Fall back to the fresher of an older status-line snapshot and the last known
-   good normalized OAuth result.
+1. Serve a valid status-line snapshot with at least one quota window captured
+   no more than two minutes ago. This performs no Keychain read, network request,
+   or Claude CLI launch.
+2. Silently read Claude Code's existing Keychain credential and call
+   `GET /api/oauth/usage`, subject to existing rate-limit backoff.
+3. Fall back to the freshest usable older status-line snapshot or cached
+   reading, retaining its original capture time.
+4. With no usable reading, show unavailable usage and explicit recovery actions.
+
+Launch, scheduled refresh, menu opening, ordinary Refresh, and retries never
+permit Keychain interaction. Only explicit Connect/Reconnect may prompt.
 
 `claude -p /usage` is not in the automatic hierarchy. It can consume a small
 amount of quota and runs only from the separately disclosed **Force Read** action.
+
+Fresh passive readings and successful explicit `/usage` readings are eligible
+for quota-threshold evaluation when each window carries a future reset time.
+Passive eligibility uses the same two-minute freshness boundary as collection;
+retained cached readings never trigger a new threshold alert. `/usage` reset
+text uses its reported timezone when present. If a reset cannot be parsed, the
+percentage remains usable but that window cannot alert because it has no stable
+reset-window identity.
+
+Permitted automatic sources do not currently expose Claude redeemable-reset
+inventory or a prepaid usage-credit balance. Settings reports those values as
+**Unavailable** and links to Claude Usage. OAuth `extra_usage` remains the source
+for reported usage-credit spending and an optional monthly spending limit;
+missing amount or currency is never converted to zero or USD. Its observation
+time remains separate when a newer passive or explicit CLI quota reading is displayed.
 
 ### One Connect action
 
@@ -48,13 +68,21 @@ amount of quota and runs only from the separately disclosed **Force Read** actio
 - it installs Agent Monitor's privacy-scoped status-line command when Claude
   Code has no status line; a working foreign command is never replaced; and
 - it reads Claude Code's existing OAuth credential once with user interaction
-  allowed, validates `user:profile`, and proves the connection with a successful
-  usage response.
+  allowed, validates `user:profile`, and attempts a live usage response.
+
+Enrollment means **Monitoring enabled**, independently of live OAuth availability.
+If credential authorization is denied, cancelled, or unavailable, passive
+monitoring resumes; enrollment and usable quota readings remain intact. Explicit
+Reconnect remains available without becoming a prerequisite for showing usage.
 
 macOS prompts because Claude Code and Agent Monitor are different signed
-applications. Choosing **Always Allow** permits later scheduled reads. Choosing
-**Allow** permits only that read; automatic refreshes never display the prompt
-and instead degrade to passive capture or cache.
+applications. **Always Allow** is intended to authorize subsequent reads, but
+its durability for this provider-owned item is not guaranteed. **Allow** permits
+only that read. Background failures are **Live fallback unavailable**, not
+evidence that permission was revoked, and collection falls back to passive
+capture or cache without another dialog. Repeated prompts are tracked in the
+separate [grant-durability diagnosis](claude-keychain-grant-durability.md); that
+investigation does not gate passive-first monitoring.
 
 There is no setup-token route or credential-method fallback. Claude Code
 2.1.247 successfully created a one-year `setup-token`, but that inference token
@@ -65,21 +93,31 @@ obsolete app-owned Keychain item (`AgentUsageMonitor-ClaudeOAuth`, account
 ### Credential boundary
 
 `ClaudeKeychainCredentialStore` is an actor. Its secret-bearing Keychain read
-runs outside `@MainActor`; scheduled reads attach an `LAContext` with interaction
-disabled. The access token is deliberately non-`Codable` and non-printable,
+runs outside `@MainActor`. Because the legacy Keychain path does not consume
+`LAContext`, a shared lock serializes both read policies. Silent reads save the
+process-local legacy interaction setting, disable interaction, perform the scoped
+read, and restore the previous setting with every status checked. The query also
+attaches a noninteractive `LAContext`; that context alone is not the legacy UI
+guard. The deprecated `SecKeychainGetUserInteractionAllowed`,
+`SecKeychainSetUserInteractionAllowed`, and `SecKeychainCopyDefault` APIs are kept
+only at this compatibility boundary. See [Apple's legacy SecItem implementation](https://github.com/apple-oss-distributions/Security/blob/main/OSX/libsecurity_keychain/lib/SecItem.cpp).
+ The access token is deliberately non-`Codable` and non-printable,
 exists only in memory for the request, and is never cached, logged, exported,
 refreshed directly, changed, or deleted.
 
-The provider-owned item uses Claude Code's compatible login-Keychain lookup.
-Agent Monitor does not migrate it into the data-protection keychain. The one
-delete query owned by this app targets only the retired setup-token service and
+The provider-owned item uses Claude Code's compatible legacy Keychain lookup,
+scoped to the single default/login Keychain instead of the global search list.
+Agent Monitor never changes that list or the item's access permissions and does
+not migrate it into the data-protection keychain. The one delete query owned by
+this app targets only the retired setup-token service and
 account and includes data-protection routing.
 
-On an unauthorized response, automatic refresh does not launch Claude Code.
-The delegated `claude auth status --json` renewal check remains user-initiated
-and single-flight until scheduled behavior passes its separate capability gate.
-Its output is discarded and success requires the non-secret Keychain
-modification date to change before one non-interactive retry.
+Typed credential failures remain intact through the OAuth layer. Neither an
+expired token nor an unauthorized response launches Claude Code during ordinary
+Refresh or automatic collection. Delegated CLI renewal is removed. Only the
+explicit, consented `/usage` recovery action launches the CLI for usage; it
+prevents duplicate execution, publishes and caches a successful result, and
+retains the previous reading on failure.
 
 ### Passive capture and single executable
 

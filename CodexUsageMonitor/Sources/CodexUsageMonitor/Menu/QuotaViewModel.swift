@@ -22,6 +22,7 @@ final class QuotaViewModel: ObservableObject {
     /// Result of the last manual CLI probe, so the page can report a failure
     /// the user paid tokens for.
     @Published private(set) var claudeCLIProbeError: String?
+    private var claudeCLIProbeGeneration = 0
     @Published private(set) var isRunningClaudeCLIProbe = false
     @Published private(set) var isRefreshingClaude = false
     @Published private(set) var claudeSetupState: ClaudeSetupState
@@ -120,8 +121,7 @@ final class QuotaViewModel: ObservableObject {
         let claudeCollector = ClaudeUsageCollector(
             oauthSource: claudeOAuthUsageSource,
             statusLineReader: ClaudeRateLimitSnapshotReader(),
-            cache: claudeUsageCache,
-            delegatedRefresh: ClaudeDelegatedRefreshCoordinator()
+            cache: claudeUsageCache
         )
         let claudeMonitor = ClaudeUsageMonitor(
             collector: claudeCollector,
@@ -148,8 +148,20 @@ final class QuotaViewModel: ObservableObject {
                 return snapshot
             },
             onConnected: { snapshot in
+                let previous = claudeUsageCache.load()?.snapshot
+                let merged: ClaudeUsageSnapshot
+                if snapshot.hasQuotaWindows {
+                    merged = snapshot.retainingExtraUsage(from: previous)
+                } else if let previous, previous.hasQuotaWindows {
+                    merged = previous.retainingExtraUsage(from: snapshot)
+                } else {
+                    merged = snapshot.retainingExtraUsage(from: previous)
+                }
                 claudeUsageCache.save(snapshot)
-                claudeMonitor.reconnect(with: snapshot)
+                claudeMonitor.reconnect(
+                    with: merged,
+                    delivery: snapshot.hasQuotaWindows ? .live : .cached
+                )
             },
             onConnectionFailed: {
                 // Enrollment and passive capture remain active after a denied
@@ -202,9 +214,6 @@ final class QuotaViewModel: ObservableObject {
                presentation.snapshot.source == .oauth {
                 self?.claudeConnectionController.applyLiveOAuthSnapshot(presentation.snapshot)
             }
-        }.store(in: &subscriptions)
-        claudeMonitor.$credentialFailure.compactMap { $0 }.sink { [weak self] failure in
-            self?.claudeConnectionController.applyCredentialFailure(failure)
         }.store(in: &subscriptions)
         claudeMonitor.$hasCompletedInitialRefresh.removeDuplicates().sink { [weak self] _ in
             self?.updateClaudeSetupState()
@@ -346,6 +355,7 @@ final class QuotaViewModel: ObservableObject {
     /// prompt; the credential read it delegates to is the user-initiated step
     /// that may.
     func connectClaude() {
+        claudeCLIProbeGeneration += 1
         enrollment.enable(.claudeCode)
         // Enroll passive capture at the same time. A foreign status line is
         // preserved, and a repairable command still requires confirmation.
@@ -438,6 +448,7 @@ final class QuotaViewModel: ObservableObject {
     /// Recording `.disabled` also stops Claude's local reads and purges its
     /// derived Token Monitor cache through the existing privacy path.
     func disconnectClaude() {
+        claudeCLIProbeGeneration += 1
         claudeConnectionController.disconnect()
         let cancelledRefresh = claudeMonitor.disconnect()
         enrollment.disable(.claudeCode)
@@ -457,17 +468,20 @@ final class QuotaViewModel: ObservableObject {
         guard !isRunningClaudeCLIProbe else { return }
         isRunningClaudeCLIProbe = true
         claudeCLIProbeError = nil
+        let generation = claudeCLIProbeGeneration
         Task { [weak self] in
-            defer { Task { @MainActor [weak self] in self?.isRunningClaudeCLIProbe = false } }
+            guard let self else { return }
+            defer { isRunningClaudeCLIProbe = false }
             do {
                 let snapshot = try await ClaudeCLIUsageProbe().run()
-                await MainActor.run { [weak self] in
-                    self?.claudeMonitor.applyManualSnapshot(snapshot)
-                }
+                guard generation == claudeCLIProbeGeneration,
+                      enrollment.isEnabled(.claudeCode) else { return }
+                claudeUsageCache.save(snapshot)
+                claudeMonitor.applyManualSnapshot(snapshot)
             } catch {
-                await MainActor.run { [weak self] in
-                    self?.claudeCLIProbeError = Self.cliProbeMessage(for: error)
-                }
+                guard generation == claudeCLIProbeGeneration,
+                      enrollment.isEnabled(.claudeCode) else { return }
+                claudeCLIProbeError = Self.cliProbeMessage(for: error)
             }
         }
     }
@@ -504,17 +518,18 @@ final class QuotaViewModel: ObservableObject {
         claudeMonitor.stop()
     }
 
-    /// Evaluates Claude's windows for threshold alerts, but only on a confirmed
-    /// (live) read — a cached read must not re-alert. Dedup by reset time in the
-    /// notifier makes repeated live reads safe.
+    /// Evaluates current Claude readings only. The notifier retains ownership
+    /// of threshold settings and reset-window deduplication.
     private func deliverClaudeThresholdAlerts(for state: ClaudeUsageState) {
         guard let appNotifier,
               case .available(let presentation) = state,
-              presentation.delivery == .live else { return }
-        let model = ClaudeUsageDisplayModel(presentation: presentation)
-        let fiveHour = Self.claudeThresholdWindow(model.fiveHour)
-        let weekly = Self.claudeThresholdWindow(model.sevenDay)
-        Task { await appNotifier.evaluateClaudeThresholds(fiveHour: fiveHour, weekly: weekly) }
+              let windows = Self.claudeThresholdWindows(for: presentation) else { return }
+        Task {
+            await appNotifier.evaluateClaudeThresholds(
+                fiveHour: windows.fiveHour,
+                weekly: windows.weekly
+            )
+        }
     }
 
     /// Collects newly-enabled thresholds and, after a short quiet period, sends
@@ -549,10 +564,31 @@ final class QuotaViewModel: ObservableObject {
         await appNotifier?.deliverConfirmation(body)
     }
 
-    /// Maps a Claude window into the provider-neutral `QuotaWindow`. A window
-    /// that has already reset is dropped rather than alerted on a stale figure.
-    private static func claudeThresholdWindow(_ window: ClaudeUsageDisplayModel.Window?) -> QuotaWindow? {
-        guard let window, !window.hasReset else { return nil }
-        return QuotaWindow(usedPercent: window.usedPercent, resetAt: window.resetsAt, durationMinutes: nil)
+    nonisolated static func claudeThresholdWindows(
+        for presentation: ClaudeUsagePresentation,
+        now: Date = .now
+    ) -> (fiveHour: QuotaWindow?, weekly: QuotaWindow?)? {
+        let eligible = switch (presentation.delivery, presentation.snapshot.source) {
+        case (.live, .oauth), (.live, .cli): true
+        case (.passiveSnapshot, .statusLine): presentation.isFreshPassive(at: now)
+        default: false
+        }
+        guard eligible else { return nil }
+        return (
+            claudeThresholdWindow(presentation.snapshot.fiveHour, now: now),
+            claudeThresholdWindow(presentation.snapshot.sevenDay, now: now)
+        )
+    }
+
+    nonisolated private static func claudeThresholdWindow(
+        _ window: ClaudeLimitWindow?,
+        now: Date
+    ) -> QuotaWindow? {
+        guard let window, let resetAt = window.resetsAt, resetAt > now else { return nil }
+        return QuotaWindow(
+            usedPercent: Int(window.usedPercent.rounded()),
+            resetAt: resetAt,
+            durationMinutes: nil
+        )
     }
 }

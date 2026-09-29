@@ -13,13 +13,13 @@ enum ClaudeConnectionFailure: Equatable, Sendable {
     var displayMessage: String {
         switch self {
         case .keychainAccessDenied:
-            "macOS denied access to Claude Code’s credential. Reconnect and choose Always Allow in the Keychain prompt."
+            "Live fallback unavailable. Keychain access was not approved. Passive monitoring remains enabled."
         case .credentialsNotFound:
             "No Claude Code credential was found. Sign in to Claude Code, then reconnect here."
         case .insufficientUsageScope:
             "Claude Code’s current credential cannot read usage. Sign in to Claude Code again."
         case .usageUnavailable:
-            "Claude accepted the credential but returned no usage. Try again shortly."
+            "Live fallback could not be checked. Passive monitoring remains enabled."
         }
     }
 }

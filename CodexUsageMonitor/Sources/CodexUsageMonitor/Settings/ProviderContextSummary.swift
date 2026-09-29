@@ -51,6 +51,7 @@ struct ProviderContextSummary: Identifiable, Equatable {
     }
 
     static func claude(
+        isEnrolled: Bool,
         connectionState: ClaudeConnectionState,
         usageState: ClaudeUsageState,
         valueMode: QuotaValueMode = .used,
@@ -58,12 +59,12 @@ struct ProviderContextSummary: Identifiable, Equatable {
     ) -> ProviderContextSummary {
         let model = usageState.presentation.map { ClaudeUsageDisplayModel(presentation: $0, now: now) }
         // Shared with the agent page so the two surfaces cannot disagree.
-        // Holding cached data is not the same as being connected.
-        let status = ClaudeConnectionStatus.resolve(signInState: connectionState, usageState: usageState)
+        // Enrollment does not depend on whether live fallback is available.
+        let status = ClaudeConnectionStatus.resolve(isEnrolled: isEnrolled, signInState: connectionState, usageState: usageState)
         return ProviderContextSummary(
             provider: .claudeCode,
-            isConnected: status.isConnected,
-            statusText: status.text,
+            isConnected: status.isMonitoringEnabled,
+            statusText: [status.text, status.detail].compactMap { $0 }.joined(separator: "\n"),
             planText: claudePlanText(connectionState: connectionState, model: model),
             // Routed through the same helper Codex uses, so one setting
             // governs both providers rather than Claude hardcoding "used".

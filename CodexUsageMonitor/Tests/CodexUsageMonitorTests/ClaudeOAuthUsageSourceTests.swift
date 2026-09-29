@@ -55,9 +55,25 @@ final class ClaudeOAuthUsageSourceTests: XCTestCase {
             _ = try await source.fetch()
             XCTFail("expected an error")
         } catch let error as ClaudeOAuthError {
-            XCTAssertEqual(error, .credentialsNotFound)
+            XCTAssertEqual(error, .credentialUnavailable(.notFound))
         } catch {
             XCTFail("unexpected error: \(error)")
+        }
+    }
+
+    func testNoninteractiveCredentialFailureRetainsItsTypedCause() async {
+        let source = ClaudeOAuthUsageSource(
+            credentialStore: FakeCredentialStore(result: .failure(.interactionNotAllowed)),
+            requestExecutor: { _ in
+                XCTFail("must not request usage without a credential")
+                return (Data(), Self.httpResponse(status: 200))
+            }
+        )
+        do {
+            _ = try await source.fetch()
+            XCTFail("expected credential failure")
+        } catch {
+            XCTAssertEqual(error as? ClaudeOAuthError, .credentialUnavailable(.interactionNotAllowed))
         }
     }
 
