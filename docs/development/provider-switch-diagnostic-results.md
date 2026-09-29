@@ -347,3 +347,51 @@ still part of the native window's hit area, so clicks there do not pass through
 to the underlying app. The user confirmed provider switching is fine in this
 build and asked to stop. A bottom rounded edge remains visible and is recorded
 as the outstanding visual detail. No further UI change was made.
+
+### Failure-state viewport regression — 2026-09-28
+
+A focused native NSHostingView/NSScrollView regression reproduced the reported
+header/footer overlap using the existing modifier order. An 800-point content
+region inside a 637-point maximum-height allocation produced an actual 800-point
+scroll viewport at y=4.5…804.5, instead of y=86…723. The outer frame constrained
+allocation while the vertically fixed scroll view kept its ideal height.
+
+The shared MenuAdaptiveLayout now measures intrinsic content and fixed regions,
+then assigns the bounded height to the scroll view itself. The same test passes,
+with content taller than the native viewport and the viewport between the header
+and footer. This proves the viewport geometry correction, not the absence of
+intermediate compositor artifacts in the real MenuBarExtra.
+
+Custom-panel and native-popover comparison apps use this layout and shared
+production card renderers. They have not replaced the production host. Computer
+Use timed out (-10005) when opening the signed Panel Demo; its resulting audit
+process was closed without touching the pre-existing app. Pointer/keyboard,
+VoiceOver, Light/Dark, multi-screen and intermediate-frame acceptance remain
+pending. The trial build and full source-check results are recorded in the
+[active plan](../superpowers/plans/2026-09-27-adaptive-menu-presentation.md).
+
+### Trial rejection and diagnosis — 2026-09-28
+
+The user reported that neither comparison host fixed the defect and that both
+recreated the switch-tab artifact. Both trials were built to "resize to content
+immediately" with no transparent tail, which reintroduced the host resize that
+the July diagnosis had identified as the cause and that both accepted fixes
+removed.
+
+The resize could not be immediate. A switch commits the new SwiftUI subtree,
+measures it through a preference, and resizes the window on a later run-loop
+turn. In between, the unanchored, vertically fixed root is centered in the
+old-sized window, so the tabs and header move by half the height difference
+and the window then snaps them back. A local headless probe (not committed)
+reproduced this in a trial-like `NSPanel` hosting the same geometry: after a
+520 → 380 pt content switch, the viewport started at y=156 instead of y=86
+until the deferred resize, and anchoring the root to the top removed the
+displacement. The same probe showed that `MenuAdaptiveLayout` settles in one
+layout pass inside a fixed host, so it was ruled out as the cause.
+
+The user then confirmed that tab switching works in the production build: the
+stable 860-point host together with the bounded viewport. The trial code is
+archived outside this branch. An app-owned, content-fitted panel remains
+possible only with a top-anchored root and a window that is never smaller than
+its committed content; see the
+[content-fitted menu panel plan](../superpowers/plans/2026-09-29-content-fitted-menu-panel.md).

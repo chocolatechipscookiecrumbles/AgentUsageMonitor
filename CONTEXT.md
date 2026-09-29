@@ -286,3 +286,13 @@ _Avoid_: Other warning, window warning
 **Coalesced Interruption Notice**:
 One notification that names every agent whose separate interruption episode became alert-eligible within the provisional five-second delivery-coalescing window. That window assumes agents refresh on a shared cadence and must be revisited if scheduling becomes provider-specific.
 _Avoid_: Shared interruption episode, generic outage alert, duplicate provider notices
+
+## Menu Presentation
+
+**Menu Panel**:
+The visible menu surface containing provider selection, usage content, and commands.
+_Avoid_: Two layers, outer background, dropdown window
+
+**Provider Viewport**:
+The region between the provider header and command footer through which provider content scrolls when it exceeds available space.
+_Avoid_: Content floor, blank provider region

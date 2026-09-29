@@ -741,3 +741,15 @@ Do not push until the user explicitly approves the resulting commits.
 - VoiceOver and keyboard behavior pass in Light and Dark.
 - All temporary diagnostic code and logs are removed.
 - Full source and signed-app verification are recorded without inferred coverage.
+
+
+## Adaptive presentation comparison — 2026-09-28
+
+The failure-state overflow now has a red/green native layout regression and a
+bounded-viewport correction. Custom-panel and native-popover comparison builds
+reuse the actual provider renderers; production host selection remains pending.
+See [the active implementation plan](2026-09-27-adaptive-menu-presentation.md)
+for agreed behavior, review fixes, build/test evidence, and incomplete signed-app
+acceptance. Earlier settled switching screenshots do not close this boundary.
+
+**Outcome — 2026-09-28:** Both comparison hosts were rejected because they recreated the switch artifact by resizing the native window after measuring. Production keeps the stable host with the bounded viewport; see [Trial rejection and diagnosis](../../development/provider-switch-diagnostic-results.md#trial-rejection-and-diagnosis--2026-09-28).
