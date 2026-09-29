@@ -123,12 +123,12 @@ Follow the file map in the structure draft.
 
 ### Task 4 — Signed build
 
-- [x] Restore `build-menu-trials.sh` from the archive branch and reduce it to Panel Live and Panel Demo. Build them, then run `codesign --verify --deep --strict` on both. Script restored and reduced; build pending (see Verification log).
-- [ ] Record the `xcodebuild` limitation (no project; exit 66) exactly as in the adaptive-menu plan. Do not generate a project to work around it.
+- [x] Restore `build-menu-trials.sh` from the archive branch and reduce it to Panel Live and Panel Demo. Build them, then run `codesign --verify --deep --strict` on both. Done 2026-09-29 (see Verification log).
+- [x] Run `xcodebuild -scheme CodexUsageMonitor -destination 'platform=macOS' build`. Done 2026-09-29 from `CodexUsageMonitor/`: **BUILD SUCCEEDED**, exit 0. The adaptive-menu plan's "exit 66, no project" limitation does not apply when run from the package directory.
 
 ### Task 5 — Self-audit (the agent's own evidence only)
 
-- [ ] Launch Panel Demo, which uses no live services, and check the debug log for `lateGrow` faults (Q3). If Computer Use times out, stop promptly, close only the audit-owned process and move on to Task 6.
+- [x] Attempted 2026-09-29 and blocked (see Verification log). Launch Panel Demo, which uses no live services, and check the debug log for `lateGrow` faults (Q3). If Computer Use times out, stop promptly, close only the audit-owned process and move on to Task 6.
 
 ### Task 6 — User-operated recording (the actual acceptance evidence)
 
@@ -182,5 +182,7 @@ Follow the file map in the structure draft.
 - 2026-09-29, `MenuPanelAnchorTests` (red first). Against the archived `MenuTrialShell`: viewport minY −102.5 in a window 140 pt taller vs −172.5 in the fitted window, a 70 pt move, so red. Against `MenuPanelRoot`: minY 120 in both, so green. A first draft of the test built its window from `fittingSize` on a host with `sizingOptions = []`, which reports 0. That was corrected before accepting either result.
 - 2026-09-29, `MenuWindowEnvelopeTests` (red first). The unguarded policy applied a stale shrink to 400 pt beneath 700 pt of content, so red. The generation guard makes it green.
 - Neither test proves compositor behavior; that remains Tasks 6–7.
+- 2026-09-29, `xcodebuild -scheme CodexUsageMonitor -destination 'platform=macOS' build` from `CodexUsageMonitor/`: exit 0, BUILD SUCCEEDED. Warnings: the three existing Keychain deprecations only.
 - 2026-09-29, `swift build` and `swift test`: exit 0, 316 tests, 1 skipped (the existing glyph test), 0 failures. No new warnings; the existing Keychain deprecation warnings remain.
-- Signed build: pending, run from a separate worktree so the user-owned app at `.build/CodexUsageMonitor.app` (PID 75660) is not re-signed while it runs.
+- 2026-09-29, signed build: `build-menu-trials.sh` run from a separate worktree at `473473a`, so the user-owned app at `.build/CodexUsageMonitor.app` (PID 75660) was not re-signed while it ran. A fresh worktree lacks the git-ignored `Resources/Assets.xcassets`; it was copied from the main checkout. Exit 0, "Signed with: Developer ID Application". `codesign --verify --deep --strict` passed for Panel Live (`MenuPresentationTrialMode=panel`, fixtures false) and Panel Demo (fixtures true). Both apps were copied to `CodexUsageMonitor/.build/Menu Presentation Trials`, replacing the rejected 09-28 builds there. Warnings: the three existing Keychain deprecations only.
+- 2026-09-29, self-audit (Task 5) **blocked; no panel observation.** Panel Demo was launched as audit PID 79907 beside the user's app. System Events resolved "process whose unix id is 79907" to the user's instance, because both share the bundle identifier `com.david.codex-usage-monitor`, so the Accessibility click opened the user's production menu. That menu was closed with the same toggle, only PID 79907 was terminated, and PID 75660 kept running. Panel Demo's own status item did not appear in the visible menu bar. Screenshots taken during the attempt captured unrelated screen content and were deleted. Automated self-audit needs the user's app quit first, or a distinct bundle identifier, which AGENTS.md forbids changing. Tasks 6–7 remain the acceptance path.
