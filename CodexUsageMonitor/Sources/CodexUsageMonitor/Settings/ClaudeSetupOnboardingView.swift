@@ -24,18 +24,22 @@ struct ClaudeSetupOnboardingView: View {
                 Text("Set up Claude usage")
                     .font(.headline)
 
-                Text(
-                    "Connect with Claude Code credentials for live usage, or use its status line for passive capture. "
-                        + ClaudeSignInPresentation.keychainDisclosure
-                )
+                Text(ClaudeConnectionCopy.keychainDisclosure)
                 .font(.callout)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: SettingsLayoutMetrics.agentOnboardingTextMaxWidth)
+
+                Text(ClaudeConnectionCopy.keychainPromptExplanation)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: SettingsLayoutMetrics.agentOnboardingTextMaxWidth)
             }
 
-            Button("Connect with credentials", action: connect)
+            Button("Connect Claude", action: connect)
                 .buttonStyle(.borderedProminent)
                 .tint(AgentProvider.claudeCode.settingsPresentationTint)
         }

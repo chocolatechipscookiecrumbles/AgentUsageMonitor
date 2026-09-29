@@ -15,6 +15,35 @@ struct CodexMenuContent: View {
     }
 
     var body: some View {
+        CodexMenuContentRender(
+            presentation: presentation,
+            connectionState: viewModel.connectionState,
+            activity: settings.isTokenMonitorVisible(for: .codex)
+                ? ProviderTokenActivityPresentation(
+                    provider: .codex,
+                    state: viewModel.localActivityState(for: .codex),
+                    range: settings.tokenMonitorRange(for: .codex)
+                ) : nil,
+            visibleActivitySections: settings.enabledTokenMonitorSections(for: .codex),
+            showsNotificationPermission: viewModel.notificationAuthorizationState == .denied,
+            signInWithBrowser: viewModel.signInWithBrowser,
+            signInWithCLI: viewModel.signInWithCLI,
+            openSystemNotificationSettings: viewModel.openNotificationSettings
+        )
+    }
+}
+
+struct CodexMenuContentRender: View {
+    let presentation: CodexMenuPresentation?
+    let connectionState: AgentConnectionState
+    let activity: ProviderTokenActivityPresentation?
+    let visibleActivitySections: Set<TokenMonitorSection>
+    let showsNotificationPermission: Bool
+    let signInWithBrowser: () -> Void
+    let signInWithCLI: () -> Void
+    let openSystemNotificationSettings: () -> Void
+
+    var body: some View {
         VStack(spacing: MenuPopoverTheme.contentSpacing) {
             if let presentation {
                 if presentation.isCached {
@@ -32,11 +61,11 @@ struct CodexMenuContent: View {
                     CodexCreditsCard(credits: credits)
                 }
 
-                if !viewModel.connectionState.isConnected {
+                if !connectionState.isConnected {
                     CodexConnectionRecoveryCard(
-                        state: viewModel.connectionState,
-                        signInWithBrowser: viewModel.signInWithBrowser,
-                        signInWithCLI: viewModel.signInWithCLI
+                        state: connectionState,
+                        signInWithBrowser: signInWithBrowser,
+                        signInWithCLI: signInWithCLI
                     )
                 }
             } else {
@@ -46,15 +75,15 @@ struct CodexMenuContent: View {
                 activityCard
 
                 CodexUnavailableContent(
-                    state: viewModel.connectionState,
-                    signInWithBrowser: viewModel.signInWithBrowser,
-                    signInWithCLI: viewModel.signInWithCLI
+                    state: connectionState,
+                    signInWithBrowser: signInWithBrowser,
+                    signInWithCLI: signInWithCLI
                 )
             }
 
-            if viewModel.notificationAuthorizationState == .denied {
+            if showsNotificationPermission {
                 NotificationPermissionStrip(
-                    openNotificationSettings: viewModel.openNotificationSettings
+                    openNotificationSettings: openSystemNotificationSettings
                 )
             }
         }
@@ -63,14 +92,10 @@ struct CodexMenuContent: View {
 
     @ViewBuilder
     private var activityCard: some View {
-        if settings.isTokenMonitorVisible(for: .codex) {
+        if let activity {
             ProviderTokenActivityCard(
-                presentation: ProviderTokenActivityPresentation(
-                    provider: .codex,
-                    state: viewModel.localActivityState(for: .codex),
-                    range: settings.tokenMonitorRange(for: .codex)
-                ),
-                visibleSections: settings.enabledTokenMonitorSections(for: .codex)
+                presentation: activity,
+                visibleSections: visibleActivitySections
             )
         }
     }

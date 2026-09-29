@@ -73,6 +73,90 @@ final class ClaudeCLIUsageProbeParsingTests: XCTestCase {
         XCTAssertEqual(parsed.fiveHour?.usedPercent, 44)
         XCTAssertNil(parsed.sevenDay)
     }
+
+    func testParsesObservedResetWordingAndRollsTheYearForward() throws {
+        let timeZone = try XCTUnwrap(TimeZone(identifier: "America/New_York"))
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let reference = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 12, day: 31, hour: 12
+        )))
+        let output = """
+        Current session: 20% used · resets Dec 31 at 1pm (America/New_York)
+        Weekly limit: 31% used · resets Jan 2 at 3am (America/New_York)
+        """
+
+        let parsed = try XCTUnwrap(ClaudeCLIUsageProbe.parse(
+            output,
+            referenceDate: reference,
+            timeZone: timeZone
+        ))
+
+        XCTAssertEqual(parsed.capturedAt, reference)
+        XCTAssertEqual(
+            parsed.fiveHour?.resetsAt,
+            calendar.date(from: DateComponents(year: 2026, month: 12, day: 31, hour: 13))
+        )
+        XCTAssertEqual(
+            parsed.sevenDay?.resetsAt,
+            calendar.date(from: DateComponents(year: 2027, month: 1, day: 2, hour: 3))
+        )
+    }
+
+    func testParsesISOResetTimestamps() throws {
+        let reference = Date(timeIntervalSince1970: 1_798_804_800)
+        let output = """
+        5-hour limit: 44% used · resets 2027-01-02T08:00:00Z
+        Weekly limit: 28% used · resets 2027-01-09T03:00:00.500-05:00
+        """
+
+        let parsed = try XCTUnwrap(ClaudeCLIUsageProbe.parse(output, referenceDate: reference))
+
+        XCTAssertEqual(parsed.fiveHour?.resetsAt?.timeIntervalSince1970, 1_798_876_800)
+        XCTAssertEqual(parsed.sevenDay?.resetsAt?.timeIntervalSince1970, 1_799_481_600.5)
+    }
+
+    func testInvalidAndAmbiguousResetsPreservePercentages() throws {
+        let timeZone = try XCTUnwrap(TimeZone(identifier: "America/New_York"))
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let reference = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 9, day: 22, hour: 12
+        )))
+        let output = """
+        Current session: 20% used · resets Sep 31 at 1pm (America/New_York)
+        Weekly limit: 31% used · resets Nov 1 at 1:30am (America/New_York)
+        """
+
+        let parsed = try XCTUnwrap(ClaudeCLIUsageProbe.parse(
+            output,
+            referenceDate: reference,
+            timeZone: timeZone
+        ))
+
+        XCTAssertEqual(parsed.fiveHour?.usedPercent, 20)
+        XCTAssertNil(parsed.fiveHour?.resetsAt)
+        XCTAssertEqual(parsed.sevenDay?.usedPercent, 31)
+        XCTAssertNil(parsed.sevenDay?.resetsAt)
+    }
+
+    func testPastSameMonthResetDoesNotRollToNextYear() throws {
+        let timeZone = try XCTUnwrap(TimeZone(identifier: "America/New_York"))
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let reference = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 9, day: 22, hour: 12
+        )))
+
+        let parsed = try XCTUnwrap(ClaudeCLIUsageProbe.parse(
+            "Current session: 20% used · resets Sep 21 at 1pm (America/New_York)",
+            referenceDate: reference,
+            timeZone: timeZone
+        ))
+
+        XCTAssertEqual(parsed.fiveHour?.usedPercent, 20)
+        XCTAssertNil(parsed.fiveHour?.resetsAt)
+    }
 }
 
 final class ClaudeCLIUsageProbeRunTests: XCTestCase {

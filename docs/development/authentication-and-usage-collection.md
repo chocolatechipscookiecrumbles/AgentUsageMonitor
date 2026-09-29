@@ -1,151 +1,165 @@
-# Authentication & usage collection: Codex and Claude
+# Authentication and usage collection
 
-This document explains, per provider, **how the app authenticates** and **how it reads usage**. The two providers are deliberately different because Codex and Claude expose their account and quota data through entirely different mechanisms.
+Agent Monitor does not operate an account service. Provider authentication
+stays owned by the official local CLI; the app reads the minimum provider state
+needed to show quota after the user enrolls that provider.
 
-The guiding principle for both is the same: **this app never runs its own token
-exchange and never stores a provider password.** It reuses credentials the official
-CLIs already own. The shipped Claude flow does not issue a token of its own, and
-every automatic refresh is designed so it can never interrupt the user with a
-system prompt.
+## Enrollment and disconnect
 
----
+Codex and Claude begin app-locally disconnected. Each provider requires its own
+Connect action before Agent Monitor checks the account, reads quota, or scans
+local activity. Existing CLI login state does not silently enroll a provider.
 
-## Part 1 — Codex
+Disconnect is local to Agent Monitor. It stops that provider's monitors and
+removes app-owned derived data. It does not sign out the provider CLI or delete
+provider-owned credentials.
 
-### 1.1 How we authenticate with Codex
+## Codex
 
-Codex has **no credential of ours to store**. The Codex CLI owns its own login session and keychain entry; we only ever *ask it* about its state.
+Codex authentication and quota are read through the local Codex app-server.
+Browser sign-in uses the provider-generated URL and completion event. CLI sign-in
+opens the located `codex login` command visibly. Agent Monitor never reads or
+stores `auth.json` or a Codex token.
 
-All interaction happens through a short-lived **app-server subprocess** speaking newline-delimited JSON-RPC over stdio:
+Quota refresh uses read-only account and rate-limit methods. Confirmed normalized
+results may be cached under Application Support; raw responses and credentials
+are not retained.
 
-```
-codex app-server --listen stdio://
-```
+## Claude
 
-See [CodexAppServerProcess](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/CodexAppServerSession.swift#L75). Every session follows the same handshake ([CodexProtocol](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/CodexProtocolModels.swift#L20)):
+### Source order
 
-| id | method | purpose |
-|----|--------|---------|
-| 1  | `initialize` + `initialized` notification | open the session |
-| 2  | `account/read` (`refreshToken: false`) | who is signed in / connection status |
-| 3  | `account/rateLimits/read` | quota windows |
-| 4  | `account/usage/read` | usage / credits |
-| 5  | `account/login/start` (`type: chatgpt`) | begin browser sign-in |
+Automatic Claude collection has one source policy:
 
-**Locating the CLI** — [CodexExecutableLocator](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/CodexAppServerSession.swift#L23) searches, in order: `CODEX_EXECUTABLE`, the Homebrew/`/usr/local`/`/usr/bin` prefixes, every directory on `PATH`, and the bundled `openai.chatgpt-*` VS Code extension. A GUI `.app` does not inherit the login shell's `PATH`, so the explicit prefixes matter.
+1. Serve a valid status-line snapshot with at least one quota window captured
+   no more than two minutes ago. This performs no Keychain read, network request,
+   or Claude CLI launch.
+2. Silently read Claude Code's existing Keychain credential and call
+   `GET /api/oauth/usage`, subject to existing rate-limit backoff.
+3. Fall back to the freshest usable older status-line snapshot or cached
+   reading, retaining its original capture time.
+4. With no usable reading, show unavailable usage and explicit recovery actions.
 
-**Reading connection status** ([CodexConnectionService.readStatus](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Connection/CodexConnectionService.swift#L29)):
-- executable missing → `missingCLI`
-- `account/read` returns an account → `connected` (with `planType`)
-- otherwise → `disconnected`
+Launch, scheduled refresh, menu opening, ordinary Refresh, and retries never
+permit Keychain interaction. Only explicit Connect/Reconnect may prompt.
 
-**Two sign-in methods**, both driven by [CodexConnectionController](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Connection/CodexConnectionController.swift):
-1. **Browser** ([startBrowserLogin](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Connection/CodexConnectionService.swift#L53)) — send `account/login/start`, open the returned `authUrl` (must be `https`) in the default browser, then wait for the `account/login/completed` notification carrying `success: true`. After completion we re-read `account/read` to confirm the connected identity.
-2. **CLI** ([signInWithCLI](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Connection/CodexConnectionController.swift#L202)) — open Terminal (via AppleScript) running `codex login`, then poll `codex login status` until it exits `0` and `account/read` returns an account.
+`claude -p /usage` is not in the automatic hierarchy. It can consume a small
+amount of quota and runs only from the separately disclosed **Force Read** action.
 
-**App-local disconnect** is a *persisted flag on our side only* — it hides Codex and stops auto-detection without touching the Codex CLI session or its stored credential. While set, the still-valid CLI login is deliberately not auto-reconnected.
+Fresh passive readings and successful explicit `/usage` readings are eligible
+for quota-threshold evaluation when each window carries a future reset time.
+Passive eligibility uses the same two-minute freshness boundary as collection;
+retained cached readings never trigger a new threshold alert. `/usage` reset
+text uses its reported timezone when present. If a reset cannot be parsed, the
+percentage remains usable but that window cannot alert because it has no stable
+reset-window identity.
 
-### 1.2 How we read Codex usage
+Permitted automatic sources do not currently expose Claude redeemable-reset
+inventory or a prepaid usage-credit balance. Settings reports those values as
+**Unavailable** and links to Claude Usage. OAuth `extra_usage` remains the source
+for reported usage-credit spending and an optional monthly spending limit;
+missing amount or currency is never converted to zero or USD. Its observation
+time remains separate when a newer passive or explicit CLI quota reading is displayed.
 
-[CodexQuotaCollector.refresh](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/CodexQuotaCollector.swift#L12) opens a fresh app-server session and issues `account/read` + `account/rateLimits/read` + `account/usage/read` ([collectSample](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/CodexAppServerSession.swift#L58)).
+### One Connect action
 
-Parsing ([parseSample](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/CodexProtocolModels.swift#L63)):
-- The account **email is never stored** — it is SHA-256 fingerprinted (first 8 bytes) purely to detect an account switch.
-- The `codex` rate-limit lane exposes a `primary` and `secondary` window. We classify by `windowDurationMins`: `10080` (7 days) is the **weekly** window; the other is the **5-hour** window.
-- Credits, `hasCredits`, and reset-credit expiry timestamps are carried through for the credits card.
+**Connect Claude** performs two disclosed app-local enrollment steps:
 
-**Confirmation by agreement** — a single app-server read can return a transient empty snapshot, so `refresh()` takes **three samples one second apart** and only marks the result `confirmed` when **≥2 non-empty samples agree** ([resolve](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/CodexQuotaCollector.swift#L28)). If the fresh samples don't agree, it falls back to the last-known-good value from [QuotaStateStore](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/CodexQuotaCollector.swift) and labels it `cachedLastKnownGood`.
+- it installs Agent Monitor's privacy-scoped status-line command when Claude
+  Code has no status line; a working foreign command is never replaced; and
+- it reads Claude Code's existing OAuth credential once with user interaction
+  allowed, validates `user:profile`, and attempts a live usage response.
 
-**Summary:** Codex = local subprocess only. No network calls of ours, no credential of ours, an authoritative reading every refresh, cross-checked across three samples.
+Enrollment means **Monitoring enabled**, independently of live OAuth availability.
+If credential authorization is denied, cancelled, or unavailable, passive
+monitoring resumes; enrollment and usable quota readings remain intact. Explicit
+Reconnect remains available without becoming a prerequisite for showing usage.
 
----
+macOS prompts because Claude Code and Agent Monitor are different signed
+applications. **Always Allow** is intended to authorize subsequent reads, but
+its durability for this provider-owned item is not guaranteed. **Allow** permits
+only that read. Background failures are **Live fallback unavailable**, not
+evidence that permission was revoked, and collection falls back to passive
+capture or cache without another dialog. Repeated prompts are tracked in the
+separate [grant-durability diagnosis](claude-keychain-grant-durability.md); that
+investigation does not gate passive-first monitoring.
 
-## Part 2 — Claude
+There is no setup-token route or credential-method fallback. Claude Code
+2.1.247 successfully created a one-year `setup-token`, but that inference token
+does not carry the `user:profile` scope required by the usage endpoint. The
+obsolete app-owned Keychain item (`AgentUsageMonitor-ClaudeOAuth`, account
+`setup-token-v1`) is deleted by an idempotent migration.
 
-Claude is the opposite shape: authentication produces (or borrows) a **bearer token**, and usage comes from a **network endpoint**, with three local fallbacks behind it.
+### Credential boundary
 
-### 2.1 How we authenticate with Claude
+`ClaudeKeychainCredentialStore` is an actor. Its secret-bearing Keychain read
+runs outside `@MainActor`. Because the legacy Keychain path does not consume
+`LAContext`, a shared lock serializes both read policies. Silent reads save the
+process-local legacy interaction setting, disable interaction, perform the scoped
+read, and restore the previous setting with every status checked. The query also
+attaches a noninteractive `LAContext`; that context alone is not the legacy UI
+guard. The deprecated `SecKeychainGetUserInteractionAllowed`,
+`SecKeychainSetUserInteractionAllowed`, and `SecKeychainCopyDefault` APIs are kept
+only at this compatibility boundary. See [Apple's legacy SecItem implementation](https://github.com/apple-oss-distributions/Security/blob/main/OSX/libsecurity_keychain/lib/SecItem.cpp).
+ The access token is deliberately non-`Codable` and non-printable,
+exists only in memory for the request, and is never cached, logged, exported,
+refreshed directly, changed, or deleted.
 
-The shipped UI exposes one connection action: **Use Claude Code credentials**.
-Browser/setup-token sign-in remains shelved as unverified and is not presented as
-working. The underlying self-issued-token store remains for compatibility with
-earlier experiments, and `CLAUDE_CODE_OAUTH_TOKEN` is still recognized at read
-time, but neither is a second advertised sign-in path.
+The provider-owned item uses Claude Code's compatible legacy Keychain lookup,
+scoped to the single default/login Keychain instead of the global search list.
+Agent Monitor never changes that list or the item's access permissions and does
+not migrate it into the data-protection keychain. The one delete query owned by
+this app targets only the retired setup-token service and
+account and includes data-protection routing.
 
-**Method (b): borrow Claude Code's own credential** *(the default)*
-[ClaudeKeychainCredentialStore](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Connection/ClaudeOAuthCredential.swift#L49) reads Claude Code's existing login-Keychain item, service **`Claude Code-credentials`**, and decodes its `claudeAiOauth` JSON (access token, optional refresh token, `expiresAt` in ms, scopes, `subscriptionType`). We never run a sign-in flow and never copy the token elsewhere.
+Typed credential failures remain intact through the OAuth layer. Neither an
+expired token nor an unauthorized response launches Claude Code during ordinary
+Refresh or automatic collection. Delegated CLI renewal is removed. Only the
+explicit, consented `/usage` recovery action launches the CLI for usage; it
+prevents duplicate execution, publishes and caches a successful result, and
+retains the previous reading on failure.
 
-Reading another app's Keychain item is an **ACL-gated cross-app access** that *can* raise the macOS permission dialog. That is governed by [KeychainPromptPolicy](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Connection/ClaudeOAuthCredential.swift#L27):
-- `.never` — sets `kSecUseAuthenticationUIFail`, so the read **fails instead of prompting**. Used by *every automatic refresh*. `errSecInteractionNotAllowed` maps to `accessDenied`, which cleanly degrades to a lower tier.
-- `.userInitiatedOnly` — allows the prompt. Only ever reached from an explicit button press.
+### Passive capture and single executable
 
-The mapping from refresh reason to policy lives in [ClaudeRefreshReason](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeUsageCollector.swift#L3): only `.userInitiated` may prompt; `appLaunch` / `scheduled` / `menuOpened` never can.
+Claude Code pipes its official status-line JSON to Agent Monitor's command. The
+bridge extracts only:
 
-**Compatibility fallback.** [ClaudeCompositeCredentialStore](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Connection/ClaudeCompositeCredentialStore.swift#L38) resolves Claude Code's credential first, then may read an already-existing app-owned self-issued credential or `CLAUDE_CODE_OAUTH_TOKEN`. The app does not create a new setup-token credential through the shipped UI. A [ClaudeEffectiveMethodRecorder](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Connection/ClaudeCompositeCredentialStore.swift#L21) keeps any fallback visible in diagnostics.
+- `rate_limits.five_hour.used_percentage`
+- `rate_limits.five_hour.resets_at`
+- `rate_limits.seven_day.used_percentage`
+- `rate_limits.seven_day.resets_at`
 
-> The credential itself ([ClaudeOAuthCredential](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Connection/ClaudeOAuthCredential.swift#L7)) is intentionally **not** `Codable`, `CustomStringConvertible`, or `CustomDebugStringConvertible` — nothing about the token should be persistable or printable by accident. It lives in Keychain only.
+No prompts, responses, paths, model names, session identifiers, or other payload
+fields are retained.
 
-### 2.2 How we read Claude usage — a four-tier fallback
+The app bundle contains one compiled executable. An atomic app-owned symlink to
+the signed main Mach-O uses the stable path
+`~/Library/Application Support/CodexUsageMonitor/ClaudeBridge/claude-usage-bridge`.
+When invoked under that basename, the process enters bridge mode before creating
+SwiftUI/AppKit state, reads stdin, writes the normalized snapshot, and exits.
 
-[ClaudeUsageCollector.refresh](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeUsageCollector.swift#L66) walks tiers until one produces a reading. (Tier 2 is manual-only, so the *automatic* runtime order is 1 → 3 → 4.)
+Disconnect removes only the exact managed status-line entry, bridge symlink,
+passive snapshot, normalized cache, and enrollment state. A changed or foreign
+status line is preserved.
 
-**Tier 1 — OAuth usage endpoint** *(authoritative, networked)*
-[ClaudeOAuthUsageSource.fetch](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeOAuthUsageSource.swift#L128) issues:
+## Security and product caveat
 
-```
-GET https://api.anthropic.com/api/oauth/usage
-Authorization: Bearer <accessToken>
-anthropic-beta: oauth-2025-04-20
-User-Agent: claude-code/2.0.0
-```
+Anthropic does not publish `/api/oauth/usage` or reuse of Claude Code's OAuth
+credential as a third-party application contract. This is a compatibility
+boundary and may carry account-enforcement risk. A first-party Agent Monitor
+OAuth client would supersede it if Anthropic offers a supported contract.
 
-- Requires the credential to carry the **`user:profile`** scope (pre-checked before any network call).
-- The **`User-Agent` is mandatory**: without a `claude-code/<version>` agent the endpoint drops the caller into an aggressive rate-limit bucket that returns persistent 429s.
-- Response parsing pulls the `five_hour` and `seven_day` utilization windows, any `limits[]` scoped windows, and `extra_usage` credits. ISO-8601 timestamps (incl. microsecond fractional seconds) are parsed by [ClaudeOAuthDateParsing](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeOAuthUsageSource.swift#L30).
-- **Status handling:** 401/403 → `unauthorized`; 429 → `rateLimited(retryAfter:)`; other non-200 → `serverFailure`.
-- **429 back-off:** on a 429 the collector stops calling the endpoint until `Retry-After` (or a default 15 min) elapses and serves local sources instead — hammering `/api/oauth/usage` during a limit only compounds it. See [docs/development/claude-usage-endpoint-rate-safety.md](./claude-usage-endpoint-rate-safety.md).
+The durable decision and alternatives are recorded in
+[ADR 0002](../adr/0002-claude-usage-auth-and-bridge-boundaries.md).
 
-**Tier 2 — Claude Code CLI `/usage` probe** *(manual, consented — costs tokens)*
-[ClaudeCLIUsageProbe](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeCLIUsageProbe.swift#L20) runs `claude -p /usage` and parses the 5-hour / weekly percentages out of the panel text (after stripping ANSI). It is **never automatic**: `/usage` generates billed requests (typically < $0.04), so running it on a timer would spend quota to measure quota. It sits behind an explicit, consented button and exists only to force a fresh reading when OAuth is unavailable but the CLI is signed in.
+## Summary
 
-**Tier 3 — statusLine snapshot** *(passive, local, free)*
-Claude Code renders a status line on every turn. We install a native helper, **`claude-usage-bridge`** ([main.swift](../../CodexUsageMonitor/Sources/ClaudeUsageBridge/main.swift)), into `~/.claude/settings.json`'s `statusLine` command via [ClaudeStatusLineInstaller](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Settings/ClaudeStatusLineInstaller.swift) (which merges non-destructively and never clobbers an existing custom status line). Claude Code pipes its status-line JSON to the helper on each render; the helper extracts only the `rate_limits` windows and writes `Application Support/CodexUsageMonitor/claude-rate-limits.json`. [ClaudeRateLimitSnapshotReader](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeRateLimitSnapshotReader.swift) reads that file (best-effort, never throws). This costs nothing but is only as fresh as the last time Claude Code ran.
-
-In 0.0.1 that helper is a second Mach-O executable nested in the app bundle. The
-build signs it first and then signs the containing app, so it is operationally
-correct but expands the signing, verification, and notarization surface. Product
-Follow-up 10 tracks consolidating the same stdin-driven helper mode into the main
-app executable. The replacement must still exit without creating UI, preserve the
-field-scoped privacy boundary and atomic snapshot write, remain safe when invoked
-by Claude Code, and keep installation/update paths stable.
-
-**Tier 4 — cache** *(last resort)*
-[ClaudeUsageCache](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeUsageCache.swift) holds the most recent successful snapshot from any source. If nothing else is available, the last good reading is shown labelled `cached`; if even that is empty, a "no source available" warning is returned.
-
-**Freshness ordering nuance** — tier 3 normally outranks tier 4, but a status-line capture can be *days* old if Claude Code hasn't run, while a cached OAuth read could be newer. So the collector compares `capturedAt` and serves whichever is actually fresher ([refresh](../../CodexUsageMonitor/Sources/CodexUsageMonitor/Quota/ClaudeUsageCollector.swift#L88)).
-
----
-
-## Part 3 — Side-by-side
-
-| | **Codex** | **Claude** |
+| Boundary | Codex | Claude |
 |---|---|---|
-| Credential ownership | Codex CLI owns it; we store nothing | Claude Code owns the active credential; an older app-owned item may be read as a compatibility fallback |
-| Our token storage | none | no new token is stored by the shipped connection flow |
-| Auth transport | `codex app-server` JSON-RPC over stdio | Keychain read |
-| Sign-in methods | browser (`account/login/start`) · CLI (`codex login`) | use Claude Code credentials; browser/setup-token is shelved |
-| Usage source | app-server `rateLimits/read` + `usage/read` | OAuth `GET /api/oauth/usage` (+ 3 local fallbacks) |
-| Networked read of ours? | **No** — all local subprocess | **Yes** — tier 1 only; tiers 2–4 are local |
-| Reliability strategy | 3 samples, confirm on agreement, else last-known-good | 4-tier degrade: OAuth → CLI probe → statusLine → cache |
-| Can a background refresh prompt? | No | No — `.never` policy forbids the Keychain dialog off explicit actions |
-
-## Part 4 — Cross-cutting safeguards
-
-- **No background prompts.** Codex reads are local subprocess calls; Claude background reads use `kSecUseAuthenticationUIFail`. Only an explicit user action can ever surface a system dialog.
-- **No token exchange of ours.** Codex login is performed by the official CLI. The shipped Claude flow reads an existing Claude Code credential and never hits `/v1/oauth/token`.
-- **Degrade, don't dead-end.** Both providers prefer a labelled, older-but-real reading over a blank one — Codex via last-known-good, Claude via the tier ladder and cross-app method fallback — and every degrade is surfaced, never silently masked.
-- **Minimal identity retention.** Codex account emails are fingerprinted, not stored; Claude tokens live only in Keychain and are kept out of logs by design.
-
-### Related documents
-- [docs/development/claude-usage-endpoint-rate-safety.md](./claude-usage-endpoint-rate-safety.md) — the 429 back-off contract for tier 1
-- [docs/claude-usage-verification.md](../claude-usage-verification.md) — verifying Claude readings against the CLI
+| Credential owner | Codex CLI | Claude Code |
+| App token storage | none | none |
+| First connection | explicit provider enrollment | explicit enrollment plus possible Keychain prompt |
+| Scheduled prompt | never | never |
+| Passive source | local app-server state | status-line `rate_limits` |
+| Manual recovery | provider sign-in / refresh | cost-disclosed `/usage` |
+| Disconnect changes provider login | no | no |

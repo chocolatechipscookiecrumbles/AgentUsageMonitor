@@ -61,9 +61,9 @@ final class ClaudeSetupStateTests: XCTestCase {
         XCTAssertEqual(state, .existingSetup)
     }
 
-    func testSignInInProgressDoesNotReturnToOnboarding() {
+    func testConnectingDoesNotReturnToOnboarding() {
         let state = ClaudeSetupState.resolve(
-            connectionState: .signingIn(.claudeCodeCredentials),
+            connectionState: .connecting,
             usageState: .unavailable(reason: "No reading"),
             hasSetupHistory: false,
             hasCompletedSourceDiscovery: true

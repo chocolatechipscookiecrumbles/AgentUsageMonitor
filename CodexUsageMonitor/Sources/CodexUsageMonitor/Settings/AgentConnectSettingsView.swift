@@ -16,9 +16,11 @@ struct AgentConnectSettingsView: View {
                 SettingsPreferenceControlRow("Status") { Text("Not connected") }
             }
             SettingsSectionRow(showsDivider: false) {
-                VStack(alignment: .leading, spacing: 8) {
-                    SettingsDescription(disclosure)
-                    Button("Connect \(provider.tabTitle)", action: connect)
+                SettingsPreferenceControlRow(
+                    "\(provider.tabTitle) connection",
+                    description: disclosure
+                ) {
+                    Button(connectActionTitle, action: connect)
                 }
             }
         }
@@ -31,9 +33,13 @@ struct AgentConnectSettingsView: View {
         case .codex:
             "Codex is not connected. Connecting lets Agent Monitor read your five-hour and weekly quota, and read Codex usage records already on this Mac. Nothing is read until you connect."
         case .claudeCode:
-            "Claude is not connected. Connecting goes through Claude Code and may ask for Keychain access. It lets Agent Monitor read your five-hour and weekly quota, and read Claude Code usage records already on this Mac. Nothing is read until you connect."
+            ClaudeConnectionCopy.connectionDisclosure
         case .githubCopilot:
             "\(provider.title) is not connected."
         }
+    }
+
+    private var connectActionTitle: String {
+        provider == .claudeCode ? "Connect Claude" : "Connect \(provider.tabTitle)"
     }
 }

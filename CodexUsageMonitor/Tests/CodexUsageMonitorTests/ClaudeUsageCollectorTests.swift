@@ -37,7 +37,7 @@ final class ClaudeUsageCollectorTests: XCTestCase {
     func testRefreshReturnsLiveWhenOAuthSucceeds() async throws {
         let oauthSource = ClaudeOAuthUsageSource(
             credentialStore: FakeCredentialStore(result: .success(
-                ClaudeOAuthCredential(accessToken: "t", refreshToken: nil, expiresAt: nil, scopes: ["user:profile"], subscriptionType: "pro")
+                ClaudeOAuthCredential(accessToken: "t", scopes: ["user:profile"], subscriptionType: "pro")
             )),
             requestExecutor: { _ in (Self.encodedOAuthFixture(fiveHour: 10.0), Self.httpResponse(200)) }
         )
@@ -104,7 +104,7 @@ final class ClaudeUsageCollectorTests: XCTestCase {
     func testSuccessfulOAuthRefreshUpdatesCache() async throws {
         let oauthSource = ClaudeOAuthUsageSource(
             credentialStore: FakeCredentialStore(result: .success(
-                ClaudeOAuthCredential(accessToken: "t", refreshToken: nil, expiresAt: nil, scopes: ["user:profile"], subscriptionType: "pro")
+                ClaudeOAuthCredential(accessToken: "t", scopes: ["user:profile"], subscriptionType: "pro")
             )),
             requestExecutor: { _ in (Self.encodedOAuthFixture(fiveHour: 21.0), Self.httpResponse(200)) }
         )
@@ -118,6 +118,115 @@ final class ClaudeUsageCollectorTests: XCTestCase {
         _ = await collector.refresh(reason: .userInitiated)
 
         XCTAssertEqual(cache.load()?.snapshot.fiveHour?.usedPercent, 21.0)
+    }
+
+    func testSilentCredentialFailurePreservesCachedQuotaAndCaptureTime() async throws {
+        let capturedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let cache = ClaudeUsageCache(fileURL: cacheFileURL)
+        cache.save(ClaudeUsageSnapshot(
+            planHint: "pro", fiveHour: ClaudeLimitWindow(usedPercent: 55, resetsAt: nil),
+            sevenDay: nil, scopedWindows: [], extraUsage: nil,
+            source: .oauth, capturedAt: capturedAt, schemaVersion: 1
+        ))
+        // A newer but empty passive payload must not hide the usable reading.
+        try Data("{\"schemaVersion\":1,\"capturedAt\":1700000100}".utf8).write(to: statusLineFileURL)
+        let recorder = PolicyRecorder()
+        let collector = ClaudeUsageCollector(
+            oauthSource: ClaudeOAuthUsageSource(
+                credentialStore: FakeCredentialStore(
+                    result: .failure(.interactionNotAllowed), policyRecorder: recorder
+                ),
+                requestExecutor: { _ in
+                    XCTFail("an unavailable credential must not make a request")
+                    return (Data(), Self.httpResponse(200))
+                }
+            ),
+            statusLineReader: ClaudeRateLimitSnapshotReader(fileURL: statusLineFileURL),
+            cache: cache
+        )
+
+        let result = await collector.refresh(reason: .userInitiated)
+
+        XCTAssertEqual(recorder.recorded, [.never])
+        XCTAssertEqual(result.delivery, .cached)
+        XCTAssertEqual(result.snapshot.fiveHour?.usedPercent, 55)
+        XCTAssertEqual(result.snapshot.capturedAt, capturedAt)
+        XCTAssertEqual(result.warnings, ["Live fallback unavailable. Claude Code’s credential could not be read silently."])
+    }
+
+    func testEmptyOAuthResponseDoesNotReplaceUsableCachedQuota() async {
+        let capturedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let cache = ClaudeUsageCache(fileURL: cacheFileURL)
+        cache.save(ClaudeUsageSnapshot(
+            planHint: "pro", fiveHour: ClaudeLimitWindow(usedPercent: 55, resetsAt: nil),
+            sevenDay: nil, scopedWindows: [], extraUsage: nil,
+            source: .oauth, capturedAt: capturedAt, schemaVersion: 1
+        ))
+        let collector = ClaudeUsageCollector(
+            oauthSource: ClaudeOAuthUsageSource(
+                credentialStore: FakeCredentialStore(result: .success(
+                    ClaudeOAuthCredential(accessToken: "t", scopes: ["user:profile"], subscriptionType: "pro")
+                )),
+                requestExecutor: { _ in (Data("{}".utf8), Self.httpResponse(200)) }
+            ),
+            statusLineReader: ClaudeRateLimitSnapshotReader(fileURL: statusLineFileURL),
+            cache: cache
+        )
+
+        let result = await collector.refresh(reason: .scheduled)
+
+        XCTAssertEqual(result.delivery, .cached)
+        XCTAssertEqual(result.snapshot.fiveHour?.usedPercent, 55)
+        XCTAssertEqual(result.snapshot.capturedAt, capturedAt)
+        XCTAssertEqual(cache.load()?.snapshot, result.snapshot)
+    }
+
+    func testRejectedCredentialDoesNotRenewOrRetryDuringRefresh() async {
+        for reason in [ClaudeRefreshReason.userInitiated, .scheduled] {
+            let source = ExpiringSource()
+            let collector = ClaudeUsageCollector(
+                oauthSource: source.asSource,
+                statusLineReader: ClaudeRateLimitSnapshotReader(fileURL: statusLineFileURL),
+                cache: ClaudeUsageCache(fileURL: cacheFileURL)
+            )
+            let result = await collector.refresh(reason: reason)
+            XCTAssertEqual(source.attempts, 1, "a rejected credential falls through without CLI renewal")
+            XCTAssertEqual(result.delivery, .cached)
+            XCTAssertFalse(result.warnings.isEmpty)
+        }
+    }
+
+    private final class ExpiringSource: @unchecked Sendable {
+        private let lock = NSLock()
+        private var _attempts = 0
+        var attempts: Int { lock.withLock { _attempts } }
+
+        var asSource: ClaudeOAuthUsageSource {
+            ClaudeOAuthUsageSource(
+                credentialStore: Store(),
+                requestExecutor: { [self] request in
+                    let attempt = lock.withLock { () -> Int in
+                        _attempts += 1
+                        return _attempts
+                    }
+                    let url = request.url!
+                    if attempt == 1 {
+                        return (Data(), HTTPURLResponse(url: url, statusCode: 401, httpVersion: nil, headerFields: nil)!)
+                    }
+                    let body = Data(#"{"five_hour":{"utilization":9},"seven_day":{"utilization":3}}"#.utf8)
+                    return (body, HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+                }
+            )
+        }
+
+        private struct Store: ClaudeCredentialProviding {
+            func loadCredential(promptPolicy: KeychainPromptPolicy) throws -> ClaudeOAuthCredential {
+                ClaudeOAuthCredential(
+                    accessToken: "t",
+                    scopes: ["user:profile"], subscriptionType: "pro"
+                )
+            }
+        }
     }
 
     private static func encodedOAuthFixture(fiveHour: Double) -> Data {
@@ -137,7 +246,7 @@ final class ClaudeUsageCollectorTests: XCTestCase {
         let clock = NowBox(Date(timeIntervalSince1970: 1_000_000))
         let oauthSource = ClaudeOAuthUsageSource(
             credentialStore: FakeCredentialStore(result: .success(
-                ClaudeOAuthCredential(accessToken: "t", refreshToken: nil, expiresAt: nil, scopes: ["user:profile"], subscriptionType: "pro")
+                ClaudeOAuthCredential(accessToken: "t", scopes: ["user:profile"], subscriptionType: "pro")
             )),
             requestExecutor: { _ in
                 calls.increment()
@@ -224,7 +333,7 @@ final class ClaudeCollectorPromptPolicyTests: XCTestCase {
         let store = FakeCredentialStore(
             result: .success(
                 ClaudeOAuthCredential(
-                    accessToken: "t", refreshToken: nil, expiresAt: nil,
+                    accessToken: "t",
                     scopes: ["user:profile"], subscriptionType: "pro"
                 )
             ),
@@ -263,11 +372,12 @@ final class ClaudeCollectorPromptPolicyTests: XCTestCase {
         XCTAssertEqual(recorder.recorded, [.never])
     }
 
-    func testUserInitiatedRefreshMayPrompt() async {
+    func testUserInitiatedRefreshNeverRequestsInteraction() async {
         let recorder = PolicyRecorder()
         _ = await makeCollector(recorder: recorder).refresh(reason: .userInitiated)
-        XCTAssertEqual(recorder.recorded, [.userInitiatedOnly])
+        XCTAssertEqual(recorder.recorded, [.never])
     }
+
 }
 
 /// Tier 3 outranks tier 4 only because a statusLine capture is normally
@@ -284,6 +394,134 @@ final class ClaudeCollectorFreshnessTests: XCTestCase {
 
     override func tearDownWithError() throws {
         try? FileManager.default.removeItem(at: directory)
+    }
+
+    func testPassiveCaptureRetainsFinancialObservationWithoutCredentialRead() async throws {
+        let observed = Date(timeIntervalSince1970: 1_700_000_000)
+        let capture = observed.addingTimeInterval(3600)
+        let statusLineURL = directory.appendingPathComponent("rate-limits.json")
+        try Data("""
+        {"schemaVersion":1,"capturedAt":\(capture.timeIntervalSince1970),"fiveHour":{"usedPercentage":7,"resetsAt":1800000000}}
+        """.utf8).write(to: statusLineURL)
+        let cache = ClaudeUsageCache(fileURL: directory.appendingPathComponent("cache.json"))
+        cache.save(ClaudeUsageSnapshot(
+            planHint: nil, fiveHour: ClaudeLimitWindow(usedPercent: 5, resetsAt: nil),
+            sevenDay: nil, scopedWindows: [],
+            extraUsage: ClaudeExtraUsage(isEnabled: true, monthlyLimit: 50, usedCredits: 12, currencyCode: "USD"),
+            source: .oauth, capturedAt: observed, schemaVersion: 1
+        ))
+        let credentialReads = PolicyRecorder()
+        let collector = ClaudeUsageCollector(
+            oauthSource: ClaudeOAuthUsageSource(credentialStore: FakeCredentialStore(
+                result: .failure(.notFound), policyRecorder: credentialReads),
+                requestExecutor: { _ in XCTFail("Passive refresh must not request OAuth"); throw URLError(.badURL) }),
+            statusLineReader: ClaudeRateLimitSnapshotReader(fileURL: statusLineURL), cache: cache,
+            now: { capture }
+        )
+        let result = await collector.refresh(reason: .scheduled)
+        XCTAssertEqual(result.delivery, .passiveSnapshot)
+        XCTAssertEqual(result.snapshot.extraUsage?.usedCredits, 12)
+        XCTAssertEqual(cache.load()?.snapshot.extraUsage?.usedCredits, 12)
+        XCTAssertEqual(result.snapshot.extraUsageObservedAt, observed)
+        XCTAssertEqual(cache.load()?.snapshot.extraUsageObservedAt, observed)
+        let repeated = await collector.refresh(reason: .scheduled)
+        XCTAssertEqual(repeated.snapshot.extraUsageObservedAt, observed)
+        XCTAssertEqual(credentialReads.recorded, [])
+    }
+
+    func testFinancialOnlyOAuthSurvivesWithAndWithoutCachedQuota() async throws {
+        let observed = Date(timeIntervalSince1970: 1_700_000_000)
+        let quotaTime = observed.addingTimeInterval(-3600)
+        for hasCachedQuota in [true, false] {
+            let cache = ClaudeUsageCache(fileURL: directory.appendingPathComponent("financial-\(hasCachedQuota).json"))
+            let statusURL = directory.appendingPathComponent("status-\(hasCachedQuota).json")
+            if hasCachedQuota {
+                cache.save(ClaudeUsageSnapshot(
+                    planHint: nil, fiveHour: ClaudeLimitWindow(usedPercent: 25, resetsAt: nil),
+                    sevenDay: nil, scopedWindows: [],
+                    extraUsage: ClaudeExtraUsage(isEnabled: true, monthlyLimit: 50, usedCredits: 1, currencyCode: "USD"),
+                    source: .oauth, capturedAt: quotaTime, schemaVersion: 1
+                ))
+            }
+            let source = ClaudeOAuthUsageSource(
+                credentialStore: FakeCredentialStore(result: .success(
+                    ClaudeOAuthCredential(accessToken: "fixture", scopes: ["user:profile"], subscriptionType: nil)
+                )),
+                requestExecutor: { request in
+                    (Data(#"{"extra_usage":{"is_enabled":true,"monthly_limit":50,"used_credits":12,"currency":"USD"}}"#.utf8),
+                     HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+                }, now: { observed }
+            )
+            let collector = ClaudeUsageCollector(
+                oauthSource: source, statusLineReader: ClaudeRateLimitSnapshotReader(fileURL: statusURL),
+                cache: cache, now: { observed }
+            )
+            let result = await collector.refresh(reason: .scheduled)
+            XCTAssertEqual(result.delivery, .cached)
+            XCTAssertEqual(result.snapshot.fiveHour?.usedPercent, hasCachedQuota ? 25 : nil)
+            XCTAssertEqual(result.snapshot.extraUsage?.usedCredits, 12)
+            XCTAssertEqual(result.snapshot.extraUsageObservedAt, observed)
+            XCTAssertEqual(cache.load()?.snapshot.extraUsage?.usedCredits, 12)
+            if hasCachedQuota { XCTAssertEqual(result.snapshot.capturedAt, quotaTime) }
+
+            let failingCollector = ClaudeUsageCollector(
+                oauthSource: ClaudeOAuthUsageSource(credentialStore: FakeCredentialStore(result: .failure(.notFound))),
+                statusLineReader: ClaudeRateLimitSnapshotReader(fileURL: statusURL),
+                cache: cache, now: { observed }
+            )
+            let fallback = await failingCollector.refresh(reason: .scheduled)
+            XCTAssertEqual(fallback.snapshot.extraUsage?.usedCredits, 12)
+            XCTAssertEqual(fallback.snapshot.extraUsageObservedAt, observed)
+            XCTAssertEqual(fallback.snapshot.hasQuotaWindows, hasCachedQuota)
+
+            try Data("""
+            {"schemaVersion":1,"capturedAt":\(observed.addingTimeInterval(-30).timeIntervalSince1970),"fiveHour":{"usedPercentage":30,"resetsAt":1800000000}}
+            """.utf8).write(to: statusURL)
+            let passive = await failingCollector.refresh(reason: .scheduled)
+            XCTAssertEqual(passive.delivery, .passiveSnapshot)
+            XCTAssertEqual(passive.snapshot.fiveHour?.usedPercent, 30)
+            XCTAssertEqual(passive.snapshot.extraUsage?.usedCredits, 12)
+            XCTAssertEqual(passive.snapshot.extraUsageObservedAt, observed)
+            XCTAssertEqual(cache.load()?.snapshot.fiveHour?.usedPercent, 30)
+            XCTAssertEqual(cache.load()?.snapshot.capturedAt, observed.addingTimeInterval(-30))
+            XCTAssertEqual(cache.load()?.snapshot.extraUsageObservedAt, observed)
+        }
+    }
+
+    func testFinancialOnlyOAuthStillUsesUsablePassiveQuota() async throws {
+        let observed = Date(timeIntervalSince1970: 1_700_000_000)
+        let passiveTime = observed.addingTimeInterval(-180)
+        let statusURL = directory.appendingPathComponent("financial-passive.json")
+        try Data("""
+        {"schemaVersion":1,"capturedAt":\(passiveTime.timeIntervalSince1970),"fiveHour":{"usedPercentage":30,"resetsAt":1800000000}}
+        """.utf8).write(to: statusURL)
+        let blockedDirectory = directory.appendingPathComponent("financial-passive-blocked")
+        try Data().write(to: blockedDirectory)
+        let cache = ClaudeUsageCache(fileURL: blockedDirectory.appendingPathComponent("cache.json"))
+        let source = ClaudeOAuthUsageSource(
+            credentialStore: FakeCredentialStore(result: .success(
+                ClaudeOAuthCredential(accessToken: "fixture", scopes: ["user:profile"], subscriptionType: nil)
+            )),
+            requestExecutor: { request in
+                (Data(#"{"extra_usage":{"is_enabled":true,"monthly_limit":50,"used_credits":12,"currency":"USD"}}"#.utf8),
+                 HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+            },
+            now: { observed }
+        )
+        let collector = ClaudeUsageCollector(
+            oauthSource: source,
+            statusLineReader: ClaudeRateLimitSnapshotReader(fileURL: statusURL),
+            cache: cache,
+            now: { observed }
+        )
+
+        let result = await collector.refresh(reason: .scheduled)
+
+        XCTAssertEqual(result.delivery, .passiveSnapshot)
+        XCTAssertEqual(result.snapshot.capturedAt, passiveTime)
+        XCTAssertEqual(result.snapshot.fiveHour?.usedPercent, 30)
+        XCTAssertEqual(result.snapshot.extraUsage?.usedCredits, 12)
+        XCTAssertEqual(result.snapshot.extraUsageObservedAt, observed)
     }
 
     /// OAuth is unavailable, a 47h-old statusLine snapshot exists, and the

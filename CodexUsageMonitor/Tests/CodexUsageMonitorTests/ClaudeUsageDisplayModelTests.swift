@@ -177,8 +177,30 @@ final class ClaudeUsageDisplayModelTests: XCTestCase {
         XCTAssertNil(model.creditsUsedText)
     }
 
-    /// The live shape on a Pro account: enabled, nothing spent, no cap
-    /// returned. "0 spent" must not be presented as "0 remaining".
+    func testMissingCreditAmountOrCurrencyDoesNotInventMoney() {
+        for extra in [
+            ClaudeExtraUsage(isEnabled: true, monthlyLimit: 50, usedCredits: nil, currencyCode: "USD"),
+            ClaudeExtraUsage(isEnabled: true, monthlyLimit: 50, usedCredits: 12, currencyCode: nil)
+        ] {
+            let model = ClaudeUsageDisplayModel(presentation: withExtraUsage(extra))
+            XCTAssertEqual(model.creditsUsedText, "Unavailable")
+        }
+    }
+
+    func testFinancialLastUpdatedUsesObservationRatherThanQuotaCapture() {
+        let observed = Date(timeIntervalSince1970: 1_700_000_000)
+        var snapshot = withExtraUsage(
+            ClaudeExtraUsage(isEnabled: true, monthlyLimit: nil, usedCredits: 0, currencyCode: "USD")
+        ).snapshot
+        snapshot.extraUsageObservedAt = observed
+        let model = ClaudeUsageDisplayModel(presentation: ClaudeUsagePresentation(
+            snapshot: snapshot, delivery: .passiveSnapshot, warnings: []
+        ))
+        XCTAssertEqual(model.financialUpdatedText, observed.formatted(date: .abbreviated, time: .shortened))
+        XCTAssertNotEqual(model.financialUpdatedText, snapshot.capturedAt.formatted(date: .abbreviated, time: .shortened))
+    }
+
+    /// Explicit zero with a currency must not be presented as a remaining balance.
     func testSpendWithNoCapIsJustTheAmount() {
         let model = ClaudeUsageDisplayModel(
             presentation: withExtraUsage(
@@ -205,7 +227,8 @@ final class ClaudeUsageDisplayModelTests: XCTestCase {
 
         let value = model.creditsUsedText ?? ""
         XCTAssertTrue(value.contains("12.50"), value)
-        XCTAssertTrue(value.contains("50.00"), value)
+        XCTAssertFalse(value.contains("50.00"), value)
+        XCTAssertTrue(model.monthlySpendingLimitText?.contains("50.00") == true)
     }
 
     func testDisabledExtraUsageIsReportedAsOff() {
@@ -242,9 +265,9 @@ final class ClaudeUsageDisplayModelTests: XCTestCase {
         XCTAssertEqual(model.fiveHour?.usedText, "26%")
     }
 
-    /// Anthropic reports no remaining balance, so the label must say "used".
-    func testCreditsLabelSaysUsedNotRemaining() {
-        XCTAssertTrue(ClaudeUsageDisplayModel.creditsUsedLabel.lowercased().contains("used"))
+    /// Spending must not be labeled as a remaining balance.
+    func testCreditsLabelSaysSpendingNotRemaining() {
+        XCTAssertTrue(ClaudeUsageDisplayModel.creditsUsedLabel.lowercased().contains("spending"))
         XCTAssertFalse(ClaudeUsageDisplayModel.creditsUsedLabel.lowercased().contains("remaining"))
     }
 

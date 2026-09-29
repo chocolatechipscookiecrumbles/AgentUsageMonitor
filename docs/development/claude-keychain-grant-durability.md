@@ -2,9 +2,14 @@
 
 **Question:** why does the macOS "Always Allow" grant for reading Claude Code's Keychain item stop working after a few hours, on a build whose code signature does not change?
 
-**Status: IN PROGRESS — the previously documented cause is ruled out and the grant is confirmed live, including across a three-hour outage that turned out to be a different defect. The prompt transition itself is still not captured.**
+**Status: IN PROGRESS — the prompt transition is now captured for the same
+running process, and the machine's duplicated Keychain search list is a
+confirmed defect. The causal fix still requires the controlled scoped-query
+and credential-update observation in the September 1 follow-up plan.**
 
 Owning plan: [Claude Usage Source Durability and Refresh Defects](../superpowers/plans/2026-08-12-claude-usage-source-durability.md), Task 0.
+
+Follow-up plan: [Claude Keychain Reprompt Durability](../superpowers/plans/2026-09-01-claude-keychain-reprompt-durability.md).
 
 No credential bytes were read at any point. `security find-generic-password` was always run **without `-w`**, which returns attributes only, never the secret, and never prompts.
 
@@ -61,7 +66,7 @@ Two things follow:
 
 So the failure is a **transition**, not a steady state. Any explanation must account for a grant that works, then stops, while the application's code identity never changes.
 
-### O5 — The passive tier is dead, which is why a lost grant becomes "no usage data"
+### O5 — The passive tier was dead at the time of this observation
 
 Tier 3 reported `no snapshot at claude-rate-limits.json (bridge not installed or never fired)`, confirming from inside the app what the filesystem already showed. The configured status line is:
 
@@ -70,6 +75,11 @@ cd '~/Desktop/<superseded-project-dir>/ClaudeUsageBridge' && python3 -m claude_u
 ```
 
 That directory does not exist, so every Claude Code render fails silently. `ClaudeStatusLineInstaller` has no call site in application code, so the shipped app can neither install nor repair it. This is independent of the grant question but is what converts a lost grant into a blank reading instead of a slightly stale one.
+
+This observation is historical. The later single-binary work installed the
+privacy-scoped status-line bridge through the main signed executable, and the
+user reported its smoke test working. The follow-up reprompt fix therefore
+preserves passive/cache delivery instead of assuming OAuth is the only source.
 
 ---
 
@@ -142,24 +152,155 @@ The efficacy test requires an expired-token window — precisely the state O7 ca
 
 ## Still open
 
-The **recurring prompt itself remains unexplained.** O7 explains hours of missing usage; it does not explain a returning permission dialog, and the grant was demonstrably intact across it. Do not let the D5 finding be mistaken for a diagnosis of the prompt.
+The prompt transition is now captured, but its causal mechanism is not yet
+proven. The same running process was prompted again, ruling out a changed app
+identity for those events. The duplicated global search list and the app's
+classification of a noninteractive failure as revoked authorization still
+confound the later reconnect prompt.
 
-The remaining discriminator is unchanged: catch a `.never` read failing with `errSecInteractionNotAllowed` while the app runs, and record whether an `mdat` advance coincided.
+The remaining discriminator is a scoped, noninteractive read across an ordinary
+credential modification. If that read continues to succeed, the app-side query
+and state handling caused the false recovery path. If it persistently fails and
+the same signed process prompts on an explicit reconnect, Claude Code changed
+the item's access object even though its creation date stayed fixed.
+
+---
+
+### O10 — The same process was prompted again after Always Allow
+
+Sanitized `securityd` ACL logs captured three cycles in one still-running
+signed working-copy process. Each cycle recorded a displayed Keychain prompt
+and a later user approval of **Always Allow**. The process identifier and path
+remained unchanged between cycles.
+
+This rules out process replacement, restart into the installed copy, and a new
+code signature as explanations for those specific repeated prompts. Both the
+working-copy and installed bundles currently share the same Developer ID
+designated requirement and both pass the noninteractive sanitized OAuth probe.
+
+### O11 — The global Keychain search list contains one Keychain 168 times
+
+`security list-keychains -d user` reports the default login Keychain 168 times
+and no other unique path. An attributes-only `SecItemCopyMatching` for the
+Claude service inherited that list and returned 168 entries with identical
+creation and modification dates. Adding `kSecMatchSearchList` with the single
+default Keychain reduced the same query to one result.
+
+The repository contains no call to `SecKeychainSetSearchList` and no invocation
+of `security list-keychains`, so Agent Monitor did not create this machine
+state. The production credential query currently inherits it, however, making
+explicit single-Keychain scoping an app-level containment.
+
+### O12 — One prompt followed a Claude credential update
+
+The Claude item's creation date remained unchanged, while its latest observed
+modification occurred about six minutes before the next recorded ACL prompt.
+That is consistent with an in-place value update followed by renewed ACL
+evaluation. It does not yet prove that Claude Code replaced the access object:
+the duplicated global search scope and the app's collapse of temporary
+`errSecInteractionNotAllowed` into durable access denial are still active
+confounders.
+
+The September 1 plan therefore tests the invariant in this order: scope the
+query to one login Keychain, preserve temporary unavailability as retry-later,
+then observe one normal credential modification with one stable signed process.
+Only a persistent failure after those corrections can establish provider-owned
+access-object replacement.
 
 ## Not run
 
-- Steps 2 and 4 (grant, then re-read after a forced rewrite) as an **interactive** sequence — these need the user at the keyboard to answer or observe a dialog.
+- A scoped grant → ordinary credential modification → noninteractive re-read
+  sequence. This needs the user at the keyboard to answer or observe any dialog.
 - Step 5(a), keychain lock/unlock and logout/login.
 - Any inspection of the item's ACL entries. There is no way to read a Keychain item's ACL without an authorization prompt, so the ACL is measured **by behaviour** — whether a non-prompting read succeeds — rather than read directly.
 
 ## Conclusions so far
 
+### September 21 diagnostic follow-up
+
+- Sanitized same-day system logs recorded five displayed prompts, including
+  Always Allow approvals at 15:40 and 22:37 Eastern. The installed build 266
+  process had been running since September 15.
+- Binary inspection identified the older `ClaudeCompositeCredentialStore`
+  implementation and `kSecUseAuthenticationUIFail` imports in that installed
+  build. It is not the implementation in the current checkout; conclusions
+  about the checkout's Connect-only prompting policy cannot be applied to it.
+- The default login Keychain still appeared 168 times in the search list.
+  Attributes-only inspection found an unchanged creation date and a credential
+  modification at 22:35:54 Eastern, about 87 seconds before the latest prompt.
+  This correlation does not establish an access-object replacement.
+- The status-line snapshot existed with both quota windows. The OAuth cache
+  had also advanced after the latest approval.
+- Built the current feature checkout (`b98782f`, containing public main plus
+  eleven commits) with `Scripts/build-app.sh`: exit 0, Developer ID signed,
+  strict signature verification passed, designated requirement matched the
+  installed build. Asset compilation emitted three dyld missing-symbol
+  diagnostics for AVFCore/MediaToolbox; the build completed successfully.
+- Ran the new signed executable with `--claude-live-read-once`: exit 0,
+  interaction forbidden, live OAuth accepted, no collection warnings. Passive
+  data was too old for the two-minute fast path; `/usage` was not invoked.
+- After explicit user authorization, quit the installed app normally and
+  launched the new signed checkout build. Resolved an older duplicate checkout
+  instance through its normal Quit shortcut. Process inspection confirmed one
+  monitor remained, launched at 23:01 Eastern from the checkout bundle. The
+  three-minute system-log check around the switch recorded zero displayed
+  Keychain prompts. Credential-update and sleep/wake durability remain
+  unobserved with the new build; no permission or search-list changes were made.
+
 1. The ad-hoc-signature explanation is **ruled out** (O1).
 2. A second app identity is **ruled out** (O2).
 3. Item recreation is **ruled out** as the mechanism (O3).
-4. The grant is **confirmed working** for both prompting and non-prompting reads (O4), held for a continuous 4.45-hour sampled window (O6), and was still intact across the three-hour outage in O7. The reported reprompting remains a transition nobody has caught in the act.
-5. The app has **no working fallback** beneath the OAuth tier (O5), which is the difference between "slightly stale" and "nothing".
+4. The grant is **confirmed working** for both prompting and non-prompting reads (O4), held for a continuous 4.45-hour sampled window (O6), and was still intact across the three-hour outage in O7. A later reprompt was captured in the same running process (O10), so app replacement is not its cause.
+5. The app had **no working fallback** beneath the OAuth tier when O5 was
+   recorded. The later single-binary status-line bridge superseded that state;
+   the current fix must preserve it as the no-prompt fallback.
 6. **A three-hour Claude blackout was explained, and it was not the grant** (O7): the borrowed access token expired and stayed expired until Claude Code next ran. That is D5, and it is the reason to pursue delegated refresh.
 7. The credential's modification date is readable **without authorization and without prompting** (O8), so a refresh can be detected without ever touching the secret.
+8. The global Keychain query is malformed by a 168-entry duplicate search list,
+   while an explicit default-Keychain scope finds one item (O11). Agent Monitor
+   did not create that state, but it must stop inheriting it.
+9. A noninteractive `errSecInteractionNotAllowed` does not establish that the
+   user revoked access. It establishes only that the attempted read could not
+   complete without interaction. Background collection must not convert that
+   result into a disconnected account.
 
-**Do not build a workaround for a cause that has not reproduced.** The durability work in the owning plan — reviving the keychain-free passive tier, and moving to an app-owned token — is justified by O5 and by the read-path defects, and does not depend on this question being answered.
+The scoped-query and state-classification changes are app-side containment, not
+a claim that Claude Code's ACL behavior has been proven. The controlled sequence
+in the follow-up plan decides whether any provider-owned limitation remains.
+
+## September 22 silent-access diagnosis
+
+Diagnosis only; no production code or provider credential/access-rule changes.
+The signed noninteractive probe reproduced fallback at 11:24 Eastern. At
+11:24:04.615, securityd logged an ACL partition mismatch for the monitor's
+Developer ID team against an ACL containing only `apple-tool:`. This identifies
+the immediate access barrier, not the process or event that changed the ACL.
+
+During the evening follow-up, securityd recorded the same mismatch and a prompt
+at 20:59:10 for the same checkout app and PID. At 20:59:14, securityd recorded
+that the user approved **Always Allow**. Explicit Reconnect then reported OAuth;
+independent silent probes at 21:02:44, 21:04:49, and 21:07:56 returned live OAuth
+without warnings. A further bounded probe at 23:36 returned live OAuth with no
+warning or matching prompt/partition-mismatch event, extending this observed
+post-approval interval to 2 hours 36 minutes 45 seconds.
+
+The running process retained the same Developer ID designated requirement and
+passed strict on-disk and dynamic signature validation. A targeted attributes-only
+query against the default `login.keychain-db` completed without prompting and
+reported credential creation `2026-07-20T02:32:03Z` and modification
+`2026-09-22T22:20:32Z`. The modification preceded both the evening mismatch
+series and Always Allow; no post-approval credential update occurred. The user
+search list still contained 168 entries resolving to one unique Keychain path,
+while the scoped query returned one item. Full `dump-keychain` remains excluded;
+the targeted default-Keychain query is the bounded metadata method for the next
+comparison.
+
+Five credential tests passed earlier in the day. The cause of recurring ACL
+restriction remains unresolved; successful short-window reads do not prove
+credential-update or sleep/wake durability.
+
+This establishes that Always Allow survived ordinary reads for the observed
+interval with one stable running identity. It does not establish durability
+across a provider credential update, relaunch, sleep/wake, or Keychain lock-state
+transition, and it does not identify what previously reduced the ACL to
+`apple-tool:`. Those natural events remain the open comparison boundary.

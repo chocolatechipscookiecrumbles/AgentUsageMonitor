@@ -61,6 +61,18 @@ final class ClaudeUsageCacheTests: XCTestCase {
 
         XCTAssertNil(cache.load())
     }
+
+    func testLegacyFinancialCacheWithoutObservationTimestampDecodes() throws {
+        try Data(#"{"snapshot":{"fiveHour":{"usedPercent":25},"scopedWindows":[],"extraUsage":{"isEnabled":true,"monthlyLimit":50,"usedCredits":12,"currencyCode":"USD"},"source":"oauth","capturedAt":700000000,"schemaVersion":1},"savedAt":700000060}"#.utf8).write(to: fileURL)
+        let snapshot = try XCTUnwrap(ClaudeUsageCache(fileURL: fileURL).load()?.snapshot)
+        XCTAssertEqual(snapshot.extraUsage?.usedCredits, 12)
+        XCTAssertNil(snapshot.extraUsageObservedAt)
+        let model = ClaudeUsageDisplayModel(presentation: ClaudeUsagePresentation(
+            snapshot: snapshot, delivery: .cached, warnings: []
+        ))
+        XCTAssertEqual(model.financialUpdatedText,
+                       Date(timeIntervalSinceReferenceDate: 700000000).formatted(date: .abbreviated, time: .shortened))
+    }
 }
 
 /// The cache is last-known-**good**. A degraded refresh must not replace a
@@ -105,6 +117,25 @@ final class ClaudeUsageCacheFreshnessTests: XCTestCase {
         let loaded = cache.load()
         XCTAssertEqual(loaded?.snapshot.source, .oauth, "a 47h-old capture must not clobber a current one")
         XCTAssertEqual(loaded?.snapshot.fiveHour?.usedPercent, 44)
+    }
+
+    func testQuotaAndFinancialFreshnessMergeIndependently() throws {
+        let time = Date(timeIntervalSince1970: 1_700_000_000)
+        let cache = ClaudeUsageCache(fileURL: fileURL)
+        var current = snapshot(.oauth, capturedAt: time.addingTimeInterval(100), fiveHour: 44)
+        current.extraUsage = ClaudeExtraUsage(isEnabled: true, monthlyLimit: 50, usedCredits: 1, currencyCode: "USD")
+        current.extraUsageObservedAt = time
+        cache.save(current)
+        var olderQuota = snapshot(.oauth, capturedAt: time, fiveHour: 5)
+        olderQuota.extraUsage = ClaudeExtraUsage(isEnabled: true, monthlyLimit: 50, usedCredits: 12, currencyCode: "USD")
+        olderQuota.extraUsageObservedAt = time.addingTimeInterval(200)
+        cache.save(olderQuota)
+        cache.save(current)
+        let merged = try XCTUnwrap(cache.load()?.snapshot)
+        XCTAssertEqual(merged.fiveHour?.usedPercent, 44)
+        XCTAssertEqual(merged.capturedAt, current.capturedAt)
+        XCTAssertEqual(merged.extraUsage?.usedCredits, 12)
+        XCTAssertEqual(merged.extraUsageObservedAt, olderQuota.extraUsageObservedAt)
     }
 
     func testNewerSnapshotDoesOverwriteOlderOne() {

@@ -5,15 +5,14 @@ import SwiftUI
 /// actions) followed by the provider-neutral quota rows, so both agents read
 /// as one system.
 ///
-/// It uses the shared `AgentQuotaSessionSection`, passing a "used" credits
-/// label (Anthropic reports spend, not a balance) and no reset credits.
+/// Spending remains distinct from prepaid balance and redeemable reset offers.
 struct ClaudeAgentSettingsView: View {
     @ObservedObject var settings: AppSettings
-    let setupState: ClaudeSetupState
+    let isEnrolled: Bool
     let connectionState: ClaudeConnectionState
     let usageState: ClaudeUsageState
     let valueMode: QuotaValueMode
-    let connectWithCredentials: () -> Void
+    let connect: () -> Void
     let disconnect: () -> Void
     let refresh: () -> Void
     let isRunningCLIProbe: Bool
@@ -29,8 +28,8 @@ struct ClaudeAgentSettingsView: View {
     @State private var pendingRepair: String?
 
     var body: some View {
-        if setupState == .notSetUp {
-            ClaudeSetupOnboardingView(connect: connectWithCredentials)
+        if !isEnrolled {
+            ClaudeSetupOnboardingView(connect: connect)
         } else {
             // Built once per render: it does date math and currency formatting,
             // and a computed property would rebuild it at every reference.
@@ -66,7 +65,7 @@ struct ClaudeAgentSettingsView: View {
             SettingsSectionRow {
                 // Status text is variable-length ("Signing in with Claude Code
                 // credentials…"), so it wraps rather than widening the card.
-                SettingsValueRow("Status", value: status(model).text, description: status(model).detail)
+                SettingsValueRow("Status", value: connectionStatus.text, description: connectionStatus.detail)
             }
             if let plan = planName(model) {
                 SettingsSectionRow {
@@ -89,10 +88,40 @@ struct ClaudeAgentSettingsView: View {
             resetCredits: nil,
             weeklyFootnote: ClaudeUsageDisplayModel.weeklyScopeCaveat,
             fiveHourNote: ClaudeUsageDisplayModel.showsFiveHourSessionNote(
-                isConnected: status(model).isConnected,
+                isConnected: usageState.presentation?.delivery == .live,
                 hasFiveHourWindow: model?.fiveHour != nil
             ) ? ClaudeUsageDisplayModel.fiveHourSessionNote : nil
         )
+
+        SettingsSection("Credits and resets") {
+            SettingsSectionRow {
+                SettingsValueRow("Available resets", value: "Unavailable")
+            }
+            SettingsSectionRow {
+                SettingsValueRow("Credit balance", value: "Unavailable")
+            }
+            SettingsSectionRow {
+                SettingsValueRow(
+                    "Monthly spending limit", value: model?.monthlySpendingLimitText ?? "Unavailable",
+                    description: "A spending cap, separate from your prepaid balance."
+                )
+            }
+            if let updated = model?.financialUpdatedText {
+                SettingsSectionRow {
+                    SettingsValueRow(
+                        "Last updated", value: updated,
+                        description: "Last financial reading. Passive quota updates do not refresh it."
+                    )
+                }
+            }
+            SettingsSectionRow(showsDivider: false) {
+                SettingsPreferenceControlRow(
+                    "Claude Usage", description: "Check your balance and available resets in Claude."
+                ) {
+                    Link("Open Claude Usage", destination: URL(string: "https://claude.ai/settings/usage")!)
+                }
+            }
+        }
 
         SettingsSection("Source") {
             SettingsSectionRow {
@@ -101,14 +130,14 @@ struct ClaudeAgentSettingsView: View {
                 // it rides as its description instead of a block of its own.
                 SettingsValueRow(
                     "Read from",
-                    value: model.map { "\($0.sourceLabel) · \($0.capturedAtText)" } ?? "Not available",
+                    value: model.map { "\($0.sourceLabel) · Last updated \($0.capturedAtText)" } ?? "Not available",
                     description: model?.stalenessNotice
                 )
             }
             SettingsSectionRow {
                 SettingsPreferenceControlRow(
                     "Refresh now",
-                    description: "Uses the free sources. Never prompts."
+                    description: "Uses passive capture, then silent live fallback. Never requests Keychain permission."
                 ) {
                     Button("Refresh", action: refresh)
                 }
@@ -154,10 +183,10 @@ struct ClaudeAgentSettingsView: View {
             SettingsSectionRow(showsDivider: cliProbeError != nil) {
                 // Title, cost footnote and button in one row rather than three.
                 SettingsPreferenceControlRow(
-                    "Claude CLI check",
+                    "Claude /usage",
                     description: ClaudeCLIUsageProbe.buttonFootnote
                 ) {
-                    Button(isRunningCLIProbe ? "Reading…" : "Run check") {
+                    Button(isRunningCLIProbe ? "Reading…" : "Force Read") {
                         if hasConsentedToCLIProbe {
                             runCLIProbe()
                         } else {
@@ -187,11 +216,14 @@ struct ClaudeAgentSettingsView: View {
         }
     }
 
-    /// The same derivation the context rail uses, so a live read is reported
-    /// as connected on both surfaces even if the sign-in button was never
-    /// pressed.
-    private func status(_ model: ClaudeUsageDisplayModel?) -> ClaudeConnectionStatus {
-        ClaudeConnectionStatus.resolve(signInState: connectionState, usageState: usageState)
+    /// The same derivation the context rail uses, so every Claude surface has
+    /// one definition of monitoring enrollment and live fallback availability.
+    private var connectionStatus: ClaudeConnectionStatus {
+        ClaudeConnectionStatus.resolve(
+            isEnrolled: isEnrolled,
+            signInState: connectionState,
+            usageState: usageState
+        )
     }
 
     /// Prefers the plan proven by the connection; falls back to the plan hint
@@ -213,46 +245,20 @@ struct ClaudeAgentSettingsView: View {
 
     @ViewBuilder
     private var connectionActions: some View {
-        if showsConnectAction {
-            // Disclosure sits with the button that triggers the prompt, rather
-            // than as a separate full-width block.
-            SettingsPreferenceControlRow(
-                "Claude Code credentials",
-                description: ClaudeSignInPresentation.keychainDisclosure
-            ) {
-                Button("Connect", action: connectWithCredentials)
-                    .disabled(isSigningIn)
-            }
-            // The Always Allow / Allow explanation belongs before connecting,
-            // so the user understands the Keychain prompt they will approve.
-            SettingsDescription(ClaudeSignInPresentation.keychainPromptExplanation)
+        SettingsPreferenceControlRow(
+            "Live fallback",
+            description: "Reconnect may ask for Keychain permission. Passive monitoring continues if access is unavailable."
+        ) {
+            Button("Reconnect Claude", action: connect)
+                .disabled(isSigningIn)
         }
-        if isEffectivelyConnected {
-            SettingsPreferenceControlRow("Connected account") {
-                AgentDisconnectButton(provider: .claudeCode, disconnect: disconnect)
-            }
-        }
-    }
-
-    /// A live read (passive capture with a working credential) or an explicit
-    /// sign-in both count as connected here, matching the status row.
-    private var isEffectivelyConnected: Bool {
-        ClaudeConnectionStatus.isEffectivelyConnected(
-            signInState: connectionState,
-            usageState: usageState
-        )
-    }
-
-    private var showsConnectAction: Bool {
-        if isEffectivelyConnected { return false }
-        switch connectionState {
-        case .notConnected, .failed, .signingIn, .missingCLI: return true
-        case .checking, .connected: return false
+        SettingsPreferenceControlRow("Claude monitoring") {
+            AgentDisconnectButton(provider: .claudeCode, disconnect: disconnect)
         }
     }
 
     private var isSigningIn: Bool {
-        if case .signingIn = connectionState { return true }
+        if case .connecting = connectionState { return true }
         return false
     }
 }

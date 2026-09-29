@@ -11,6 +11,9 @@ struct ClaudeCachedUsage: Codable, Equatable {
 /// Stores only normalized, non-secret usage data — this type has no token
 /// fields to accidentally cache because ClaudeUsageSnapshot has none.
 struct ClaudeUsageCache {
+    // ponytail: one lock serializes cache writes; use per-file locks only if
+    // multiple independent Claude caches make this a measurable bottleneck.
+    private static let writeLock = NSLock()
     private let fileURL: URL
 
     init(fileURL: URL) {
@@ -29,14 +32,19 @@ struct ClaudeUsageCache {
     }
 
     func save(_ snapshot: ClaudeUsageSnapshot) {
-        // Last-known-*good* means most recent good. A degraded refresh falling
-        // back to an old statusLine capture must not overwrite a fresher
-        // result — otherwise the cache decays instead of preserving the best
-        // reading we have.
-        if let existing = load(), existing.snapshot.capturedAt > snapshot.capturedAt {
-            return
+        Self.writeLock.lock()
+        defer { Self.writeLock.unlock() }
+        // Quota and financial observations have independent ages. Keep the
+        // newest quota while merging spending by its own observation time.
+        let existing = load()
+        let merged: ClaudeUsageSnapshot
+        if let existing, existing.snapshot.hasQuotaWindows,
+           !snapshot.hasQuotaWindows || existing.snapshot.capturedAt > snapshot.capturedAt {
+            merged = existing.snapshot.retainingExtraUsage(from: snapshot)
+        } else {
+            merged = snapshot.retainingExtraUsage(from: existing?.snapshot)
         }
-        let cached = ClaudeCachedUsage(snapshot: snapshot, savedAt: .now)
+        let cached = ClaudeCachedUsage(snapshot: merged, savedAt: .now)
         let directory = fileURL.deletingLastPathComponent()
         do {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -46,6 +54,16 @@ struct ClaudeUsageCache {
             try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
         } catch {
             // Cache is best-effort and must never make a refresh fail.
+        }
+    }
+
+    func delete() throws {
+        Self.writeLock.lock()
+        defer { Self.writeLock.unlock() }
+        do {
+            try FileManager.default.removeItem(at: fileURL)
+        } catch let error as CocoaError where error.code == .fileNoSuchFile {
+            return
         }
     }
 }

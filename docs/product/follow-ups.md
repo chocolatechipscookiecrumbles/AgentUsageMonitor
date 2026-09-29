@@ -420,9 +420,13 @@ Acceptance
 
 ## 10. Consolidate the Claude usage bridge into the app executable
 
-**Status:** **Needs plan.** The 0.0.1 implementation works and was signed,
-notarized, published, and verified, but its packaging boundary is more complex than
-the product needs.
+**Status:** **Implemented; acceptance pending.** The integrated
+[Claude Keychain, Passive Usage, and Single-Binary Bridge plan](../superpowers/plans/2026-08-29-claude-keychain-statusline-single-binary.md)
+plan is implemented: the app target is the only executable product and the custom
+entry point dispatches bridge mode before SwiftUI/AppKit. The copy prototype
+failed strict validation because the main signature is bundle-bound; an atomic
+stable-basename symlink now targets the valid signed bundle executable. Packaging, launch-cost, privacy,
+rollback, and sleep-assertion evidence remain acceptance gates.
 
 Problem
 
@@ -542,10 +546,22 @@ Acceptance
 
 ## 12. Claude setup is not a dependable first-run flow
 
-**Status:** **Planned with a capability gate.** The user reported the published
-setup as problematic, but the exact failed step has not yet been captured well
-enough to claim a root cause. Follow the
-[Claude delegated OAuth and setup plan](../superpowers/plans/2026-07-31-claude-delegated-oauth-and-setup.md).
+**Status:** **Replacement implemented; acceptance pending.** A direct successful
+Claude Code 2.1.247 `setup-token` run proved callback/capture completion.
+Installed CLI semantics, the endpoint's scope rejection, and matching public
+issues establish that the issued inference token lacks the `user:profile` scope
+required by the usage endpoint. Setup-token is therefore rejected for quota. A fresh status-line
+reading remains the zero-secret fast path, Claude Code's explicitly authorized
+Keychain credential becomes the authoritative source, and `/usage` remains
+manual recovery. The implementation removes setup-token, app-owned credential
+storage, and method selection; one Connect action enrolls safe passive capture
+and validates Claude Code's Keychain credential. Disconnect now clears app-local
+monitoring and exact managed artifacts without changing Claude Code. Follow the
+[integrated replacement plan](../superpowers/plans/2026-08-29-claude-keychain-statusline-single-binary.md)
+and corrected [source audit](../development/claude-usage-monitor-source-audit-2026-08-26.md).
+The callback reliability plan remains historical evidence only. A later direct
+CLI run proved that further callback work cannot make its token a quota
+credential.
 
 Problem
 
@@ -556,20 +572,22 @@ or unclear recovery actions rather than one understandable setup sequence.
 
 Required outcome
 
-Instrument and observe the first-run transitions before redesigning them. The app
-must clearly distinguish:
+Retire the setup-token security boundary and present one informed Claude Code
+connection action that clearly distinguishes:
 
-* existing Claude Code credentials available without interaction
-* credential access requiring an explicit user action and possible Keychain prompt
+* a fresh zero-secret status-line reading
+* Claude Code Keychain access requiring an explicit user action and possible prompt
 * passive status-line capture installed, absent, stale, or conflicting
 * CLI-only usage recovery that does not prove account/plan identity
-* setup failure with a safe, specific retry path
+* Keychain denial, missing Claude Code login, or expired credential with a safe,
+  specific retry path
 
 Acceptance
 
 * one guided path reaches a coherent connected/usable state or names the exact
   blocker without contradictory status
 * ordinary background refresh remains non-prompting
+* a selected credential failure never silently reads the other credential method
 * existing custom `~/.claude/settings.json` configuration is never overwritten
 * cancel, deny, retry, relaunch, stale snapshot, and later credential recovery are
   explicit

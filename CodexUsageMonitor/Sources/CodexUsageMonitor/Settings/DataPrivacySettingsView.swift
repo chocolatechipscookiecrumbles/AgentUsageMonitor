@@ -45,15 +45,14 @@ struct DataPrivacySettingsView: View {
                 }
             }
 
-            // Claude reads data this app does not own — a Keychain item and a
-            // file another program writes — so what is read, and what is
-            // deliberately not, is stated here rather than on the Agents page.
+            // Claude Code owns the only credential this app reads. Agent
+            // Monitor never copies it into an app-owned Keychain item.
             SettingsSection("Claude Code") {
                 SettingsSectionRow {
                     SettingsValueRow(
                         "Credentials",
-                        value: "Read, never stored",
-                        description: "Claude Code's own Keychain item is read at refresh time. This app keeps no copy of it and never requests a token of its own."
+                        value: "Borrowed from Claude Code",
+                        description: "After Connect Claude, Agent Monitor reads Claude Code’s existing OAuth credential in memory. It never stores, changes, directly refreshes, exports, or deletes that credential."
                     )
                 }
                 SettingsSectionRow {
@@ -73,7 +72,7 @@ struct DataPrivacySettingsView: View {
                 // to use Claude support is an informed choice.
                 SettingsSectionRow(showsDivider: false) {
                     SettingsDescription(
-                        "Anthropic's Terms of Service do not permit another application to reuse Claude Code's credential. This app does it anyway, which may put your Anthropic account at risk of enforcement. Turning off Claude in Agents stops the read entirely. A first-party sign-in that would remove this caveat is planned."
+                        "Anthropic does not publish the Claude usage endpoint as a third-party app contract. Reusing Claude Code’s credential is not permitted by Anthropic’s Terms of Service and may carry account-enforcement risk. Turning off Claude stops all reads."
                     )
                 }
             }
@@ -110,13 +109,13 @@ struct DataPrivacySettingsView: View {
 
             SettingsSection("Excluded data") {
                 SettingsSectionRow(showsDivider: false) {
-                    SettingsDescription("The app does not store passwords, OAuth tokens, email addresses, prompts, source code, raw provider responses, or raw provider errors.")
+                    SettingsDescription("The app does not store passwords, OAuth tokens, email addresses, prompts, source code, raw provider responses, or raw provider errors. Keychain credentials remain provider-owned and never enter diagnostics or exports.")
                 }
             }
 
             SettingsSection("Export") {
                 SettingsSectionRow {
-                    SettingsDescription("Writes every store listed above to one JSON file you choose. A store this Mac has not written yet is named and marked unavailable rather than left out. Nothing outside this app's own folder is included — not Claude Code's Keychain item, and not the agents' own records.")
+                    SettingsDescription("Writes every store listed above to one JSON file you choose. A store this Mac has not written yet is named and marked unavailable rather than left out. Nothing outside this app's own folder is included — not Claude Code’s Keychain credential, and not the agents' own records.")
                 }
                 SettingsSectionRow {
                     VStack(alignment: .leading, spacing: SettingsLayoutMetrics.preferenceTitleDescriptionSpacing) {

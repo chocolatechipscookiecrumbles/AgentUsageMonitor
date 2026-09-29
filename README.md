@@ -22,10 +22,10 @@ asks for a password, and no prompt, response, or file content ever leaves your M
 
 > ### ⚠️ Read this before installing
 >
-> Claude support works by reusing the OAuth credential **Claude Code already stored
-> in your Keychain**. **Anthropic's Terms of Service do not permit a third-party
-> application to do that.** This build does it anyway, and says so here rather than
-> burying it — see [How Claude usage is read](#how-claude-usage-is-read-and-the-terms-caveat).
+> Claude support reads Claude Code's existing credential after one explicit
+> Keychain permission action. Anthropic does not publish the usage endpoint or
+> credential reuse as a third-party app contract. See
+> [How Claude usage is read](#how-claude-usage-is-read-and-the-terms-caveat).
 > Using it may put your Anthropic account at risk of enforcement; that risk is yours
 > to weigh. Codex support carries no such caveat, and Claude can be turned off
 > entirely in **Settings → Agents**.
@@ -78,12 +78,12 @@ swift build          # compile
 swift test           # run the test suite
 
 ./Scripts/build-app.sh                    # bundle + sign the .app
-./Scripts/verify-signed-app-resources.sh  # confirm the catalog and bridge are inside
+./Scripts/verify-signed-app-resources.sh  # confirm the signed asset catalog
 ```
 
 `build-app.sh` produces `.build/CodexUsageMonitor.app`. It builds `-c release`,
-compiles the asset catalog, builds the bundle `.icns`, and signs the nested Claude
-bridge before signing the app. Without a Developer ID certificate it falls back to
+compiles the asset catalog, builds the bundle `.icns`, and signs the app's single
+executable. Without a Developer ID certificate it falls back to
 ad-hoc signing and warns you — fine for local use, but see
 [Known limitations](#known-limitations) for the Keychain-prompt consequence.
 
@@ -98,8 +98,8 @@ ad-hoc signing and warns you — fine for local use, but see
 | **OS** | macOS 14 (Sonoma) or later |
 | **Codex support** | The Codex CLI, already signed in |
 | **Claude support** | Claude Code, already signed in |
-| **Runtime** | None. The Claude usage bridge is currently a second native Swift executable bundled and signed inside the app — no Python needed |
-| **Accounts** | None. The app adds no account, network login, or credential of its own |
+| **Runtime** | None. The app's signed executable also provides Claude passive-capture bridge mode — no Python needed |
+| **Accounts** | No app account. Claude Code remains the owner of its credential |
 
 You need at least one of the two providers; neither is required for the other to
 work.
@@ -109,14 +109,14 @@ work.
 | Provider | Source | What is read | Refresh floor | Leaves your machine |
 |---|---|---|---|---|
 | **OpenAI Codex** | Local Codex CLI app-server | Five-hour and weekly quota, reset times, plan | Full range (as fast as 30s in Automatic) | No |
-| **Claude Code** | Keychain OAuth credential → statusLine snapshot → local cache | Five-hour and weekly quota, reset times, plan, extra-usage amount | Never faster than 5 minutes | No |
+| **Claude Code** | fresh statusLine snapshot → OAuth credential → best local cache | Five-hour and weekly quota, reset times, plan, extra-usage amount | Never faster than 5 minutes | No |
 | **Token Monitor** (both) | Codex and Claude Code's own local record files | Token counts, models, timestamps | Filesystem events, incremental | No |
 | GitHub Copilot | — | **Not supported** — no personal-quota API has been verified | — | — |
 | OpenCode | — | **Not supported** — reports connected providers, not a personal quota | — | — |
 
-Both supported providers reuse a session you already established with the
-provider's own tool. The reads are strictly one-way: the app never writes to a
-provider's credential store, never signs you out, and never sends a prompt.
+Both supported providers delegate sign-in to the provider's own tool. The reads are
+strictly one-way: the app never modifies a provider-owned credential store, never
+signs you out of a provider tool, and never sends a prompt.
 
 ## Features
 
@@ -235,9 +235,10 @@ Six destinations, reachable with `⌘,`:
 - **Codex** is read from your local Codex CLI's app-server. Choosing "Codex CLI
   sign-in" opens Terminal only when you ask it to. The app never reads `auth.json`,
   tokens, email, or raw provider output.
-- **Claude** is read from the OAuth token Claude Code already stored in your
-  Keychain (macOS prompts the first time), falling back to a local statusLine
-  snapshot and then a local cache. Background refreshes never prompt.
+- **Claude** first serves a statusLine snapshot captured within the last two
+  minutes, with no credential access. Otherwise it reads Claude Code's existing
+  Keychain credential under the refresh reason's prompt policy, then falls back
+  to the best local snapshot or cache. `/usage` is manual only.
 - **Notifications** require macOS notification permission, requested when you enable
   quota alerts.
 
@@ -259,18 +260,21 @@ readiness on 2026-07-31; its disclosures remain unchanged and match this list.
 
 ## How Claude usage is read, and the terms caveat
 
-Claude usage is read from the **OAuth credential Claude Code already stored in your
-Keychain**. macOS asks your permission the first time; background refreshes never
-prompt again. Nothing is uploaded. The quota path reads only usage percentages and
-reset times; the separate Token Monitor selectively decodes usage metadata from
-Claude Code's local records without retaining or transmitting record content.
+**Connect Claude** installs passive capture when it can do so without replacing a
+working third-party status line, then asks macOS to read Claude Code's existing
+Keychain credential. Choose **Always Allow** for unattended refresh. Automatic
+reads never prompt; they fall back to passive capture or cache. Agent Monitor
+never stores, changes, refreshes directly, exports, or deletes that credential.
 
-**Anthropic's Terms of Service do not permit a third-party application to reuse that
-credential.** This build does it anyway. That is disclosed here, in the app's **Data
-& Privacy** Settings page, and in the release notes rather than buried, so the choice
-to install is an informed one. Using it may put your Anthropic account at risk of
-enforcement; that risk is yours to weigh. Turning Claude off in **Settings → Agents**
-stops the read entirely.
+`claude setup-token` is not used. A direct Claude Code 2.1.247 run successfully
+created a one-year token, but that inference token lacks the `user:profile` scope
+required by the usage endpoint.
+
+Anthropic does not publish `/api/oauth/usage` as a third-party application contract.
+Its Terms also do not permit the compatibility method's reuse of Claude Code's
+credential. This path may therefore carry account-enforcement risk. Turning
+Claude off in **Settings → Agents** stops the reads and removes only Agent
+Monitor's local artifacts; it does not alter Claude Code's login.
 
 Replacing this with a **first-party OAuth client** — the app requesting its own
 authorization instead of borrowing Claude Code's — is the first work planned after
@@ -289,9 +293,8 @@ which is the authoritative queue. Nothing below is a delivery promise.
 
 ### Next
 
-- [ ] **First-party Claude OAuth client** — the app requests its own authorization
-      instead of reusing Claude Code's credential. This is what retires the terms
-      caveat above.
+- [ ] **Claude Keychain and passive-capture acceptance** — finish signed-app
+      relaunch, lock/sleep, prompt, disconnect, and UI evidence before release approval.
 - [ ] **Popover height** — the tallest Token Monitor state clips on smaller
       displays. Candidate fixes are recorded and none is chosen yet.
 - [ ] **Editable keyboard shortcuts** — the four popover commands are currently
@@ -351,10 +354,9 @@ explicit direction.
   published release even though Codex had been used locally. The discovery,
   permission, record-schema, and reconciliation paths have not yet been isolated,
   so no cause or workaround is claimed.
-- **Claude setup is not yet a dependable first-run flow.** The released setup can
-  require extra connection or recovery actions, and the exact failing boundary
-  between credential access, passive status-line capture, and explicit CLI recovery
-  has not yet been reproduced deterministically.
+- **Claude's replacement flow is not release-accepted.** This feature branch
+  still requires the user's signed-app capture, relaunch, locked-Mac, Keychain,
+  disconnect, and UI behavior matrix before release approval.
 - **First-launch connection consent is not explicit enough.** A future connection
   change will deliberately start both providers app-locally disconnected on a fresh
   installation and require separate Connect actions before quota collection. It
@@ -392,7 +394,9 @@ The weekly window is shared with Claude chat.
 Yes. Disconnect the other in **Settings → Agents**; the menu bar and popover adapt.
 
 **Does disconnecting sign me out of the CLI?**
-No. Disconnect is app-local only. Your credential is untouched.
+No. Disconnect removes Agent Monitor's enrollment, normalized usage data, and
+managed passive-capture artifacts, but it never deletes a provider-owned
+credential or signs a CLI out.
 
 **Is it open to contributions?**
 Issues are welcome. Agree on implementation scope before opening a pull request;
@@ -403,19 +407,16 @@ unsolicited implementation pull requests may not be merged. See
 
 - **`QuotaViewModel`** is the single state owner the UI observes.
 - **`QuotaMonitor`** owns the Codex read cycle; **`ClaudeUsageMonitor`** owns the
-  Claude read cycle (OAuth → statusLine → cache). Both run on the one shared
+  Claude read cycle (fresh statusLine → OAuth → best local reading). Both run on the one shared
   refresh schedule.
 - **`QuotaNotifier`** delivers threshold alerts and confirmations, gated on a single
   notification-permission state and deduplicated per provider.
-- **`ClaudeUsageBridge`** is a separate native executable, bundled and signed inside
-  the app, that turns a Claude Code statusLine payload into the snapshot the app
-  reads. `ClaudeUsageBridgeCore` holds its pure, dependency-free logic so it can be
-  tested directly. This works in 0.0.1, but it creates a second nested code object
-  that must be built, signed, verified, and notarized with the app.
-  [Product Follow-up 10](docs/product/follow-ups.md#10-consolidate-the-claude-usage-bridge-into-the-app-executable)
-  plans to give the main app executable a non-UI status-line bridge mode so the
-  bundle ships one executable binary while preserving the same stdin, privacy,
-  installation, and failure contracts.
+- **`CodexUsageMonitor`** checks for its non-UI Claude status-line bridge mode
+  before SwiftUI or AppKit starts. An app-managed, stable Application Support
+  symlink named `claude-usage-bridge` points to the signed main executable, so
+  Claude Code keeps the same stdin, privacy, installation, and failure contracts
+  while the bundle ships one executable. `ClaudeUsageBridgeCore` holds the pure,
+  dependency-free payload logic.
 - **`AppSettings`** persists preferences; **`LocalDataInventory`** is the single
   declaration of every file the app writes, and both the Data & Privacy page and the
   export action read from it.

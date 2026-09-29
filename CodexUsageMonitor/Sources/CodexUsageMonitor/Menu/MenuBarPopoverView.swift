@@ -27,7 +27,10 @@ struct MenuBarPopoverView: View {
 
     var body: some View {
         MenuPopoverChrome {
-            VStack(spacing: 0) {
+            MenuAdaptiveLayout(
+                selection: selectedProvider,
+                maximumHeight: MenuPopoverTheme.availablePopoverHeight
+            ) {
                 MenuProviderTabStrip(
                     providers: MenuPopoverProviderCatalog.availableProviders,
                     selection: $selectedProvider
@@ -38,10 +41,11 @@ struct MenuBarPopoverView: View {
                     presentation: headerPresentation
                 )
 
+            } content: {
                 providerContent
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.bottom, MenuPopoverTheme.providerContentFooterSpacing)
-
+            } footer: {
                 MenuActionFooter(
                     settings: viewModel.settings,
                     isRefreshing: isRefreshing,
@@ -92,7 +96,7 @@ struct MenuBarPopoverView: View {
             .claude(
                 usageState: viewModel.claudeState,
                 connectionState: viewModel.claudeConnectionState,
-                isRefreshing: viewModel.isRefreshingClaude
+                isRefreshing: viewModel.isRefreshingClaude || viewModel.isRunningClaudeCLIProbe
             )
         }
     }
@@ -102,7 +106,7 @@ struct MenuBarPopoverView: View {
         case .codex:
             viewModel.isRefreshing
         case .claudeCode:
-            viewModel.isRefreshingClaude
+            viewModel.isRefreshingClaude || viewModel.isRunningClaudeCLIProbe
         case .githubCopilot:
             false
         }

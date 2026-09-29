@@ -150,6 +150,24 @@ _Avoid_: Logged-out provider, deleted account, inactive agent
 The immediate app-local action that removes an agent's link, monitoring, and notifications without confirmation and without logging out or deleting its Provider Session.
 _Avoid_: Logout, sign out, revoke credentials
 
+## Claude Usage Sources
+
+**Passive Claude Usage Snapshot**:
+An event-driven `rate_limits` reading emitted through Claude Code's status line after a qualifying response. It contains no credential and is the first source used while it is fresh, but it is not an on-demand account read.
+_Avoid_: Anonymous OAuth, live polling, credential-free login
+
+**Claude Code Credential**:
+The OAuth credential owned and stored by Claude Code. Agent Monitor reads it only after the user explicitly selects **Connect Claude**; macOS may ask for Keychain permission during explicit Connect/Reconnect only. Ordinary Refresh and automatic collection always read silently; unavailable access leaves monitoring enrolled and falls back to passive or cached usage. Agent Monitor never copies, stores, refreshes, or deletes this credential.
+_Avoid_: App-owned credential, browser OAuth, copied credential, prompt-free credential
+
+**Claude Monitoring Enrollment**:
+The app-local consent to collect Claude usage, shown as **Monitoring enabled**. It survives unavailable OAuth access. **Live fallback unavailable** describes a silent OAuth failure independently of reading freshness and does not establish that permission was revoked.
+_Avoid_: Permission revoked, authorization required to view passive usage
+
+**Forced Claude Usage Read**:
+An explicit, user-initiated `claude -p /usage` execution used to recover a current usage reading. It is never scheduled because running it may consume Claude quota.
+_Avoid_: Automatic CLI fallback, background usage check, free refresh
+
 **Agent Status Block**:
 One read-only Context Rail summary for a Paired Agent, showing its identity and current active/connection state. Blocks remain alphabetical while they fit; when they overflow vertically, the Settings Agent is promoted to the top and the rest remain alphabetical. Agent switching belongs to the Agent Selector, not the block.
 _Avoid_: Agent card, connected-only block, provider preview
@@ -218,6 +236,7 @@ _Avoid_: Top model, model quota, model allowance
 
 **Short Model Name**:
 A compact model family and number such as GPT-5.6 or Sonnet 4.5; provider prefixes, product suffixes, and dated build identifiers are omitted.
+Unrecognized families retain their supplied identifier rather than becoming Unknown Model; abbreviation rules are presentation conveniences, not a model allowlist.
 _Avoid_: Raw model identifier, model alias, display label
 
 **Last Request**:
@@ -267,3 +286,13 @@ _Avoid_: Other warning, window warning
 **Coalesced Interruption Notice**:
 One notification that names every agent whose separate interruption episode became alert-eligible within the provisional five-second delivery-coalescing window. That window assumes agents refresh on a shared cadence and must be revisited if scheduling becomes provider-specific.
 _Avoid_: Shared interruption episode, generic outage alert, duplicate provider notices
+
+## Menu Presentation
+
+**Menu Panel**:
+The visible menu surface containing provider selection, usage content, and commands.
+_Avoid_: Two layers, outer background, dropdown window
+
+**Provider Viewport**:
+The region between the provider header and command footer through which provider content scrolls when it exceeds available space.
+_Avoid_: Content floor, blank provider region

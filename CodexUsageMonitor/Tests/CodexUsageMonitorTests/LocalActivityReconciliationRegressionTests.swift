@@ -3,6 +3,14 @@ import XCTest
 @testable import CodexUsageMonitor
 
 final class LocalActivityReconciliationRegressionTests: XCTestCase {
+    func testSuppliedUnrecognizedModelIsNotReportedAsMissing() {
+        XCTAssertEqual(LocalActivityModelName.shortName(for: "codex-auto-review"), "codex-auto-review")
+        XCTAssertEqual(LocalActivityModelName.shortName(for: "  future-family-7.1  "), "future-family-7.1")
+        XCTAssertEqual(LocalActivityModelName.shortName(for: "gpt-6-astra"), "GPT-6")
+        XCTAssertEqual(LocalActivityModelName.shortName(for: nil), "Unknown model")
+        XCTAssertEqual(LocalActivityModelName.shortName(for: " \n "), "Unknown model")
+    }
+
     func testExactCumulativeReplayDoesNotInflateObservedTokens() async throws {
         let root = URL(fileURLWithPath: "/private/tmp", isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)

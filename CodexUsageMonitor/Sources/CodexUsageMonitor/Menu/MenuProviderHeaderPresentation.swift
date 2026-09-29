@@ -45,7 +45,8 @@ struct MenuProviderHeaderPresentation {
     static func claude(
         usageState: ClaudeUsageState,
         connectionState: ClaudeConnectionState,
-        isRefreshing: Bool
+        isRefreshing: Bool,
+        now: Date = .now
     ) -> Self {
         let presentation = usageState.presentation
         let title = self.title(
@@ -64,10 +65,15 @@ struct MenuProviderHeaderPresentation {
 
         // The Claude source label rides in the content caption, not here — the
         // header freshness line is identical across providers.
+        let status: MenuPopoverStatus = switch presentation.delivery {
+        case .live: .confirmed
+        case .passiveSnapshot: presentation.isFreshPassive(at: now) ? .captured : .cached
+        case .cached: .cached
+        }
         return Self(
             title: title,
             subtitle: updatedText(for: presentation.snapshot.capturedAt),
-            status: presentation.delivery == .live ? .confirmed : .cached
+            status: status
         )
     }
 

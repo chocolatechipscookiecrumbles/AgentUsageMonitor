@@ -10,7 +10,47 @@
 
 **Resolution — 2026-07-24:** This diagnosis is complete. The instability is fixed and visually confirmed on both surfaces via stable intrinsic host geometry (menu: shared 288-point content floor; Settings: viewport-filling provider-content envelope). The separately tracked too-small tab hit area is fixed under [the hit-area plan](2026-07-24-provider-tab-hit-area.md). The argument-gated diagnostic scaffolding this plan introduced (`ProviderSwitchTrace`, `ProviderSwitchWindowProbe`, the `--provider-switch-diagnostic` launch gate, and every `record(…)` call site) has been **removed** now that the cause is established. See [provider-switch diagnostic results](../../development/provider-switch-diagnostic-results.md#resolution--2026-07-24). Only the global Settings destination-switch defect remains deferred.
 
+**Follow-up — 2026-09-27:** The earlier intrinsic-height menu treatment again produced a 97-point host resize between live Codex and Claude states. A first follow-up held 860 points across tabs; 20 settled signed-app pointer transitions kept the same 340 × 860-point frame. The user then rejected the blank Claude region and asked to match Claude’s orange warning font to Codex. The intrinsic-height revision still showed the jump, so the latest treatment holds a transparent 860-point screen-capped host while the visible shell fits provider content and scrolls only overflow. In the signed app, 20 pointer switches retained a 340 × 860-point host; the Claude shell ended at its natural height without an interior gap. Intermediate compositing and the short-screen cap remain unverified. The global Settings destination-switch defect remains deferred; see the [follow-up evidence](../../development/provider-switch-diagnostic-results.md#user-correction--2026-09-27).
+
+**Stop point — 2026-09-27:** A native content-view mask removed the painted host strip below the shorter Claude panel without resizing the host. The user confirmed switching is fine and asked to stop. The bottom rounded edge remains visible; see the [mask follow-up](../../development/provider-switch-diagnostic-results.md#native-host-mask-follow-up--2026-09-27).
+
 ## Global Constraints
+
+### Reopened overflow report — 2026-09-27
+
+The user supplied a cached Codex screenshot with the warning strip overlapping
+the provider tabs, quota content overlapping the provider header, and the
+connection recovery card overlapping footer commands. This reopens menu
+acceptance independently of the previously accepted provider switching.
+The recent `MenuBarPopoverView` change wraps vertically fixed provider content
+in a vertically fixed `ScrollView` with an outer maximum-height frame; that
+viewport boundary needs reproduction and measurement before selecting a fix.
+
+Live inspection was blocked: Computer Use returned `timeoutReached` (-10005)
+when accessing both the installed app and the current signed development app.
+Automation stopped without terminating any app or changing production code.
+The screenshot is failure evidence, but no agent-runnable reproduction or
+post-fix visual verification exists yet. Next: regain live menu inspection,
+establish whether opening, switching, or scrolling triggers the overlap, and
+measure the scroll viewport against its content and the fixed header/footer.
+
+The user subsequently clarified that overlap is immediately visible when it
+occurs, disappeared after relaunch, and seems associated with failed Codex
+refreshes/captures. A second screenshot shows the unavailable state fitting
+inside the visible shell while the larger outer window remains outlined below
+it. Treat these as separate acceptance failures: provider viewport overflow
+and exposed native host geometry. `CodexMenuContent` adds a warning strip and
+potential connection recovery card when cached data survives a failure; with
+no presentation it instead shows activity plus unavailable content. Reproduce
+both transitions, not merely provider switching. No causal fix is verified.
+
+Proposed direction for discussion: first isolate viewport sizing in the current
+host; separately prototype an explicitly owned AppKit popover with a persistent
+SwiftUI hosting controller, one content-size owner, and a capped provider scroll
+viewport. This is a proposal, not an accepted migration or evidence that AppKit
+resizing eliminates the compositor defect. Compare failure/recovery transitions
+and repeated provider switches before replacing the current presentation.
+
 
 - Work on `feature/multiprovider-menubar-popover` in its existing linked worktree; do not push before explicit approval.
 - Build the signed app with `CodexUsageMonitor/Scripts/build-app.sh` for every visual or interaction claim.
@@ -701,3 +741,15 @@ Do not push until the user explicitly approves the resulting commits.
 - VoiceOver and keyboard behavior pass in Light and Dark.
 - All temporary diagnostic code and logs are removed.
 - Full source and signed-app verification are recorded without inferred coverage.
+
+
+## Adaptive presentation comparison — 2026-09-28
+
+The failure-state overflow now has a red/green native layout regression and a
+bounded-viewport correction. Custom-panel and native-popover comparison builds
+reuse the actual provider renderers; production host selection remains pending.
+See [the active implementation plan](2026-09-27-adaptive-menu-presentation.md)
+for agreed behavior, review fixes, build/test evidence, and incomplete signed-app
+acceptance. Earlier settled switching screenshots do not close this boundary.
+
+**Outcome — 2026-09-28:** Both comparison hosts were rejected because they recreated the switch artifact by resizing the native window after measuring. Production keeps the stable host with the bounded viewport; see [Trial rejection and diagnosis](../../development/provider-switch-diagnostic-results.md#trial-rejection-and-diagnosis--2026-09-28).

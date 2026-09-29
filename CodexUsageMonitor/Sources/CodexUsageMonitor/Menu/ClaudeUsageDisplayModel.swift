@@ -12,11 +12,9 @@ struct ClaudeUsageDisplayModel {
         let resetsAt: Date?
     }
 
-    /// Anthropic exposes no remaining-credit figure — only spend, and an
-    /// optional cap. The label must therefore say "used"; Codex's "Credits"
-    /// label would imply a balance that does not exist.
-    static let creditsUsedLabel = "Credits used"
-    static let creditsUsedDescription = "Amount billed beyond your plan."
+    /// Spending and its optional cap are separate from a prepaid balance.
+    static let creditsUsedLabel = "Usage-credit spending"
+    static let creditsUsedDescription = "Reported spending beyond your plan."
 
     /// Claude's five-hour window is not a fixed clock like Codex's: it starts
     /// at your first message and runs five hours from there, so the reset time
@@ -38,7 +36,7 @@ struct ClaudeUsageDisplayModel {
 
     /// Gate criterion #3: the weekly figure is not Claude Code only, so the
     /// UI must say what it covers rather than letting the user assume.
-    static let weeklyScopeCaveat = "Weekly usage is shared with Claude chat, not Claude Code alone."
+    static let weeklyScopeCaveat = "Weekly usage is shared with Claude chat."
 
     let planText: String?
     let fiveHour: Window?
@@ -49,6 +47,8 @@ struct ClaudeUsageDisplayModel {
     /// Pay-as-you-go overage, already phrased as spend. `nil` when the
     /// endpoint omits it.
     let creditsUsedText: String?
+    let monthlySpendingLimitText: String?
+    let financialUpdatedText: String?
     /// Non-nil whenever the data is not a live read, so the UI can never
     /// present a cached or passive result as current.
     let stalenessNotice: String?
@@ -62,30 +62,33 @@ struct ClaudeUsageDisplayModel {
         capturedAtText = RelativeTimeText.text(from: snapshot.capturedAt, to: now)
         isLive = presentation.delivery == .live
         creditsUsedText = Self.creditsUsed(snapshot.extraUsage)
+        monthlySpendingLimitText = snapshot.extraUsage.map {
+            Self.currency($0.monthlyLimit, code: $0.currencyCode)
+        }
+        financialUpdatedText = snapshot.extraUsage.map { _ in
+            (snapshot.extraUsageObservedAt ?? snapshot.capturedAt).formatted(date: .abbreviated, time: .shortened)
+        }
         // Prefer the collector's specific cause over the generic sentence. A
         // refresh that produced no live reading should say *why* — rate limited,
         // Keychain denied, credential rejected — so the user knows whether to
         // wait or to act, instead of pressing a button that appears inert.
-        stalenessNotice = presentation.delivery == .live
-            ? nil
-            : presentation.warnings.first
-                ?? "Live usage is temporarily unavailable; showing the last result."
+        stalenessNotice = presentation.warnings.first
+            ?? (presentation.delivery == .cached ? "Showing the last saved reading." : nil)
     }
 
-    /// Spend, optionally against its cap. Never phrased as remaining.
+    /// Never invent an amount or currency when either field is absent.
     private static func creditsUsed(_ raw: ClaudeExtraUsage?) -> String? {
         guard let raw else { return nil }
         guard raw.isEnabled else { return "Off" }
-        let code = raw.currencyCode ?? "USD"
-        let spent = currency(raw.usedCredits ?? 0, code: code)
-        guard let limit = raw.monthlyLimit.map({ currency($0, code: code) }) else { return spent }
-        return "\(spent) of \(limit)"
+        return currency(raw.usedCredits, code: raw.currencyCode)
     }
 
     /// `formatted(.currency:)` rather than a NumberFormatter: same output,
     /// without allocating a formatter on every render pass.
-    private static func currency(_ value: Double, code: String) -> String {
-        value.formatted(.currency(code: code))
+    private static func currency(_ value: Double?, code: String?) -> String {
+        guard let value, value.isFinite, value >= 0,
+              let code, Locale.commonISOCurrencyCodes.contains(code) else { return "Unavailable" }
+        return value.formatted(.currency(code: code))
     }
 
     private static func window(_ limit: ClaudeLimitWindow?, now: Date) -> Window? {

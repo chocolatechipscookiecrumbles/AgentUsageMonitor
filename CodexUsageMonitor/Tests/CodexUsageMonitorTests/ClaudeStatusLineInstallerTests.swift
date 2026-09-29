@@ -31,45 +31,6 @@ final class ClaudeStatusLineInstallerTests: XCTestCase {
         XCTAssertEqual(statusLine["command"] as? String, "'\(bridgeExecutable.path)' --quiet")
     }
 
-    func testPrepareBridgeCopiesBundledBinaryToDeterministicApplicationSupportPath() throws {
-        let bundledBridge = tempDirectory.appendingPathComponent("BundledClaudeUsageBridge")
-        try FileManager.default.createDirectory(at: bundledBridge, withIntermediateDirectories: true)
-        let bundledBinary = bundledBridge.appendingPathComponent("claude-usage-bridge")
-        try Data("binary-v1".utf8).write(to: bundledBinary)
-        let applicationSupport = tempDirectory.appendingPathComponent("Application Support")
-
-        let resolved = try ClaudeStatusLineInstaller.prepareBridgeDirectory(
-            bundledBridgeDirectory: bundledBridge,
-            applicationSupportDirectory: applicationSupport
-        )
-
-        let expected = applicationSupport
-            .appendingPathComponent("CodexUsageMonitor/ClaudeBridge")
-        XCTAssertEqual(resolved, expected)
-        let copiedBinary = expected.appendingPathComponent("claude-usage-bridge")
-        XCTAssertEqual(try Data(contentsOf: copiedBinary), Data("binary-v1".utf8))
-        // The copied helper must be executable.
-        let perms = try FileManager.default.attributesOfItem(atPath: copiedBinary.path)[.posixPermissions] as? Int
-        XCTAssertEqual(perms, 0o755)
-
-        // A second prepare replaces the directory in place (app update path).
-        try Data("binary-v2".utf8).write(to: bundledBinary)
-        XCTAssertEqual(
-            try ClaudeStatusLineInstaller.prepareBridgeDirectory(
-                bundledBridgeDirectory: bundledBridge,
-                applicationSupportDirectory: applicationSupport
-            ),
-            expected
-        )
-        XCTAssertEqual(try Data(contentsOf: copiedBinary), Data("binary-v2".utf8))
-        XCTAssertFalse(
-            try FileManager.default.contentsOfDirectory(
-                at: expected.deletingLastPathComponent(),
-                includingPropertiesForKeys: nil
-            ).contains { $0.lastPathComponent.hasPrefix(".ClaudeBridge-") }
-        )
-    }
-
     /// Regression test: an earlier version left the bridge path unquoted, so a
     /// directory literally named "agent usage" (a space in the path) split into
     /// two shell words and the command failed with "No such file or directory".

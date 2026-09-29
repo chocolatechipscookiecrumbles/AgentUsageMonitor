@@ -1,4 +1,6 @@
+import Darwin
 import Foundation
+import Security
 
 enum ClaudeStatusLineInstallResult: Equatable {
     case installed
@@ -77,8 +79,8 @@ struct ClaudePassiveCaptureHealth: Equatable {
 
     var repairActionTitle: String? {
         switch state {
-        case .repairable: return "Repair"
-        case .notConfigured: return "Set Up"
+        case .repairable: return "Repair Passive Capture"
+        case .notConfigured: return "Set Up Passive Capture"
         case .installed, .foreign, .settingsUnreadable: return nil
         }
     }
@@ -89,102 +91,112 @@ struct ClaudePassiveCaptureHealth: Equatable {
 /// statusLine or a file that fails to parse as JSON.
 struct ClaudeStatusLineInstaller {
     static let bridgeExecutableName = "claude-usage-bridge"
+    private static let managedDefaultsKey = "claude.passive-capture-managed.v1"
 
     private let settingsURL: URL
+    private let sourceExecutable: URL?
+    private let applicationSupportDirectory: URL?
+    private let bridgeExecutable: URL
     private let bridgeCommand: String
+    private let managedDefaults: UserDefaults?
+    private let needsBridgeLinkPreparation: Bool
 
-    /// Production path: copy the signed bundle's read-only bridge executable to
-    /// app-owned Application Support before pointing Claude Code at it.
+    /// Production path: create an app-owned symlink to this app's signed Mach-O
+    /// under the stable bridge basename. The executable remains in its signed
+    /// bundle (copying it out invalidates its Info.plist-bound signature), while
+    /// basename dispatch still enters bridge mode before SwiftUI/AppKit startup.
     ///
-    /// Copying (rather than pointing into the .app) does two things: it strips
-    /// the quarantine flag so Claude Code can exec the helper without a Gatekeeper
-    /// block, and it keeps the statusLine command stable across app-bundle
-    /// replacement.
-    init?(
+    /// The stable link preserves the already-validated bundle signature and
+    /// lets app launch repair the command target when the app bundle moves.
+    init(
         settingsURL: URL = URL(fileURLWithPath: NSHomeDirectory())
             .appendingPathComponent(".claude/settings.json"),
-        bundledBridgeDirectory: URL? = Bundle.main.resourceURL?
-            .appendingPathComponent("ClaudeUsageBridge"),
+        sourceExecutable: URL? = Bundle.main.executableURL,
         applicationSupportDirectory: URL? = FileManager.default.urls(
             for: .applicationSupportDirectory,
             in: .userDomainMask
-        ).first,
-        fileManager: FileManager = .default
+        ).first
     ) {
-        guard let bundledBridgeDirectory,
-              let applicationSupportDirectory,
-              fileManager.fileExists(
-                  atPath: bundledBridgeDirectory
-                      .appendingPathComponent(Self.bridgeExecutableName)
-                      .path
-              ),
-              let bridgeDirectory = try? Self.prepareBridgeDirectory(
-                  bundledBridgeDirectory: bundledBridgeDirectory,
-                  applicationSupportDirectory: applicationSupportDirectory,
-                  fileManager: fileManager
-              )
-        else { return nil }
-        self.init(
-            settingsURL: settingsURL,
-            bridgeExecutable: bridgeDirectory.appendingPathComponent(Self.bridgeExecutableName)
-        )
+        let applicationSupportDirectory = applicationSupportDirectory
+            ?? URL(fileURLWithPath: NSHomeDirectory())
+                .appendingPathComponent("Library/Application Support", isDirectory: true)
+        self.settingsURL = settingsURL
+        self.sourceExecutable = sourceExecutable
+        self.applicationSupportDirectory = applicationSupportDirectory
+        self.bridgeExecutable = Self.bridgeExecutable(in: applicationSupportDirectory)
+        self.bridgeCommand = "\(Self.shellQuoted(self.bridgeExecutable.path)) --quiet"
+        self.managedDefaults = .standard
+        self.needsBridgeLinkPreparation = true
     }
 
     init(settingsURL: URL, bridgeExecutable: URL) {
         self.settingsURL = settingsURL
+        self.sourceExecutable = nil
+        self.applicationSupportDirectory = nil
+        self.bridgeExecutable = bridgeExecutable
         self.bridgeCommand = "\(Self.shellQuoted(bridgeExecutable.path)) --quiet"
+        self.managedDefaults = nil
+        self.needsBridgeLinkPreparation = false
     }
 
-    static func prepareBridgeDirectory(
-        bundledBridgeDirectory: URL,
+    private static func bridgeExecutable(in applicationSupportDirectory: URL) -> URL {
+        applicationSupportDirectory
+            .appendingPathComponent("CodexUsageMonitor", isDirectory: true)
+            .appendingPathComponent("ClaudeBridge", isDirectory: true)
+            .appendingPathComponent(bridgeExecutableName)
+    }
+
+    static func prepareBridgeLink(
+        sourceExecutable: URL,
         applicationSupportDirectory: URL,
         fileManager: FileManager = .default
     ) throws -> URL {
         let parentDirectory = applicationSupportDirectory
             .appendingPathComponent("CodexUsageMonitor", isDirectory: true)
-        let destination = parentDirectory
+        let destinationDirectory = parentDirectory
             .appendingPathComponent("ClaudeBridge", isDirectory: true)
-        let staging = parentDirectory
-            .appendingPathComponent(".ClaudeBridge-\(UUID().uuidString)", isDirectory: true)
+        let destination = destinationDirectory.appendingPathComponent(bridgeExecutableName)
+        let staging = destinationDirectory
+            .appendingPathComponent(".claude-usage-bridge-\(UUID().uuidString)")
 
         try fileManager.createDirectory(
-            at: parentDirectory,
+            at: destinationDirectory,
             withIntermediateDirectories: true
         )
         try fileManager.setAttributes(
             [.posixPermissions: 0o700],
             ofItemAtPath: parentDirectory.path
         )
-        try fileManager.copyItem(at: bundledBridgeDirectory, to: staging)
+        try fileManager.setAttributes(
+            [.posixPermissions: 0o700],
+            ofItemAtPath: destinationDirectory.path
+        )
+        guard hasValidCodeSignature(sourceExecutable) else {
+            throw ClaudeStatusLinePreparationError.invalidCodeSignature
+        }
+        try fileManager.createSymbolicLink(at: staging, withDestinationURL: sourceExecutable)
         defer { try? fileManager.removeItem(at: staging) }
 
-        if fileManager.fileExists(atPath: destination.path) {
-            _ = try fileManager.replaceItemAt(
-                destination,
-                withItemAt: staging,
-                backupItemName: nil
-            )
-        } else {
-            try fileManager.moveItem(at: staging, to: destination)
+        // Validate through the link too, proving the exact command target
+        // resolves to the signed bundle executable.
+        guard hasValidCodeSignature(staging) else {
+            throw ClaudeStatusLinePreparationError.invalidCodeSignature
         }
 
-        // The copied helper must be executable and free of the quarantine flag
-        // so Claude Code can exec it directly. Both are best-effort: a missing
-        // quarantine attribute is the normal case and not an error.
-        let executable = destination.appendingPathComponent(bridgeExecutableName)
-        try? fileManager.setAttributes(
-            [.posixPermissions: 0o755],
-            ofItemAtPath: executable.path
-        )
-        removeQuarantine(executable)
+        // POSIX rename atomically replaces the previous file or symlink without
+        // following it. This also migrates the released copied helper in place.
+        guard rename(staging.path, destination.path) == 0 else {
+            throw ClaudeStatusLinePreparationError.renameFailed(errno)
+        }
         return destination
     }
 
-    /// Best-effort removal of `com.apple.quarantine` from a copied executable.
-    private static func removeQuarantine(_ url: URL) {
-        _ = url.withUnsafeFileSystemRepresentation { path in
-            path.map { removexattr($0, "com.apple.quarantine", 0) }
-        }
+    private static func hasValidCodeSignature(_ url: URL) -> Bool {
+        var code: SecStaticCode?
+        guard SecStaticCodeCreateWithPath(url as CFURL, [], &code) == errSecSuccess,
+              let code else { return false }
+        return SecStaticCodeCheckValidity(code, SecCSFlags(rawValue: kSecCSStrictValidate), nil)
+            == errSecSuccess
     }
 
     /// Single-quotes a path for safe use inside the shell command Claude
@@ -195,28 +207,72 @@ struct ClaudeStatusLineInstaller {
         "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
     }
 
-    /// Markers identifying a status-line command **this project** installed at
-    /// some point. The superseded Python bridge is the reason this exists: on
-    /// the reporting machine the configured command was this project's own
-    /// earlier helper pointing at a directory that had since been deleted, and
-    /// treating it as the user's custom status line meant the capture stayed
-    /// dead and unrepairable forever.
-    private static let projectBridgeMarkers = ["claude-usage-bridge", "claude_usage_bridge"]
+    private func prepareBridgeLinkIfNeeded(fileManager: FileManager = .default) -> Bool {
+        guard needsBridgeLinkPreparation else { return true }
+        guard let sourceExecutable, let applicationSupportDirectory else { return false }
+        do {
+            _ = try Self.prepareBridgeLink(
+                sourceExecutable: sourceExecutable,
+                applicationSupportDirectory: applicationSupportDirectory,
+                fileManager: fileManager
+            )
+            return true
+        } catch {
+            return false
+        }
+    }
 
-    /// Classifies the existing status line without changing anything.
-    func inspect(fileManager: FileManager = .default) -> ClaudeStatusLineState {
-        guard fileManager.fileExists(atPath: settingsURL.path) else { return .notConfigured }
+    /// Repairs the stable link after an app move or update, but only when a
+    /// prior explicit installation recorded durable management consent.
+    func repairManagedLinkIfNeeded(fileManager: FileManager = .default) {
+        guard managedDefaults?.bool(forKey: Self.managedDefaultsKey) == true else { return }
+        _ = prepareBridgeLinkIfNeeded(fileManager: fileManager)
+    }
+
+    /// The released Python bridge command this project previously installed.
+    /// Only this exact form is project-owned; a working command that merely
+    /// mentions its module or basename remains the user's status line.
+    private static func isSupersededProjectBridge(_ command: String) -> Bool {
+        guard let path = firstReferencedPath(in: command),
+              URL(fileURLWithPath: path).lastPathComponent == "ClaudeUsageBridge"
+        else { return false }
+        return command == "cd '\(path)' && python3 -m claude_usage_bridge --quiet"
+    }
+
+    private enum LoadedSettings {
+        case missing
+        case unreadable
+        case loaded(root: [String: Any], statusLineCommand: String?)
+    }
+
+    private func loadSettings(fileManager: FileManager) -> LoadedSettings {
+        guard fileManager.fileExists(atPath: settingsURL.path) else { return .missing }
         guard let data = try? Data(contentsOf: settingsURL),
               let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        else { return .settingsUnreadable }
+        else { return .unreadable }
 
-        guard let statusLine = root["statusLine"] as? [String: Any],
-              let command = statusLine["command"] as? String
-        else { return .notConfigured }
+        let command = (root["statusLine"] as? [String: Any])?["command"] as? String
+        return .loaded(root: root, statusLineCommand: command)
+    }
+
+    private func classify(
+        _ loadedSettings: LoadedSettings,
+        fileManager: FileManager
+    ) -> ClaudeStatusLineState {
+        let command: String
+        switch loadedSettings {
+        case .missing:
+            return .notConfigured
+        case .unreadable:
+            return .settingsUnreadable
+        case .loaded(_, let statusLineCommand):
+            guard let statusLineCommand else { return .notConfigured }
+            command = statusLineCommand
+        }
 
         if command == bridgeCommand { return .installed }
 
-        if Self.projectBridgeMarkers.contains(where: command.contains) {
+        if Self.isSupersededProjectBridge(command) {
             return .repairable(existing: command, reason: .supersededProjectBridge)
         }
         if let path = Self.firstReferencedPath(in: command),
@@ -224,6 +280,11 @@ struct ClaudeStatusLineInstaller {
             return .repairable(existing: command, reason: .brokenPath)
         }
         return .foreign(existing: command)
+    }
+
+    /// Classifies the existing status line without changing anything.
+    func inspect(fileManager: FileManager = .default) -> ClaudeStatusLineState {
+        classify(loadSettings(fileManager: fileManager), fileManager: fileManager)
     }
 
     /// The first absolute path the command names — the `cd` target or the
@@ -246,16 +307,25 @@ struct ClaudeStatusLineInstaller {
     /// repairable command is reported, never overwritten — the user has to be
     /// shown what changes before their Claude Code configuration is edited.
     func install(replacingExisting: Bool = false) -> ClaudeStatusLineInstallResult {
-        var root: [String: Any] = [:]
-        if FileManager.default.fileExists(atPath: settingsURL.path) {
-            guard let data = try? Data(contentsOf: settingsURL),
-                  let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-            else { return .unableToUpdateSettings }
-            root = parsed
+        let fileManager = FileManager.default
+        let loadedSettings = loadSettings(fileManager: fileManager)
+        let state = classify(loadedSettings, fileManager: fileManager)
+        var root: [String: Any]
+        switch loadedSettings {
+        case .missing:
+            root = [:]
+        case .unreadable:
+            return .unableToUpdateSettings
+        case .loaded(let loadedRoot, _):
+            root = loadedRoot
         }
 
-        switch inspect() {
+        switch state {
         case .installed:
+            guard prepareBridgeLinkIfNeeded(fileManager: fileManager) else {
+                return .unableToUpdateSettings
+            }
+            managedDefaults?.set(true, forKey: Self.managedDefaultsKey)
             return .alreadyInstalled
         case .settingsUnreadable:
             return .unableToUpdateSettings
@@ -269,13 +339,17 @@ struct ClaudeStatusLineInstaller {
             break
         }
 
+        guard prepareBridgeLinkIfNeeded(fileManager: fileManager) else {
+            return .unableToUpdateSettings
+        }
+
         root["statusLine"] = ["type": "command", "command": bridgeCommand]
 
         guard let data = try? JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys]) else {
             return .unableToUpdateSettings
         }
         do {
-            try FileManager.default.createDirectory(
+            try fileManager.createDirectory(
                 at: settingsURL.deletingLastPathComponent(),
                 withIntermediateDirectories: true
             )
@@ -283,6 +357,45 @@ struct ClaudeStatusLineInstaller {
         } catch {
             return .unableToUpdateSettings
         }
+        managedDefaults?.set(true, forKey: Self.managedDefaultsKey)
         return .installed
     }
+
+    /// Removes only the exact statusLine entry installed by this app, then its
+    /// stable symlink and passive snapshot. A changed, unreadable, or foreign
+    /// settings file is preserved, but never prevents removal of app-owned files.
+    func uninstallManagedCapture(fileManager: FileManager = .default) {
+        defer { managedDefaults?.removeObject(forKey: Self.managedDefaultsKey) }
+
+        let loadedSettings = loadSettings(fileManager: fileManager)
+        switch loadedSettings {
+        case .loaded(var root, _) where classify(loadedSettings, fileManager: fileManager) == .installed:
+            root.removeValue(forKey: "statusLine")
+            if let updated = try? JSONSerialization.data(
+                withJSONObject: root,
+                options: [.prettyPrinted, .sortedKeys]
+            ) {
+                try? updated.write(to: settingsURL, options: .atomic)
+            }
+        case .missing, .unreadable, .loaded:
+            // The command might still reference this path, but is not the
+            // exact managed value. Preserve it until the user repairs it.
+            break
+        }
+
+        try? fileManager.removeItem(at: bridgeExecutable)
+        try? fileManager.removeItem(at: snapshotURL)
+    }
+
+    private var snapshotURL: URL {
+        bridgeExecutable
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("claude-rate-limits.json")
+    }
+}
+
+enum ClaudeStatusLinePreparationError: Error {
+    case invalidCodeSignature
+    case renameFailed(Int32)
 }

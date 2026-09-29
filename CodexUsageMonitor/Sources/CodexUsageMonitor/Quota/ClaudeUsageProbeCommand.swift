@@ -6,11 +6,11 @@ import Foundation
 /// print JSON, exit. This is a verification tool, not a shipped feature — it
 /// lets us confirm each layer resolves as expected on a real account.
 ///
-/// Layer order (claude_probe_plan four-tier hierarchy):
-///   1. OAuth live fetch          (ClaudeOAuthUsageSource)
-///   2. CLI /usage probe          — manual-only, outside the automatic collector
-///   3. statusLine passive snapshot (ClaudeRateLimitSnapshotReader)
-///   4. cached last-known-good    (ClaudeUsageCache)
+/// Accepted source order:
+///   1. Fresh status-line passive snapshot
+///   2. OAuth through Claude Code's credential
+///   3. CLI /usage — manual-only, outside the automatic collector
+///   4. Cached last-known-good
 enum ClaudeUsageProbeCommand {
     static let flag = "--claude-live-read-once"
 
@@ -33,70 +33,53 @@ enum ClaudeUsageProbeCommand {
             let warnings: [String]
         }
         let ranAt: Date
-        /// Which tier-1 credential method served, if any — never the token.
+        /// Which OAuth credential method served, if any — never the token.
         let tier1Method: String?
-        /// Why this probe can succeed at the same moment the app degrades.
-        /// The probe is a separate process, so it starts with no rate-limit
-        /// back-off state and its user-initiated read goes straight to the
-        /// Keychain. A disagreement between the two is expected here and is
-        /// stated rather than left for the reader to infer.
+        /// States the interaction policy used by the single collector call.
         let processNote: String
         let layers: [Layer]
         let coordinatorResult: Coordinator
     }
 
     static func run() async {
-        // Claude Code credentials is the working default (browser sign-in is
-        // shelved pending a decisive re-test). The recorder reports which
-        // method actually served, so a degrade is never invisible.
-        let recorder = ClaudeEffectiveMethodRecorder()
-        let credentialStore = ClaudeCompositeCredentialStore(
-            selectedMethod: .claudeCodeCredentials, recorder: recorder
-        )
+        let credentialStore = ClaudeKeychainCredentialStore()
         let oauthSource = ClaudeOAuthUsageSource(credentialStore: credentialStore)
         let statusLineReader = ClaudeRateLimitSnapshotReader()
         let cache = ClaudeUsageCache()
+        let passiveSnapshot = statusLineReader.readSnapshot()
+
+        // Exercise the production hierarchy exactly once. Diagnostics are
+        // noninteractive, matching scheduled and menu-owned refreshes.
+        let collector = ClaudeUsageCollector(oauthSource: oauthSource, statusLineReader: statusLineReader, cache: cache)
+        let presentation = await collector.refresh(reason: .menuOpened)
+        let snapshot = presentation.snapshot
+        let acceptedOAuth = presentation.delivery == .live && snapshot.source == .oauth
+        let tier1Method = acceptedOAuth ? "claudeCodeCredentials" : nil
 
         var layers: [Report.Layer] = []
-        var tier1Method: String?
-
-        // Tier 1: OAuth live fetch. A user-initiated probe may raise a Keychain
-        // prompt if it degrades to the Claude Code credentials method — that is
-        // acceptable here (the user ran this command).
-        do {
-            // The user ran this command, so an interactive Keychain read is
-            // permitted here — unlike any automatic refresh.
-            let snapshot = try await oauthSource.fetch(
-                promptPolicy: ClaudeRefreshReason.userInitiated.keychainPromptPolicy
-            )
-            tier1Method = recorder.effectiveMethod?.rawValue
-            let five = snapshot.fiveHour.map { String(format: "%.1f%%", $0.usedPercent) } ?? "—"
-            let seven = snapshot.sevenDay.map { String(format: "%.1f%%", $0.usedPercent) } ?? "—"
-            let via = recorder.effectiveMethod.map { " · via \($0.displayName)" } ?? ""
-            layers.append(.init(tier: 1, name: "OAuth live fetch", available: true,
-                                detail: "5h \(five) · 7d \(seven) · plan \(snapshot.planHint ?? "unknown")\(via)"))
-        } catch {
-            layers.append(.init(tier: 1, name: "OAuth live fetch", available: false,
-                                detail: "unavailable: \(error)"))
-        }
-
-        // Tier 2: built, but deliberately outside the automatic order —
-        // /usage consumes tokens, so it only runs when the user asks.
-        layers.append(.init(tier: 2, name: "CLI /usage probe", available: false,
-                            detail: "manual only — costs tokens, so never part of an automatic refresh"))
-
-        // Tier 3: statusLine passive snapshot (written by the bundled native bridge).
-        if let snap = statusLineReader.readSnapshot() {
+        if let snap = passiveSnapshot,
+           Date.now.timeIntervalSince(snap.capturedAt) <= ClaudeUsageCollector.passiveFastPathFreshness {
             let five = snap.fiveHour.map { String(format: "%.1f%%", $0.usedPercentage) } ?? "—"
             let seven = snap.sevenDay.map { String(format: "%.1f%%", $0.usedPercentage) } ?? "—"
-            layers.append(.init(tier: 3, name: "statusLine passive snapshot", available: true,
+            layers.append(.init(tier: 1, name: "Fresh passive status line", available: true,
                                 detail: "5h \(five) · 7d \(seven) · captured \(snap.capturedAt)"))
         } else {
-            layers.append(.init(tier: 3, name: "statusLine passive snapshot", available: false,
-                                detail: "no snapshot at claude-rate-limits.json (bridge not installed or never fired)"))
+            layers.append(.init(tier: 1, name: "Fresh passive status line", available: false,
+                                detail: "no status-line snapshot fresh enough for the fast path"))
         }
 
-        // Tier 4: cached last-known-good.
+        layers.append(.init(
+            tier: 2,
+            name: "OAuth via Claude Code credential",
+            available: acceptedOAuth,
+            detail: acceptedOAuth ? "accepted by the collector" : "not accepted by this collector run"
+        ))
+
+        // Manual /usage consumes tokens and is intentionally never invoked by
+        // this automatic-hierarchy diagnostic.
+        layers.append(.init(tier: 3, name: "Manual-only /usage", available: false,
+                            detail: "not run — costs tokens and requires a separate explicit action"))
+
         if let cached = cache.load() {
             layers.append(.init(tier: 4, name: "cached last-known-good", available: true,
                                 detail: "source \(cached.snapshot.source.rawValue) · saved \(cached.savedAt)"))
@@ -105,9 +88,6 @@ enum ClaudeUsageProbeCommand {
                                 detail: "no cache file yet"))
         }
 
-        // Now run the real coordinator and report which layer it settles on.
-        let collector = ClaudeUsageCollector(oauthSource: oauthSource, statusLineReader: statusLineReader, cache: cache)
-        let presentation = await collector.refresh(reason: .userInitiated)
         let s = presentation.snapshot
         let coordinator = Report.Coordinator(
             delivery: String(describing: presentation.delivery),
@@ -122,8 +102,7 @@ enum ClaudeUsageProbeCommand {
         let report = Report(
             ranAt: .now,
             tier1Method: tier1Method,
-            processNote: "Separate process: no rate-limit back-off state is carried over from the app, "
-                + "and this read is user-initiated, so it may reach the Keychain when an app refresh would not.",
+            processNote: "The production collector ran once with Keychain interaction forbidden; no preliminary credential read was made.",
             layers: layers,
             coordinatorResult: coordinator
         )

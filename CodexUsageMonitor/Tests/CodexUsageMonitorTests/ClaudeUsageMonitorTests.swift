@@ -125,6 +125,22 @@ final class ClaudeUsageMonitorTests: XCTestCase {
         XCTAssertEqual(reason, "No Claude usage source is currently available.")
     }
 
+    func testFinancialOnlyFallbackRemainsAvailableWithoutInventingQuota() async {
+        let captured = ClaudeUsagePresentation(
+            snapshot: ClaudeUsageSnapshot(
+                planHint: nil, fiveHour: nil, sevenDay: nil, scopedWindows: [],
+                extraUsage: ClaudeExtraUsage(isEnabled: true, monthlyLimit: nil, usedCredits: 12, currencyCode: "USD"),
+                source: .oauth, capturedAt: Date(timeIntervalSince1970: 1_700_000_000), schemaVersion: 1
+            ), delivery: .cached, warnings: ["Live fallback unavailable."]
+        )
+        let monitor = ClaudeUsageMonitor(collector: FakeCollector(captured))
+        await monitor.refreshNow(reason: .scheduled)
+        let published = monitor.state.presentation
+        XCTAssertEqual(published?.snapshot.extraUsage?.usedCredits, 12)
+        XCTAssertEqual(published?.delivery, .cached)
+        XCTAssertEqual(published?.snapshot.hasQuotaWindows, false)
+    }
+
     func testUserInitiatedRefreshPassesUserInitiatedReason() async {
         let collector = FakeCollector(presentation(delivery: .live))
         let monitor = ClaudeUsageMonitor(collector: collector)
@@ -218,13 +234,66 @@ final class ClaudeUsageMonitorTests: XCTestCase {
         }
     }
 
+    func testManualReadingSurvivesOlderInFlightFallback() async {
+        let collector = BlockingCollector(presentation(delivery: .cached, fiveHour: 10))
+        let monitor = ClaudeUsageMonitor(collector: collector)
+        let pending = Task { await monitor.refreshNow(reason: .scheduled) }
+        for _ in 0..<500 {
+            if !(await collector.seenReasons()).isEmpty { break }
+            await Task.yield()
+        }
+        monitor.applyManualSnapshot(presentation(delivery: .live, source: .cli, fiveHour: 25).snapshot)
+        await collector.release()
+        await pending.value
+        XCTAssertEqual(monitor.state.presentation?.snapshot.source, .cli)
+        XCTAssertEqual(monitor.state.presentation?.snapshot.fiveHour?.usedPercent, 25)
+        XCTAssertFalse(monitor.isRefreshing)
+    }
+
+    func testManualReadingRetainsExistingFinancialObservation() {
+        let collector = FakeCollector(presentation(delivery: .cached, source: .oauth, fiveHour: 10))
+        let monitor = ClaudeUsageMonitor(collector: collector)
+        var existing = presentation(delivery: .live, source: .oauth, fiveHour: 10).snapshot
+        existing.extraUsage = ClaudeExtraUsage(
+            isEnabled: false, monthlyLimit: nil, usedCredits: nil, currencyCode: nil
+        )
+        existing.extraUsageObservedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        monitor.reconnect(with: existing)
+
+        monitor.applyManualSnapshot(presentation(delivery: .live, source: .cli, fiveHour: 25).snapshot)
+
+        XCTAssertEqual(monitor.state.presentation?.snapshot.extraUsage, existing.extraUsage)
+        XCTAssertEqual(
+            monitor.state.presentation?.snapshot.extraUsageObservedAt,
+            existing.extraUsageObservedAt
+        )
+    }
+
+    func testReconnectQuotaRetainsExistingFinancialObservation() {
+        let monitor = ClaudeUsageMonitor(collector: FakeCollector(presentation(delivery: .cached)))
+        var existing = presentation(delivery: .live, source: .oauth, fiveHour: 10).snapshot
+        existing.extraUsage = ClaudeExtraUsage(
+            isEnabled: false, monthlyLimit: nil, usedCredits: nil, currencyCode: nil
+        )
+        existing.extraUsageObservedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        monitor.reconnect(with: existing)
+
+        monitor.reconnect(with: presentation(delivery: .live, source: .oauth, fiveHour: 20).snapshot)
+
+        XCTAssertEqual(monitor.state.presentation?.snapshot.extraUsage, existing.extraUsage)
+        XCTAssertEqual(
+            monitor.state.presentation?.snapshot.extraUsageObservedAt,
+            existing.extraUsageObservedAt
+        )
+    }
+
     func testReconnectResumesReading() async {
         let collector = FakeCollector(presentation(delivery: .live))
         let monitor = ClaudeUsageMonitor(collector: collector)
         monitor.disconnect()
 
         monitor.reconnect()
-        for _ in 0..<500 where collector.seenReasons.isEmpty {
+        for _ in 0..<500 where !monitor.state.isAvailable {
             await Task.yield()
         }
         monitor.stop()

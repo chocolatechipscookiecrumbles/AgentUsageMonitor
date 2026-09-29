@@ -30,7 +30,7 @@ struct ProviderConnectCard: View {
                 .foregroundStyle(theme.primaryText)
 
             Text(detail)
-                .font(.caption)
+                .font(.callout)
                 .foregroundStyle(theme.secondaryText)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
@@ -70,7 +70,7 @@ struct ProviderConnectCard: View {
         case .codex:
             "Connect Codex to show quota and local activity from this Mac."
         case .claudeCode:
-            "Connect through Claude Code to show quota and local activity. The connection may ask for Keychain access."
+            ClaudeConnectionCopy.connectionDisclosure
         case .githubCopilot:
             "Connect \(provider.title) to show usage from this Mac."
         }

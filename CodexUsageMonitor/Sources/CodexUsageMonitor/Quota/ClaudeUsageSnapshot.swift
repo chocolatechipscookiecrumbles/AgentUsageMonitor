@@ -36,10 +36,29 @@ struct ClaudeUsageSnapshot: Codable, Sendable, Equatable {
     let fiveHour: ClaudeLimitWindow?
     let sevenDay: ClaudeLimitWindow?
     let scopedWindows: [ClaudeScopedLimitWindow]
-    let extraUsage: ClaudeExtraUsage?
+    var extraUsage: ClaudeExtraUsage?
     let source: ClaudeUsageSource
     let capturedAt: Date
     let schemaVersion: Int
+    /// Separate from quota capture time when a quota-only reading retains spending.
+    /// Optional for caches written before financial observation times were stored.
+    var extraUsageObservedAt: Date? = nil
+
+    var hasQuotaWindows: Bool {
+        fiveHour != nil || sevenDay != nil || !scopedWindows.isEmpty
+    }
+
+    func retainingExtraUsage(from previous: ClaudeUsageSnapshot?) -> Self {
+        guard let previous, previous.extraUsage != nil else { return self }
+        if extraUsage != nil,
+           (extraUsageObservedAt ?? capturedAt) >= (previous.extraUsageObservedAt ?? previous.capturedAt) {
+            return self
+        }
+        var result = self
+        result.extraUsage = previous.extraUsage
+        result.extraUsageObservedAt = previous.extraUsageObservedAt ?? previous.capturedAt
+        return result
+    }
 }
 
 enum ClaudeUsageDelivery: Sendable, Equatable {
@@ -52,7 +71,15 @@ enum ClaudeUsageDelivery: Sendable, Equatable {
 /// OAuth read still reports source == .oauth (where the data originated)
 /// separately from delivery == .cached (that it's not fresh right now).
 struct ClaudeUsagePresentation: Sendable {
+    static let passiveFreshness: TimeInterval = 2 * 60
+
     let snapshot: ClaudeUsageSnapshot
     let delivery: ClaudeUsageDelivery
     let warnings: [String]
+
+    func isFreshPassive(at now: Date) -> Bool {
+        guard delivery == .passiveSnapshot, snapshot.source == .statusLine else { return false }
+        let age = now.timeIntervalSince(snapshot.capturedAt)
+        return (0...Self.passiveFreshness).contains(age)
+    }
 }

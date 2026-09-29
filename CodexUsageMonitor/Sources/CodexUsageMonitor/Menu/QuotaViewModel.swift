@@ -22,6 +22,7 @@ final class QuotaViewModel: ObservableObject {
     /// Result of the last manual CLI probe, so the page can report a failure
     /// the user paid tokens for.
     @Published private(set) var claudeCLIProbeError: String?
+    private var claudeCLIProbeGeneration = 0
     @Published private(set) var isRunningClaudeCLIProbe = false
     @Published private(set) var isRefreshingClaude = false
     @Published private(set) var claudeSetupState: ClaudeSetupState
@@ -65,6 +66,7 @@ final class QuotaViewModel: ObservableObject {
     /// authorization gate and UserDefaults dedup, so it cannot double-fire.
     private let appNotifier: QuotaNotifier?
     private let claudeConnectionController: ClaudeConnectionController
+    private let claudeUsageCache: ClaudeUsageCache
     private let connectionController: CodexConnectionController
     private var subscriptions: Set<AnyCancellable> = []
     /// Confirmation debounce: newly-enabled thresholds are collected and one
@@ -81,6 +83,20 @@ final class QuotaViewModel: ObservableObject {
         self.settings = settings
         let enrollment = ProviderEnrollmentStore()
         self.enrollment = enrollment
+        // Repair the stable passive-capture symlink after an app move or update
+        // only when Claude is enrolled. The installer separately requires the
+        // durable managed-capture consent recorded by an explicit installation.
+        if enrollment.isEnabled(.claudeCode) {
+            ClaudeStatusLineInstaller().repairManagedLinkIfNeeded()
+        }
+        // Setup-token was experimental and is no longer a credential route.
+        // Remove only this app's legacy selection hint; borrowed Claude Code
+        // credentials are never modified here.
+        UserDefaults.standard.removeObject(forKey: "claude.credential-method.v1")
+        let claudeCredentialStore = ClaudeKeychainCredentialStore()
+        let claudeOAuthUsageSource = ClaudeOAuthUsageSource(credentialStore: claudeCredentialStore)
+        let claudeUsageCache = ClaudeUsageCache()
+        self.claudeUsageCache = claudeUsageCache
         claudeSetupState = ClaudeSetupState.resolve(
             connectionState: .notConnected,
             usageState: .unavailable(reason: ClaudeUsageState.notConnectedReason),
@@ -102,7 +118,13 @@ final class QuotaViewModel: ObservableObject {
         self.connectionController = connectionController
         // Claude follows the shared Refresh Preferences like Codex, but its
         // networked OAuth read is floored for endpoint safety.
+        let claudeCollector = ClaudeUsageCollector(
+            oauthSource: claudeOAuthUsageSource,
+            statusLineReader: ClaudeRateLimitSnapshotReader(),
+            cache: claudeUsageCache
+        )
         let claudeMonitor = ClaudeUsageMonitor(
+            collector: claudeCollector,
             cadence: { [settings] in
                 ClaudeRefreshCadence.pollInterval(for: settings.refreshMode)
             }
@@ -117,21 +139,37 @@ final class QuotaViewModel: ObservableObject {
             : nil
         self.previousThresholds = settings.enabledQuotaThresholdsByProvider
         self.claudeConnectionController = ClaudeConnectionController(
-            browserSignIn: {
-                // Browser sign-in (claude setup-token) is shelved as unverified;
-                // it must not be presented as working. See the spike findings.
-                throw ClaudeSetupTokenError.missingCLI
-            },
             credentialsSignIn: {
                 // Proof of connection is a real usage read. User-initiated, so
                 // this is the one path allowed to raise the Keychain prompt.
-                let source = ClaudeOAuthUsageSource(credentialStore: ClaudeCompositeCredentialStore())
-                let snapshot = try await source.fetch(
-                    promptPolicy: ClaudeRefreshReason.userInitiated.keychainPromptPolicy
+                let snapshot = try await claudeOAuthUsageSource.fetch(
+                    promptPolicy: ClaudeRefreshReason.credentialConnection.keychainPromptPolicy
                 )
-                return ClaudeAccountSummary(planType: snapshot.planHint)
+                return snapshot
+            },
+            onConnected: { snapshot in
+                let previous = claudeUsageCache.load()?.snapshot
+                let merged: ClaudeUsageSnapshot
+                if snapshot.hasQuotaWindows {
+                    merged = snapshot.retainingExtraUsage(from: previous)
+                } else if let previous, previous.hasQuotaWindows {
+                    merged = previous.retainingExtraUsage(from: snapshot)
+                } else {
+                    merged = snapshot.retainingExtraUsage(from: previous)
+                }
+                claudeUsageCache.save(snapshot)
+                claudeMonitor.reconnect(
+                    with: merged,
+                    delivery: snapshot.hasQuotaWindows ? .live : .cached
+                )
+            },
+            onConnectionFailed: {
+                // Enrollment and passive capture remain active after a denied
+                // or missing credential, so resume noninteractive collection.
+                claudeMonitor.reconnect()
             }
         )
+        Task { _ = await ClaudeLegacySetupTokenCleanup().removeAppOwnedCredential() }
         displayState = monitor.displayState
         alertsEnabled = settings.alertsEnabled
         monitor.$displayState.sink { [weak self] state in
@@ -171,6 +209,11 @@ final class QuotaViewModel: ObservableObject {
             self?.claudeState = state
             self?.updateClaudeSetupState()
             self?.deliverClaudeThresholdAlerts(for: state)
+            if case .available(let presentation) = state,
+               presentation.delivery == .live,
+               presentation.snapshot.source == .oauth {
+                self?.claudeConnectionController.applyLiveOAuthSnapshot(presentation.snapshot)
+            }
         }.store(in: &subscriptions)
         claudeMonitor.$hasCompletedInitialRefresh.removeDuplicates().sink { [weak self] _ in
             self?.updateClaudeSetupState()
@@ -181,9 +224,6 @@ final class QuotaViewModel: ObservableObject {
         claudeConnectionController.$state.removeDuplicates().sink { [weak self] state in
             self?.claudeConnectionState = state
             self?.updateClaudeSetupState()
-            // A successful connect proves the credential works; pull usage now
-            // rather than waiting for the next scheduled refresh.
-            if state.isConnected { self?.refreshClaude() }
         }.store(in: &subscriptions)
         activityMonitor.$states.sink { [weak self] states in
             self?.localActivityStates = states
@@ -315,7 +355,17 @@ final class QuotaViewModel: ObservableObject {
     /// prompt; the credential read it delegates to is the user-initiated step
     /// that may.
     func connectClaude() {
-        connectClaudeWithCredentials()
+        claudeCLIProbeGeneration += 1
+        enrollment.enable(.claudeCode)
+        // Enroll passive capture at the same time. A foreign status line is
+        // preserved, and a repairable command still requires confirmation.
+        configureClaudePassiveCapture(replacingExisting: false)
+        Task { [weak self] in
+            guard let self else { return }
+            await claudeMonitor.prepareForConnection()
+            guard enrollment.isEnabled(.claudeCode) else { return }
+            claudeConnectionController.connect()
+        }
     }
 
     /// User-initiated from Diagnostics: drop the recorded refresh history.
@@ -361,8 +411,8 @@ final class QuotaViewModel: ObservableObject {
         NSWorkspace.shared.open(url)
     }
 
-    /// User-initiated: this is the only path allowed to raise a Keychain
-    /// prompt, so it must never be called from a background trigger.
+    /// User-initiated refresh bypasses eligible back-off/coalescing, but still
+    /// forbids Keychain interaction. Only Connect may prompt.
     func refreshClaude() {
         guard runtimePolicy(for: .claudeCode).mayRefreshQuota else { return }
         Task { [claudeMonitor] in
@@ -376,10 +426,7 @@ final class QuotaViewModel: ObservableObject {
     @Published private(set) var claudePassiveCapture: ClaudePassiveCaptureHealth?
 
     func refreshClaudePassiveCaptureHealth() {
-        guard let installer = ClaudeStatusLineInstaller() else {
-            claudePassiveCapture = nil
-            return
-        }
+        let installer = ClaudeStatusLineInstaller()
         claudePassiveCapture = ClaudePassiveCaptureHealth(
             state: installer.inspect(),
             lastCapturedAt: ClaudeRateLimitSnapshotReader().readSnapshot()?.capturedAt
@@ -390,27 +437,28 @@ final class QuotaViewModel: ObservableObject {
     /// behind. `replacingExisting` is the user's explicit confirmation; a
     /// working third-party status line is never replaced either way.
     func configureClaudePassiveCapture(replacingExisting: Bool) {
-        guard let installer = ClaudeStatusLineInstaller() else { return }
-        _ = installer.install(replacingExisting: replacingExisting)
+        _ = ClaudeStatusLineInstaller().install(replacingExisting: replacingExisting)
         refreshClaudePassiveCaptureHealth()
     }
 
     /// Explicit user action — the only path that may raise the Keychain
     /// prompt for Claude Code's credential.
-    func connectClaudeWithCredentials() {
-        enrollment.enable(.claudeCode)
-        claudeMonitor.reconnect()
-        claudeConnectionController.useClaudeCodeCredentials()
-    }
-
     /// App-local disconnect: hide Claude usage (including passive capture) and
     /// reset the connection, leaving the Claude Code Keychain credential intact.
     /// Recording `.disabled` also stops Claude's local reads and purges its
     /// derived Token Monitor cache through the existing privacy path.
     func disconnectClaude() {
+        claudeCLIProbeGeneration += 1
+        claudeConnectionController.disconnect()
+        let cancelledRefresh = claudeMonitor.disconnect()
         enrollment.disable(.claudeCode)
-        claudeMonitor.disconnect()
-        claudeConnectionController.signOut()
+        ClaudeStatusLineInstaller().uninstallManagedCapture()
+        claudePassiveCapture = nil
+        Task { [weak self] in
+            _ = await cancelledRefresh?.value
+            guard let self, !enrollment.isEnabled(.claudeCode) else { return }
+            try? claudeUsageCache.delete()
+        }
     }
 
     /// Tier 2. Manual only, and only after the user has consented to the
@@ -420,17 +468,20 @@ final class QuotaViewModel: ObservableObject {
         guard !isRunningClaudeCLIProbe else { return }
         isRunningClaudeCLIProbe = true
         claudeCLIProbeError = nil
+        let generation = claudeCLIProbeGeneration
         Task { [weak self] in
-            defer { Task { @MainActor [weak self] in self?.isRunningClaudeCLIProbe = false } }
+            guard let self else { return }
+            defer { isRunningClaudeCLIProbe = false }
             do {
                 let snapshot = try await ClaudeCLIUsageProbe().run()
-                await MainActor.run { [weak self] in
-                    self?.claudeMonitor.applyManualSnapshot(snapshot)
-                }
+                guard generation == claudeCLIProbeGeneration,
+                      enrollment.isEnabled(.claudeCode) else { return }
+                claudeUsageCache.save(snapshot)
+                claudeMonitor.applyManualSnapshot(snapshot)
             } catch {
-                await MainActor.run { [weak self] in
-                    self?.claudeCLIProbeError = Self.cliProbeMessage(for: error)
-                }
+                guard generation == claudeCLIProbeGeneration,
+                      enrollment.isEnabled(.claudeCode) else { return }
+                claudeCLIProbeError = Self.cliProbeMessage(for: error)
             }
         }
     }
@@ -467,17 +518,18 @@ final class QuotaViewModel: ObservableObject {
         claudeMonitor.stop()
     }
 
-    /// Evaluates Claude's windows for threshold alerts, but only on a confirmed
-    /// (live) read — a cached read must not re-alert. Dedup by reset time in the
-    /// notifier makes repeated live reads safe.
+    /// Evaluates current Claude readings only. The notifier retains ownership
+    /// of threshold settings and reset-window deduplication.
     private func deliverClaudeThresholdAlerts(for state: ClaudeUsageState) {
         guard let appNotifier,
               case .available(let presentation) = state,
-              presentation.delivery == .live else { return }
-        let model = ClaudeUsageDisplayModel(presentation: presentation)
-        let fiveHour = Self.claudeThresholdWindow(model.fiveHour)
-        let weekly = Self.claudeThresholdWindow(model.sevenDay)
-        Task { await appNotifier.evaluateClaudeThresholds(fiveHour: fiveHour, weekly: weekly) }
+              let windows = Self.claudeThresholdWindows(for: presentation) else { return }
+        Task {
+            await appNotifier.evaluateClaudeThresholds(
+                fiveHour: windows.fiveHour,
+                weekly: windows.weekly
+            )
+        }
     }
 
     /// Collects newly-enabled thresholds and, after a short quiet period, sends
@@ -512,10 +564,31 @@ final class QuotaViewModel: ObservableObject {
         await appNotifier?.deliverConfirmation(body)
     }
 
-    /// Maps a Claude window into the provider-neutral `QuotaWindow`. A window
-    /// that has already reset is dropped rather than alerted on a stale figure.
-    private static func claudeThresholdWindow(_ window: ClaudeUsageDisplayModel.Window?) -> QuotaWindow? {
-        guard let window, !window.hasReset else { return nil }
-        return QuotaWindow(usedPercent: window.usedPercent, resetAt: window.resetsAt, durationMinutes: nil)
+    nonisolated static func claudeThresholdWindows(
+        for presentation: ClaudeUsagePresentation,
+        now: Date = .now
+    ) -> (fiveHour: QuotaWindow?, weekly: QuotaWindow?)? {
+        let eligible = switch (presentation.delivery, presentation.snapshot.source) {
+        case (.live, .oauth), (.live, .cli): true
+        case (.passiveSnapshot, .statusLine): presentation.isFreshPassive(at: now)
+        default: false
+        }
+        guard eligible else { return nil }
+        return (
+            claudeThresholdWindow(presentation.snapshot.fiveHour, now: now),
+            claudeThresholdWindow(presentation.snapshot.sevenDay, now: now)
+        )
+    }
+
+    nonisolated private static func claudeThresholdWindow(
+        _ window: ClaudeLimitWindow?,
+        now: Date
+    ) -> QuotaWindow? {
+        guard let window, let resetAt = window.resetsAt, resetAt > now else { return nil }
+        return QuotaWindow(
+            usedPercent: Int(window.usedPercent.rounded()),
+            resetAt: resetAt,
+            durationMinutes: nil
+        )
     }
 }

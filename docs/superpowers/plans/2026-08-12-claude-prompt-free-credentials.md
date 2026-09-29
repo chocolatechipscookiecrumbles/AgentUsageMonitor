@@ -1,8 +1,10 @@
 # Claude Prompt-Free Credentials Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use `swift-security-expert` for every Keychain and credential change, `systematic-debugging` for the capability gate, and `writing-for-interfaces` for each user-facing state. Steps use checkbox (`- [ ]`) syntax. **This plan is awaiting the maintainer's verification. Do not write code against it until it is approved.**
+> **Execution note (2026-08-26):** This document remains the research record and prompt-contract source. The consolidated, task-ordered implementation sequence is now [Claude Setup-Token Primary and Explicit Recovery](2026-08-26-claude-setup-token-primary-and-recovery.md).
 
-**Goal:** After a user connects Claude once — by either method — Agent Monitor never surprises them with a macOS Keychain dialog again.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use `swift-security-expert` for every Keychain and credential change, `systematic-debugging` for the capability gate, and `writing-for-interfaces` for each user-facing state. Steps use checkbox (`- [ ]`) syntax. **Direction approved 2026-08-26: app-owned `setup-token` credential for normal authoritative reads, explicit `/usage` recovery, and borrowed Keychain access only as an opt-in compatibility mode. Production enrollment remains gated on Tasks 1 and 2.**
+
+**Goal:** After a user connects Claude once, normal operation uses passive Claude status-line data plus an app-owned credential and never needs access to Claude Code's Keychain item.
 
 **Branch:** `feat/claude-prompt-free-credentials`. The read-path defects are a separate, independently shippable change on `fix/claude-refresh-defects`, implementing [Task 1 of the durability plan](2026-08-12-claude-usage-source-durability.md#task-1--make-an-explicit-refresh-always-perform-a-real-read). Neither branch depends on the other.
 
@@ -42,81 +44,53 @@ From [claude-keychain-grant-durability.md](../../development/claude-keychain-gra
 - The grant is **live in the steady state** for both prompting and non-prompting reads; the failure is a transition that has not yet been caught.
 - Ruled out: ad-hoc signing (the build is Developer ID signed with a stable requirement), a second app identity, and item recreation (`cdat` static since 2026-07-20 while `mdat` advances).
 - Claude Code **updates its item in place**, frequently.
-- The passive status-line tier is **dead in production** — `ClaudeStatusLineInstaller` has no call site — so today there is no silent degrade path for P3/P4 to use.
+- The passive status-line tier was historically dead in production. The installer and repair UI are now wired, and a real `claude-rate-limits.json` snapshot has been observed. Signed-app acceptance with tier 1 deliberately unavailable is still open.
 
 **Consequence for design:** P3 and P4 both require a working passive tier. [Task 2 of the durability plan](2026-08-12-claude-usage-source-durability.md#task-2--revive-the-passive-status-line-tier-as-a-first-class-keychain-free-source) is therefore a hard prerequisite of this plan, not a parallel nicety.
 
-## How comparable projects fetch Claude usage
+## 2026-08-26 source audit and decision
 
-Reviewed 2026-08-13 by reading the sources at `main` of the two neighbouring projects already recorded in [RESOURCES.md](../../../RESOURCES.md). This changes the plan's conclusions, so it is recorded before them.
+The expanded, revision-pinned audit is recorded in [claude-usage-monitor-source-audit-2026-08-26.md](../../development/claude-usage-monitor-source-audit-2026-08-26.md). Its central correction is that CodexBar and the reviewed Token Monitor projects are not actually access-free: they read a credential file or Keychain item, keep an app-owned Keychain cache, or delegate to Claude CLI.
 
-### Both agree with our tier-1 contract
+The only verified zero-secret source is Claude Code's documented status-line `rate_limits` payload. It is event-driven rather than a guaranteed on-demand read. The selected order is therefore:
 
-| | CodexBar (Swift, macOS menu bar) | Token Monitor (Electron, cross-platform) |
-|---|---|---|
-| Usage endpoint | `GET https://api.anthropic.com/api/oauth/usage` | same constant |
-| Headers | Bearer, `anthropic-beta`, `claude-code` User-Agent | same |
-| Credential source | Claude Code's Keychain item | `~/.claude/.credentials.json` first, Keychain second |
-| macOS Keychain read | Security framework | spawns `security find-generic-password -s "Claude Code-credentials" -w` |
-| Windows | — | `wincred` via `advapi32` |
-| Own token refresh | **Yes** — `POST https://platform.claude.com/v1/oauth/token` | **Yes** — `POST https://console.anthropic.com/v1/oauth/token` |
-| Client ID | `9d1c250a-…` (Claude Code's public client, env-overridable) | `9d1c250a-…` (same, hard-coded) |
+1. Fresh passive status-line snapshot, with no credential access.
+2. App-owned long-lived token created through `claude setup-token`, for normal authoritative reads.
+3. Cache, labelled with its age and source.
+4. Explicit recovery: `Force read with Claude /usage`.
+5. Separately disclosed compatibility mode: `Use Claude Code credentials`, which may prompt and is never an automatic fallback.
 
-Our endpoint, headers, and credential shape match both independent implementations, so tier 1 is not where our divergence lies.
+### Why direct PKCE is not the primary login
 
-### CodexBar tried the `security` CLI read and turned it off
+Current ecosystem examples reuse Claude Code's public client identifier and private/undocumented endpoints. That is not an independent Agent Usage Monitor OAuth registration: the browser identifies Claude Code while this app receives the result. The repository's own authorization-code spike also never completed because the token exchange returned 429. Do not ship this path unless Anthropic publishes a third-party contract or issues this app its own client registration.
 
-`ClaudeOAuthCredentials+SecurityCLIReader.swift` implements the same `security` CLI read Token Monitor relies on, behind a `.securityCLIExperimental` strategy. It is **force-disabled**: `ClaudeOAuthKeychainReadStrategyPreference.current()` coerces `.securityCLIExperimental` back to `.securityFramework`, so even an explicitly stored preference cannot select it. Their own note gives the reason — `security` can prompt too.
+### Why `security` is not a workaround
 
-**Consequence for us:** shelling out to `security` is not a way around the ACL, and a comparable project has already paid to learn that. Do not spend a task on it.
+Shelling out to `/usr/bin/security` still asks macOS to read Claude Code's Keychain item. It can prompt and does not bypass the item's access control. It remains prohibited as a supposed prompt-free mechanism.
 
-### CodexBar treats the Keychain prompt as a first-class, gated event
+### Why `setup-token` is the primary credential
 
-It carries `ClaudeOAuthKeychainAccessGate`, `KeychainPromptMode`, `KeychainPreAlertGate`, `DirectKeychainReadConsent`, and `KeychainQueryTiming` — a **pre-alert shown before the system dialog**, an explicit consent record, and prompt-mode gating. That is the same shape as this plan's prompt contract, arrived at independently, which is corroboration that *bounding* the prompt is the realistic goal for a borrowed credential rather than eliminating it. It also carries `ClaudeOAuthUsageRateLimitGate`, the counterpart of our 429 back-off.
+Claude Code 2.1.241 exposes `setup-token` as a long-lived token flow for subscription users. Claude Code owns the browser interaction; Agent Usage Monitor receives an app-specific secret and stores it in an item the app owns. This avoids the recurring cross-app ACL problem. It is not a refresh-token session: a rejected or revoked token must surface `Reconnect`.
 
-### CodexBar has a third option we had not considered: delegated refresh
+### Borrowed credentials remain compatibility-only
 
-`ClaudeOAuthDelegatedRefreshCoordinator` exchanges nothing. It **touches the Claude CLI so Claude Code refreshes its own token**, then confirms success by observing the Keychain item's fingerprint change. It carries cooldowns (5 min default, 20 s after a soft failure), in-flight joining so concurrent callers share one attempt, and prompt-policy gating.
+CodexBar's prompt gates and delegated refresh remain useful evidence for users who explicitly choose borrowed credentials. They do not make the credential app-owned and cannot guarantee prompt-free access. The composite store must not silently switch to this method after an app-owned-token failure.
 
-This needs no client ID, no exchange, and no impersonation — and it deliberately causes exactly the credential rewrite our Task 0 sampler waited four and a half hours to observe naturally and never saw.
-
-## The token-exchange question, reopened
-
-The [July spike](2026-07-21-claude-oauth-web-login-spike-findings.md) was shelved after the exchange returned persistent 429s and was never once observed succeeding. The review above shows the approach is not infeasible — **two shipping projects perform it** — so "unproven" described our single attempt, not the method.
-
-**A distinction the earlier analysis missed, and it matters.** Both projects use the **`refresh_token` grant**, starting from a refresh token Claude Code already obtained and stored. Neither runs an authorize step. Our spike was blocked on the **`authorization_code` grant** — the initial exchange following a browser consent screen. Different requests, different objections:
-
-- The consent-screen objection — "the screen would name Claude Code while a different app receives the token" — applies **only to the authorization step**. A refresh-token exchange opens no browser and shows no consent screen, so that objection does not carry over. The earlier draft of this plan applied it to both. That was wrong.
-- The delegated-OAuth constraint is written as "never reuses Claude Code's OAuth client ID **in its own authorization request**". Refreshing a token Claude Code already holds is arguably not an authorization request. That is a judgement call for the maintainer, and this plan should not quietly decide it either way.
-- What a refresh **does not** do is make the credential ours. It extends a borrowed one, so it does not deliver P5 and does not remove the Keychain read. Its real value is against **D5** (the expiring borrowed token) and independence from whether Claude Code has run recently.
-
-`claude setup-token` remains the only route to a genuinely app-owned credential and therefore the only route to P5, so it stays as Task 1 — but it is no longer presented as the sole survivor of a field of rejected options. Task 1b re-tests what was never actually tried.
-
----
-
-## Decision requiring your sign-off
-
-**Should method B mirror Claude Code's token into our own Keychain item after a successful user-initiated read?**
-
-It sounds like it would fix everything — read once with a prompt, then read our own copy forever. **My recommendation is no**, for two reasons:
-
-1. **It does not actually work.** Claude Code rotates that token frequently (`mdat` moves constantly). A mirrored copy goes stale within hours, returns 401, and we are back at the borrowed item needing a fresh read — the prompt is postponed, not removed.
-2. **It costs a privacy commitment for that non-fix.** The README, the app's Data & Privacy page, and the release notes all currently state that the app reads Claude Code's credential and never copies it. Mirroring makes those statements false and requires changing all three.
-
-The durable answer to the same desire is method A, which gets a token that is genuinely ours. Task 1b's delegated refresh is the cheaper partial answer: it keeps the credential where it is and lets Claude Code renew it, which addresses the staleness that mirroring was reaching for without copying anything. If you disagree, say so and I will design the mirroring path with the disclosure changes it requires.
-
----
+The prior question about mirroring Claude Code's credential is closed: do not mirror it. Rotation makes the copy stale and copying would violate current privacy disclosures without removing the eventual fallback read.
 
 ## Architecture
 
 **Fit — no new architecture.** `ClaudeUsageCollector` remains the tier owner and `ClaudeUsageMonitor` the read-cycle owner. What changes is credential ownership and who is allowed to prompt.
 
 ```
-                        ┌─ Method A: app-owned item ──── our ACL ──── never prompts (P5)
- ClaudeCredentialActor ─┤
-                        └─ Method B: Claude Code item ── their ACL ─── prompts only on P2
-                                        │
-                                        └── on lapse ──► passive tier ──► cache   (P4)
+fresh status-line snapshot ──► serve without credential access
+             │ stale/absent
+             ▼
+app-owned setup-token item ──► authoritative usage read ──► cache
+             │ unavailable/rejected
+             ▼
+explicit recovery ──► Claude /usage
+                  └─► borrowed Claude Code credential (compatibility opt-in only)
 ```
 
 ## File Structure
@@ -138,24 +112,23 @@ The durable answer to the same desire is method A, which gets a token that is ge
 
 ## Task 1 — Gate `claude setup-token` before building any UI on it
 
-- [ ] **Step 1: Re-run the capability gate** from [the delegated OAuth plan](2026-07-31-claude-delegated-oauth-and-setup.md#task-0--re-run-the-delegated-oauth-capability-gate) against Claude Code **2.1.227**. That plan's evidence is 2.1.220; the interface is still present, so nothing blocks the re-test. The repository's prior attempt ended in an inconclusive 401 and is treated as **unreproduced**, not as a verdict.
+- [ ] **Step 1: Re-run the capability gate** from [the delegated OAuth plan](2026-07-31-claude-delegated-oauth-and-setup.md#task-0--re-run-the-delegated-oauth-capability-gate) against Claude Code **2.1.241**. The command still advertises `setup-token`; the repository's prior attempt ended in an inconclusive 401 and is treated as **unreproduced**, not as a verdict.
 - [ ] **Step 2: Capture the token without letting it reach disk.** `setup-token` is interactive, so the runner needs a PTY, an in-memory-only buffer, a parser retaining **only** the token bytes, and typed errors carrying no captured text. No shell history, temp file, `tee`, log, diagnostics field, or fixture may receive it.
 - [ ] **Step 3: Validate once, then prove it survives relaunch.** One typed usage request; retain only HTTP status and non-secret window presence. Store it, terminate the app, relaunch, and perform one **non-prompting** read. That read succeeding is the direct proof of P5.
 - [ ] **Step 4: Decide by explicit gate.** Accept only if validation, relaunch read, and clean deletion all succeed. Otherwise leave method A unavailable in the UI and record why.
 - [ ] **Step 5: Write the capability record** — Run / Observed / Not run, accepted path, exact CLI version, non-secret statuses, and why any rejected path stays unavailable.
 
-## Task 1b — Re-test the token exchange instead of shelving it
+## Task 1b — Keep borrowed-credential renewal compatibility-only
 
-The July spike is **not** removed. It was one attempt against one host that never returned anything but 429, which is not a verdict. Two shipping projects perform this exchange, so the question is which variant works here.
-
-Run these in order and stop at the first that succeeds — each is cheaper and less contested than the one after it.
+This task cannot become the primary login. It exists only to make the explicitly
+selected borrowed-Keychain compatibility mode less fragile.
 
 - [x] **Step 1: Delegated refresh first — no exchange at all.** **Implemented 2026-08-13.** `ClaudeDelegatedRefreshCoordinator` touches the CLI on a 401 and proves renewal by the credential's modification date changing; 10 regressions. Its stdout is discarded because it carries `email`/`orgId`/`orgName`. **Renewal efficacy is unverified** — the touch runs cleanly but has not yet been observed against an expired token; CodexBar's PTY `claude /status` is the documented fallback if `auth status` proves insufficient. Original step text: Reproduce CodexBar's approach: touch the Claude CLI so **Claude Code** refreshes its own token, then confirm by observing the Keychain item's `mdat`/fingerprint change. No client ID, no token endpoint, no impersonation, and nothing this repository's constraints prohibit. Carry over their hard-won details: a cooldown (5 min default, ~20 s after a soft failure), in-flight joining so concurrent callers share one attempt, and never touching from a non-user-initiated path without the cooldown.
   - This doubles as the **Task 0 experiment we could not run**: a deliberate credential rewrite, immediately followed by a non-prompting read. If the grant dies exactly there, the recurring-prompt cause is identified in one shot.
-- [ ] **Step 2: Retry the `refresh_token` exchange against the untried host.** Our spike only ever hit `console.anthropic.com/v1/oauth/token`. CodexBar uses `platform.claude.com/v1/oauth/token`. Send **one** `POST`, form-encoded, `grant_type=refresh_token` + `refresh_token` + `client_id`, using the refresh token already in Claude Code's Keychain item.
+- [ ] **Step 2: If delegated refresh proves ineffective against an expired borrowed token, run one evidence-only `refresh_token` request against the untried host.** Our spike only ever hit `console.anthropic.com/v1/oauth/token`; CodexBar uses `platform.claude.com/v1/oauth/token`. This experiment may inform compatibility mode but must not be wired into app-owned enrollment.
   - **One attempt only.** The spike established that retrying re-arms the cooldown; treat a 429 as "wait much longer", never as "try again shortly". Record status only.
   - A 200 here answers a question open since July. A 429 or 4xx is also an answer — record which, and stop.
-- [ ] **Step 3: Only if both fail, revisit the `authorization_code` flow.** This is the one carrying the real consent-screen objection, because the browser page would name Claude Code while this app receives the token. Do not run it without an explicit decision recorded against the delegated-OAuth plan's client-ID constraint.
+- [x] **Step 3: Reject the direct `authorization_code` flow for production.** **Decision recorded 2026-08-26.** The browser would name Claude Code while Agent Usage Monitor receives the token, the endpoints are not a published third-party contract, and the local exchange never completed. Reconsider only if Anthropic publishes a supported third-party flow or issues this app its own client registration.
 - [ ] **Step 4: Record the outcome as evidence, not as a recommendation.** Extend the spike findings document with Run / Observed / Not run for each step: exact host, grant type, HTTP status, and whether the Keychain item changed. No token, refresh token, authorization code, or callback URL may appear — the spike's own security note is the standard to meet.
 - [ ] **Step 5: State what it does and does not buy.** A working refresh extends a **borrowed** credential. It helps D5 and removes the dependency on Claude Code having run recently. It does **not** deliver P5 and does not remove the Keychain read, and the plan must not imply otherwise.
 
@@ -173,7 +146,7 @@ The existing store is not fit to hold a primary credential.
 ## Task 3 — Enforce the prompt contract in code
 
 - [ ] **Step 1: Make P1 structurally impossible to violate.** The prompt policy must be derived from the refresh reason at a single choke point, with no call site able to pass `.userInitiatedOnly` on a non-user-initiated path. Add the assertion as a test, not a comment.
-- [ ] **Step 2: Implement P3 — check passive freshness first.** On an explicit refresh under method B, if a passive snapshot newer than a short threshold exists, serve it and **do not read the Keychain at all**. The cheapest way to not prompt is to not read.
+- [x] **Step 2: Implement P3 — check passive freshness first.** **Implemented 2026-08-26.** A valid status-line snapshot captured within two minutes is served before OAuth for every refresh reason, and the regression proves the credential provider is not invoked.
 - [ ] **Step 3: Implement P2 — one prompt per press.** A single user action performs at most one prompting read; internal retries, degrades, and the composite store's second method must not each get their own dialog.
 - [ ] **Step 4: Implement P4 — silent degrade with a labelled recovery.** On `errSecInteractionNotAllowed` or a lapsed grant, fall to passive/cache, mark the reading's source honestly, and surface one `Reconnect` action. No dialog, no modal, no silent blank.
 - [ ] **Step 5: Add `ClaudePromptBudgetTests`.** Drive every refresh reason through an injected Keychain spy and assert the exact number of prompting reads: zero for launch/scheduled/wake/menu-open; at most one per user action; zero when a fresh passive snapshot exists; zero after method A is configured.
@@ -182,9 +155,10 @@ The existing store is not fit to hold a primary credential.
 
 - [ ] **Step 1: Present both methods with their real trade-off.** Method A: "Set up a token for Agent Monitor — macOS will not ask again." Method B: "Use the credential Claude Code already stored — macOS will ask permission, and may ask again if it withdraws access." Do not describe method B as permanent.
 - [ ] **Step 2: Disclose before the first borrowed read**, not after: what is read, that it is never changed or exported, and that a dialog is about to appear.
-- [ ] **Step 3: Never auto-switch methods.** A failure of the chosen method degrades **visibly** through `ClaudeEffectiveMethodRecorder`; the app does not quietly start using the other one.
+- [x] **Step 3: Never auto-switch methods.** **Implemented 2026-08-26.** `ClaudeCompositeCredentialStore` invokes only the selected provider; regressions prove a missing app-owned credential never reads the borrowed provider.
 - [ ] **Step 4: Distinguish the failure states** — CLI missing, setup cancelled or timed out, Keychain denied, credential absent, credential rejected, usage unavailable, passive capture absent or stale. Each gets one verb-labelled action.
 - [ ] **Step 5: Handle method A revocation.** A long-lived token has no refresh, so a 401 means "reconnect" and must be reported as such, not retried indefinitely.
+- [x] **Step 6: Keep `/usage` as explicit recovery.** `ClaudeCLIUsageProbe` and its `QuotaViewModel` call site already run only after user consent and never join scheduled collection. Preserve this boundary while changing the credential order.
 
 ## Task 5 — Verification
 
@@ -196,10 +170,28 @@ The existing store is not fit to hold a primary credential.
 - [ ] Inspect unified logs and diagnostics for token fragments after setup, refresh, failure, and disconnect. Expected: none.
 - [ ] `git diff --check` — exit 0; `gitleaks git . --log-opts='origin/main..HEAD' --redact=100` — no findings.
 
+### Verification evidence — 2026-08-26 partial implementation
+
+- The passive-first and no-cross-method-fallback regressions were observed red
+  against the prior behavior, then green after the minimal changes.
+- `ClaudeCollectorPromptPolicyTests`: 5 tests, 0 failures.
+- `ClaudeCompositeCredentialStoreTests`: 10 tests, 0 failures.
+- `xcodebuild -scheme CodexUsageMonitor -destination 'platform=macOS'
+  -derivedDataPath /tmp/agent-usage-claude-oauth-derived build`: exit 0,
+  `BUILD SUCCEEDED`; Xcode emitted only its multiple-matching-destinations warning.
+- Full `swift test`: 370 tests executed, 1 skipped, 1 failure. The reproducible
+  failure is the pre-existing timing assertion
+  `ClaudeUsageMonitorTests.testReconnectResumesReading`; neither its source nor
+  its test was changed in this slice. Do not mark the full-suite checkbox until
+  that independently scoped failure is resolved.
+- `git diff --check`: exit 0.
+- `claude setup-token` was not executed, so no secret was generated or exposed.
+  The interactive capability/relaunch and signed-app prompt matrix remain open.
+
 ## Risks and limitations
 
 - **The lapse cause is still unknown.** This plan is deliberately designed not to need the answer: method A removes the cross-app read, and P1–P4 bound method B's behaviour either way. Task 0's sampler continues independently.
 - **Method A depends on an ungated interface.** If the capability gate rejects `setup-token`, P5 is unavailable this release and the honest outcome is P1–P4 plus a working passive tier. That limitation must then be stated in the README, Data & Privacy page, and release notes rather than left implied.
-- **P3 and P4 require the passive tier**, which is currently dead. Durability-plan Task 2 must land first or these degrade to "silent, but with no data".
-- **The exchange question is open, not closed.** Task 1b re-tests what the July spike never actually reached. A working refresh would not deliver P5; it extends a borrowed credential rather than creating an app-owned one.
+- **P3 and P4 require the passive tier.** Installation/repair and real snapshot production now work; signed-app proof with OAuth deliberately unavailable remains open.
+- **Borrowed refresh research cannot become primary auth.** Task 1b may improve the explicitly selected compatibility mode, but it never creates an app-owned credential and does not deliver P5.
 - **Compilation is not acceptance.** Every prompt-behaviour claim requires the signed app; unit tests can only prove which policy was requested, not what macOS did.

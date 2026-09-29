@@ -112,6 +112,7 @@ final class ProviderContextSummaryTests: XCTestCase {
 
     func testClaudeConnectedReportsPlanLimitsAndCaptureTime() {
         let summary = ProviderContextSummary.claude(
+            isEnrolled: true,
             connectionState: .connected(ClaudeAccountSummary(planType: "pro")),
             usageState: .available(
                 claudePresentation(fiveHour: 14, sevenDay: 25, capturedAt: now.addingTimeInterval(-8 * 60))
@@ -121,7 +122,7 @@ final class ProviderContextSummaryTests: XCTestCase {
 
         XCTAssertEqual(summary.provider, .claudeCode)
         XCTAssertTrue(summary.isConnected)
-        XCTAssertEqual(summary.statusText, "Connected")
+        XCTAssertEqual(summary.statusText, "Monitoring enabled")
         XCTAssertEqual(summary.planText, "Pro")
         XCTAssertEqual(summary.fiveHourText, "14%")
         XCTAssertEqual(summary.weeklyText, "25%")
@@ -130,6 +131,7 @@ final class ProviderContextSummaryTests: XCTestCase {
 
     func testClaudeUnavailableNeverShowsZeroPercent() {
         let summary = ProviderContextSummary.claude(
+            isEnrolled: false,
             connectionState: .notConnected,
             usageState: .unavailable(reason: "nope"),
             now: now
@@ -143,8 +145,27 @@ final class ProviderContextSummaryTests: XCTestCase {
         XCTAssertEqual(summary.lastRefreshText, ProviderContextSummary.placeholder)
     }
 
+    func testClaudeCredentialFailurePreservesEnrolledCachedReading() {
+        let original = claudePresentation(fiveHour: 14, sevenDay: 25, capturedAt: now.addingTimeInterval(-480))
+        let usage = ClaudeUsageState.available(ClaudeUsagePresentation(
+            snapshot: original.snapshot, delivery: .cached,
+            warnings: ["Live fallback unavailable. Keychain access could not complete without interaction."]
+        ))
+        let summary = ProviderContextSummary.claude(
+            isEnrolled: true, connectionState: .failed(.keychainAccessDenied),
+            usageState: usage, now: now
+        )
+        XCTAssertTrue(summary.isConnected)
+        XCTAssertTrue(summary.statusText.hasPrefix("Monitoring enabled"))
+        XCTAssertTrue(summary.statusText.contains("Live fallback unavailable"))
+        XCTAssertEqual(summary.fiveHourText, "14%")
+        XCTAssertEqual(summary.weeklyText, "25%")
+        XCTAssertEqual(summary.lastRefreshText, "8 minutes ago")
+    }
+
     func testClaudeMissingWindowIsPlaceholderNotZero() {
         let summary = ProviderContextSummary.claude(
+            isEnrolled: true,
             connectionState: .connected(ClaudeAccountSummary(planType: "pro")),
             usageState: .available(claudePresentation(fiveHour: nil, sevenDay: 25)),
             now: now
@@ -165,6 +186,7 @@ final class ProviderContextSummaryTests: XCTestCase {
             now: now
         )
         let claude = ProviderContextSummary.claude(
+            isEnrolled: true,
             connectionState: .connected(ClaudeAccountSummary(planType: "pro")),
             usageState: .available(claudePresentation(fiveHour: 1, sevenDay: 1, capturedAt: stamp)),
             now: now
@@ -233,6 +255,7 @@ final class ProviderValueModeConsistencyTests: XCTestCase {
                 now: now
             ),
             .claude(
+                isEnrolled: true,
                 connectionState: .connected(ClaudeAccountSummary(planType: "pro")),
                 usageState: .available(claudePresentationForMode(fiveHour: 44, sevenDay: 28)),
                 valueMode: mode,
