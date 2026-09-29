@@ -512,6 +512,13 @@ An identity-scoped experiment using `.id(settings.selectedSettingsTab)` was reje
 
 No new automated test case is added by user direction. The deferred repair's future signed-app regression boundary is rapid repeated switching across all six destinations, including both Context Rail states; no transition is currently claimed fixed.
 
+On 2026-09-27, computer use switched the currently running signed Settings
+window across all six destinations and back (11 consecutive changes). Each
+settled frame remained 680 × 588 pt and accessibility selected the requested
+destination. These snapshots cannot detect the previously recorded one-to-two
+frame compositor artifact, so the deferred status and frame-capture boundary
+remain unchanged.
+
 ### Video inspection evidence — 2026-07-18
 
 The user-provided `tab switch text bug.mov` is a 5.95-second, 60 fps recording of the current signed app. Its raw General → Notifications frames reproduce the defect: interleaved frames at 3.033, 3.067, and 3.100 seconds contain duplicated/displaced text across the full Settings hierarchy, including the unchanged sidebar and header, while adjacent frames settle correctly. The artifact is therefore not a Notifications-card spacing change or a delayed persisted selection; it is a whole-hierarchy SwiftUI/AppKit compositing transaction during sidebar selection.

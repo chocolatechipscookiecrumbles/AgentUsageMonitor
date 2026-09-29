@@ -4,42 +4,41 @@ struct MenuPopoverChrome<Content: View>: View {
     @ViewBuilder let content: Content
 
     @Environment(\.colorScheme) private var colorScheme
-    @State private var contentHeight: CGFloat = 0
+    @Environment(\.dismiss) private var dismiss
+    @State private var shellHeight: CGFloat = 0
 
     var body: some View {
-        content
-            .frame(width: MenuPopoverTheme.popoverWidth)
-            .background(theme.windowBackground)
-            .clipShape(.rect(cornerRadius: MenuPopoverTheme.shellCornerRadius))
-            .overlay {
-                RoundedRectangle(cornerRadius: MenuPopoverTheme.shellCornerRadius)
-                    .stroke(theme.border, lineWidth: MenuPopoverTheme.shellBorderWidth)
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: MenuPopoverTheme.shellCornerRadius)
-                    .stroke(theme.shellOutline, lineWidth: MenuPopoverTheme.shellOutlineWidth)
-            }
-            // Measure the shell's real height so the host window can track it.
-            // `MenuBarExtra(.window)` only re-measures its intrinsic height on
-            // discrete events (e.g. a tab switch); it does not follow in-place
-            // growth when a conditional row appears (e.g. the connection
-            // recovery card), which otherwise leaves the window too short and
-            // the footer drawn over the taller content.
-            .background(
-                GeometryReader { proxy in
-                    Color.clear.preference(
-                        key: MenuPopoverContentHeightKey.self,
-                        value: proxy.size.height
-                    )
+        VStack(spacing: 0) {
+            content
+                .frame(width: MenuPopoverTheme.popoverWidth)
+                .fixedSize(horizontal: false, vertical: true)
+                .background(theme.windowBackground)
+                .clipShape(.rect(cornerRadius: MenuPopoverTheme.shellCornerRadius))
+                .overlay {
+                    RoundedRectangle(cornerRadius: MenuPopoverTheme.shellCornerRadius)
+                        .stroke(theme.border, lineWidth: MenuPopoverTheme.shellBorderWidth)
                 }
-            )
-            .onPreferenceChange(MenuPopoverContentHeightKey.self) { contentHeight = $0 }
-            // Clears the host window so this rounded shell is the only visible
-            // piece; the window server supplies a matching rounded shadow, so
-            // the chrome carries no separate SwiftUI shadow of its own. Also
-            // resizes the host to `contentHeight` so the popover scales with its
-            // contents instead of clipping them.
-            .background(MenuPopoverWindowConfigurator(contentHeight: contentHeight))
+                .overlay {
+                    RoundedRectangle(cornerRadius: MenuPopoverTheme.shellCornerRadius)
+                        .stroke(theme.shellOutline, lineWidth: MenuPopoverTheme.shellOutlineWidth)
+                }
+                .background {
+                    GeometryReader { proxy in
+                        Color.clear.preference(key: MenuPopoverShellHeightKey.self, value: proxy.size.height)
+                    }
+                }
+
+            Color.clear
+                .contentShape(.rect)
+                .onTapGesture { dismiss() }
+                .accessibilityHidden(true)
+        }
+        .frame(height: MenuPopoverTheme.availablePopoverHeight)
+        .onPreferenceChange(MenuPopoverShellHeightKey.self) { shellHeight = $0 }
+        .background(MenuPopoverWindowConfigurator(
+            contentHeight: MenuPopoverTheme.availablePopoverHeight,
+            visibleHeight: shellHeight
+        ))
     }
 
     private var theme: MenuPopoverTheme {
@@ -47,9 +46,7 @@ struct MenuPopoverChrome<Content: View>: View {
     }
 }
 
-/// The measured height of the popover shell, propagated up to the window
-/// configurator so it can size the host to fit.
-private struct MenuPopoverContentHeightKey: PreferenceKey {
+private struct MenuPopoverShellHeightKey: PreferenceKey {
     static let defaultValue: CGFloat = 0
 
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {

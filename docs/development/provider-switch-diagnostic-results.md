@@ -266,9 +266,84 @@ label, and `AgentSettingsTabStrip` adds `.contentShape(.rect)` to its fixed-size
 label. That is a hit-testing change only and does not touch the accepted
 geometry above.
 
+### Live follow-up — 2026-09-27
+
+Computer use attached to the already running signed build and switched the open
+popover between Codex and Claude 20 times. Every settled selection matched the
+requested provider after the first diff-only accessibility observation; a
+separate four-switch loop using full accessibility snapshots confirmed 4/4.
+The rendered window alternated between **340 × 859 pt** for Codex (including its
+credit card) and **340 × 762 pt** for Claude. The 97-point host resize on every
+switch is therefore reproducible in the current live state. The user also
+reports a brief layered-background jump during the switch. Computer-use
+screenshots captured settled frames, not the intermediate 60 fps frames needed
+to locate that compositor boundary. No new fix or complete visual acceptance
+is claimed from this loop.
+
 By user direction, the following work remains deferred:
 
 - the global Settings destination-switch compositor defect.
 
 The remaining open visual track is the menu-popover corner artifact, which keeps
 its own diagnosis plan and has no claimed fix.
+
+### Fixed-height menu follow-up — 2026-09-27
+
+The user accepted the 97-point spare region on Claude and requested a hard
+screen-height limit. The provider area now sits in a vertical scroll view
+between the fixed selector and footer. The outer popover is 340 × 860 points
+on the observed display and caps its height to the smallest available screen
+height. In the signed app, 20 alternating pointer selections all displayed the
+requested provider, and every settled screenshot measured 340 × 860 points.
+Codex content and the footer remained visible; Claude showed the expected
+spare region. These settled screenshots establish stable host height, but do
+not prove the intermediate layered frame is absent. A short display, keyboard,
+VoiceOver, and Light/Dark transitions were not exercised in this follow-up.
+
+The separate global Settings destination-switch defect remains deferred.
+
+### User correction — 2026-09-27
+
+The fixed-height screenshot exposed a blank region below Claude's source line;
+this was caused by the 860-point menu fix, not by Claude content. The Codex
+credit card also extended below the initial viewport and required scrolling.
+The user rejected the blank region and requested Claude's orange warning text
+match Codex's caption font. The revision changes the fixed height to a
+content-fitting maximum, retains overflow scrolling, and makes both warning
+strips `.caption.weight(.medium)`. In the reopened signed app, Claude's
+cached-warning state measured **340 × 820 pt** with the footer directly below
+the source line; confirmed Codex measured **340 × 859 pt**. Twenty alternating
+pointer switches selected the intended tab and returned the corresponding
+height every time. Settled screenshots showed no duplicated content, but did
+not capture intermediate frames, so the brief compositor artifact remains an
+unverified boundary. The small-screen cap and overflow scroll were not
+directly exercised.
+
+### Stable transparent host — 2026-09-27
+
+The user confirmed the 39-point intrinsic host resize still caused the
+doubled-background/text jump. The next signed build held the transparent
+AppKit host at 340 × 860 points while keeping the visible rounded SwiftUI shell
+at each provider's natural height. An initial prototype let the host's height
+proposal stretch the shell; adding `.fixedSize(horizontal: false, vertical:
+true)` to the shell removed that interior gap. The signed Claude screenshot
+showed the footer directly below its source line and the shell ending above
+the transparent host tail. Twenty alternating pointer selections all selected
+the intended provider and all host screenshots remained 340 × 860 points.
+The transparent tail initially swallowed clicks, so the final revision adds a
+tap-to-dismiss area there. In the final signed build, clicking the transparent
+tail dismissed the menu while the Agent Monitor process remained running.
+Intermediate frame capture, short-screen overflow, keyboard, VoiceOver, and
+Light/Dark coverage remain unverified.
+
+### Native host mask follow-up — 2026-09-27
+
+The fixed native host still painted a second background strip below Claude's
+shorter SwiftUI panel. A signed build now measures the visible panel and masks
+the host's drawing to that height while leaving the 340 × 860-point host stable.
+The Claude screenshot showed the second painted strip removed; clicking the
+masked tail dismissed the menu and left the app running. The masked tail is
+still part of the native window's hit area, so clicks there do not pass through
+to the underlying app. The user confirmed provider switching is fine in this
+build and asked to stop. A bottom rounded edge remains visible and is recorded
+as the outstanding visual detail. No further UI change was made.

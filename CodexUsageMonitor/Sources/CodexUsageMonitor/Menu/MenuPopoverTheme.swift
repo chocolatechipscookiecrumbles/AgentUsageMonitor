@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 /// The complete visual token set for the menu-bar popover.
@@ -6,6 +7,10 @@ import SwiftUI
 /// low-emphasis surfaces from those shared tints.
 struct MenuPopoverTheme {
     static let popoverWidth: CGFloat = 340
+    static let maximumPopoverHeight: CGFloat = 860
+    static var availablePopoverHeight: CGFloat {
+        min(maximumPopoverHeight, NSScreen.screens.map(\.visibleFrame.height).min() ?? maximumPopoverHeight)
+    }
     static let shellCornerRadius: CGFloat = 14
     static let shellBorderWidth: CGFloat = 1
     static let shellOutlineWidth: CGFloat = 0.5
