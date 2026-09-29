@@ -62,6 +62,9 @@ struct MenuSurface: View {
                     .id(Self.contentTop)
             }
             .scrollBounceBehavior(.basedOnSize)
+            // Tall content still scrolls; the menu shows no scroll bar, even
+            // when System Settings asks to always show them (user, 2026-09-29).
+            .scrollIndicators(.never)
             .onChange(of: state.selection) { _, _ in
                 proxy.scrollTo(Self.contentTop, anchor: .top)
             }
