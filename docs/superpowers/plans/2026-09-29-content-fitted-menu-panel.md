@@ -85,11 +85,11 @@ The diagnosis's optional follow-up asked for the frame to be applied "in the sam
 ### Task 0 — Preconditions
 
 - [x] Review and commit the pending Claude/provider working-tree changes as their own reviewed commits (user decision). Done 2026-09-29: Claude passive-first, model identifiers, stable menu host + bounded viewport, renderer split, and these docs; the trial code was archived.
-- [ ] Re-inventory running `CodexUsageMonitor` processes and record the PIDs the user owns. Never terminate them.
+- [x] Re-inventory running `CodexUsageMonitor` processes and record the PIDs the user owns. Never terminate them. Done 2026-09-29: one user-owned instance, PID 75660 (`.build/CodexUsageMonitor.app`), left untouched.
 
 ### Task 1 — ADR 0004 (Proposed)
 
-- [ ] Write `docs/adr/0004-content-fitted-menu-panel.md`:
+- [x] Write `docs/adr/0004-content-fitted-menu-panel.md`:
   - **Context:** two reproduced mechanisms (centered stale frame; resize-after-measure).
   - **Decision:** invariants I1–I6, the gated snapshot pipeline and the decisions table.
   - **Rejected alternatives:**
@@ -100,30 +100,30 @@ The diagnosis's optional follow-up asked for the frame to be applied "in the sam
     - growing to the screen cap: rejected in favor of pre-measuring;
     - same-commit synchronization: not provable with public API.
   - **Consequences:** loses `MenuBarExtra` scene conveniences; Settings goes through ⌘, dispatch; a new status item position.
-- [ ] Mark ADR 0003 `Superseded by 0004`, and record that its "resize to content immediately / no transparent tail" constraint contradicted the established root cause.
+- [x] Mark ADR 0003 `Superseded by 0004`, and record that its "resize to content immediately / no transparent tail" constraint contradicted the established root cause.
 
 ### Task 2 — Minimal red regressions (reproduced defects only)
 
-- [ ] `MenuPanelAnchorTests.testShellStaysTopAnchoredInTallerWindow`: run it first against today's `MenuTrialShell` and confirm **red** (probe: viewport y=156 vs 86).
-- [ ] `MenuWindowEnvelopeTests.testStaleShrinkIsDroppedAfterNewerGrow`: run it first against a policy without the generation guard and confirm **red**.
-- [ ] Record in the Verification log that neither test proves compositor behavior.
+- [x] `MenuPanelAnchorTests.testShellStaysTopAnchoredInTallerWindow`: run it first against today's `MenuTrialShell` and confirm **red** (probe: viewport y=156 vs 86). Done: red against the archived shell (viewport moved 70 pt when the window grew 140 pt).
+- [x] `MenuWindowEnvelopeTests.testStaleShrinkIsDroppedAfterNewerGrow`: run it first against a policy without the generation guard and confirm **red**. Done: red against the unguarded policy (window 400 pt under 700 pt content).
+- [x] Record in the Verification log that neither test proves compositor behavior.
 
 ### Task 3 — Prototype (panel mode only)
 
 Follow the file map in the structure draft.
-- [ ] Refactor `MenuAdaptiveLayout` into `MenuViewportLayout`, then run `MenuViewportOverflowTests` → green.
-- [ ] Add `MenuPanelState`, `MenuSurfaceActions` and `MenuSurface` (moved from `MenuTrialSurface`; the tab binding routes writes to `actions.select`). Make `MenuContentSnapshot` `Equatable`.
-- [ ] Add `MenuPanelModel` and `MenuPanelRoot` (top anchor). Run the anchor test → green.
-- [ ] Add `MenuWindowEnvelope`. Run the envelope test → green.
-- [ ] Add `MenuSurfaceMeasurer`, `MenuSnapshotSource` (live and fixture) and `MenuContentPipeline`.
-- [ ] Add `MenuPanel`, `MenuPanelController` (non-activating, fade, monitors, `setHeight`) and `MenuCommandRouter`. Replace `MenuPresentationMode` with `MenuHost`.
-- [ ] Do not restore `MenuTrialView`, `MenuTrialShell`, `MenuPresentationSizing`, `MenuTrialPanel`, `MenuPresentationController` or the popover trial mode; they are superseded by the files above.
+- [x] ~~Refactor `MenuAdaptiveLayout` into `MenuViewportLayout`~~ Changed: added `MenuViewportLayout` for the panel only, because production's `MenuBarPopoverView` uses `MenuAdaptiveLayout` and PR 1 leaves production unchanged. Promotion replaces `MenuAdaptiveLayout` and retargets `MenuViewportOverflowTests`. `MenuViewportOverflowTests` stays green.
+- [x] Add `MenuPanelState`, `MenuSurfaceActions` and `MenuSurface` (moved from `MenuTrialSurface`; the tab binding routes writes to `actions.select`). Make `MenuContentSnapshot` `Equatable`. `MenuContentSnapshot` is **not** made `Equatable` (see Deviations).
+- [x] Add `MenuPanelModel` and `MenuPanelRoot` (top anchor). Run the anchor test → green.
+- [x] Add `MenuWindowEnvelope`. Run the envelope test → green.
+- [x] Add `MenuSurfaceMeasurer`, `MenuSnapshotSource` (live and fixture) and `MenuContentPipeline`.
+- [x] Add `MenuPanel`, `MenuPanelController` (non-activating, fade, monitors, `setHeight`) and `MenuCommandRouter`. Replace `MenuPresentationMode` with `MenuHost`.
+- [x] Do not restore `MenuTrialView`, `MenuTrialShell`, `MenuPresentationSizing`, `MenuTrialPanel`, `MenuPresentationController` or the popover trial mode; they are superseded by the files above.
 - [ ] Try the Q1 variants one at a time, each as its own signed build. Revert each losing variant before testing the next.
-- [ ] `swift test --filter 'MenuPanelAnchorTests|MenuWindowEnvelopeTests|MenuViewportOverflowTests'`, then `swift test` once. Report warnings precisely.
+- [x] `swift test --filter 'MenuPanelAnchorTests|MenuWindowEnvelopeTests|MenuViewportOverflowTests'`, then `swift test` once. Report warnings precisely.
 
 ### Task 4 — Signed build
 
-- [ ] Restore `build-menu-trials.sh` from the archive branch and reduce it to Panel Live and Panel Demo. Build them, then run `codesign --verify --deep --strict` on both.
+- [x] Restore `build-menu-trials.sh` from the archive branch and reduce it to Panel Live and Panel Demo. Build them, then run `codesign --verify --deep --strict` on both. Script restored and reduced; build pending (see Verification log).
 - [ ] Record the `xcodebuild` limitation (no project; exit 66) exactly as in the adaptive-menu plan. Do not generate a project to work around it.
 
 ### Task 5 — Self-audit (the agent's own evidence only)
@@ -169,6 +169,18 @@ Follow the file map in the structure draft.
   These are reimplemented and must be accepted in the signed app.
 - Pre-measurement can drift from live layout. Drift is visible only as a debug fault and at most a one-frame bottom clip; it must be fixed, not masked with a margin.
 
+## Deviations from the structure draft (2026-09-29)
+
+- **No `Equatable` de-duplication.** `MenuProviderHeaderPresentation`, `CodexMenuPresentation` and `ClaudeUsageDisplayModel` are not `Equatable`, and conforming them would spread into the quota model types. The pipeline instead coalesces a burst of model changes into one rebuild per run-loop turn and always publishes.
+- **`MenuViewportLayout` is added beside `MenuAdaptiveLayout`,** not in place of it, so production is unchanged in PR 1. Evidence that the panel needs it: in a fresh `NSHostingView`, the archived trial shell (built on `MenuAdaptiveLayout`) reports a fitted height of 263 pt because its measured `@State` is still empty, which counts the viewport as 0. The `MenuViewportLayout`-based root reports its real height (860 pt for the capped fixture) on the first pass.
+- **Display changes close the panel** instead of re-anchoring it, which keeps geometry ownership simple.
+- **`MenuSurface` lives in `Menu/Panel/`,** because only the panel uses it until promotion.
+- **Status item** keeps the archived default click action (mouse-up), unchanged from the trials.
+
 ## Verification log
 
-_Empty. Record commands, exit statuses, warnings, the signed build, recording results and any unobserved states here as work proceeds._
+- 2026-09-29, `MenuPanelAnchorTests` (red first). Against the archived `MenuTrialShell`: viewport minY −102.5 in a window 140 pt taller vs −172.5 in the fitted window, a 70 pt move, so red. Against `MenuPanelRoot`: minY 120 in both, so green. A first draft of the test built its window from `fittingSize` on a host with `sizingOptions = []`, which reports 0. That was corrected before accepting either result.
+- 2026-09-29, `MenuWindowEnvelopeTests` (red first). The unguarded policy applied a stale shrink to 400 pt beneath 700 pt of content, so red. The generation guard makes it green.
+- Neither test proves compositor behavior; that remains Tasks 6–7.
+- 2026-09-29, `swift build` and `swift test`: exit 0, 316 tests, 1 skipped (the existing glyph test), 0 failures. No new warnings; the existing Keychain deprecation warnings remain.
+- Signed build: pending, run from a separate worktree so the user-owned app at `.build/CodexUsageMonitor.app` (PID 75660) is not re-signed while it runs.

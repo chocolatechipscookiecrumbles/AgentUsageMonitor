@@ -401,3 +401,16 @@ The current reader already takes three read-only samples and compares reset time
 - preserve the last-known-good snapshot.
 
 In short: use `codex login` to reproduce the sign-in flow safely, then run `python3 -m codex_probe`. Never manually replay the localhost callback URL.
+
+## Content-fitted menu panel prototype (2026-09-29)
+
+Normal launches keep the `MenuBarExtra` menu. The ADR 0004 panel runs only with
+`--menu-presentation=panel` (add `--menu-fixture` for synthetic states); any
+other presentation value, or `--menu-fixture` alone, exits with status 64.
+`zsh CodexUsageMonitor/Scripts/build-menu-trials.sh` builds signed **Panel Live**
+and **Panel Demo** apps in `CodexUsageMonitor/.build/Menu Presentation Trials`.
+The script runs `build-app.sh`, which re-signs `.build/CodexUsageMonitor.app`;
+quit an instance running from that path first, or build from a separate
+worktree. Run one build at a time. Panel Demo never constructs live monitoring
+services. Acceptance is a user-operated 60 fps recording; see the
+[plan](../superpowers/plans/2026-09-29-content-fitted-menu-panel.md).

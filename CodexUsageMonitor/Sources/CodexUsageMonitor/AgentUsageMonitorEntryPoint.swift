@@ -13,6 +13,10 @@ enum AgentUsageMonitorEntryPoint {
         if ClaudeUsageBridgeCommand.shouldRun(arguments: CommandLine.arguments) {
             exit(ClaudeUsageBridgeCommand.run(arguments: CommandLine.arguments))
         }
+        if MenuHost.isInvalidRequest {
+            FileHandle.standardError.write(Data((MenuHost.usage + "\n").utf8))
+            exit(64)
+        }
         CodexUsageMonitorApp.main()
     }
 }
