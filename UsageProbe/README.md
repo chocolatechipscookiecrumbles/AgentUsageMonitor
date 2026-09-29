@@ -1,5 +1,7 @@
 # Codex capability probe
 
+Token Monitor model compatibility: new supplied model identifiers remain visible even when no friendly abbreviation is known. `Unknown model` is reserved for missing/blank identifiers. See the [adaptation plan](../docs/superpowers/plans/2026-09-23-model-adaptation.md) and the separate [Claude reset-source diagnosis](../docs/development/claude-reset-tracker-portability.md).
+
 This Phase 0 harness checks whether the locally installed Codex exposes useful account limits and token-usage summaries without starting a model turn.
 
 ## Safety boundary

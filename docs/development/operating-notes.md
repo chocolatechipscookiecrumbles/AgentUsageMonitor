@@ -1,5 +1,11 @@
 # Operating notes
 
+## Model compatibility and reset-source evidence — September 23
+
+Token Monitor now retains unfamiliar model identifiers instead of grouping them as Unknown model. Recent Codex records contain `codex-auto-review`, which exposed the formatter defect; `gpt-6-astra` already parses as GPT-6. Truly absent identifiers still show Unknown model. Existing raw-ID caches need no migration. Future names in the same record schema work without an app-specific model list; semantic/schema changes may still need an update. See the [adaptation plan](../superpowers/plans/2026-09-23-model-adaptation.md).
+
+Claude reset-offer portability remains source-gated. The OAuth decoder discards unknown fields, so normalized snapshots cannot prove inventory is absent from today's raw endpoint. See the [diagnosis and bounded next check](claude-reset-tracker-portability.md). No new credential read or automatic `/usage` was performed for this follow-up.
+
 These maintainer notes cover the Codex login flow, the read-only usage probe, and
 running the native app from source.
 

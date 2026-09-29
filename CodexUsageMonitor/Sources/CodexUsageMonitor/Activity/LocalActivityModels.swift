@@ -388,8 +388,9 @@ enum LocalActivityModelName {
 
     static func shortName(for rawModelID: String?) -> String {
         guard let rawModelID else { return unknown }
-        let normalized = rawModelID.lowercased()
-        guard !normalized.isEmpty else { return unknown }
+        let identifier = rawModelID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !identifier.isEmpty else { return unknown }
+        let normalized = identifier.lowercased()
 
         if let version = version(in: normalized, family: "gpt") {
             return "GPT-\(version)"
@@ -399,7 +400,9 @@ enum LocalActivityModelName {
                 return "\(family.capitalized) \(version)"
             }
         }
-        return unknown
+        // A new provider identifier is still evidence, even before we know how
+        // to abbreviate it. Reserve Unknown model for an absent identifier.
+        return identifier
     }
 
     /// One or two digits not followed by another digit. Bounding the run is what

@@ -236,6 +236,7 @@ _Avoid_: Top model, model quota, model allowance
 
 **Short Model Name**:
 A compact model family and number such as GPT-5.6 or Sonnet 4.5; provider prefixes, product suffixes, and dated build identifiers are omitted.
+Unrecognized families retain their supplied identifier rather than becoming Unknown Model; abbreviation rules are presentation conveniences, not a model allowlist.
 _Avoid_: Raw model identifier, model alias, display label
 
 **Last Request**:
