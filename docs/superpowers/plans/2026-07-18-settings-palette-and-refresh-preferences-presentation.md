@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` (recommended) or `executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Status:** **Implementation complete — known destination-switch compositor defect deferred.** The user directly inspected the final card presentation across the stated Settings matrix. The page-switch artifact remains reproducible after two rejected workarounds and is deferred by user direction for a dedicated prototype. Its original presentation-only Refresh rows are superseded by the implemented [Refresh-on-Wake plan](2026-07-18-refresh-wake-and-menu-open.md); this plan itself added no automated test case.
+**Status:** **Implementation complete — destination-switch compositor defect fixed 2026-09-30** by retained pages ([plan](2026-09-30-settings-destination-retained-pages.md)). The user directly inspected the final card presentation across the stated Settings matrix. The page-switch artifact remains reproducible after two rejected workarounds and is deferred by user direction for a dedicated prototype. Its original presentation-only Refresh rows are superseded by the implemented [Refresh-on-Wake plan](2026-07-18-refresh-wake-and-menu-open.md); this plan itself added no automated test case.
 
 **Refresh scope correction — 2026-07-18:** This document's original Figma-derived **Refresh on open** affordance was intentionally not promoted to product behavior. The user rejected it as poor design. Treat any later uncompleted task text that mentions an open preference, `refresh.onOpen`, or `RefreshReason.menuOpen` as historical rejected design, not executable direction. The implemented behavior is the persisted wake-only control in the linked follow-on plan.
 
@@ -518,6 +518,8 @@ settled frame remained 680 × 588 pt and accessibility selected the requested
 destination. These snapshots cannot detect the previously recorded one-to-two
 frame compositor artifact, so the deferred status and frame-capture boundary
 remain unchanged.
+
+**Resolution — 2026-09-30:** keeping all six destinations mounted and switching only visibility (`SettingsDestinationStack`) removed the defect in the user's signed-app 60 fps recording, including rapid General ↔ Notifications switching. See the [retained-pages plan](2026-09-30-settings-destination-retained-pages.md).
 
 ### Video inspection evidence — 2026-07-18
 

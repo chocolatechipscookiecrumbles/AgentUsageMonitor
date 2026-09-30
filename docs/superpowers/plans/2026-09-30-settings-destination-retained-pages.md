@@ -30,12 +30,13 @@ In each case the container that hosts the swapped content changed in the same tr
 - [x] Wire `SettingsDestinationStack` into `SettingsDetailView`, with visibility-triggered refreshes.
 - [x] `swift build`, `swift test`.
 - [x] Signed build delivered without replacing the user's running app.
-- [ ] User 60 fps recording: rapid General ↔ Notifications and all six destinations, with the Context Rail hidden and visible, in Light and Dark.
-- [ ] VoiceOver and keyboard: hidden pages must not be read or focused.
-- [ ] If red: revert and try candidate 2 (one shared scroll host with a viewport-filling envelope), then candidate 3 (AppKit-hosted pages). If green: update `AGENTS.md`'s deferred-defect guidance and the 2026-07-18 plan.
+- [x] User 60 fps recording: rapid General ↔ Notifications and all six destinations, with the Context Rail hidden and visible, in Light and Dark.
+- [x] VoiceOver and keyboard: hidden pages must not be read or focused.
+- [x] Green, so candidates 2 and 3 are not needed. (If red: revert and try candidate 2 (one shared scroll host with a viewport-filling envelope), then candidate 3 (AppKit-hosted pages). If green: update `AGENTS.md`'s deferred-defect guidance and the 2026-07-18 plan.) Done 2026-09-30.
 
 ## Verification log
 
 - 2026-09-30: a first test draft used stand-in pages of one view type; SwiftUI reused a single scroll view, so it passed against the `switch` version. That draft was rejected. With distinct page types, matching `SettingsDetailView`, the `switch` version fails (scroll host replaced) and the retained stack passes.
 - 2026-09-30: `swift build` and `swift test`: exit 0, 315 tests, 1 skipped (existing glyph test), 0 failures.
 - 2026-09-30: `build-app.sh` run from a separate worktree at `9fc4a06` (the ignored asset catalog copied in). "Signed with: Developer ID Application"; `codesign --verify --deep --strict` passed. Delivered as `CodexUsageMonitor/.build/Settings Retained Pages.app`; the user's running Panel Live (PID 34905) and `.build/CodexUsageMonitor.app` were not touched.
+- 2026-09-30, **user acceptance (Observed).** In the signed `Settings Retained Pages.app`, the user's 60 fps recording showed no duplicated or displaced text, including rapid General ↔ Notifications switching and all six destinations with the Context Rail hidden and visible in Light and Dark. VoiceOver and keyboard checks passed: hidden pages were not read or focused.
