@@ -263,7 +263,6 @@ final class QuotaViewModel: ObservableObject {
     static func shouldStartProviderMonitoring(arguments: [String]) -> Bool {
         !arguments.contains("--live-read-once")
             && !arguments.contains(ClaudeUsageProbeCommand.flag)
-            && !arguments.contains(MenuPopoverViabilityGate.launchArgument)
             // Re-opening the tour for visual acceptance must not read a
             // provider, so the preview run is inert in the same way the probes
             // are.

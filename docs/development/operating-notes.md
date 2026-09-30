@@ -402,11 +402,14 @@ The current reader already takes three read-only samples and compares reset time
 
 In short: use `codex login` to reproduce the sign-in flow safely, then run `python3 -m codex_probe`. Never manually replay the localhost callback URL.
 
-## Content-fitted menu panel prototype (2026-09-29)
+## Content-fitted menu panel (default since 2026-09-30)
 
-Normal launches keep the `MenuBarExtra` menu. The ADR 0004 panel runs only with
-`--menu-presentation=panel` (add `--menu-fixture` for synthetic states); any
-other presentation value, or `--menu-fixture` alone, exits with status 64.
+The menu is the ADR 0004 content-fitted panel. To fall back to the previous
+stable-host `MenuBarExtra` menu, launch with `--menu-host=legacy` or run
+`defaults write com.david.codex-usage-monitor MenuHostLegacy -bool true` and
+relaunch (`defaults delete com.david.codex-usage-monitor MenuHostLegacy` undoes
+it). `--menu-fixture` shows synthetic states in the panel; any
+`--menu-presentation` value other than `panel` exits with status 64.
 `zsh CodexUsageMonitor/Scripts/build-menu-trials.sh` builds signed **Panel Live**
 and **Panel Demo** apps in `CodexUsageMonitor/.build/Menu Presentation Trials`.
 The script runs `build-app.sh`, which re-signs `.build/CodexUsageMonitor.app`;

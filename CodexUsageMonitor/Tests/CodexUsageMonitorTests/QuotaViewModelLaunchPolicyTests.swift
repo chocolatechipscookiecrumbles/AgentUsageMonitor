@@ -3,14 +3,6 @@ import XCTest
 
 @MainActor
 final class QuotaViewModelLaunchPolicyTests: XCTestCase {
-    func testWindowPopoverGateDoesNotStartProviderMonitoring() {
-        XCTAssertFalse(
-            QuotaViewModel.shouldStartProviderMonitoring(
-                arguments: ["CodexUsageMonitor", MenuPopoverViabilityGate.launchArgument]
-            )
-        )
-    }
-
     func testOnboardingPreviewDoesNotStartProviderMonitoring() {
         XCTAssertFalse(
             QuotaViewModel.shouldStartProviderMonitoring(

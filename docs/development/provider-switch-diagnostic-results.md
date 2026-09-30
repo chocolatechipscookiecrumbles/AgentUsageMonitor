@@ -395,3 +395,7 @@ archived outside this branch. An app-owned, content-fitted panel remains
 possible only with a top-anchored root and a window that is never smaller than
 its committed content; see the
 [content-fitted menu panel plan](../superpowers/plans/2026-09-29-content-fitted-menu-panel.md).
+
+### Promotion — 2026-09-30
+
+The content-fitted panel (ADR 0004) passed the user's 60 fps recording, VoiceOver, Light/Dark, short-screen, multiple-screen and Settings-from-panel checks and is now the default menu. The stable-host `MenuBarExtra` menu remains as the `--menu-host=legacy` kill switch.
