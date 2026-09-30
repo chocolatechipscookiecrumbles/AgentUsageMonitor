@@ -6,9 +6,25 @@ final class LocalActivityReconciliationRegressionTests: XCTestCase {
     func testSuppliedUnrecognizedModelIsNotReportedAsMissing() {
         XCTAssertEqual(LocalActivityModelName.shortName(for: "codex-auto-review"), "codex-auto-review")
         XCTAssertEqual(LocalActivityModelName.shortName(for: "  future-family-7.1  "), "future-family-7.1")
-        XCTAssertEqual(LocalActivityModelName.shortName(for: "gpt-6-astra"), "GPT-6")
+        XCTAssertEqual(LocalActivityModelName.shortName(for: "gpt-6-astra"), "GPT-6 Astra")
         XCTAssertEqual(LocalActivityModelName.shortName(for: nil), "Unknown model")
         XCTAssertEqual(LocalActivityModelName.shortName(for: " \n "), "Unknown model")
+    }
+
+    /// Distinct variants of one family (gpt-6-astra beside another GPT-6, or
+    /// gpt-5.6-sol) were merged into one "GPT-6"/"GPT-5.6" row, attributing
+    /// their tokens to a single model. Dates and context tags are not variants.
+    func testModelVariantsAreNotMergedIntoTheirFamily() {
+        XCTAssertEqual(LocalActivityModelName.shortName(for: "gpt-5.6-sol"), "GPT-5.6 Sol")
+        XCTAssertEqual(LocalActivityModelName.shortName(for: "gpt-5.1-codex-max"), "GPT-5.1 Codex Max")
+        XCTAssertEqual(LocalActivityModelName.shortName(for: "gpt-4o-mini"), "GPT-4o Mini")
+        XCTAssertEqual(LocalActivityModelName.shortName(for: "gpt-6"), "GPT-6")
+        XCTAssertEqual(LocalActivityModelName.shortName(for: "claude-sonnet-4-5-20250929"), "Sonnet 4.5")
+        XCTAssertEqual(LocalActivityModelName.shortName(for: "claude-opus-4-20250514"), "Opus 4")
+        XCTAssertEqual(LocalActivityModelName.shortName(for: "claude-opus-4-5[1m]"), "Opus 4.5")
+        XCTAssertEqual(LocalActivityModelName.shortName(for: "claude-3-5-sonnet-20241022"), "Sonnet 3.5")
+        XCTAssertEqual(LocalActivityModelName.shortName(for: "claude-fable-5-1"), "Fable 5.1")
+        XCTAssertEqual(LocalActivityModelName.shortName(for: "claude-opus-5-5"), "Opus 5.5")
     }
 
     func testExactCumulativeReplayDoesNotInflateObservedTokens() async throws {

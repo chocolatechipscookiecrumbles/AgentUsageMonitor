@@ -235,7 +235,7 @@ Observed Token Activity grouped by Short Model Name and ordered by contribution.
 _Avoid_: Top model, model quota, model allowance
 
 **Short Model Name**:
-A compact model family and number such as GPT-5.6 or Sonnet 4.5; provider prefixes, product suffixes, and dated build identifiers are omitted.
+A compact model family, number and variant such as GPT-6 Astra, GPT-5.6 Sol, GPT-4o Mini, Sonnet 4.5 or Fable 5.1. Variants are distinct models and keep separate rows; provider prefixes, dated build identifiers and context tags such as `[1m]` are omitted.
 Unrecognized families retain their supplied identifier rather than becoming Unknown Model; abbreviation rules are presentation conveniences, not a model allowlist.
 _Avoid_: Raw model identifier, model alias, display label
 

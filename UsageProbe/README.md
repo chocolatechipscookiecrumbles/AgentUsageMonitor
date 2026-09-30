@@ -1,6 +1,6 @@
 # Codex capability probe
 
-Token Monitor model compatibility: new supplied model identifiers remain visible even when no friendly abbreviation is known. `Unknown model` is reserved for missing/blank identifiers. See the [adaptation plan](../docs/superpowers/plans/2026-09-23-model-adaptation.md) and the separate [Claude reset-source diagnosis](../docs/development/claude-reset-tracker-portability.md).
+Token Monitor model compatibility: model rows keep the variant, so `gpt-6-astra` and `gpt-5.6-sol` show as GPT-6 Astra and GPT-5.6 Sol rather than merging into their family, and VoiceOver reads the exact identifiers. New supplied model identifiers remain visible even when no friendly abbreviation is known. `Unknown model` is reserved for missing/blank identifiers. See the [adaptation plan](../docs/superpowers/plans/2026-09-23-model-adaptation.md) and the separate [Claude reset-source diagnosis](../docs/development/claude-reset-tracker-portability.md).
 
 This Phase 0 harness checks whether the locally installed Codex exposes useful account limits and token-usage summaries without starting a model turn.
 
