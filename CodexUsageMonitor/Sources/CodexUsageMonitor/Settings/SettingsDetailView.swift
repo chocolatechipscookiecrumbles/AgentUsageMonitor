@@ -7,7 +7,19 @@ struct SettingsDetailView: View {
     let selectedSettingsAgent: AgentProvider
 
     var body: some View {
-        switch selection {
+        // Every destination stays mounted; a switch only changes visibility.
+        // See `SettingsDestinationStack` for why a `switch` is not used here.
+        SettingsDestinationStack(selection: selection) { destination in
+            page(for: destination)
+        }
+        .onChange(of: selection) { _, destination in
+            pageDidBecomeVisible(destination)
+        }
+    }
+
+    @ViewBuilder
+    private func page(for destination: SettingsTab) -> some View {
+        switch destination {
         case .general:
             GeneralSettingsView(
                 viewModel: viewModel,
@@ -36,6 +48,19 @@ struct SettingsDetailView: View {
                 status: viewModel.settingsStatus,
                 clearDiagnostics: viewModel.clearRefreshDiagnostics
             )
+        }
+    }
+
+    /// Retained pages do not re-run `onAppear` when revisited, so repeat the
+    /// refreshes they performed each time they were shown.
+    private func pageDidBecomeVisible(_ destination: SettingsTab) {
+        switch destination {
+        case .general:
+            launchAtLogin.refresh()
+        case .agents where selectedSettingsAgent == .claudeCode:
+            viewModel.refreshClaudePassiveCaptureHealth()
+        default:
+            break
         }
     }
 }
