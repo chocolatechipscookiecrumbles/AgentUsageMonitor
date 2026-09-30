@@ -10,11 +10,17 @@ import SwiftUI
 /// object nothing else observes.
 @MainActor
 final class ApplicationDelegate: NSObject, NSApplicationDelegate {
-    let viewModel = QuotaViewModel()
+    /// Lazy so the synthetic menu replay never constructs live monitoring.
+    lazy var viewModel = QuotaViewModel()
+    private var menuPanel: MenuPanelController?
     private lazy var startupCoordinator = StartupCoordinator(settings: viewModel.settings)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let arguments = CommandLine.arguments
+        if MenuHost.current == .panel {
+            menuPanel = MenuPanelController(viewModel: MenuHost.usesFixtures ? nil : viewModel)
+            if MenuHost.usesFixtures { return }
+        }
         if OnboardingLaunchMode.isPreview(arguments: arguments) {
             startupCoordinator.presentPreview()
             return

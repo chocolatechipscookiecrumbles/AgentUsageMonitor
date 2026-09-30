@@ -1,6 +1,6 @@
 # Own menu presentation geometry
 
-Status: Rejected (2026-09-28). The user reported that neither trial fixed the defect and both recreated the provider-switch artifact. Superseded by the [content-fitted menu panel plan](../superpowers/plans/2026-09-29-content-fitted-menu-panel.md); ADR 0004 is to be written from it.
+Status: Rejected (2026-09-28). The user reported that neither trial fixed the defect and both recreated the provider-switch artifact. Superseded by [ADR 0004](0004-content-fitted-menu-panel.md).
 
 **Why it failed:** the constraint "resizes to content immediately" with no transparent tail reintroduced the host resize that the July diagnosis identified as the cause. Both hosts resized after measuring, a run-loop turn later, while the unanchored root was centered in the stale window. See [Trial rejection and diagnosis](../development/provider-switch-diagnostic-results.md#trial-rejection-and-diagnosis--2026-09-28). The trial code is archived on the local branch `archive/rejected-menu-trials-2026-09-28`.
 
