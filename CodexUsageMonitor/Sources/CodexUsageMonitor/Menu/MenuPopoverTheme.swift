@@ -101,10 +101,17 @@ struct MenuPopoverTheme {
     let shellOutline: Color
     let cardShadow: Color
     let accent: Color
+    /// Claude's selected-tab tint. Codex keeps `accent`.
+    let claudeAccent: Color
     let success: Color
     let warning: Color
     let danger: Color
     let neutral: Color
+
+    /// The selected provider tab's text and underline color.
+    func tabSelectionTint(for provider: AgentProvider) -> Color {
+        provider == .claudeCode ? claudeAccent : accent
+    }
 
     static func resolve(for colorScheme: ColorScheme) -> Self {
         // The Settings window is the primary palette. Surface and divider tokens
@@ -135,6 +142,8 @@ struct MenuPopoverTheme {
                 shellOutline: .white.opacity(0.07),
                 cardShadow: .clear,
                 accent: accent,
+                // Claude brand orange (#D97757), as in the Token Monitor bars.
+                claudeAccent: rgb(217, 119, 87),
                 success: success,
                 warning: warning,
                 danger: danger,
@@ -157,6 +166,9 @@ struct MenuPopoverTheme {
             shellOutline: .black.opacity(0.08),
             cardShadow: .black.opacity(0.06),
             accent: accent,
+            // Claude's darker brand shade (#C15F3C) keeps caption-size tab
+            // text readable on the light shell.
+            claudeAccent: rgb(193, 95, 60),
             success: success,
             warning: warning,
             danger: danger,

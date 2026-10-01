@@ -36,7 +36,7 @@ struct MenuProviderTabStrip: View {
                         Text(provider.tabTitle)
                     }
                     .font(.caption.weight(.medium))
-                    .foregroundStyle(selection == provider ? theme.accent : theme.secondaryText)
+                    .foregroundStyle(selection == provider ? theme.tabSelectionTint(for: provider) : theme.secondaryText)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .contentShape(.rect)
                 }
@@ -44,7 +44,7 @@ struct MenuProviderTabStrip: View {
                 .background(hoveredProvider == provider ? theme.hoverBackground : .clear)
                 .overlay(alignment: .bottom) {
                     Rectangle()
-                        .fill(selection == provider ? theme.accent : .clear)
+                        .fill(selection == provider ? theme.tabSelectionTint(for: provider) : .clear)
                         .frame(height: MenuPopoverTheme.tabIndicatorHeight)
                 }
                 .onHover { hovering in
