@@ -1,6 +1,6 @@
 # ADR 0004: Content-fitted menu panel
 
-- Status: Proposed (prototype behind `--menu-presentation=panel`; production unchanged until signed-app acceptance)
+- Status: Accepted (2026-09-30). The panel is the default menu; `--menu-host=legacy` or the `MenuHostLegacy` default restores the stable-host `MenuBarExtra` menu.
 - Date: 2026-09-29
 - Supersedes: [ADR 0003](0003-own-menu-presentation-geometry.md)
 

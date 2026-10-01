@@ -139,7 +139,7 @@ Follow the file map in the structure draft.
 
 ### Task 7 — Acceptance matrix and decision gate
 
-- [ ] Beyond Task 6, check:
+- [x] Beyond Task 6, check:
   - failure-state overlap, and recovery controls reachable by scrolling;
   - Light and Dark;
   - VoiceOver;
@@ -148,15 +148,15 @@ Follow the file map in the structure draft.
   - Settings and Notifications commands;
   - status item position (Q5);
   - a short screen and multiple screens.
-- [ ] Compare side by side with the current production host. The user decides whether to promote the panel. **If any item is red and the fix is not obvious and isolated, stop.** Production remains the stable host.
-- [ ] Prepare PR 1 with `preparing-evidence-rich-prs`. The user creates it.
+- [x] Compare side by side with the current production host. The user decides whether to promote the panel. **If any item is red and the fix is not obvious and isolated, stop.** Production remains the stable host.
+- [x] Prepare PR 1 with `preparing-evidence-rich-prs`. The user creates it.
 
 ### Task 8 — Promotion, PR 2 (only after explicit user acceptance)
 
-- [ ] Switch `MenuHost.current` to default to `.panel`, with `--menu-host=legacy` or the `MenuHostLegacy` default restoring the `MenuBarExtra` host (kill switch).
-- [ ] Convert `MenuBarPopoverView` into a thin `MenuPopoverChrome { MenuSurface(live snapshot) }` wrapper, so the kill switch shares the one renderer.
-- [ ] Delete `WindowPopoverGateView` and `MenuPopoverViabilityGate`. Keep `--menu-fixture`.
-- [ ] Update AGENTS.md "SwiftUI selection-host geometry guardrails" to describe the panel invariants, with the 860-point host as the kill switch. Also update `UsageProbe/README.md`, `docs/development/operating-notes.md` and `provider-switch-diagnostic-results.md`.
+- [x] Switch `MenuHost.current` to default to `.panel`, with `--menu-host=legacy` or the `MenuHostLegacy` default restoring the `MenuBarExtra` host (kill switch).
+- [ ] ~~Convert~~ **Not done by decision (2026-09-30):** the kill switch keeps the exact stable-host code accepted on 2026-09-28 rather than a new, unverified path. Convert `MenuBarPopoverView` into a thin `MenuPopoverChrome { MenuSurface(live snapshot) }` wrapper, so the kill switch shares the one renderer.
+- [x] Delete `WindowPopoverGateView` and `MenuPopoverViabilityGate`. Keep `--menu-fixture`.
+- [x] Update AGENTS.md "SwiftUI selection-host geometry guardrails" to describe the panel invariants, with the 860-point host as the kill switch. Also update `UsageProbe/README.md`, `docs/development/operating-notes.md` and `provider-switch-diagnostic-results.md`.
 - [ ] Prepare PR 2 with `preparing-evidence-rich-prs`. The user creates it.
 
 ## Risks and limitations
@@ -188,3 +188,6 @@ Follow the file map in the structure draft.
 - 2026-09-29, self-audit (Task 5) **blocked; no panel observation.** Panel Demo was launched as audit PID 79907 beside the user's app. System Events resolved "process whose unix id is 79907" to the user's instance, because both share the bundle identifier `com.david.codex-usage-monitor`, so the Accessibility click opened the user's production menu. That menu was closed with the same toggle, only PID 79907 was terminated, and PID 75660 kept running. Panel Demo's own status item did not appear in the visible menu bar. Screenshots taken during the attempt captured unrelated screen content and were deleted. Automated self-audit needs the user's app quit first, or a distinct bundle identifier, which AGENTS.md forbids changing. Tasks 6–7 remain the acceptance path.
 - 2026-09-29, **user observation (no recording).** In the signed Panel builds, switching back and forth from every fixture stage worked, and the switch artifact did not appear. The user asked to hide the scroll bar while keeping scrolling; `2726bd6` adds `.scrollIndicators(.never)` to the panel viewport, and the signed apps were rebuilt and re-verified. There is no automated test for this presentation preference. Not yet observed: a frame-by-frame 60 fps recording, VoiceOver, Light/Dark, a short screen, multiple screens, and the Settings commands from the panel.
 - 2026-09-29, **user acceptance.** The user reported that the 60 fps recording of the panel checks out, and that VoiceOver, Dark and Light appearance are fine. Still not observed: a short screen, multiple screens, and the Settings commands from the panel. The user also reported that the separate, deferred Settings destination-switch defect still occurs between General and Notifications; it is outside this plan (see `2026-07-18-settings-palette-and-refresh-preferences-presentation.md`).
+- 2026-09-30, **user acceptance (Observed).** Short screen, multiple screens and Settings commands from the panel all check out. Together with the 60 fps recording, VoiceOver and Light/Dark results, Task 7 is complete; the user directed promotion.
+- 2026-09-30, **promotion (PR 2).** `MenuHost.current` defaults to `.panel`; `--menu-host=legacy` or `defaults write com.david.codex-usage-monitor MenuHostLegacy -bool true` restores the `MenuBarExtra` host. The window-popover viability gate, its scene, its launch-policy argument and its one test (`testWindowPopoverGateDoesNotStartProviderMonitoring`) are removed with the feature. `swift test`: 316 tests, 1 skipped, 0 failures.
+- 2026-09-30, **provider tab tint (user request).** The selected tab's text and underline use the provider's color: Codex keeps the system blue accent; Claude uses brand orange #D97757 in Dark and the darker brand shade #C15F3C in Light, for caption-size contrast. Tab text, layout and hit areas are unchanged. **Verified by the user in the signed app, 2026-09-30.**

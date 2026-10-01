@@ -42,16 +42,9 @@ struct CodexUsageMonitorApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra(isInserted: .constant(MenuHost.current == .menuBarExtra && MenuPopoverViabilityGate.isEnabled)) {
-            WindowPopoverGateView()
-        } label: {
-            if !MenuHost.usesFixtures {
-                MenuBarStatusLabel(viewModel: viewModel)
-            }
-        }
-        .menuBarExtraStyle(.window)
-
-        MenuBarExtra(isInserted: .constant(MenuHost.current == .menuBarExtra && !MenuPopoverViabilityGate.isEnabled)) {
+        // Kill switch only (`--menu-host=legacy`): the stable-host menu that
+        // preceded the content-fitted panel (ADR 0004).
+        MenuBarExtra(isInserted: .constant(MenuHost.current == .menuBarExtra)) {
             if !MenuHost.usesFixtures {
                 MenuBarPopoverView(viewModel: viewModel)
             }
