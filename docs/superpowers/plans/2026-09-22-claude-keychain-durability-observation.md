@@ -16,6 +16,10 @@
 - [ ] At the first failure, preserve the failed state, capture the same fields once, and classify it using the plan’s decision rules.
 - [ ] Record unobserved events as untested; never claim permanent grant durability from a successful interval.
 
+## User observation — 2026-09-30
+
+During 0.1.0 acceptance the user reported, without timestamps or captured fields, that macOS occasionally shows the Keychain access prompt again, and that silent access sometimes fails until Claude is reconnected through Settings. This matches the failure the tasks above are designed to classify; it is not yet classified. The next occurrence should be captured once per Task 2 before reconnecting.
+
 ## Acceptance
 
 The evidence separates access-rule change, lookup mismatch, and OAuth rejection, or states precisely which required event did not occur.
