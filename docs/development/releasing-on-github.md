@@ -25,6 +25,14 @@ Merge order: the menu-panel default PR, the model-variant PR, then the
 must run in your own Terminal; an agent must not run `notarytool` or
 `security find-identity`, because they can block on a Keychain prompt.
 
+0. **Asset catalog.** `CodexUsageMonitor/Resources/Assets.xcassets` is git-ignored
+   and must contain the `Codex`, `Claude` and `Copilot` imagesets, or
+   `verify-signed-app-resources.sh` fails and the Claude tab and Settings agent
+   tiles lose their icons. On 2026-09-30 they were missing from this checkout and
+   were restored locally as vector PDFs converted from the design-import SVGs
+   (`codex-color`, `claudecode-color`, `githubcopilot`); the Codex SVG's compact
+   arc flags were expanded first so CoreSVG draws its rounded corners. With them
+   present, `MenuBarProviderGlyphTests` runs instead of being skipped.
 1. **(agent)** After the three PRs merge: `git switch main && git pull --ff-only`,
    then `cd CodexUsageMonitor && swift test && ./Scripts/build-app.sh &&
    ./Scripts/verify-signed-app-resources.sh`.
