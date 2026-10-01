@@ -17,6 +17,42 @@ the commands, so you can repeat it.
 > then, do not remove the disclosure from any of those three places. Codex usage
 > is read from the local Codex CLI app-server and carries no such caveat.
 
+## Releasing 0.1.0 — checklist (in progress, 2026-09-30)
+
+Version `0.1.0`, build `330`, notes in [`docs/release-notes/0.1.0.md`](../release-notes/0.1.0.md).
+Merge order: the menu-panel default PR, the model-variant PR, then the
+`release/0.1.0` PR. Steps marked **(you)** need your Keychain or Apple account and
+must run in your own Terminal; an agent must not run `notarytool` or
+`security find-identity`, because they can block on a Keychain prompt.
+
+1. **(agent)** After the three PRs merge: `git switch main && git pull --ff-only`,
+   then `cd CodexUsageMonitor && swift test && ./Scripts/build-app.sh &&
+   ./Scripts/verify-signed-app-resources.sh`.
+2. **(agent)** Confirm the bundle identity before spending a submission:
+   ```sh
+   app=.build/CodexUsageMonitor.app
+   plutil -extract CFBundleShortVersionString raw "$app/Contents/Info.plist"  # 0.1.0
+   plutil -extract CFBundleVersion raw "$app/Contents/Info.plist"             # 330
+   codesign --verify --deep --strict "$app"
+   ```
+3. **(you) Notarize and staple**, from `CodexUsageMonitor/.build`:
+   ```sh
+   ditto -c -k --keepParent CodexUsageMonitor.app CodexUsageMonitor-notarize.zip
+   xcrun notarytool submit CodexUsageMonitor-notarize.zip \
+     --keychain-profile "notary-codexmon" --wait        # wait for: status: Accepted
+   xcrun stapler staple CodexUsageMonitor.app
+   xcrun stapler validate CodexUsageMonitor.app        # "The validate action worked!"
+   spctl -a -vv CodexUsageMonitor.app                  # accepted … Notarized Developer ID
+   ```
+   If the status is `Invalid`, run `xcrun notarytool log <submission-id>
+   --keychain-profile "notary-codexmon"` and stop; do not staple or package.
+4. **(agent)** Package `AgentUsageMonitor-0.1.0.dmg` ([Step 4](#step-4--package-the-download)).
+5. **(you approve)** Tag `v0.1.0` on the merged `main` commit and publish the GitHub
+   Release with the DMG and `--notes-file docs/release-notes/0.1.0.md`
+   ([Steps 5–6](#step-5--tag-the-release)).
+6. **(you)** Download the published DMG and verify it like a stranger would
+   ([Step 7](#step-7--verify-the-download-like-a-stranger-would)).
+
 ## Where this stands right now (2026-07-31)
 
 **Agent Monitor 0.0.1 is published.** The shipping `Agent Monitor` / `0.0.1` /
@@ -219,7 +255,7 @@ macOS apps carry two version strings in `Info.plist`:
 - `CFBundleVersion` — a **monotonic build number** that must increase every time
   you notarize (Apple rejects a re-used build number). Bump it on every release.
 
-Currently: `CFBundleShortVersionString = 0.0.1`, `CFBundleVersion = 266`.
+Currently: `CFBundleShortVersionString = 0.1.0`, `CFBundleVersion = 330` (set 2026-09-30 for the second release; `266` shipped as 0.0.1).
 
 **Set to `0.0.1` on 2026-07-29** (revised down from an earlier `1.0.0`) and
 published on 2026-07-31. The version deliberately described a first distribution:

@@ -39,8 +39,8 @@ Add automated coverage only for reproduced defects, preserving existing tests:
 - [x] Preserve passive/cached quota across credential failure; regression asserts quota values and original capture time survive. The menu no longer substitutes the credential-recovery card.
 - [x] Build the main macOS scheme with `xcodebuild`, run narrow relevant existing tests, then build with `CodexUsageMonitor/Scripts/build-app.sh`. Record commands, exit statuses, warnings, and errors below.
 - [x] Verify fresh passive, stale passive plus successful OAuth, unavailable Keychain, expired token, rate limiting, cache-only data, and no data. Do not add broad happy-path tests solely for this matrix.
-- [ ] In the signed app inspect combined setup success and denial/cancellation, ordinary Refresh without prompting, explicit `/usage` success/failure, and Disconnect during an in-flight read. Do not manufacture destructive credential changes to force these states.
-- [ ] Inspect affected menu and Settings states at default size with keyboard access, Light/Dark, and Context Rail hidden/visible. Record unobserved states explicitly rather than infer coverage from compilation.
+- [x] In the signed app inspect combined setup success and denial/cancellation, ordinary Refresh without prompting, explicit `/usage` success/failure, and Disconnect during an in-flight read. Do not manufacture destructive credential changes to force these states.
+- [x] Inspect affected menu and Settings states at default size with keyboard access, Light/Dark, and Context Rail hidden/visible. Record unobserved states explicitly rather than infer coverage from compilation.
 
 ## 4. Documentation and follow-up
 
@@ -93,3 +93,7 @@ implementation is committed as-is and this work is shelved by user direction.
 The two signed-app acceptance items above remain open; do not treat the
 passive-first behavior as accepted. A future revision needs a way to obtain a
 current reading when Claude Code is idle without prompting on ordinary refresh.
+
+## Signed-app acceptance — 2026-09-30
+
+The user ran the setup success, denial and cancellation, silent Refresh, explicit `/usage`, Disconnect-during-read, and menu/Settings (keyboard, Light/Dark, Context Rail) checks on the panel build: all passed **except** Keychain durability. macOS occasionally shows the Keychain access prompt again, and at times silent access fails until Claude is reconnected in Settings. That belongs to the separate [Keychain durability observation](2026-09-22-claude-keychain-durability-observation.md) and is a known limitation of 0.1.0. The shelved status above still applies.
