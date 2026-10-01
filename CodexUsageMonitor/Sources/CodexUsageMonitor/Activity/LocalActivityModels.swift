@@ -392,12 +392,12 @@ enum LocalActivityModelName {
         guard !identifier.isEmpty else { return unknown }
         let normalized = identifier.lowercased()
 
-        if let version = version(in: normalized, family: "gpt") {
-            return "GPT-\(version)"
+        if let name = familyName(in: normalized, family: "gpt", label: "GPT-") {
+            return name
         }
-        for family in ["sonnet", "opus", "haiku"] {
-            if let version = version(in: normalized, family: family) {
-                return "\(family.capitalized) \(version)"
+        for family in ["sonnet", "opus", "haiku", "fable"] {
+            if let name = familyName(in: normalized, family: family, label: "\(family.capitalized) ") {
+                return name
             }
         }
         // A new provider identifier is still evidence, even before we know how
@@ -410,33 +410,52 @@ enum LocalActivityModelName {
     /// version component, while still allowing a minor of `10` or above.
     private static let versionComponent = "(\\d{1,2})(?![0-9])"
 
-    private static func version(in value: String, family: String) -> String? {
+    /// `label` + version + variant, e.g. "GPT-6 Astra" for `gpt-6-astra`.
+    /// Variants of one family are different models, so they keep separate
+    /// rows instead of merging into "GPT-6".
+    private static func familyName(in value: String, family: String, label: String) -> String? {
         // Current identifiers put the version after the family, and the minor
         // component is genuinely optional: `sonnet-4-5`, `gpt-5.6`, `opus-5`.
-        if let version = firstVersion(
+        if let match = firstVersion(
             in: value,
             pattern: "\(family)[-_ ]?\(versionComponent)(?:[-_ .]\(versionComponent))?"
         ) {
-            return version
+            let rest = value[match.end...]
+            // Letters joined to the version belong to it: `gpt-4o`.
+            let attached = rest.prefix { $0.isLetter }
+            let variant = variantWords(in: rest.dropFirst(attached.count))
+            return ([label + match.version + attached] + variant).joined(separator: " ")
         }
         // Earlier identifiers put it before the family: `claude-3-5-sonnet`.
         return firstVersion(
             in: value,
             pattern: "\(versionComponent)(?:[-_ .]\(versionComponent))?[-_ ]?\(family)"
-        )
+        ).map { label + $0.version }
     }
 
-    private static func firstVersion(in value: String, pattern: String) -> String? {
+    /// Alphabetic words only: dates (`20250929`) and context tags (`[1m]`)
+    /// describe a build, not a different model.
+    private static func variantWords(in rest: Substring) -> [String] {
+        rest.split { !$0.isLetter && !$0.isNumber }
+            .filter { $0.allSatisfy(\.isLetter) }
+            .map { $0.prefix(1).uppercased() + $0.dropFirst() }
+    }
+
+    private static func firstVersion(
+        in value: String,
+        pattern: String
+    ) -> (version: String, end: String.Index)? {
         guard let expression = try? NSRegularExpression(pattern: pattern),
               let match = expression.firstMatch(
                 in: value,
                 range: NSRange(value.startIndex..., in: value)
               ),
+              let matchRange = Range(match.range, in: value),
               let majorRange = Range(match.range(at: 1), in: value)
         else { return nil }
         guard let minorRange = Range(match.range(at: 2), in: value) else {
-            return String(value[majorRange])
+            return (String(value[majorRange]), matchRange.upperBound)
         }
-        return "\(value[majorRange]).\(value[minorRange])"
+        return ("\(value[majorRange]).\(value[minorRange])", matchRange.upperBound)
     }
 }

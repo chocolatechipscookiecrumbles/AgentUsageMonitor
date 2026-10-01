@@ -44,10 +44,10 @@ This implements the minimum automatic support already needed. It does not requir
 
 **Interface:** Retain `LocalActivityRequest.modelID` and `LocalActivityModelShare.sourceModelIDs`. Do not use a display label as evidence of model capabilities.
 
-- [ ] Make an explicit product decision about family versus variant grouping. Recommended: retain the current family summary (GPT-6) and expose the exact source identifiers in the existing model-row help/accessibility description. Astra is then discoverable without guessing a new alias.
-- [ ] For unfamiliar families, use their supplied identifier as the group label. Do not strip suffixes/dates generically: a suffix can distinguish variants.
+- [x] Make an explicit product decision about family versus variant grouping. **Decided 2026-09-30 (user): always show the variant.** `LocalActivityModelName` keeps the alphabetic words after the version (`gpt-6-astra` → GPT-6 Astra, `gpt-5.6-sol` → GPT-5.6 Sol, `gpt-4o-mini` → GPT-4o Mini) and drops dates and context tags (`-20250929`, `[1m]`), so variants keep separate rows. `fable` joins the Claude families from Anthropic's published `claude-fable-5-1` identifier.
+- [x] For unfamiliar families, use their supplied identifier as the group label. Do not strip suffixes/dates generically: a suffix can distinguish variants.
 - [ ] Bound visible text in the existing single-line row and expose the full value through accessibility/help; sanitize control characters at the display boundary without changing stored identity.
-- [ ] Preserve `sourceModelIDs` through `ProviderTokenActivityPresentation.ModelRow`; use the sorted identifiers to construct help text. Avoid a global model registry merely for labeling.
+- [x] (Already true: the model row's VoiceOver value lists the sorted source identifiers; the visible name is `lineLimit(1)`.) Preserve `sourceModelIDs` through `ProviderTokenActivityPresentation.ModelRow`; use the sorted identifiers to construct help text. Avoid a global model registry merely for labeling.
 - [ ] Inspect known, unknown-family, missing, long, and Unicode identifiers at 340-point menu width with keyboard/VoiceOver and Light/Dark. No host or row-count changes.
 
 ## Task 3 — Evolve parsers only from verified evidence (draft)
@@ -82,3 +82,9 @@ Update `UsageProbe/README.md`, `docs/development/operating-notes.md`, `CONTEXT.m
 - Compiler warnings remain the legacy `SecKeychainGetUserInteractionAllowed`, `SecKeychainSetUserInteractionAllowed`, and `SecKeychainCopyDefault` deprecations; asset processing emits existing CoreMedia/MediaToolbox dyld diagnostics. No build settings changed.
 - `git diff --check`: exit 0. No production usage/cache/notification fixtures injected.
 - UI automation resolved the checkout app and read its existing Settings, but normal quit/relaunch timed out. No final model-row, Light/Dark, or VoiceOver acceptance claimed for this fix. Stop the automation rather than attaching a debugger or forcibly killing a process.
+
+## Verification log — variant names (2026-09-30)
+
+- Red first: with the updated expectations, `LocalActivityReconciliationRegressionTests` failed 4 assertions (`gpt-5.6-sol` → GPT-5.6, `gpt-5.1-codex-max` → GPT-5.1, `gpt-4o-mini` → GPT-4, `gpt-6-astra` → GPT-6); the Claude date and context-tag cases already passed. Green after the change. The Fable assertion failed (`claude-fable-5-1` returned raw) before adding the family, then passed.
+- `swift test`: 318 tests, 1 skipped, 0 failures.
+- Not yet observed: the signed-app model rows at 340 points with long variant names, VoiceOver, and Light/Dark. Planned on the 0.1.0 release-candidate build.
